@@ -1,0 +1,11 @@
+export { Eager } from './eager.js';
+export { Inject } from './inject.js';
+export { Injectable } from './injectable.js';
+export { getClassMetadata, META, pushMeta, setMeta } from './metadata.js';
+export type { ModuleOptions } from './module.js';
+export { Module } from './module.js';
+export { Named } from './named.js';
+export { Optional } from './optional.js';
+export { PreDestroy } from './pre-destroy.js';
+export { Provides } from './provides.js';
+export { Singleton } from './singleton.js';

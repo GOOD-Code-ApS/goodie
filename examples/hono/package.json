@@ -1,0 +1,29 @@
+{
+  "name": "@goodie/example-hono",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "generate": "node scripts/generate.js",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@goodie/core": "workspace:*",
+    "@goodie/decorators": "workspace:*",
+    "hono": "^4.7.0",
+    "@hono/node-server": "^1.14.0",
+    "drizzle-orm": "^0.39.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "@goodie/testing": "workspace:*",
+    "@goodie/transformer": "workspace:*",
+    "@goodie/vite-plugin": "workspace:*",
+    "@types/node": "^22.19.11",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.0",
+    "testcontainers": "^10.18.0",
+    "@testcontainers/postgresql": "^10.18.0"
+  }
+}
