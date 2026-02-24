@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/testing",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Test utilities for goodie-ts with bean overrides and mock definitions",
   "license": "MIT",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Runtime dependency injection container for goodie-ts",
   "license": "MIT",
   "type": "module",
