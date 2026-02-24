@@ -27,7 +27,6 @@ jobs:
       - run: pnpm test
 
       - name: Create Release PR or Publish
-        id: changesets
         uses: changesets/action@v1
         with:
           publish: pnpm release
@@ -36,4 +35,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ""
-          NPM_CONFIG_PROVENANCE: "true"
