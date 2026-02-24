@@ -4,20 +4,20 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
-      '@goodie/core': path.resolve(__dirname, 'packages/core/src/index.ts'),
-      '@goodie/decorators': path.resolve(
+      '@goodie-ts/core': path.resolve(__dirname, 'packages/core/src/index.ts'),
+      '@goodie-ts/decorators': path.resolve(
         __dirname,
         'packages/decorators/src/index.ts',
       ),
-      '@goodie/transformer': path.resolve(
+      '@goodie-ts/transformer': path.resolve(
         __dirname,
         'packages/transformer/src/index.ts',
       ),
-      '@goodie/vite-plugin': path.resolve(
+      '@goodie-ts/vite-plugin': path.resolve(
         __dirname,
         'packages/vite-plugin/src/index.ts',
       ),
-      '@goodie/testing': path.resolve(
+      '@goodie-ts/testing': path.resolve(
         __dirname,
         'packages/testing/src/index.ts',
       ),

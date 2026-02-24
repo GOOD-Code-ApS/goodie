@@ -1,4 +1,4 @@
-import type { Scope } from '@goodie/core';
+import type { Scope } from '@goodie-ts/core';
 
 /** Source location for error messages pointing back to user code. */
 export interface SourceLocation {

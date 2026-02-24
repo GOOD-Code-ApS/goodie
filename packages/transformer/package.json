@@ -1,7 +1,17 @@
 {
-  "name": "@goodie/transformer",
-  "version": "0.1.0",
+  "name": "@goodie-ts/transformer",
+  "version": "0.1.1",
+  "description": "Compile-time TypeScript transformer for goodie-ts dependency injection",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/transformer"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -15,7 +25,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie/core": "workspace:*",
+    "@goodie-ts/core": "workspace:*",
     "ts-morph": "^24.0.0"
   },
   "devDependencies": {

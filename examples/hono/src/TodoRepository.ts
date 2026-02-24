@@ -1,4 +1,4 @@
-import { Singleton } from '@goodie/decorators';
+import { Singleton } from '@goodie-ts/decorators';
 import { eq } from 'drizzle-orm';
 import type { Database } from './Database.js';
 import { todos } from './db/schema.js';

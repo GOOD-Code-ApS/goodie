@@ -1,5 +1,5 @@
 {
-  "name": "@goodie/example-basic",
+  "name": "@goodie-ts/example-basic",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,13 +8,13 @@
     "generate": "node scripts/generate.js"
   },
   "dependencies": {
-    "@goodie/core": "workspace:*",
-    "@goodie/decorators": "workspace:*"
+    "@goodie-ts/core": "workspace:*",
+    "@goodie-ts/decorators": "workspace:*"
   },
   "devDependencies": {
-    "@goodie/testing": "workspace:*",
-    "@goodie/transformer": "workspace:*",
-    "@goodie/vite-plugin": "workspace:*",
+    "@goodie-ts/testing": "workspace:*",
+    "@goodie-ts/transformer": "workspace:*",
+    "@goodie-ts/vite-plugin": "workspace:*",
     "@types/node": "^22.19.11",
     "typescript": "^5.7.3",
     "vite": "^6.0.0"

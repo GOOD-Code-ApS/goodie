@@ -1,5 +1,5 @@
-import type { TransformResult } from '@goodie/transformer';
-import { TransformerError, transform } from '@goodie/transformer';
+import type { TransformResult } from '@goodie-ts/transformer';
+import { TransformerError, transform } from '@goodie-ts/transformer';
 import type { ResolvedOptions } from './options.js';
 
 export type RebuildSuccess = { success: true; result: TransformResult };

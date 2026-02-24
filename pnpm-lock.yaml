@@ -29,20 +29,20 @@ importers:
 
   examples/basic:
     dependencies:
-      '@goodie/core':
+      '@goodie-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@goodie/decorators':
+      '@goodie-ts/decorators':
         specifier: workspace:*
         version: link:../../packages/decorators
     devDependencies:
-      '@goodie/testing':
+      '@goodie-ts/testing':
         specifier: workspace:*
         version: link:../../packages/testing
-      '@goodie/transformer':
+      '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../../packages/transformer
-      '@goodie/vite-plugin':
+      '@goodie-ts/vite-plugin':
         specifier: workspace:*
         version: link:../../packages/vite-plugin
       '@types/node':
@@ -57,10 +57,10 @@ importers:
 
   examples/hono:
     dependencies:
-      '@goodie/core':
+      '@goodie-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@goodie/decorators':
+      '@goodie-ts/decorators':
         specifier: workspace:*
         version: link:../../packages/decorators
       '@hono/node-server':
@@ -76,13 +76,13 @@ importers:
         specifier: ^3.4.0
         version: 3.4.8
     devDependencies:
-      '@goodie/testing':
+      '@goodie-ts/testing':
         specifier: workspace:*
         version: link:../../packages/testing
-      '@goodie/transformer':
+      '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../../packages/transformer
-      '@goodie/vite-plugin':
+      '@goodie-ts/vite-plugin':
         specifier: workspace:*
         version: link:../../packages/vite-plugin
       '@testcontainers/postgresql':
@@ -105,19 +105,19 @@ importers:
 
   packages/decorators:
     dependencies:
-      '@goodie/core':
+      '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/testing:
     dependencies:
-      '@goodie/core':
+      '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/transformer:
     dependencies:
-      '@goodie/core':
+      '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
       ts-morph:
@@ -130,7 +130,7 @@ importers:
 
   packages/vite-plugin:
     dependencies:
-      '@goodie/transformer':
+      '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
     devDependencies:

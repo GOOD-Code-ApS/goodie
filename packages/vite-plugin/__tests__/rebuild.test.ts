@@ -1,17 +1,18 @@
-import { TransformerError } from '@goodie/transformer';
+import { TransformerError } from '@goodie-ts/transformer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ResolvedOptions } from '../src/options.js';
 import { runRebuild } from '../src/rebuild.js';
 
-vi.mock('@goodie/transformer', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@goodie/transformer')>();
+vi.mock('@goodie-ts/transformer', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@goodie-ts/transformer')>();
   return {
     ...actual,
     transform: vi.fn(),
   };
 });
 
-import { transform } from '@goodie/transformer';
+import { transform } from '@goodie-ts/transformer';
 
 const mockTransform = vi.mocked(transform);
 

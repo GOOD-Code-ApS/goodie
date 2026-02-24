@@ -1,4 +1,4 @@
-import type { Scope } from '@goodie/core';
+import type { Scope } from '@goodie-ts/core';
 import {
   type ClassDeclaration,
   type Decorator,
@@ -10,7 +10,7 @@ import {
 import type { ClassTokenRef, SourceLocation } from './ir.js';
 import { InvalidDecoratorUsageError } from './transformer-errors.js';
 
-/** Names of decorators we recognize from @goodie/decorators. */
+/** Names of decorators we recognize from @goodie-ts/decorators. */
 const DECORATOR_NAMES = {
   Injectable: 'Injectable',
   Singleton: 'Singleton',

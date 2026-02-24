@@ -1,4 +1,4 @@
-import { Module, Provides } from '@goodie/decorators';
+import { Module, Provides } from '@goodie-ts/decorators';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { Database } from './Database.js';

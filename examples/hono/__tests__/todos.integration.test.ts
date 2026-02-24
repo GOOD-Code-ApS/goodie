@@ -1,5 +1,5 @@
-import type { ApplicationContext } from '@goodie/core';
-import { TestContext } from '@goodie/testing';
+import type { ApplicationContext } from '@goodie-ts/core';
+import { TestContext } from '@goodie-ts/testing';
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,

@@ -1,4 +1,4 @@
-import { InjectionToken } from '@goodie/core';
+import { InjectionToken } from '@goodie-ts/core';
 import { describe, expect, it } from 'vitest';
 import {
   Eager,

@@ -4,13 +4,13 @@ import {
   InjectionToken,
   OverrideError,
   type Scope,
-} from '@goodie/core';
+} from '@goodie-ts/core';
 import {
   getMockTarget,
   MockDefinition,
   MockDefinitionError,
   TestContext,
-} from '@goodie/testing';
+} from '@goodie-ts/testing';
 import { describe, expect, it } from 'vitest';
 
 // ── Helpers ──────────────────────────────────────────────────────────

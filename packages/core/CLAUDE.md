@@ -1,4 +1,4 @@
-# @goodie/core
+# @goodie-ts/core
 
 Runtime DI container. No compile-time or decorator concerns — this package only resolves pre-built `BeanDefinition[]`.
 

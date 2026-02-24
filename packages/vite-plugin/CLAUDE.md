@@ -1,4 +1,4 @@
-# @goodie/vite-plugin
+# @goodie-ts/vite-plugin
 
 Vite integration that runs the transformer on build and re-runs on HMR.
 

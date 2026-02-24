@@ -30,7 +30,7 @@ src/
 pnpm generate
 ```
 
-This runs the `@goodie/transformer` against `tsconfig.json` and produces `src/AppContext.generated.ts`.
+This runs the `@goodie-ts/transformer` against `tsconfig.json` and produces `src/AppContext.generated.ts`.
 
 ### Build with Vite
 
@@ -38,7 +38,7 @@ This runs the `@goodie/transformer` against `tsconfig.json` and produces `src/Ap
 pnpm build
 ```
 
-Uses `@goodie/vite-plugin` to run the transform automatically during `vite build`.
+Uses `@goodie-ts/vite-plugin` to run the transform automatically during `vite build`.
 
 ## Generated output
 

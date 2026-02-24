@@ -1,4 +1,4 @@
-import type { InjectionToken } from '@goodie/core';
+import type { InjectionToken } from '@goodie-ts/core';
 import { META, pushMeta } from './metadata.js';
 
 /**

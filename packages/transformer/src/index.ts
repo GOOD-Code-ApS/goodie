@@ -1,4 +1,4 @@
-// @goodie/transformer — Phase 2: Compile-time DI transformer
+// @goodie-ts/transformer — Phase 2: Compile-time DI transformer
 
 export type { CodegenOptions } from './codegen.js';
 // Code Generator
