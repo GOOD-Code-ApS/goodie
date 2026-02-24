@@ -27,14 +27,14 @@ The result: full DI with zero runtime reflection, type-safe tokens, and instant 
 ### Install
 
 ```bash
-pnpm add @goodie/core @goodie/decorators
-pnpm add -D @goodie/transformer @goodie/vite-plugin
+pnpm add @goodie-ts/core @goodie-ts/decorators
+pnpm add -D @goodie-ts/transformer @goodie-ts/vite-plugin
 ```
 
 ### Decorate
 
 ```typescript
-import { Singleton, Inject } from '@goodie/decorators';
+import { Singleton, Inject } from '@goodie-ts/decorators';
 
 @Singleton()
 class UserRepository {
@@ -54,7 +54,7 @@ class UserService {
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite';
-import { diPlugin } from '@goodie/vite-plugin';
+import { diPlugin } from '@goodie-ts/vite-plugin';
 
 export default defineConfig({
   plugins: [diPlugin()],
@@ -64,7 +64,7 @@ export default defineConfig({
 ### Use
 
 ```typescript
-import { Goodie } from '@goodie/core';
+import { Goodie } from '@goodie-ts/core';
 import { definitions } from './AppContext.generated.js';
 
 const app = await Goodie.build(definitions).start();
@@ -75,11 +75,11 @@ const userService = app.context.get(UserService);
 
 | Package | Description |
 |---------|-------------|
-| [`@goodie/core`](./packages/core) | Runtime container, `ApplicationContext`, `InjectionToken`, topological sort |
-| [`@goodie/decorators`](./packages/decorators) | `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, and more |
-| [`@goodie/transformer`](./packages/transformer) | ts-morph scanner and code generator (build-time only) |
-| [`@goodie/vite-plugin`](./packages/vite-plugin) | Vite integration — runs transformer on build and HMR |
-| [`@goodie/testing`](./packages/testing) | `TestContext` with bean overrides and `@MockDefinition` |
+| [`@goodie-ts/core`](./packages/core) | Runtime container, `ApplicationContext`, `InjectionToken`, topological sort |
+| [`@goodie-ts/decorators`](./packages/decorators) | `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, and more |
+| [`@goodie-ts/transformer`](./packages/transformer) | ts-morph scanner and code generator (build-time only) |
+| [`@goodie-ts/vite-plugin`](./packages/vite-plugin) | Vite integration — runs transformer on build and HMR |
+| [`@goodie-ts/testing`](./packages/testing) | `TestContext` with bean overrides and `@MockDefinition` |
 
 ## Development
 

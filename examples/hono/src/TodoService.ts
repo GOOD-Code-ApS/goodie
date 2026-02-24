@@ -1,4 +1,4 @@
-import { Singleton } from '@goodie/decorators';
+import { Singleton } from '@goodie-ts/decorators';
 import type { TodoRepository } from './TodoRepository.js';
 
 @Singleton()

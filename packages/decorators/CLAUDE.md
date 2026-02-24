@@ -1,4 +1,4 @@
-# @goodie/decorators
+# @goodie-ts/decorators
 
 User-facing decorators that attach metadata via `Symbol.metadata`. These are read at compile time by the transformer — they do NOT wire anything at runtime.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import path from 'node:path';
-import { transform } from '@goodie/transformer';
+import { transform } from '@goodie-ts/transformer';
 
 const root = path.resolve(import.meta.dirname, '..');
 

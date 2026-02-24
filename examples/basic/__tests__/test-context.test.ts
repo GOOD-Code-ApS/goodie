@@ -1,4 +1,4 @@
-import { MockDefinition, TestContext } from '@goodie/testing';
+import { MockDefinition, TestContext } from '@goodie-ts/testing';
 import { describe, expect, it } from 'vitest';
 import {
   definitions,

@@ -1,4 +1,4 @@
-# @goodie/testing
+# @goodie-ts/testing
 
 Test utilities for overriding beans in `ApplicationContext` during tests.
 

@@ -12,6 +12,7 @@
     "clean": "pnpm -r clean",
     "changeset": "changeset",
     "version": "changeset version",
+    "release": "pnpm build && changeset publish",
     "prepare": "husky"
   },
   "lint-staged": {

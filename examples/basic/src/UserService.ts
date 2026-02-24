@@ -1,4 +1,4 @@
-import { Singleton } from '@goodie/decorators';
+import { Singleton } from '@goodie-ts/decorators';
 import { User } from './model.js';
 import type { Repository } from './Repository.js';
 

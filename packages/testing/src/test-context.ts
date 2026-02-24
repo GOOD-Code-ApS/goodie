@@ -4,7 +4,7 @@ import {
   type Constructor,
   InjectionToken,
   OverrideError,
-} from '@goodie/core';
+} from '@goodie-ts/core';
 import { getMockTarget, MockDefinitionError } from './mock-definition.js';
 
 type Token = InjectionToken<unknown> | Constructor;

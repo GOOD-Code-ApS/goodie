@@ -1,4 +1,4 @@
-import { diPlugin } from '@goodie/vite-plugin';
+import { diPlugin } from '@goodie-ts/vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -10,7 +10,7 @@ export default defineConfig({
       fileName: 'main',
     },
     rollupOptions: {
-      external: ['@goodie/core', '@goodie/decorators'],
+      external: ['@goodie-ts/core', '@goodie-ts/decorators'],
     },
   },
 });

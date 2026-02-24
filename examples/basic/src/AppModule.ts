@@ -1,4 +1,4 @@
-import { Module, Provides } from '@goodie/decorators';
+import { Module, Provides } from '@goodie-ts/decorators';
 import type { Order, User } from './model.js';
 import { Repository } from './Repository.js';
 

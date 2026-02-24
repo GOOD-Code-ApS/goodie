@@ -5,8 +5,8 @@ import {
   InjectionToken,
   OverrideError,
   type Scope,
-} from '@goodie/core';
-import { TestContext } from '@goodie/testing';
+} from '@goodie-ts/core';
+import { TestContext } from '@goodie-ts/testing';
 import { describe, expect, it } from 'vitest';
 
 // ── Helpers ──────────────────────────────────────────────────────────

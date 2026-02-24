@@ -1,4 +1,4 @@
-import { diPlugin } from '@goodie/vite-plugin';
+import { diPlugin } from '@goodie-ts/vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -11,8 +11,8 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-        '@goodie/core',
-        '@goodie/decorators',
+        '@goodie-ts/core',
+        '@goodie-ts/decorators',
         'hono',
         '@hono/node-server',
         'drizzle-orm',

@@ -1,4 +1,4 @@
-import { scan } from '@goodie/transformer';
+import { scan } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { resolve } from '../src/resolver.js';

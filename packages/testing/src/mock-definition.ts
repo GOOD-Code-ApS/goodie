@@ -1,4 +1,8 @@
-import { type Constructor, DIError, type InjectionToken } from '@goodie/core';
+import {
+  type Constructor,
+  DIError,
+  type InjectionToken,
+} from '@goodie-ts/core';
 
 /** Well-known metadata key for @MockDefinition target. */
 const MOCK_TARGET = Symbol('goodie:mock-target');

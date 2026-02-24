@@ -1,4 +1,4 @@
-# @goodie/transformer
+# @goodie-ts/transformer
 
 Compile-time scanning, type resolution, and code generation. Turns decorated TypeScript source into a generated `BeanDefinition[]` file.
 

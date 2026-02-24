@@ -1,4 +1,4 @@
-import type { IRBeanDefinition } from '@goodie/transformer';
+import type { IRBeanDefinition } from '@goodie-ts/transformer';
 import { describe, expect, it } from 'vitest';
 import { generateCode } from '../src/codegen.js';
 
@@ -149,7 +149,7 @@ describe('Code Generator', () => {
       outputPath: '/out/AppContext.generated.ts',
     });
 
-    expect(code).toContain("import { InjectionToken } from '@goodie/core'");
+    expect(code).toContain("import { InjectionToken } from '@goodie-ts/core'");
     expect(code).toContain(
       "export const Db_Url_Token = new InjectionToken<unknown>('dbUrl')",
     );
@@ -450,7 +450,7 @@ describe('Code Generator', () => {
     });
 
     expect(code).toContain(
-      "import { ApplicationContext, Goodie } from '@goodie/core'",
+      "import { ApplicationContext, Goodie } from '@goodie-ts/core'",
     );
     expect(code).toContain('export const app = Goodie.build(definitions)');
   });

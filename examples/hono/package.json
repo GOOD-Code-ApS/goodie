@@ -1,5 +1,5 @@
 {
-  "name": "@goodie/example-hono",
+  "name": "@goodie-ts/example-hono",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,17 +9,17 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@goodie/core": "workspace:*",
-    "@goodie/decorators": "workspace:*",
+    "@goodie-ts/core": "workspace:*",
+    "@goodie-ts/decorators": "workspace:*",
     "hono": "^4.7.0",
     "@hono/node-server": "^1.14.0",
     "drizzle-orm": "^0.39.0",
     "postgres": "^3.4.0"
   },
   "devDependencies": {
-    "@goodie/testing": "workspace:*",
-    "@goodie/transformer": "workspace:*",
-    "@goodie/vite-plugin": "workspace:*",
+    "@goodie-ts/testing": "workspace:*",
+    "@goodie-ts/transformer": "workspace:*",
+    "@goodie-ts/vite-plugin": "workspace:*",
     "@types/node": "^22.19.11",
     "typescript": "^5.7.3",
     "vite": "^6.0.0",
