@@ -9,9 +9,11 @@ import {
   Module,
   Named,
   Optional,
+  PostConstruct,
   PreDestroy,
   Provides,
   Singleton,
+  Value,
 } from '../src/index.js';
 
 // Polyfill for test environment
@@ -188,6 +190,99 @@ describe('@PreDestroy()', () => {
     expect(preDestroy).toHaveLength(2);
     expect(preDestroy[0].methodName).toBe('closeConnections');
     expect(preDestroy[1].methodName).toBe('flushBuffers');
+  });
+});
+
+describe('@PostConstruct()', () => {
+  it('records the method name in post-construct array', () => {
+    @Singleton()
+    class Service {
+      @PostConstruct()
+      init() {}
+    }
+
+    const meta = getClassMetadata(Service)!;
+    const postConstruct = meta[META.POST_CONSTRUCT] as Array<{
+      methodName: string;
+    }>;
+    expect(postConstruct).toHaveLength(1);
+    expect(postConstruct[0].methodName).toBe('init');
+  });
+
+  it('records multiple @PostConstruct methods', () => {
+    @Singleton()
+    class Service {
+      @PostConstruct()
+      initCache() {}
+
+      @PostConstruct()
+      loadConfig() {}
+    }
+
+    const meta = getClassMetadata(Service)!;
+    const postConstruct = meta[META.POST_CONSTRUCT] as Array<{
+      methodName: string;
+    }>;
+    expect(postConstruct).toHaveLength(2);
+    expect(postConstruct[0].methodName).toBe('initCache');
+    expect(postConstruct[1].methodName).toBe('loadConfig');
+  });
+});
+
+describe('@Value()', () => {
+  it('records the field name and config key', () => {
+    @Singleton()
+    class Service {
+      @Value('DB_URL')
+      accessor dbUrl: string = '';
+    }
+
+    const meta = getClassMetadata(Service)!;
+    const values = meta[META.VALUE] as Array<{
+      fieldName: string;
+      key: string;
+    }>;
+    expect(values).toHaveLength(1);
+    expect(values[0].fieldName).toBe('dbUrl');
+    expect(values[0].key).toBe('DB_URL');
+  });
+
+  it('records default value when provided', () => {
+    @Singleton()
+    class Service {
+      @Value('PORT', { default: 3000 })
+      accessor port: number = 0;
+    }
+
+    const meta = getClassMetadata(Service)!;
+    const values = meta[META.VALUE] as Array<{
+      fieldName: string;
+      key: string;
+      default: unknown;
+    }>;
+    expect(values).toHaveLength(1);
+    expect(values[0].key).toBe('PORT');
+    expect(values[0].default).toBe(3000);
+  });
+
+  it('records multiple @Value fields', () => {
+    @Singleton()
+    class Service {
+      @Value('DB_URL')
+      accessor dbUrl: string = '';
+
+      @Value('PORT')
+      accessor port: number = 0;
+    }
+
+    const meta = getClassMetadata(Service)!;
+    const values = meta[META.VALUE] as Array<{
+      fieldName: string;
+      key: string;
+    }>;
+    expect(values).toHaveLength(2);
+    expect(values[0].key).toBe('DB_URL');
+    expect(values[1].key).toBe('PORT');
   });
 });
 

@@ -25,6 +25,13 @@ export function generateCode(
   const outputDir = path.dirname(options.outputPath);
   const lines: string[] = [];
 
+  // Check if any bean uses @Value
+  const hasValueFields = beans.some(
+    (b) =>
+      b.metadata.valueFields &&
+      (b.metadata.valueFields as unknown[]).length > 0,
+  );
+
   // Header
   const versionTag = options.version ? ` v${options.version}` : '';
   const timestamp = new Date().toISOString();
@@ -40,16 +47,18 @@ export function generateCode(
   const classImports = collectClassImports(beans);
   const injectionTokens = collectInjectionTokens(beans);
 
+  // If @Value is used, add the config token
+  const needsInjectionToken = injectionTokens.length > 0 || hasValueFields;
+  if (needsInjectionToken) {
+    lines.push("import { InjectionToken } from '@goodie-ts/core'");
+  }
+
   // Build collision-safe tokenName → varName mapping
   const tokenVarNameMap = buildTokenVarNameMap(injectionTokens);
   const resolveTokenRef = (ref: TokenRef): string => {
     if (ref.kind === 'class') return ref.className;
     return tokenVarNameMap.get(ref.tokenName) ?? tokenVarName(ref.tokenName);
   };
-
-  if (injectionTokens.length > 0) {
-    lines.push("import { InjectionToken } from '@goodie-ts/core'");
-  }
 
   // Class imports
   for (const [className, importPath] of classImports) {
@@ -69,6 +78,14 @@ export function generateCode(
 
   lines.push('');
 
+  // Config token (if @Value is used)
+  if (hasValueFields) {
+    lines.push(
+      "const __Goodie_Config = new InjectionToken<Record<string, unknown>>('__Goodie_Config')",
+    );
+    lines.push('');
+  }
+
   // InjectionToken declarations (exported + typed)
   for (const token of injectionTokens) {
     const varName = tokenVarNameMap.get(token.tokenName)!;
@@ -83,28 +100,63 @@ export function generateCode(
   }
 
   // Bean definitions array
-  lines.push('const definitions: BeanDefinition[] = [');
+  if (hasValueFields) {
+    lines.push(
+      'function buildDefinitions(config?: Record<string, unknown>): BeanDefinition[] {',
+    );
+    lines.push('  return [');
+    // Config bean definition
+    lines.push('    {');
+    lines.push('      token: __Goodie_Config,');
+    lines.push("      scope: 'singleton',");
+    lines.push('      dependencies: [],');
+    lines.push(
+      '      factory: () => ({ ...process.env, ...config } as Record<string, unknown>),',
+    );
+    lines.push('      eager: false,');
+    lines.push('      metadata: {},');
+    lines.push('    },');
+  } else {
+    lines.push('const definitions: BeanDefinition[] = [');
+  }
 
   for (const bean of beans) {
     lines.push('  {');
     lines.push(`    token: ${resolveTokenRef(bean.tokenRef)},`);
     lines.push(`    scope: '${bean.scope}',`);
-    lines.push(`    dependencies: ${depsToCode(bean, resolveTokenRef)},`);
+    lines.push(
+      `    dependencies: ${depsToCode(bean, resolveTokenRef, hasValueFields)},`,
+    );
     lines.push(`    factory: ${factoryToCode(bean)},`);
     lines.push(`    eager: ${bean.eager},`);
     lines.push(`    metadata: ${metadataToCode(bean.metadata)},`);
     lines.push('  },');
   }
 
-  lines.push(']');
+  if (hasValueFields) {
+    lines.push('  ]');
+    lines.push('}');
+    lines.push('');
+    lines.push('const definitions = buildDefinitions()');
+  } else {
+    lines.push(']');
+  }
   lines.push('');
 
   // createContext function
-  lines.push(
-    'export async function createContext(): Promise<ApplicationContext> {',
-  );
-  lines.push('  return ApplicationContext.create(definitions)');
-  lines.push('}');
+  if (hasValueFields) {
+    lines.push(
+      'export async function createContext(config?: Record<string, unknown>): Promise<ApplicationContext> {',
+    );
+    lines.push('  return ApplicationContext.create(buildDefinitions(config))');
+    lines.push('}');
+  } else {
+    lines.push(
+      'export async function createContext(): Promise<ApplicationContext> {',
+    );
+    lines.push('  return ApplicationContext.create(definitions)');
+    lines.push('}');
+  }
   lines.push('');
   lines.push('export { definitions }');
   lines.push('');
@@ -252,23 +304,42 @@ function tokenVarName(tokenName: string): string {
 function depsToCode(
   bean: IRBeanDefinition,
   resolveTokenRef: (ref: TokenRef) => string,
+  hasValueFields = false,
 ): string {
   const allDeps = [
     ...bean.constructorDeps.map((d) => ({
       token: resolveTokenRef(d.tokenRef),
       optional: d.optional,
+      collection: d.collection,
     })),
     ...bean.fieldDeps.map((f) => ({
       token: resolveTokenRef(f.tokenRef),
       optional: f.optional,
+      collection: false,
     })),
   ];
 
+  // If this bean has @Value fields, add config token as last dependency
+  const beanValueFields = bean.metadata.valueFields as
+    | Array<{ fieldName: string; key: string; default?: string }>
+    | undefined;
+  if (hasValueFields && beanValueFields && beanValueFields.length > 0) {
+    allDeps.push({
+      token: '__Goodie_Config',
+      optional: false,
+      collection: false,
+    });
+  }
+
   if (allDeps.length === 0) return '[]';
 
-  const items = allDeps.map(
-    (d) => `{ token: ${d.token}, optional: ${d.optional} }`,
-  );
+  const items = allDeps.map((d) => {
+    const parts = [`token: ${d.token}`, `optional: ${d.optional}`];
+    if (d.collection) {
+      parts.push('collection: true');
+    }
+    return `{ ${parts.join(', ')} }`;
+  });
   return `[${items.join(', ')}]`;
 }
 
@@ -287,30 +358,53 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
       ? bean.tokenRef.className
       : bean.tokenRef.tokenName;
 
+  const beanValueFields = bean.metadata.valueFields as
+    | Array<{ fieldName: string; key: string; default?: string }>
+    | undefined;
+  const hasValues = beanValueFields && beanValueFields.length > 0;
+
   const ctorParams = bean.constructorDeps.map((_, i) => `dep${i}`);
   const allParams = [...ctorParams];
   const fieldParams = bean.fieldDeps.map((_, i) => `field${i}`);
   allParams.push(...fieldParams);
+  if (hasValues) {
+    allParams.push('__config');
+  }
 
-  if (allParams.length === 0 && bean.fieldDeps.length === 0) {
+  if (allParams.length === 0 && bean.fieldDeps.length === 0 && !hasValues) {
     return `() => new ${className}()`;
   }
 
   const paramList = allParams.map((p) => `${p}: any`).join(', ');
   const ctorArgs = ctorParams.join(', ');
 
-  if (bean.fieldDeps.length === 0) {
+  if (bean.fieldDeps.length === 0 && !hasValues) {
     return `(${paramList}) => new ${className}(${ctorArgs})`;
   }
 
-  // Constructor + field injection
+  // Constructor + field injection + value injection
   const fieldAssignments = bean.fieldDeps
     .map((f, i) => `    instance.${f.fieldName} = field${i}`)
     .join('\n');
 
+  const valueAssignments = hasValues
+    ? beanValueFields
+        .map((vf) => {
+          if (vf.default !== undefined) {
+            return `    instance.${vf.fieldName} = __config['${vf.key}'] ?? ${vf.default}`;
+          }
+          return `    instance.${vf.fieldName} = __config['${vf.key}']`;
+        })
+        .join('\n')
+    : '';
+
+  const assignments = [fieldAssignments, valueAssignments]
+    .filter(Boolean)
+    .join('\n');
+
   return `(${paramList}) => {
     const instance = new ${className}(${ctorArgs})
-${fieldAssignments}
+${assignments}
     return instance
   }`;
 }

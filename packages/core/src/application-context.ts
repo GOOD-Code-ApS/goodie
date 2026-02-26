@@ -196,7 +196,11 @@ export class ApplicationContext {
   private validateDependencies(): void {
     for (const def of this.sortedDefs) {
       for (const dep of def.dependencies) {
-        if (!dep.optional && !this.primaryDef.has(dep.token)) {
+        if (
+          !dep.optional &&
+          !dep.collection &&
+          !this.primaryDef.has(dep.token)
+        ) {
           throw new MissingDependencyError(
             tokenName(dep.token),
             tokenName(def.token),
@@ -225,6 +229,9 @@ export class ApplicationContext {
 
   private resolveDepsSync(deps: Dependency[]): unknown[] {
     return deps.map((dep) => {
+      if (dep.collection) {
+        return this.getAll(dep.token);
+      }
       const depDef = this.primaryDef.get(dep.token);
       if (!depDef) {
         if (dep.optional) return undefined;
@@ -241,6 +248,10 @@ export class ApplicationContext {
   private async resolveDepsAsync(deps: Dependency[]): Promise<unknown[]> {
     const resolved: unknown[] = [];
     for (const dep of deps) {
+      if (dep.collection) {
+        resolved.push(this.getAll(dep.token));
+        continue;
+      }
       const depDef = this.primaryDef.get(dep.token);
       if (!depDef) {
         if (dep.optional) {
@@ -319,6 +330,18 @@ export class ApplicationContext {
         current = result as T;
       }
     }
+    // @PostConstruct — runs after beforeInit, before afterInit
+    const postConstructMethods = def.metadata.postConstructMethods as
+      | string[]
+      | undefined;
+    if (postConstructMethods) {
+      for (const methodName of postConstructMethods) {
+        const result = (current as Record<string, () => unknown>)[methodName]();
+        if (result instanceof Promise) {
+          throw new AsyncBeanNotReadyError(tokenName(def.token));
+        }
+      }
+    }
     for (const pp of this.postProcessors) {
       if (pp.afterInit) {
         const result = pp.afterInit(current, def as BeanDefinition<T>);
@@ -339,6 +362,15 @@ export class ApplicationContext {
     for (const pp of this.postProcessors) {
       if (pp.beforeInit) {
         current = await pp.beforeInit(current, def);
+      }
+    }
+    // @PostConstruct — runs after beforeInit, before afterInit
+    const postConstructMethods = def.metadata.postConstructMethods as
+      | string[]
+      | undefined;
+    if (postConstructMethods) {
+      for (const methodName of postConstructMethods) {
+        await (current as Record<string, () => unknown>)[methodName]();
       }
     }
     for (const pp of this.postProcessors) {

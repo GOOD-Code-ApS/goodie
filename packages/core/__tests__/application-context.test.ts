@@ -564,6 +564,204 @@ describe('ApplicationContext — errors', () => {
   });
 });
 
+// ── Collection injection ─────────────────────────────────────────────
+
+describe('ApplicationContext — collection injection', () => {
+  it('resolves collection dep via getAll()', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(HANDLER, { factory: () => ({ name: 'a' }) }),
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: (handlers) => new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    const svc = ctx.get(Service);
+    expect(svc.handlers).toHaveLength(1);
+    expect(svc.handlers[0].name).toBe('a');
+  });
+
+  it('returns empty array when no providers exist for collection dep', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: (handlers) => new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    const svc = ctx.get(Service);
+    expect(svc.handlers).toEqual([]);
+  });
+
+  it('resolves collection dep via getAll() in async path', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(HANDLER, { factory: () => ({ name: 'x' }) }),
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: async (handlers) =>
+          new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    const svc = await ctx.getAsync(Service);
+    expect(svc.handlers).toHaveLength(1);
+    expect(svc.handlers[0].name).toBe('x');
+  });
+});
+
+// ── @PostConstruct lifecycle ──────────────────────────────────────────
+
+describe('ApplicationContext — @PostConstruct lifecycle', () => {
+  it('calls @PostConstruct method on sync singleton', async () => {
+    const calls: string[] = [];
+    class Service {
+      init() {
+        calls.push('init');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    ctx.get(Service);
+    expect(calls).toEqual(['init']);
+  });
+
+  it('calls @PostConstruct method on async singleton (via getAsync)', async () => {
+    const calls: string[] = [];
+    class Service {
+      init() {
+        calls.push('init');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: async () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    await ctx.getAsync(Service);
+    expect(calls).toEqual(['init']);
+  });
+
+  it('calls async @PostConstruct method via getAsync', async () => {
+    const calls: string[] = [];
+    class Service {
+      async init() {
+        await new Promise((r) => setTimeout(r, 1));
+        calls.push('async-init');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: async () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    await ctx.getAsync(Service);
+    expect(calls).toEqual(['async-init']);
+  });
+
+  it('calls multiple @PostConstruct methods in order', async () => {
+    const calls: string[] = [];
+    class Service {
+      initCache() {
+        calls.push('cache');
+      }
+      loadConfig() {
+        calls.push('config');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['initCache', 'loadConfig'] },
+      }),
+    ]);
+    ctx.get(Service);
+    expect(calls).toEqual(['cache', 'config']);
+  });
+
+  it('runs @PostConstruct after beforeInit and before afterInit', async () => {
+    const calls: string[] = [];
+    class Service {
+      init() {
+        calls.push('postConstruct');
+      }
+    }
+    const processor: BeanPostProcessor = {
+      beforeInit(bean, def) {
+        if (def.token === Service) calls.push('beforeInit');
+        return bean;
+      },
+      afterInit(bean, def) {
+        if (def.token === Service) calls.push('afterInit');
+        return bean;
+      },
+    };
+    const ppToken = new InjectionToken<BeanPostProcessor>('pp');
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+      makeDef<BeanPostProcessor>(ppToken, {
+        factory: () => processor,
+        metadata: { isBeanPostProcessor: true },
+      }),
+    ]);
+    ctx.get(Service);
+    expect(calls).toEqual(['beforeInit', 'postConstruct', 'afterInit']);
+  });
+
+  it('calls @PostConstruct on prototype beans each time', async () => {
+    let callCount = 0;
+    class Proto {
+      init() {
+        callCount++;
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Proto, {
+        scope: 'prototype',
+        factory: () => new Proto(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    ctx.get(Proto);
+    ctx.get(Proto);
+    expect(callCount).toBe(2);
+  });
+
+  it('calls @PostConstruct on eager beans during context creation', async () => {
+    const calls: string[] = [];
+    class Startup {
+      init() {
+        calls.push('eager-init');
+      }
+    }
+    await ApplicationContext.create([
+      makeDef(Startup, {
+        eager: true,
+        factory: async () => new Startup(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    expect(calls).toEqual(['eager-init']);
+  });
+});
+
 // ── @PreDestroy / close() ────────────────────────────────────────────
 
 describe('ApplicationContext — @PreDestroy lifecycle', () => {

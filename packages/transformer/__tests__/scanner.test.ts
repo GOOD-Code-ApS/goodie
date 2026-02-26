@@ -548,6 +548,240 @@ describe('Scanner', () => {
     });
   });
 
+  describe('@PostConstruct methods', () => {
+    it('should discover @PostConstruct method on a bean', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function PostConstruct() { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton, PostConstruct } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @PostConstruct()
+            init() {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].postConstructMethods).toEqual(['init']);
+    });
+
+    it('should discover multiple @PostConstruct methods', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function PostConstruct() { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton, PostConstruct } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @PostConstruct()
+            initCache() {}
+
+            @PostConstruct()
+            loadConfig() {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].postConstructMethods).toEqual([
+        'initCache',
+        'loadConfig',
+      ]);
+    });
+
+    it('should return empty array when no @PostConstruct methods', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].postConstructMethods).toEqual([]);
+    });
+  });
+
+  describe('collection (array) type detection', () => {
+    it('should detect T[] array parameter', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Injectable() { return (t: any, c: any) => {} }
+        `,
+        '/src/Handler.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Handler[]) {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+      const service = result.beans.find(
+        (b) => b.classTokenRef.className === 'Service',
+      )!;
+
+      expect(service.constructorParams).toHaveLength(1);
+      expect(service.constructorParams[0].isCollection).toBe(true);
+      expect(service.constructorParams[0].elementTypeName).toBe('Handler');
+    });
+
+    it('should detect Array<T> parameter', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Injectable() { return (t: any, c: any) => {} }
+        `,
+        '/src/Handler.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Array<Handler>) {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+      const service = result.beans.find(
+        (b) => b.classTokenRef.className === 'Service',
+      )!;
+
+      expect(service.constructorParams[0].isCollection).toBe(true);
+      expect(service.constructorParams[0].elementTypeName).toBe('Handler');
+    });
+
+    it('should not flag non-array parameters as collection', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Injectable() { return (t: any, c: any) => {} }
+        `,
+        '/src/Repo.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Repo {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Repo } from './Repo.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private repo: Repo) {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+      const service = result.beans.find(
+        (b) => b.classTokenRef.className === 'Service',
+      )!;
+
+      expect(service.constructorParams[0].isCollection).toBe(false);
+    });
+  });
+
+  describe('@Value fields', () => {
+    it('should discover @Value on accessor field', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton, Value } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @Value('DB_URL') accessor dbUrl!: string
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].valueFields).toHaveLength(1);
+      expect(result.beans[0].valueFields[0].fieldName).toBe('dbUrl');
+      expect(result.beans[0].valueFields[0].key).toBe('DB_URL');
+    });
+
+    it('should discover @Value with default value', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton, Value } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @Value('PORT', { default: 3000 }) accessor port!: number
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans[0].valueFields[0].key).toBe('PORT');
+      expect(result.beans[0].valueFields[0].defaultValue).toBe('3000');
+    });
+
+    it('should return empty array when no @Value fields', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans[0].valueFields).toEqual([]);
+    });
+  });
+
   describe('abstract class rejection', () => {
     it('throws InvalidDecoratorUsageError for abstract @Injectable class', () => {
       const project = createProject({

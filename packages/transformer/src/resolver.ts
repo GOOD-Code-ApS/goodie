@@ -92,6 +92,16 @@ function resolveBean(
   if (scanned.preDestroyMethods.length > 0) {
     metadata.preDestroyMethods = scanned.preDestroyMethods;
   }
+  if (scanned.postConstructMethods.length > 0) {
+    metadata.postConstructMethods = scanned.postConstructMethods;
+  }
+  if (scanned.valueFields.length > 0) {
+    metadata.valueFields = scanned.valueFields.map((vf) => ({
+      fieldName: vf.fieldName,
+      key: vf.key,
+      default: vf.defaultValue,
+    }));
+  }
 
   return {
     tokenRef: scanned.classTokenRef,
@@ -212,6 +222,7 @@ function resolveProvidesParams(
         return {
           tokenRef: candidates[0].tokenRef,
           optional: false,
+          collection: false,
           sourceLocation: param.sourceLocation,
         };
       }
@@ -222,6 +233,7 @@ function resolveProvidesParams(
         return {
           tokenRef: match.tokenRef,
           optional: false,
+          collection: false,
           sourceLocation: param.sourceLocation,
         };
       }
@@ -317,6 +329,31 @@ function resolveConstructorParam(
     );
   }
 
+  // Collection injection: T[] or Array<T>
+  if (param.isCollection && param.elementTypeName) {
+    if (isPrimitiveType(param.elementTypeName)) {
+      throw new UnresolvableTypeError(
+        `${param.typeName} (parameter "${param.paramName}" of ${ownerName}) — collection injection of primitive types is not supported`,
+        param.sourceLocation,
+      );
+    }
+
+    const tokenRef = resolveTypeToTokenRef(
+      param.elementTypeName,
+      param.elementTypeSourceFile,
+      param.elementTypeArguments,
+      param.elementResolvedBaseTypeName,
+      param.sourceLocation,
+    );
+
+    return {
+      tokenRef,
+      optional: false,
+      collection: true,
+      sourceLocation: param.sourceLocation,
+    };
+  }
+
   if (isPrimitiveType(param.typeName)) {
     throw new UnresolvableTypeError(
       `${param.typeName} (parameter "${param.paramName}" of ${ownerName})`,
@@ -335,6 +372,7 @@ function resolveConstructorParam(
   return {
     tokenRef,
     optional: false,
+    collection: false,
     sourceLocation: param.sourceLocation,
   };
 }
