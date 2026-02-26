@@ -8,13 +8,22 @@ vi.mock('@goodie-ts/transformer', async (importOriginal) => {
     await importOriginal<typeof import('@goodie-ts/transformer')>();
   return {
     ...actual,
-    transform: vi.fn(),
+    transformWithProject: vi.fn(),
   };
 });
 
-import { transform } from '@goodie-ts/transformer';
+vi.mock('ts-morph', () => ({
+  Project: vi.fn().mockImplementation(() => ({
+    addSourceFilesAtPaths: vi.fn(),
+    getSourceFile: vi.fn().mockReturnValue(undefined),
+    addSourceFileAtPath: vi.fn(),
+  })),
+}));
 
-const mockTransform = vi.mocked(transform);
+import { transformWithProject } from '@goodie-ts/transformer';
+import { Project } from 'ts-morph';
+
+const mockTransformWithProject = vi.mocked(transformWithProject);
 
 const defaultOptions: ResolvedOptions = {
   tsConfigPath: '/project/tsconfig.json',
@@ -24,90 +33,214 @@ const defaultOptions: ResolvedOptions = {
 };
 
 describe('runRebuild', () => {
-  it('returns success with TransformResult on successful transform', () => {
-    const fakeResult = {
-      code: '// generated',
-      outputPath: defaultOptions.outputPath,
-      beans: [{ id: 'A' }],
-      warnings: [],
-    };
-    mockTransform.mockReturnValue(fakeResult as any);
+  describe('full rebuild (no cached project)', () => {
+    it('returns success with TransformResult and Project', () => {
+      const fakeResult = {
+        code: '// generated',
+        outputPath: defaultOptions.outputPath,
+        beans: [{ id: 'A' }],
+        warnings: [],
+      };
+      mockTransformWithProject.mockReturnValue(fakeResult as any);
 
-    const outcome = runRebuild(defaultOptions);
+      const outcome = runRebuild(defaultOptions);
 
-    expect(outcome.success).toBe(true);
-    if (outcome.success) {
-      expect(outcome.result).toBe(fakeResult);
-    }
-  });
+      expect(outcome.success).toBe(true);
+      if (outcome.success) {
+        expect(outcome.result).toBe(fakeResult);
+        expect(outcome.project).toBeDefined();
+      }
+    });
 
-  it('passes correct options to transform', () => {
-    mockTransform.mockReturnValue({
-      code: '',
-      outputPath: '',
-      beans: [],
-      warnings: [],
-    } as any);
+    it('creates a fresh Project with tsConfigFilePath', () => {
+      mockTransformWithProject.mockReturnValue({
+        code: '',
+        outputPath: '',
+        beans: [],
+        warnings: [],
+      } as any);
 
-    const opts: ResolvedOptions = {
-      tsConfigPath: '/custom/tsconfig.json',
-      outputPath: '/custom/output.ts',
-      include: ['src/**/*.ts'],
-      debounceMs: 200,
-    };
+      runRebuild(defaultOptions);
 
-    runRebuild(opts);
+      expect(Project).toHaveBeenCalledWith({
+        tsConfigFilePath: '/project/tsconfig.json',
+      });
+    });
 
-    expect(mockTransform).toHaveBeenCalledWith({
-      tsConfigFilePath: '/custom/tsconfig.json',
-      outputPath: '/custom/output.ts',
-      include: ['src/**/*.ts'],
+    it('adds include paths when specified', () => {
+      const addSourceFilesAtPaths = vi.fn();
+      vi.mocked(Project).mockImplementation(
+        () =>
+          ({
+            addSourceFilesAtPaths,
+            getSourceFile: vi.fn(),
+            addSourceFileAtPath: vi.fn(),
+          }) as any,
+      );
+      mockTransformWithProject.mockReturnValue({
+        code: '',
+        outputPath: '',
+        beans: [],
+        warnings: [],
+      } as any);
+
+      const opts: ResolvedOptions = {
+        ...defaultOptions,
+        include: ['src/**/*.ts'],
+      };
+      runRebuild(opts);
+
+      expect(addSourceFilesAtPaths).toHaveBeenCalledWith(['src/**/*.ts']);
+    });
+
+    it('returns failure with TransformerError', () => {
+      const transformerError = new TransformerError(
+        'Missing provider',
+        { filePath: 'foo.ts', line: 1, column: 0 },
+        'Add @Injectable()',
+      );
+      mockTransformWithProject.mockImplementation(() => {
+        throw transformerError;
+      });
+
+      const outcome = runRebuild(defaultOptions);
+
+      expect(outcome.success).toBe(false);
+      if (!outcome.success) {
+        expect(outcome.error).toBe(transformerError);
+      }
+    });
+
+    it('returns failure wrapping non-TransformerError exceptions', () => {
+      mockTransformWithProject.mockImplementation(() => {
+        throw new TypeError('Cannot read properties of undefined');
+      });
+
+      const outcome = runRebuild(defaultOptions);
+
+      expect(outcome.success).toBe(false);
+      if (!outcome.success) {
+        expect(outcome.error).toBeInstanceOf(TypeError);
+        expect(outcome.error.message).toBe(
+          'Cannot read properties of undefined',
+        );
+      }
+    });
+
+    it('wraps non-Error throws into an Error', () => {
+      mockTransformWithProject.mockImplementation(() => {
+        throw 'string error';
+      });
+
+      const outcome = runRebuild(defaultOptions);
+
+      expect(outcome.success).toBe(false);
+      if (!outcome.success) {
+        expect(outcome.error).toBeInstanceOf(Error);
+        expect(outcome.error.message).toBe('string error');
+      }
     });
   });
 
-  it('returns failure with TransformerError', () => {
-    const transformerError = new TransformerError(
-      'Missing provider',
-      { filePath: 'foo.ts', line: 1, column: 0 },
-      'Add @Injectable()',
-    );
-    mockTransform.mockImplementation(() => {
-      throw transformerError;
+  describe('incremental rebuild (cached project)', () => {
+    it('refreshes the changed file on the cached project', () => {
+      const refreshFromFileSystem = vi.fn();
+      const cachedProject = {
+        getSourceFile: vi.fn().mockReturnValue({ refreshFromFileSystem }),
+        addSourceFileAtPath: vi.fn(),
+      } as any;
+      mockTransformWithProject.mockReturnValue({
+        code: '',
+        outputPath: '',
+        beans: [],
+        warnings: [],
+      } as any);
+
+      const outcome = runRebuild(
+        defaultOptions,
+        cachedProject,
+        '/project/src/service.ts',
+      );
+
+      expect(cachedProject.getSourceFile).toHaveBeenCalledWith(
+        '/project/src/service.ts',
+      );
+      expect(refreshFromFileSystem).toHaveBeenCalled();
+      expect(outcome.success).toBe(true);
+      if (outcome.success) {
+        expect(outcome.project).toBe(cachedProject);
+      }
     });
 
-    const outcome = runRebuild(defaultOptions);
+    it('adds new file if not already in project', () => {
+      const cachedProject = {
+        getSourceFile: vi.fn().mockReturnValue(undefined),
+        addSourceFileAtPath: vi.fn(),
+      } as any;
+      mockTransformWithProject.mockReturnValue({
+        code: '',
+        outputPath: '',
+        beans: [],
+        warnings: [],
+      } as any);
 
-    expect(outcome.success).toBe(false);
-    if (!outcome.success) {
-      expect(outcome.error).toBe(transformerError);
-    }
-  });
+      runRebuild(defaultOptions, cachedProject, '/project/src/new-file.ts');
 
-  it('returns failure wrapping non-TransformerError exceptions', () => {
-    mockTransform.mockImplementation(() => {
-      throw new TypeError('Cannot read properties of undefined');
+      expect(cachedProject.addSourceFileAtPath).toHaveBeenCalledWith(
+        '/project/src/new-file.ts',
+      );
     });
 
-    const outcome = runRebuild(defaultOptions);
+    it('falls back to full rebuild when incremental fails', () => {
+      const cachedProject = {
+        getSourceFile: vi.fn().mockImplementation(() => {
+          throw new Error('file removed');
+        }),
+      } as any;
 
-    expect(outcome.success).toBe(false);
-    if (!outcome.success) {
-      expect(outcome.error).toBeInstanceOf(TypeError);
-      expect(outcome.error.message).toBe('Cannot read properties of undefined');
-    }
-  });
+      let callCount = 0;
+      mockTransformWithProject.mockImplementation(() => {
+        callCount++;
+        return {
+          code: '',
+          outputPath: '',
+          beans: [],
+          warnings: [],
+        } as any;
+      });
 
-  it('wraps non-Error throws into an Error', () => {
-    mockTransform.mockImplementation(() => {
-      throw 'string error';
+      const outcome = runRebuild(
+        defaultOptions,
+        cachedProject,
+        '/project/src/deleted.ts',
+      );
+
+      // Should succeed via fallback (creates fresh Project)
+      expect(outcome.success).toBe(true);
+      if (outcome.success) {
+        // The returned project should be a new Project, not the cached one
+        expect(outcome.project).not.toBe(cachedProject);
+      }
     });
 
-    const outcome = runRebuild(defaultOptions);
+    it('does full rebuild when no changedFile provided', () => {
+      const cachedProject = {
+        getSourceFile: vi.fn(),
+        refreshFromFileSystem: vi.fn(),
+      } as any;
+      mockTransformWithProject.mockReturnValue({
+        code: '',
+        outputPath: '',
+        beans: [],
+        warnings: [],
+      } as any);
 
-    expect(outcome.success).toBe(false);
-    if (!outcome.success) {
-      expect(outcome.error).toBeInstanceOf(Error);
-      expect(outcome.error.message).toBe('string error');
-    }
+      // cachedProject without changedFile → should create fresh project
+      const outcome = runRebuild(defaultOptions, cachedProject);
+
+      expect(outcome.success).toBe(true);
+      // getSourceFile should not have been called since we skip incremental path
+      expect(cachedProject.getSourceFile).not.toHaveBeenCalled();
+    });
   });
 });

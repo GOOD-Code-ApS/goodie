@@ -21,6 +21,7 @@ const DECORATOR_NAMES = {
   Inject: 'Inject',
   Optional: 'Optional',
   PreDestroy: 'PreDestroy',
+  PostProcessor: 'PostProcessor',
 } as const;
 
 /** A class decorated with @Injectable or @Singleton (but not @Module). */
@@ -34,6 +35,8 @@ export interface ScannedBean {
   fieldInjections: ScannedFieldInjection[];
   /** Method names decorated with @PreDestroy(). */
   preDestroyMethods: string[];
+  /** Whether @PostProcessor() is present on this class. */
+  isBeanPostProcessor: boolean;
   /** All ancestor classes (direct parent first, root last). */
   baseClasses: Array<{ className: string; sourceFile: SourceFile | undefined }>;
   sourceLocation: SourceLocation;
@@ -99,6 +102,8 @@ export interface ScannedProvides {
   /** The resolved base type name of the return type. */
   returnResolvedBaseTypeName: string | undefined;
   params: ScannedConstructorParam[];
+  /** Whether @Eager() is present on this @Provides method. */
+  eager: boolean;
   sourceLocation: SourceLocation;
 }
 
@@ -165,6 +170,10 @@ function scanBean(
   const constructorParams = scanConstructorParams(cls);
   const fieldInjections = scanFieldInjections(cls);
   const preDestroyMethods = scanPreDestroyMethods(cls);
+  const isBeanPostProcessor = hasDecorator(
+    decorators,
+    DECORATOR_NAMES.PostProcessor,
+  );
   const baseClasses = extractBaseClassChain(cls);
 
   return {
@@ -180,6 +189,7 @@ function scanBean(
     constructorParams,
     fieldInjections,
     preDestroyMethods,
+    isBeanPostProcessor,
     baseClasses,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
@@ -382,6 +392,7 @@ function scanProvidesMethods(
       returnTypeArguments,
       returnResolvedBaseTypeName,
       params,
+      eager: hasDecorator(decorators, DECORATOR_NAMES.Eager),
       sourceLocation: getSourceLocation(method, sourceFile),
     });
   }

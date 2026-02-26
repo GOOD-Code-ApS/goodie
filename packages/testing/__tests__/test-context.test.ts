@@ -346,6 +346,99 @@ describe('build()', () => {
   });
 });
 
+// ── withDeps() ──────────────────────────────────────────────────────
+
+describe('withDeps()', () => {
+  it('uses the original deps but replaces the factory', async () => {
+    class Repo {
+      constructor(readonly name: string) {}
+    }
+    class Service {
+      constructor(readonly repo: Repo) {}
+    }
+    const defs = [
+      makeDef(Repo, { factory: () => new Repo('real-repo') }),
+      makeDef(Service, {
+        deps: [dep(Repo)],
+        factory: (r) => new Service(r as Repo),
+      }),
+    ];
+
+    const ctx = await TestContext.from(defs)
+      .override(Service)
+      .withDeps((r) => {
+        const repo = r as Repo;
+        return { repo, replaced: true } as unknown as Service;
+      })
+      .build();
+
+    const svc = ctx.get(Service) as unknown as {
+      repo: Repo;
+      replaced: boolean;
+    };
+    expect(svc.replaced).toBe(true);
+    expect(svc.repo.name).toBe('real-repo');
+  });
+
+  it('receives all original dependencies in order', async () => {
+    class A {
+      value = 'a';
+    }
+    class B {
+      value = 'b';
+    }
+    class Target {
+      constructor(
+        readonly a: A,
+        readonly b: B,
+      ) {}
+    }
+    const defs = [
+      makeDef(A, { factory: () => new A() }),
+      makeDef(B, { factory: () => new B() }),
+      makeDef(Target, {
+        deps: [dep(A), dep(B)],
+        factory: (a, b) => new Target(a as A, b as B),
+      }),
+    ];
+
+    const receivedArgs: unknown[] = [];
+    const ctx = await TestContext.from(defs)
+      .override(Target)
+      .withDeps((...args) => {
+        receivedArgs.push(...args);
+        return new Target(args[0] as A, args[1] as B);
+      })
+      .build();
+
+    ctx.get(Target);
+    expect(receivedArgs).toHaveLength(2);
+    expect((receivedArgs[0] as A).value).toBe('a');
+    expect((receivedArgs[1] as B).value).toBe('b');
+  });
+
+  it('works with InjectionToken-based provides beans', async () => {
+    class Config {
+      host = 'localhost';
+    }
+    const DB_URL = new InjectionToken<string>('DB_URL');
+    const defs = [
+      makeDef(Config, { factory: () => new Config() }),
+      makeDef<string>(DB_URL, {
+        deps: [dep(Config)],
+        factory: (c) => `postgres://${(c as Config).host}`,
+      }),
+    ];
+
+    const ctx = await TestContext.from(defs)
+      .override(DB_URL)
+      .withDeps((c) => `test://${(c as Config).host}`)
+      .build();
+
+    expect(ctx.get(DB_URL)).toBe('test://localhost');
+  });
+});
+
 // ── InjectionToken overrides ────────────────────────────────────────
 
 describe('InjectionToken overrides', () => {

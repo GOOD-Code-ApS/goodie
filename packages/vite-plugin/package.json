@@ -25,7 +25,8 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/transformer": "workspace:*"
+    "@goodie-ts/transformer": "workspace:*",
+    "ts-morph": "^24.0.0"
   },
   "peerDependencies": {
     "vite": "^5.0.0 || ^6.0.0"

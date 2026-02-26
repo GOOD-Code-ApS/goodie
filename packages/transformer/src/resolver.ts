@@ -92,6 +92,9 @@ function resolveBean(
   if (scanned.preDestroyMethods.length > 0) {
     metadata.preDestroyMethods = scanned.preDestroyMethods;
   }
+  if (scanned.isBeanPostProcessor) {
+    metadata.isBeanPostProcessor = true;
+  }
 
   return {
     tokenRef: scanned.classTokenRef,
@@ -162,7 +165,7 @@ function resolveModule(
         methodName: p.methodName,
         tokenRef,
         scope: 'singleton' as const,
-        eager: false,
+        eager: p.eager,
         dependencies,
         sourceLocation: p.sourceLocation,
       };

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { Project } from 'ts-morph';
 import type { HmrContext, Plugin } from 'vite';
 import type { DiPluginOptions } from './options.js';
 import { type ResolvedOptions, resolveOptions } from './options.js';
@@ -8,11 +9,13 @@ import { runRebuild } from './rebuild.js';
  * Vite plugin that runs the @goodie compile-time DI transformer.
  *
  * - On `buildStart`: full transform, throws on error (aborts build).
- * - On `handleHotUpdate`: debounced rebuild on `.ts` changes, logs errors without crashing.
+ * - On `handleHotUpdate`: incremental rebuild on `.ts` changes using a
+ *   cached ts-morph Project. Falls back to full rebuild on error.
  */
 export function diPlugin(userOptions?: DiPluginOptions): Plugin {
   let resolved: ResolvedOptions;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let cachedProject: Project | undefined;
 
   return {
     name: 'goodie',
@@ -25,6 +28,7 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
     buildStart() {
       const outcome = runRebuild(resolved);
       if (outcome.success) {
+        cachedProject = outcome.project;
         const count = outcome.result.beans.length;
         const warnings = outcome.result.warnings;
         console.log(
@@ -57,8 +61,9 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
       const { server } = ctx;
       debounceTimer = setTimeout(() => {
         debounceTimer = undefined;
-        const outcome = runRebuild(resolved);
+        const outcome = runRebuild(resolved, cachedProject, filePath);
         if (outcome.success) {
+          cachedProject = outcome.project;
           const count = outcome.result.beans.length;
           console.log(
             `[goodie] Rebuild complete: ${count} bean(s) registered.`,
@@ -67,6 +72,8 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
             console.warn(`[goodie] Warning: ${w}`);
           }
         } else {
+          // On failure, invalidate cached project to force full rebuild next time
+          cachedProject = undefined;
           console.error(`[goodie] Rebuild failed: ${outcome.error.message}`);
           server.ws.send({
             type: 'error',

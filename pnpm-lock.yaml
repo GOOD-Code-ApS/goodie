@@ -133,6 +133,9 @@ importers:
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
     devDependencies:
       vite:
         specifier: ^6.0.0

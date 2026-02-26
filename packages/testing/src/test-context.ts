@@ -2,6 +2,7 @@ import {
   ApplicationContext,
   type BeanDefinition,
   type Constructor,
+  type Dependency,
   InjectionToken,
   OverrideError,
 } from '@goodie-ts/core';
@@ -23,6 +24,7 @@ export class OverrideBuilder<T> {
   constructor(
     private readonly token: Token,
     private readonly commit: (def: BeanDefinition) => void,
+    private readonly findOriginal: (token: Token) => BeanDefinition | undefined,
   ) {}
 
   /**
@@ -72,6 +74,35 @@ export class OverrideBuilder<T> {
     this.commit(def);
     return builder;
   }
+
+  /**
+   * Override with a factory that receives the original bean's resolved
+   * dependencies. Keeps the original dependency list — only replaces the
+   * factory function.
+   *
+   * @example
+   * TestContext.from(definitions)
+   *   .override(UserService).withDeps((repo: UserRepo) => new MockUserService(repo))
+   *   .build()
+   */
+  withDeps(
+    factory: (...deps: unknown[]) => T | Promise<T>,
+  ): TestContextBuilder {
+    const original = this.findOriginal(this.token);
+    const dependencies: Dependency[] = original
+      ? [...original.dependencies]
+      : [];
+    const def: BeanDefinition = {
+      token: this.token,
+      scope: 'singleton',
+      dependencies,
+      factory,
+      eager: false,
+      metadata: {},
+    };
+    this.commit(def);
+    return builder;
+  }
 }
 
 // Module-level reference that OverrideBuilder methods return.
@@ -99,9 +130,13 @@ export class TestContextBuilder {
       throw new OverrideError(tokenName(token as Token));
     }
     builder = this;
-    return new OverrideBuilder<T>(token as Token, (def) => {
-      this.overrides.set(def.token, def);
-    });
+    return new OverrideBuilder<T>(
+      token as Token,
+      (def) => {
+        this.overrides.set(def.token, def);
+      },
+      (t) => this.baseDefs.find((d) => d.token === t),
+    );
   }
 
   /**

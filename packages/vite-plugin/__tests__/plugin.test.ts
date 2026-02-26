@@ -22,6 +22,8 @@ function makeHmrContext(filePath: string): HmrContext {
   } as unknown as HmrContext;
 }
 
+const fakeProject = { fake: 'project' };
+
 function successResult(beanCount: number, warnings: string[] = []) {
   return {
     success: true as const,
@@ -31,6 +33,7 @@ function successResult(beanCount: number, warnings: string[] = []) {
       beans: Array.from({ length: beanCount }, (_, i) => ({ id: `Bean${i}` })),
       warnings,
     },
+    project: fakeProject,
   };
 }
 
@@ -83,7 +86,6 @@ describe('diPlugin', () => {
   describe('configResolved', () => {
     it('resolves options using config.root', () => {
       const plugin = setupPlugin(undefined, '/my/root');
-      // Verify by running buildStart — it will use the resolved options
       mockRunRebuild.mockReturnValue(successResult(0));
       plugin.buildStart();
       expect(mockRunRebuild).toHaveBeenCalledWith({
@@ -154,7 +156,6 @@ describe('diPlugin', () => {
       plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
       vi.advanceTimersByTime(100);
 
-      // First call is from buildStart setup? No — we didn't call buildStart
       expect(mockRunRebuild).toHaveBeenCalledTimes(1);
       expect(console.log).toHaveBeenCalledWith(
         '[goodie] Rebuild complete: 3 bean(s) registered.',
@@ -261,6 +262,76 @@ describe('diPlugin', () => {
       vi.advanceTimersByTime(100);
 
       expect(mockRunRebuild).toHaveBeenCalledTimes(2);
+    });
+
+    it('passes cached project and changed file to incremental rebuild', () => {
+      const plugin = setupPlugin();
+      const project = { cached: true };
+      mockRunRebuild.mockReturnValue({
+        success: true as const,
+        result: {
+          code: '',
+          outputPath: '',
+          beans: [],
+          warnings: [],
+        },
+        project,
+      });
+
+      // buildStart stores the project
+      plugin.buildStart();
+      mockRunRebuild.mockClear();
+
+      // HMR should pass cached project + file
+      mockRunRebuild.mockReturnValue({
+        success: true as const,
+        result: {
+          code: '',
+          outputPath: '',
+          beans: [],
+          warnings: [],
+        },
+        project,
+      });
+      plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
+      vi.advanceTimersByTime(100);
+
+      expect(mockRunRebuild).toHaveBeenCalledWith(
+        expect.anything(),
+        project,
+        '/project/src/service.ts',
+      );
+    });
+
+    it('clears cached project on rebuild failure', () => {
+      const plugin = setupPlugin();
+      const project = { cached: true };
+      mockRunRebuild.mockReturnValue({
+        success: true as const,
+        result: { code: '', outputPath: '', beans: [], warnings: [] },
+        project,
+      });
+
+      // buildStart stores project
+      plugin.buildStart();
+      mockRunRebuild.mockClear();
+
+      // First HMR fails
+      mockRunRebuild.mockReturnValue(failureResult('some error'));
+      plugin.handleHotUpdate(makeHmrContext('/project/src/a.ts'));
+      vi.advanceTimersByTime(100);
+      mockRunRebuild.mockClear();
+
+      // Second HMR should NOT pass cached project (it was cleared)
+      mockRunRebuild.mockReturnValue(successResult(1));
+      plugin.handleHotUpdate(makeHmrContext('/project/src/b.ts'));
+      vi.advanceTimersByTime(100);
+
+      expect(mockRunRebuild).toHaveBeenCalledWith(
+        expect.anything(),
+        undefined,
+        '/project/src/b.ts',
+      );
     });
   });
 });
