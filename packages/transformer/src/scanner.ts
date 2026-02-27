@@ -274,17 +274,17 @@ function scanConstructorParams(
           elementTypeName = elementType.getText();
         }
         elementTypeArguments = extractTypeArguments(elementType);
-      }
-
-      const typeSymbol = paramType.getSymbol();
-      if (typeSymbol) {
-        const decls = typeSymbol.getDeclarations();
-        if (decls.length > 0) {
-          typeSourceFile = decls[0].getSourceFile();
+      } else {
+        const typeSymbol = paramType.getSymbol();
+        if (typeSymbol) {
+          const decls = typeSymbol.getDeclarations();
+          if (decls.length > 0) {
+            typeSourceFile = decls[0].getSourceFile();
+          }
+          resolvedBaseTypeName = typeSymbol.getName();
         }
-        resolvedBaseTypeName = typeSymbol.getName();
+        typeArguments = extractTypeArguments(paramType);
       }
-      typeArguments = extractTypeArguments(paramType);
     }
 
     return {
@@ -495,7 +495,13 @@ function scanValueFields(cls: ClassDeclaration): ScannedValueField[] {
     }
 
     const args = valueDec.getArguments();
-    if (args.length === 0) continue;
+    if (args.length === 0) {
+      throw new InvalidDecoratorUsageError(
+        'Value',
+        `@Value() requires a config key argument. Use @Value('KEY_NAME') on "${prop.getName()}" in ${cls.getName()}.`,
+        getSourceLocation(prop, prop.getSourceFile()),
+      );
+    }
 
     // First argument is the config key (string literal)
     const keyArg = args[0].getText();

@@ -27,11 +27,15 @@ export function Value(
   options?: ValueOptions,
 ): FieldDecorator_Stage3 {
   return (_target, context) => {
-    pushMeta(context.metadata!, META.VALUE, {
-      fieldName: context.name,
-      key,
-      default: options?.default,
-    });
+    const meta: { fieldName: string | symbol; key: string; default?: unknown } =
+      {
+        fieldName: context.name,
+        key,
+      };
+    if (options?.default !== undefined) {
+      meta.default = options.default;
+    }
+    pushMeta(context.metadata!, META.VALUE, meta);
   };
 }
 

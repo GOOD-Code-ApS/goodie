@@ -75,11 +75,11 @@ export class ApplicationContext {
 
     if (def.scope === 'singleton') {
       const cached = this.singletonCache.get(token as Token);
-      if (cached !== undefined) {
-        return cached as T;
-      }
       if (cached === UNRESOLVED || this.asyncInFlight.has(token as Token)) {
         throw new AsyncBeanNotReadyError(tokenName(token as Token));
+      }
+      if (cached !== undefined) {
+        return cached as T;
       }
       // Attempt synchronous resolution
       const instance = this.resolveSync<T>(def);

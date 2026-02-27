@@ -782,6 +782,26 @@ describe('Scanner', () => {
       expect(() => scan(project)).toThrow(/accessor/);
     });
 
+    it('should throw InvalidDecoratorUsageError for @Value() with no arguments', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Value(key?: string, opts?: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton, Value } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @Value() accessor dbUrl!: string
+          }
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+      expect(() => scan(project)).toThrow(/requires a config key argument/);
+    });
+
     it('should return empty array when no @Value fields', () => {
       const project = createProject({
         '/src/decorators.ts': `

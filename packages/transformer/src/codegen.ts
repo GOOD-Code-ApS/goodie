@@ -79,6 +79,7 @@ export function generateCode(
   lines.push('');
 
   // Config token (if @Value is used)
+  // Reserved name — graph-builder validates no user bean collides with '__Goodie_Config'
   if (hasValueFields) {
     lines.push(
       "export const __Goodie_Config = new InjectionToken<Record<string, unknown>>('__Goodie_Config')",

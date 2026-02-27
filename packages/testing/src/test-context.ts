@@ -161,10 +161,12 @@ export class TestContextBuilder {
       );
     }
 
-    const originalFactory = configDef.factory as () => Record<string, unknown>;
+    const existingOverride = this.overrides.get(configDef.token);
+    const baseDef = existingOverride ?? configDef;
+    const baseFactory = baseDef.factory as () => Record<string, unknown>;
     const overrideDef: BeanDefinition = {
       ...configDef,
-      factory: () => ({ ...originalFactory(), ...overrides }),
+      factory: () => ({ ...baseFactory(), ...overrides }),
     };
     this.overrides.set(configDef.token, overrideDef);
 

@@ -417,7 +417,7 @@ describe('withConfig()', () => {
     );
   });
 
-  it('last withConfig call wins', async () => {
+  it('last withConfig call wins for same key', async () => {
     const defs = makeConfigDefs({ DB_URL: 'postgres://prod' });
     const ctx = await TestContext.from(defs)
       .withConfig({ DB_URL: 'first' })
@@ -425,6 +425,18 @@ describe('withConfig()', () => {
       .build();
 
     expect(ctx.get(CONFIG_TOKEN).DB_URL).toBe('second');
+  });
+
+  it('chained withConfig calls preserve cross-key overrides', async () => {
+    const defs = makeConfigDefs({ A: 'original-a', B: 'original-b' });
+    const ctx = await TestContext.from(defs)
+      .withConfig({ A: 'override-a' })
+      .withConfig({ B: 'override-b' })
+      .build();
+
+    const config = ctx.get(CONFIG_TOKEN);
+    expect(config.A).toBe('override-a');
+    expect(config.B).toBe('override-b');
   });
 
   it('chains with override() for combined config + bean overrides', async () => {

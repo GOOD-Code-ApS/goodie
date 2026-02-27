@@ -558,6 +558,42 @@ describe('Resolver', () => {
     });
   });
 
+  describe('collection parameter resolution', () => {
+    it('should produce collection: true for Service[] parameter', () => {
+      const result = scanAndResolve({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Injectable() { return (t: any, c: any) => {} }
+        `,
+        '/src/Handler.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Handler[]) {}
+          }
+        `,
+      });
+
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps).toHaveLength(1);
+      expect(service.constructorDeps[0].collection).toBe(true);
+      expect(service.constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'Handler',
+      });
+    });
+  });
+
   describe('bean metadata', () => {
     it('should preserve scope from @Injectable (prototype)', () => {
       const result = scanAndResolve({

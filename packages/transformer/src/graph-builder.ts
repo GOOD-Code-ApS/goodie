@@ -8,8 +8,12 @@ import type { ResolveResult } from './resolver.js';
 import {
   AmbiguousProviderError,
   CircularDependencyError,
+  InvalidDecoratorUsageError,
   MissingProviderError,
 } from './transformer-errors.js';
+
+/** Reserved token name used internally by codegen for the config bean. */
+const RESERVED_CONFIG_TOKEN = '__Goodie_Config';
 
 /** Result of the graph builder stage. */
 export interface GraphResult {
@@ -29,6 +33,20 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
   // Expand modules: register the module class itself + each @Provides as a bean
   const processedModules = new Set<string>();
   expandModules(resolveResult.modules, allBeans, processedModules);
+
+  // Guard: no user-defined bean may use the reserved config token name
+  for (const bean of allBeans) {
+    if (
+      bean.tokenRef.kind === 'injection-token' &&
+      bean.tokenRef.tokenName === RESERVED_CONFIG_TOKEN
+    ) {
+      throw new InvalidDecoratorUsageError(
+        'Provides',
+        `Token name "${RESERVED_CONFIG_TOKEN}" is reserved for internal use by the @Value system. Rename the @Provides method or use a different token name.`,
+        bean.sourceLocation,
+      );
+    }
+  }
 
   // Build name-based lookup for @Named → @Inject('name') matching
   resolveNamedQualifiers(allBeans, warnings);
@@ -59,6 +77,7 @@ function expandModules(
   }
 
   const visiting = new Set<string>(); // cycle detection
+  const displayPath: string[] = []; // human-readable names parallel to visiting
 
   function expandModule(mod: IRModule): void {
     const key = tokenRefKey(mod.classTokenRef);
@@ -66,12 +85,13 @@ function expandModules(
 
     if (visiting.has(key)) {
       throw new CircularDependencyError(
-        [...visiting, tokenRefDisplayName(mod.classTokenRef)],
+        [...displayPath, tokenRefDisplayName(mod.classTokenRef)],
         mod.sourceLocation,
       );
     }
 
     visiting.add(key);
+    displayPath.push(tokenRefDisplayName(mod.classTokenRef));
 
     // Recursively expand imported modules first
     for (const importRef of mod.imports) {
@@ -84,6 +104,7 @@ function expandModules(
     }
 
     visiting.delete(key);
+    displayPath.pop();
     processed.add(key);
 
     // Register the module class itself as an implicit singleton

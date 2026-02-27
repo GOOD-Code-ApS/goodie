@@ -341,8 +341,8 @@ describe('Graph Builder', () => {
       expect(names).toContain('dValue');
     });
 
-    it('should throw CircularDependencyError for circular module imports', () => {
-      expect(() =>
+    it('should throw CircularDependencyError for circular module imports with class names', () => {
+      const act = () =>
         pipeline({
           '/src/decorators.ts': decoratorsFile,
           '/src/AModule.ts': `
@@ -357,8 +357,17 @@ describe('Graph Builder', () => {
             @Module({ imports: [AModule] })
             export class BModule {}
           `,
-        }),
-      ).toThrow(CircularDependencyError);
+        });
+      expect(act).toThrow(CircularDependencyError);
+      // Error message should contain class names, not internal key format
+      expect(act).toThrow(/AModule/);
+      expect(act).toThrow(/BModule/);
+      // Should NOT contain internal key format like "class:/src/..."
+      try {
+        act();
+      } catch (err) {
+        expect((err as Error).message).not.toMatch(/class:\/src\//);
+      }
     });
 
     it('should silently ignore import of non-module class', () => {

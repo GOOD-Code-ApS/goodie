@@ -195,6 +195,19 @@ describe('ApplicationContext — async', () => {
     expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
   });
 
+  it('get() throws AsyncBeanNotReadyError on second call too (not UNRESOLVED symbol)', async () => {
+    class AsyncBean {}
+    const ctx = await ApplicationContext.create([
+      makeDef(AsyncBean, {
+        factory: async () => new AsyncBean(),
+      }),
+    ]);
+    // First call sets UNRESOLVED in cache and throws
+    expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
+    // Second call must also throw (not return the UNRESOLVED Symbol)
+    expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
+  });
+
   it('eager async bean is available via get() after context creation', async () => {
     class EagerAsync {
       value = 'ready';
@@ -787,6 +800,34 @@ describe('ApplicationContext — @PostConstruct lifecycle', () => {
       }),
     ]);
     expect(calls).toEqual(['eager-init']);
+  });
+
+  it('@PostConstruct throwing synchronously does not leave stale cache — second get() retries factory', async () => {
+    let factoryCallCount = 0;
+    let shouldThrow = true;
+    class Service {
+      init() {
+        if (shouldThrow) {
+          throw new Error('init failed');
+        }
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => {
+          factoryCallCount++;
+          return new Service();
+        },
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    // First get() — @PostConstruct throws
+    expect(() => ctx.get(Service)).toThrow('init failed');
+    // Second get() — factory should be called again (no stale cache)
+    shouldThrow = false;
+    const svc = ctx.get(Service);
+    expect(svc).toBeInstanceOf(Service);
+    expect(factoryCallCount).toBe(2);
   });
 
   it('throws AsyncBeanNotReadyError for async @PostConstruct in sync path without unhandled rejection', async () => {
