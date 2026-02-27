@@ -794,6 +794,62 @@ describe('Code Generator', () => {
     expect(code).toContain('export const __Goodie_Config');
   });
 
+  it('should export buildDefinitions when @Value fields exist', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [{ fieldName: 'port', key: 'PORT' }],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).toContain('export function buildDefinitions(');
+  });
+
+  it('should not contain buildDefinitions when no @Value fields exist', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Repo',
+          importPath: '/src/Repo.ts',
+        },
+        scope: 'prototype',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).not.toContain('buildDefinitions');
+  });
+
   it('should always generate collection field in dependency output', () => {
     const beans: IRBeanDefinition[] = [
       {

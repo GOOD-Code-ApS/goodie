@@ -2,6 +2,7 @@ import {
   ApplicationContext,
   type BeanDefinition,
   type Dependency,
+  DIError,
   InjectionToken,
   OverrideError,
   type Scope,
@@ -371,5 +372,78 @@ describe('InjectionToken overrides', () => {
       .build();
 
     expect(ctx.get(CONFIG).env).toBe('test');
+  });
+});
+
+// ── withConfig() ─────────────────────────────────────────────────────
+
+describe('withConfig()', () => {
+  const CONFIG_TOKEN = new InjectionToken<Record<string, unknown>>(
+    '__Goodie_Config',
+  );
+
+  function makeConfigDefs(config: Record<string, unknown>): BeanDefinition[] {
+    return [
+      {
+        token: CONFIG_TOKEN,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => config,
+        eager: false,
+        metadata: {},
+      },
+    ];
+  }
+
+  it('overrides specific keys while preserving others', async () => {
+    const defs = makeConfigDefs({ DB_URL: 'postgres://prod', PORT: '3000' });
+    const ctx = await TestContext.from(defs)
+      .withConfig({ DB_URL: 'postgres://test' })
+      .build();
+
+    const config = ctx.get(CONFIG_TOKEN);
+    expect(config.DB_URL).toBe('postgres://test');
+    expect(config.PORT).toBe('3000');
+  });
+
+  it('throws DIError when no __Goodie_Config bean exists', () => {
+    class Foo {}
+    const defs = [makeDef(Foo, { factory: () => new Foo() })];
+    const builder = TestContext.from(defs);
+
+    expect(() => builder.withConfig({ KEY: 'value' })).toThrow(DIError);
+    expect(() => builder.withConfig({ KEY: 'value' })).toThrow(
+      '__Goodie_Config',
+    );
+  });
+
+  it('last withConfig call wins', async () => {
+    const defs = makeConfigDefs({ DB_URL: 'postgres://prod' });
+    const ctx = await TestContext.from(defs)
+      .withConfig({ DB_URL: 'first' })
+      .withConfig({ DB_URL: 'second' })
+      .build();
+
+    expect(ctx.get(CONFIG_TOKEN).DB_URL).toBe('second');
+  });
+
+  it('chains with override() for combined config + bean overrides', async () => {
+    class Service {
+      constructor(readonly name: string) {}
+    }
+
+    const defs: BeanDefinition[] = [
+      ...makeConfigDefs({ DB_URL: 'postgres://prod' }),
+      makeDef(Service, { factory: () => new Service('real') }),
+    ];
+
+    const ctx = await TestContext.from(defs)
+      .withConfig({ DB_URL: 'postgres://test' })
+      .override(Service)
+      .withValue(new Service('mock'))
+      .build();
+
+    expect(ctx.get(CONFIG_TOKEN).DB_URL).toBe('postgres://test');
+    expect(ctx.get(Service).name).toBe('mock');
   });
 });

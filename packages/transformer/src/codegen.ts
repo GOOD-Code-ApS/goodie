@@ -102,7 +102,7 @@ export function generateCode(
   // Bean definitions array
   if (hasValueFields) {
     lines.push(
-      'function buildDefinitions(config?: Record<string, unknown>): BeanDefinition[] {',
+      'export function buildDefinitions(config?: Record<string, unknown>): BeanDefinition[] {',
     );
     lines.push('  return [');
     // Config bean definition
