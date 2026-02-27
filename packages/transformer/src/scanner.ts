@@ -128,13 +128,22 @@ export function scan(project: Project): ScanResult {
       const isModule = hasDecorator(decorators, DECORATOR_NAMES.Module);
       const isInjectable = hasDecorator(decorators, DECORATOR_NAMES.Injectable);
       const isSingleton = hasDecorator(decorators, DECORATOR_NAMES.Singleton);
+      const isPostProcessor = hasDecorator(
+        decorators,
+        DECORATOR_NAMES.PostProcessor,
+      );
 
-      if ((isModule || isInjectable || isSingleton) && cls.isAbstract()) {
+      if (
+        (isModule || isInjectable || isSingleton || isPostProcessor) &&
+        cls.isAbstract()
+      ) {
         const decoratorName = isModule
           ? 'Module'
           : isSingleton
             ? 'Singleton'
-            : 'Injectable';
+            : isPostProcessor
+              ? 'PostProcessor'
+              : 'Injectable';
         throw new InvalidDecoratorUsageError(
           decoratorName,
           `Cannot apply @${decoratorName}() to abstract class "${cls.getName()}". Abstract classes cannot be instantiated. Remove the decorator or make the class concrete.`,
@@ -145,8 +154,13 @@ export function scan(project: Project): ScanResult {
       if (isModule) {
         const scannedModule = scanModule(cls, decorators, sourceFile);
         if (scannedModule) modules.push(scannedModule);
-      } else if (isInjectable || isSingleton) {
-        const scannedBean = scanBean(cls, decorators, sourceFile, isSingleton);
+      } else if (isInjectable || isSingleton || isPostProcessor) {
+        const scannedBean = scanBean(
+          cls,
+          decorators,
+          sourceFile,
+          isSingleton || isPostProcessor,
+        );
         if (scannedBean) beans.push(scannedBean);
       }
     }

@@ -94,11 +94,11 @@ export class OverrideBuilder<T> {
       : [];
     const def: BeanDefinition = {
       token: this.token,
-      scope: 'singleton',
+      scope: original?.scope ?? 'singleton',
       dependencies,
       factory,
-      eager: false,
-      metadata: {},
+      eager: original?.eager ?? false,
+      metadata: original?.metadata ? { ...original.metadata } : {},
     };
     this.commit(def);
     return builder;

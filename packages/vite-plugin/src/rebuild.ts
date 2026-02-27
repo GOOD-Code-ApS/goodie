@@ -43,9 +43,10 @@ export function runRebuild(
       const result = transformWithProject(cachedProject, options.outputPath);
       return { success: true, result, project: cachedProject };
     } catch (error) {
-      // Incremental rebuild failed — fall through to full rebuild
-      // This handles cases like file deletions, renames, or structural changes
-      // that can't be resolved by a simple refresh.
+      console.warn(
+        '[goodie] Incremental rebuild failed, falling back to full rebuild:',
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 

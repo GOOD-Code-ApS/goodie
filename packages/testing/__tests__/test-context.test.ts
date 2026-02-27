@@ -417,6 +417,28 @@ describe('withDeps()', () => {
     expect((receivedArgs[1] as B).value).toBe('b');
   });
 
+  it('preserves scope, eager, and metadata from the original bean', async () => {
+    class Foo {}
+    const defs = [
+      makeDef(Foo, {
+        factory: () => new Foo(),
+        scope: 'prototype',
+        eager: true,
+        metadata: { isBeanPostProcessor: true },
+      }),
+    ];
+
+    const ctx = await TestContext.from(defs)
+      .override(Foo)
+      .withDeps(() => new Foo())
+      .build();
+
+    const overriddenDef = ctx.getDefinitions().find((d) => d.token === Foo)!;
+    expect(overriddenDef.scope).toBe('prototype');
+    expect(overriddenDef.eager).toBe(true);
+    expect(overriddenDef.metadata).toEqual({ isBeanPostProcessor: true });
+  });
+
   it('works with InjectionToken-based provides beans', async () => {
     class Config {
       host = 'localhost';

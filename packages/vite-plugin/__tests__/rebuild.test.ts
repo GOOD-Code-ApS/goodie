@@ -192,6 +192,7 @@ describe('runRebuild', () => {
     });
 
     it('falls back to full rebuild when incremental fails', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const cachedProject = {
         getSourceFile: vi.fn().mockImplementation(() => {
           throw new Error('file removed');
@@ -221,6 +222,12 @@ describe('runRebuild', () => {
         // The returned project should be a new Project, not the cached one
         expect(outcome.project).not.toBe(cachedProject);
       }
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[goodie] Incremental rebuild failed, falling back to full rebuild:',
+        'file removed',
+      );
+      warnSpy.mockRestore();
     });
 
     it('does full rebuild when no changedFile provided', () => {

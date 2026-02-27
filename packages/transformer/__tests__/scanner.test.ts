@@ -680,6 +680,25 @@ describe('Scanner', () => {
       );
     });
 
+    it('throws InvalidDecoratorUsageError for abstract @PostProcessor class', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function PostProcessor() { return (t: any, c: any) => {} }
+        `,
+        '/src/AbstractProcessor.ts': `
+          import { PostProcessor } from './decorators.js'
+
+          @PostProcessor()
+          export abstract class AbstractProcessor {}
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+      expect(() => scan(project)).toThrow(
+        /Cannot apply @PostProcessor\(\) to abstract class "AbstractProcessor"/,
+      );
+    });
+
     it('allows non-abstract class extending abstract class', () => {
       const project = createProject({
         '/src/decorators.ts': `
