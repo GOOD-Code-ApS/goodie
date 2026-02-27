@@ -128,6 +128,7 @@ export class ApplicationContext {
 
   /**
    * Get all beans registered under the given token.
+   * Throws if any bean has an async factory — use `getAllAsync()` instead.
    */
   getAll<T>(token: Constructor<T> | InjectionToken<T>): T[] {
     this.assertOpen();
@@ -144,6 +145,32 @@ export class ApplicationContext {
       }
       return this.resolveSync<T>(def);
     });
+  }
+
+  /**
+   * Asynchronously get all beans registered under the given token.
+   * Safe to use when beans may have async factories.
+   */
+  async getAllAsync<T>(
+    token: Constructor<T> | InjectionToken<T>,
+  ): Promise<T[]> {
+    this.assertOpen();
+    const defs = this.defsByToken.get(token as Token);
+    if (!defs || defs.length === 0) {
+      return [];
+    }
+    const results: T[] = [];
+    for (const def of defs) {
+      if (def.scope === 'singleton') {
+        const cached = this.singletonCache.get(def.token);
+        if (cached !== undefined && cached !== UNRESOLVED) {
+          results.push(cached as T);
+          continue;
+        }
+      }
+      results.push((await this.resolveAsyncRaw(def, false)) as T);
+    }
+    return results;
   }
 
   /**
@@ -249,7 +276,7 @@ export class ApplicationContext {
     const resolved: unknown[] = [];
     for (const dep of deps) {
       if (dep.collection) {
-        resolved.push(this.getAll(dep.token));
+        resolved.push(await this.getAllAsync(dep.token));
         continue;
       }
       const depDef = this.primaryDef.get(dep.token);
@@ -325,6 +352,7 @@ export class ApplicationContext {
       if (pp.beforeInit) {
         const result = pp.beforeInit(current, def as BeanDefinition<T>);
         if (result instanceof Promise) {
+          result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
         }
         current = result as T;
@@ -338,6 +366,7 @@ export class ApplicationContext {
       for (const methodName of postConstructMethods) {
         const result = (current as Record<string, () => unknown>)[methodName]();
         if (result instanceof Promise) {
+          result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
         }
       }
@@ -346,6 +375,7 @@ export class ApplicationContext {
       if (pp.afterInit) {
         const result = pp.afterInit(current, def as BeanDefinition<T>);
         if (result instanceof Promise) {
+          result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
         }
         current = result as T;

@@ -81,7 +81,7 @@ export function generateCode(
   // Config token (if @Value is used)
   if (hasValueFields) {
     lines.push(
-      "const __Goodie_Config = new InjectionToken<Record<string, unknown>>('__Goodie_Config')",
+      "export const __Goodie_Config = new InjectionToken<Record<string, unknown>>('__Goodie_Config')",
     );
     lines.push('');
   }
@@ -160,7 +160,16 @@ export function generateCode(
   lines.push('');
   lines.push('export { definitions }');
   lines.push('');
-  lines.push('export const app = Goodie.build(definitions)');
+
+  if (hasValueFields) {
+    lines.push('export function createApp(config?: Record<string, unknown>) {');
+    lines.push('  return Goodie.build(buildDefinitions(config))');
+    lines.push('}');
+    lines.push('');
+    lines.push('export const app = createApp()');
+  } else {
+    lines.push('export const app = Goodie.build(definitions)');
+  }
   lines.push('');
 
   return lines.join('\n');
@@ -334,10 +343,11 @@ function depsToCode(
   if (allDeps.length === 0) return '[]';
 
   const items = allDeps.map((d) => {
-    const parts = [`token: ${d.token}`, `optional: ${d.optional}`];
-    if (d.collection) {
-      parts.push('collection: true');
-    }
+    const parts = [
+      `token: ${d.token}`,
+      `optional: ${d.optional}`,
+      `collection: ${d.collection}`,
+    ];
     return `{ ${parts.join(', ')} }`;
   });
   return `[${items.join(', ')}]`;
@@ -390,10 +400,11 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
   const valueAssignments = hasValues
     ? beanValueFields
         .map((vf) => {
+          const safeKey = escapeStringLiteral(vf.key);
           if (vf.default !== undefined) {
-            return `    instance.${vf.fieldName} = __config['${vf.key}'] ?? ${vf.default}`;
+            return `    instance.${vf.fieldName} = __config['${safeKey}'] ?? ${vf.default}`;
           }
-          return `    instance.${vf.fieldName} = __config['${vf.key}']`;
+          return `    instance.${vf.fieldName} = __config['${safeKey}']`;
         })
         .join('\n')
     : '';
@@ -481,4 +492,16 @@ function extractPackageName(absolutePath: string): string {
   }
 
   return packageName;
+}
+
+/**
+ * Escape characters that could break out of a single-quoted string literal.
+ * Prevents code injection via @Value keys.
+ */
+function escapeStringLiteral(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r');
 }

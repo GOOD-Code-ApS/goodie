@@ -14,7 +14,7 @@ import type { Scope } from '../src/types.js';
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function dep(token: Dependency['token'], optional = false): Dependency {
-  return { token, optional };
+  return { token, optional, collection: false };
 }
 
 function makeDef<T>(
@@ -448,7 +448,7 @@ describe('ApplicationContext — BeanPostProcessor', () => {
       }),
       makeDef<BeanPostProcessor>(pp2Token, {
         deps: [dep(Config)],
-        factory: (config) => {
+        factory: (_config) => {
           // pp2 depends on Config; Config should be post-processed by pp1
           return {
             afterInit(bean, def) {
@@ -616,6 +616,34 @@ describe('ApplicationContext — collection injection', () => {
     expect(svc.handlers).toHaveLength(1);
     expect(svc.handlers[0].name).toBe('x');
   });
+
+  it('resolves collection deps with async factories via getAllAsync', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(HANDLER, { factory: async () => ({ name: 'async-a' }) }),
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: async (handlers) =>
+          new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    // getAsync resolves the collection through getAllAsync internally
+    const svc = await ctx.getAsync(Service);
+    expect(svc.handlers).toHaveLength(1);
+    expect(svc.handlers[0].name).toBe('async-a');
+  });
+
+  it('getAllAsync resolves async bean in collection', async () => {
+    const TOKEN = new InjectionToken<number>('Num');
+    const ctx = await ApplicationContext.create([
+      makeDef(TOKEN, { factory: async () => 42 }),
+    ]);
+    const all = await ctx.getAllAsync(TOKEN);
+    expect(all).toEqual([42]);
+  });
 });
 
 // ── @PostConstruct lifecycle ──────────────────────────────────────────
@@ -759,6 +787,22 @@ describe('ApplicationContext — @PostConstruct lifecycle', () => {
       }),
     ]);
     expect(calls).toEqual(['eager-init']);
+  });
+
+  it('throws AsyncBeanNotReadyError for async @PostConstruct in sync path without unhandled rejection', async () => {
+    class Service {
+      async init() {
+        // async PostConstruct
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    // sync get() should throw, but NOT cause unhandled promise rejection
+    expect(() => ctx.get(Service)).toThrow(AsyncBeanNotReadyError);
   });
 });
 

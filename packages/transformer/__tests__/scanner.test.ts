@@ -763,6 +763,25 @@ describe('Scanner', () => {
       expect(result.beans[0].valueFields[0].defaultValue).toBe('3000');
     });
 
+    it('should throw InvalidDecoratorUsageError for @Value on non-accessor property', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/Config.ts': `
+          import { Singleton, Value } from './decorators.js'
+
+          @Singleton()
+          export class Config {
+            @Value('PORT') port!: number
+          }
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(/accessor/);
+    });
+
     it('should return empty array when no @Value fields', () => {
       const project = createProject({
         '/src/decorators.ts': `

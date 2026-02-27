@@ -286,6 +286,36 @@ describe('Resolver', () => {
   });
 
   describe('module resolution', () => {
+    it('should warn when module import cannot be resolved', () => {
+      const loc = { filePath: '/src/AppModule.ts', line: 1, column: 1 };
+      const result = resolve({
+        beans: [],
+        modules: [
+          {
+            classDeclaration: undefined as any,
+            classTokenRef: {
+              kind: 'class' as const,
+              className: 'AppModule',
+              importPath: '/src/AppModule.ts',
+            },
+            imports: [{ className: 'MissingModule', sourceFile: undefined }],
+            provides: [],
+            sourceLocation: loc,
+          },
+        ],
+        warnings: [],
+      });
+
+      const appModule = result.modules.find(
+        (m) => m.classTokenRef.className === 'AppModule',
+      )!;
+      // Unresolvable imports are skipped with a warning
+      expect(appModule.imports).toHaveLength(0);
+      expect(result.warnings.some((w) => w.includes('MissingModule'))).toBe(
+        true,
+      );
+    });
+
     it('should resolve module imports to ClassTokenRefs', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `

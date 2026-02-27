@@ -485,6 +485,15 @@ function scanValueFields(cls: ClassDeclaration): ScannedValueField[] {
     const valueDec = findDecorator(decorators, DECORATOR_NAMES.Value);
     if (!valueDec) continue;
 
+    const hasAccessor = prop.hasAccessorKeyword?.() ?? false;
+    if (!hasAccessor) {
+      throw new InvalidDecoratorUsageError(
+        'Value',
+        `@Value() must be applied to an accessor property. Change "${prop.getName()}" in ${cls.getName()} to use the accessor keyword: accessor ${prop.getName()}`,
+        getSourceLocation(prop, prop.getSourceFile()),
+      );
+    }
+
     const args = valueDec.getArguments();
     if (args.length === 0) continue;
 

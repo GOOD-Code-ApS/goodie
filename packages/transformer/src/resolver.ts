@@ -120,13 +120,22 @@ function resolveBean(
 
 function resolveModule(
   scannedModule: ScannedModule,
-  _warnings: string[],
+  warnings: string[],
 ): IRModule {
-  const imports: ClassTokenRef[] = scannedModule.imports.map((imp) => ({
-    kind: 'class' as const,
-    className: imp.className,
-    importPath: imp.sourceFile?.getFilePath() ?? '',
-  }));
+  const imports: ClassTokenRef[] = [];
+  for (const imp of scannedModule.imports) {
+    if (!imp.sourceFile) {
+      warnings.push(
+        `Module ${scannedModule.classTokenRef.className}: could not resolve import '${imp.className}' — it may be missing or not in scope`,
+      );
+      continue;
+    }
+    imports.push({
+      kind: 'class' as const,
+      className: imp.className,
+      importPath: imp.sourceFile.getFilePath(),
+    });
+  }
 
   // Two-pass provides resolution:
   // Pass 1: resolve return types to get each method's tokenRef + return type name
