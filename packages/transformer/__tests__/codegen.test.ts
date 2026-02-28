@@ -72,6 +72,7 @@ describe('Code Generator', () => {
               importPath: '/src/Repo.ts',
             },
             optional: false,
+            collection: false,
             sourceLocation: loc,
           },
         ],
@@ -88,7 +89,9 @@ describe('Code Generator', () => {
     });
 
     expect(code).toContain("scope: 'singleton'");
-    expect(code).toContain('{ token: Repo, optional: false }');
+    expect(code).toContain(
+      '{ token: Repo, optional: false, collection: false }',
+    );
     expect(code).toContain('(dep0: any) => new Service(dep0)');
   });
 
@@ -127,6 +130,7 @@ describe('Code Generator', () => {
               importPath: '/src/AppModule.ts',
             },
             optional: false,
+            collection: false,
             sourceLocation: loc,
           },
         ],
@@ -191,6 +195,7 @@ describe('Code Generator', () => {
               importPath: '/src/AppModule.ts',
             },
             optional: false,
+            collection: false,
             sourceLocation: loc,
           },
         ],
@@ -267,6 +272,7 @@ describe('Code Generator', () => {
               importPath: '/src/AppModule.ts',
             },
             optional: false,
+            collection: false,
             sourceLocation: loc,
           },
           {
@@ -276,6 +282,7 @@ describe('Code Generator', () => {
               importPath: '/src/Config.ts',
             },
             optional: false,
+            collection: false,
             sourceLocation: loc,
           },
         ],
@@ -353,7 +360,9 @@ describe('Code Generator', () => {
       outputPath: '/out/AppContext.generated.ts',
     });
 
-    expect(code).toContain('{ token: Repo, optional: false }');
+    expect(code).toContain(
+      '{ token: Repo, optional: false, collection: false }',
+    );
     expect(code).toContain('const instance = new Service()');
     expect(code).toContain('instance.repo = field0');
     expect(code).toContain('return instance');
@@ -402,6 +411,7 @@ describe('Code Generator', () => {
               importPath: '/src/A.ts',
             },
             optional: false,
+            collection: false,
             sourceLocation: loc,
           },
         ],
@@ -581,6 +591,7 @@ describe('Code Generator', () => {
               importPath: '/src/Repository.ts',
             },
             optional: false,
+            collection: false,
             sourceLocation: loc,
           },
         ],
@@ -600,7 +611,9 @@ describe('Code Generator', () => {
     expect(code).toContain(
       "export const Repository_User_Token = new InjectionToken<unknown>('Repository<User>')",
     );
-    expect(code).toContain('{ token: Repository_User_Token, optional: false }');
+    expect(code).toContain(
+      '{ token: Repository_User_Token, optional: false, collection: false }',
+    );
   });
 
   it('should generate distinct var names when tokenNames collide after sanitization', () => {
@@ -680,5 +693,216 @@ describe('Code Generator', () => {
     });
 
     expect(code).toContain('metadata: { isModule: true }');
+  });
+
+  it('should escape single quotes in @Value keys to prevent code injection', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [
+            {
+              fieldName: 'evil',
+              key: "key'break",
+            },
+          ],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    // The factory code should have escaped quotes — key stays in the string literal
+    expect(code).toContain("__config['key\\'break']");
+    // Should NOT contain an unescaped break-out
+    expect(code).not.toContain("__config['key'break']");
+  });
+
+  it('should generate createApp function when @Value fields exist', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [{ fieldName: 'port', key: 'PORT' }],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).toContain(
+      'export function createApp(config?: Record<string, unknown>)',
+    );
+    expect(code).toContain('return Goodie.build(buildDefinitions(config))');
+    expect(code).toContain('export const app = createApp()');
+  });
+
+  it('should export __Goodie_Config token when @Value fields exist', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [{ fieldName: 'port', key: 'PORT' }],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).toContain('export const __Goodie_Config');
+  });
+
+  it('should export buildDefinitions when @Value fields exist', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [{ fieldName: 'port', key: 'PORT' }],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).toContain('export function buildDefinitions(');
+  });
+
+  it('should not contain buildDefinitions when no @Value fields exist', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Repo',
+          importPath: '/src/Repo.ts',
+        },
+        scope: 'prototype',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).not.toContain('buildDefinitions');
+  });
+
+  it('should always generate collection field in dependency output', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Repo',
+          importPath: '/src/Repo.ts',
+        },
+        scope: 'prototype',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Service',
+          importPath: '/src/Service.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [
+          {
+            tokenRef: {
+              kind: 'class',
+              className: 'Repo',
+              importPath: '/src/Repo.ts',
+            },
+            optional: false,
+            collection: true,
+            sourceLocation: loc,
+          },
+        ],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).toContain(
+      '{ token: Repo, optional: false, collection: true }',
+    );
   });
 });

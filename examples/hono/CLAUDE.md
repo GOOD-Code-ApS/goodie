@@ -4,23 +4,23 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 
 ## What It Demonstrates
 
-- `@Module` + `@Provides` for wiring external infrastructure (database URL, Drizzle connection)
+- `@Value('DATABASE_URL')` for config injection directly into a `@Singleton` class
+- `@PostConstruct` for initializing infrastructure after field injection
 - `@Singleton` classes with constructor injection for repository and service layers
-- Primitive token auto-wiring: `databaseUrl` parameter name matches `databaseUrl()` provider method
-- Token override pattern for integration testing with TestContainers
+- `withConfig()` testing API to override config values in integration tests
 - Hono's built-in `.request()` for HTTP testing without a live server
 
 ## Architecture
 
 ```
-@Module (AppModule)
-├── @Provides databaseUrl(): string             → reads DATABASE_URL env var
-├── @Provides database(databaseUrl): Database   → postgres.js + drizzle, wrapped in Database class
+@Singleton Database
+├── @Value('DATABASE_URL')           → config injection (default: postgres://localhost:5432/todos)
+├── @PostConstruct init()            → creates postgres.js client + drizzle instance
 │
-@Singleton TodoRepository(database)             → Drizzle queries via database.drizzle
-@Singleton TodoService(todoRepository)          → Business logic layer
+@Singleton TodoRepository(database)  → Drizzle queries via database.drizzle
+@Singleton TodoService(todoRepository) → Business logic layer
 │
-routes.ts: createTodoRoutes(todoService)        → Hono router (plain function, not decorated)
+routes.ts: createTodoRoutes(todoService)  → Hono router (plain function, not decorated)
 main.ts: bootstrap DI → Hono → @hono/node-server
 ```
 
@@ -29,8 +29,7 @@ main.ts: bootstrap DI → Hono → @hono/node-server
 | File | Role |
 |------|------|
 | `src/db/schema.ts` | Drizzle `pgTable` definition for `todos` |
-| `src/Database.ts` | Wrapper class for `PostgresJsDatabase` (clean token for DI) |
-| `src/AppModule.ts` | `@Module` with `@Provides` for `databaseUrl` and `database` |
+| `src/Database.ts` | `@Singleton` with `@Value('DATABASE_URL')` + `@PostConstruct` for Drizzle setup |
 | `src/TodoRepository.ts` | `@Singleton` CRUD repository using Drizzle |
 | `src/TodoService.ts` | `@Singleton` business logic delegating to repository |
 | `src/routes.ts` | `createTodoRoutes()` — Hono router factory (not decorated) |
@@ -40,24 +39,24 @@ main.ts: bootstrap DI → Hono → @hono/node-server
 ## Generated File
 
 `AppContext.generated.ts` exports:
-- `Database_Url_Token` — `InjectionToken<string>` for the connection URI
-- `definitions` — `BeanDefinition[]` array (5 beans)
-- `createContext()` — async factory
-- `app` — `Goodie.build(definitions)` ready to `.start()`
+- `__Goodie_Config` — `InjectionToken<Record<string, unknown>>` for config map
+- `buildDefinitions(config?)` — factory that returns `BeanDefinition[]` with optional config overrides
+- `definitions` — `buildDefinitions()` with defaults (uses `process.env`)
+- `createContext(config?)` — async factory
+- `createApp(config?)` — returns `Goodie.build()`
+- `app` — `createApp()` ready to `.start()`
 
-## Test Pattern — Token Override with TestContainers
+## Test Pattern — withConfig() + TestContainers
 
 ```typescript
 const container = await new PostgreSqlContainer('postgres:17-alpine').start();
 
-const testDefs = definitions.map((d) =>
-  d.token === Database_Url_Token
-    ? { ...d, factory: () => container.getConnectionUri() }
-    : d,
-);
-
-const ctx = await ApplicationContext.create(testDefs);
+const ctx = await TestContext.from(definitions)
+  .withConfig({ DATABASE_URL: container.getConnectionUri() })
+  .build();
 ```
+
+`withConfig()` merges overrides into the `__Goodie_Config` bean, so `@Value('DATABASE_URL')` on `Database` receives the TestContainers connection URI instead of `process.env.DATABASE_URL`.
 
 Tests use `honoApp.request(path, init)` — Hono's built-in test helper that invokes routes in-process without HTTP overhead.
 

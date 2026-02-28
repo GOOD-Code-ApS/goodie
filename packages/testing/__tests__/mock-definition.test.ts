@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function dep(token: Dependency['token'], optional = false): Dependency {
-  return { token, optional };
+  return { token, optional, collection: false };
 }
 
 function makeDef<T>(

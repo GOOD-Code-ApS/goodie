@@ -3,6 +3,7 @@ import {
   type BeanDefinition,
   type Constructor,
   type Dependency,
+  DIError,
   InjectionToken,
   OverrideError,
 } from '@goodie-ts/core';
@@ -171,6 +172,38 @@ export class TestContextBuilder {
       };
       this.overrides.set(token, def);
     }
+
+    return this;
+  }
+
+  /**
+   * Override specific config keys while preserving the rest.
+   * Requires a `__Goodie_Config` bean in the base definitions (generated when `@Value` is used).
+   *
+   * Wraps the original config factory: `{ ...originalFactory(), ...overrides }`.
+   * Last `withConfig()` call wins (consistent with `override()` semantics).
+   */
+  withConfig(overrides: Record<string, unknown>): TestContextBuilder {
+    const configDef = this.baseDefs.find(
+      (d) =>
+        d.token instanceof InjectionToken &&
+        d.token.description === '__Goodie_Config',
+    );
+
+    if (!configDef) {
+      throw new DIError(
+        'No __Goodie_Config bean found — withConfig() requires @Value to be used in at least one bean',
+      );
+    }
+
+    const existingOverride = this.overrides.get(configDef.token);
+    const baseDef = existingOverride ?? configDef;
+    const baseFactory = baseDef.factory as () => Record<string, unknown>;
+    const overrideDef: BeanDefinition = {
+      ...configDef,
+      factory: () => ({ ...baseFactory(), ...overrides }),
+    };
+    this.overrides.set(configDef.token, overrideDef);
 
     return this;
   }

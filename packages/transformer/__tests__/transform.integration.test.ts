@@ -180,6 +180,43 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
+  describe('transitive module imports', () => {
+    it('should expand transitive module imports end-to-end', () => {
+      const result = createTestProject({
+        '/src/DbModule.ts': `
+          import { Module, Provides } from './decorators.js'
+          @Module()
+          export class DbModule {
+            @Provides()
+            dbUrl(): string { return 'postgres://localhost' }
+          }
+        `,
+        '/src/CacheModule.ts': `
+          import { Module, Provides } from './decorators.js'
+          import { DbModule } from './DbModule.js'
+          @Module({ imports: [DbModule] })
+          export class CacheModule {
+            @Provides()
+            cacheUrl(): string { return 'redis://localhost' }
+          }
+        `,
+        '/src/AppModule.ts': `
+          import { Module } from './decorators.js'
+          import { CacheModule } from './CacheModule.js'
+          @Module({ imports: [CacheModule] })
+          export class AppModule {}
+        `,
+      });
+
+      // All three modules + their provides should be generated
+      expect(result.code).toContain('DbModule');
+      expect(result.code).toContain('CacheModule');
+      expect(result.code).toContain('AppModule');
+      expect(result.code).toContain('Db_Url_Token');
+      expect(result.code).toContain('Cache_Url_Token');
+    });
+  });
+
   describe('field injection', () => {
     it('should handle @Inject on accessor field', () => {
       const result = createTestProject({
@@ -572,6 +609,73 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
+  describe('@PostConstruct metadata', () => {
+    it('should emit postConstructMethods in metadata for decorated class', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton, PostConstruct } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @PostConstruct()
+            init() {}
+          }
+        `,
+      });
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].metadata).toEqual({
+        postConstructMethods: ['init'],
+      });
+      expect(result.code).toContain(
+        'metadata: { postConstructMethods: ["init"] }',
+      );
+    });
+
+    it('should emit multiple postConstructMethods', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton, PostConstruct } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @PostConstruct()
+            initCache() {}
+
+            @PostConstruct()
+            loadConfig() {}
+          }
+        `,
+      });
+
+      expect(result.beans[0].metadata).toEqual({
+        postConstructMethods: ['initCache', 'loadConfig'],
+      });
+    });
+
+    it('should coexist with @PreDestroy metadata', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton, PostConstruct, PreDestroy } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @PostConstruct()
+            init() {}
+
+            @PreDestroy()
+            shutdown() {}
+          }
+        `,
+      });
+
+      expect(result.beans[0].metadata).toEqual({
+        postConstructMethods: ['init'],
+        preDestroyMethods: ['shutdown'],
+      });
+    });
+  });
+
   describe('@PostProcessor metadata', () => {
     it('should emit isBeanPostProcessor in metadata for @PostProcessor class', () => {
       const result = createTestProject({
@@ -661,6 +765,181 @@ describe('Transform Pipeline (Integration)', () => {
 
       expect(result.beans[0].metadata).toEqual({});
       expect(result.code).toContain('metadata: {}');
+    });
+  });
+
+  describe('collection injection', () => {
+    it('should generate collection: true for T[] constructor param', () => {
+      const result = createTestProject({
+        '/src/Handler.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Handler[]) {}
+          }
+        `,
+      });
+
+      expect(result.code).toContain('collection: true');
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].collection).toBe(true);
+    });
+
+    it('should handle Array<T> syntax', () => {
+      const result = createTestProject({
+        '/src/Handler.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Array<Handler>) {}
+          }
+        `,
+      });
+
+      expect(result.code).toContain('collection: true');
+    });
+
+    it('should not throw when no providers exist for collection dep', () => {
+      const result = createTestProject({
+        '/src/Handler.ts': `
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Handler[]) {}
+          }
+        `,
+      });
+
+      // Should succeed with empty collection
+      expect(result.beans).toHaveLength(1);
+      expect(result.code).toContain('collection: true');
+    });
+  });
+
+  describe('@Value config injection', () => {
+    it('should generate config token and config bean when @Value is used', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton, Value } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @Value('DB_URL') accessor dbUrl!: string
+          }
+        `,
+      });
+
+      expect(result.code).toContain('__Goodie_Config');
+      expect(result.code).toContain(
+        "new InjectionToken<Record<string, unknown>>('__Goodie_Config')",
+      );
+      expect(result.code).toContain(
+        'factory: () => ({ ...process.env, ...config } as Record<string, unknown>)',
+      );
+      expect(result.code).toContain("instance.dbUrl = __config['DB_URL']");
+    });
+
+    it('should generate default value fallback when @Value has default', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton, Value } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @Value('PORT', { default: 3000 }) accessor port!: number
+          }
+        `,
+      });
+
+      expect(result.code).toContain("instance.port = __config['PORT'] ?? 3000");
+    });
+
+    it('should generate createContext with config parameter when @Value is used', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton, Value } from './decorators.js'
+
+          @Singleton()
+          export class Service {
+            @Value('API_KEY') accessor apiKey!: string
+          }
+        `,
+      });
+
+      expect(result.code).toContain(
+        'export async function createContext(config?: Record<string, unknown>)',
+      );
+      expect(result.code).toContain('buildDefinitions(config)');
+    });
+
+    it('should not generate config infrastructure when no @Value is used', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      expect(result.code).not.toContain('__Goodie_Config');
+      expect(result.code).not.toContain('buildDefinitions');
+      expect(result.code).toContain('const definitions: BeanDefinition[] = [');
+    });
+
+    it('should add config token as dependency only for beans with @Value', () => {
+      const result = createTestProject({
+        '/src/Repo.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Repo {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton, Value } from './decorators.js'
+          import { Repo } from './Repo.js'
+
+          @Singleton()
+          export class Service {
+            @Value('DB_URL') accessor dbUrl!: string
+            constructor(private repo: Repo) {}
+          }
+        `,
+      });
+
+      // Service should have __Goodie_Config in its deps, Repo should not
+      const serviceMatch = result.code.match(
+        /token: Service[\s\S]*?dependencies: \[([\s\S]*?)\]/,
+      );
+      expect(serviceMatch).toBeTruthy();
+      expect(serviceMatch![1]).toContain('__Goodie_Config');
+
+      const repoMatch = result.code.match(
+        /token: Repo[\s\S]*?dependencies: \[([\s\S]*?)\]/,
+      );
+      expect(repoMatch).toBeTruthy();
+      expect(repoMatch![1]).not.toContain('__Goodie_Config');
     });
   });
 

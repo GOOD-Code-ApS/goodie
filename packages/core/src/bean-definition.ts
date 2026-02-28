@@ -7,6 +7,8 @@ export interface Dependency {
   token: InjectionToken<unknown> | Constructor;
   /** If true, resolves to `undefined` when no provider is registered. */
   optional: boolean;
+  /** If true, inject all beans under this token as an array via `getAll()`. */
+  collection: boolean;
 }
 
 /** Full metadata describing how to create and manage a bean. */

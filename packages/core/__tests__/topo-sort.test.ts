@@ -20,7 +20,7 @@ function def(
 }
 
 function dep(token: BeanDefinition['token'], optional = false) {
-  return { token, optional };
+  return { token, optional, collection: false };
 }
 
 describe('topoSort', () => {

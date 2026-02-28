@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [diPlugin()],
+  esbuild: { target: 'es2022' },
   build: {
     lib: {
       entry: 'src/main.ts',

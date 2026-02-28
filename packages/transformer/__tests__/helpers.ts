@@ -12,7 +12,9 @@ export function Provides() { return (t: any, c: any) => {} }
 export function Inject(q: any) { return (t: any, c: any) => {} }
 export function Optional() { return (t: any, c: any) => {} }
 export function PreDestroy() { return (t: any, c: any) => {} }
+export function PostConstruct() { return (t: any, c: any) => {} }
 export function PostProcessor() { return (t: any, c: any) => {} }
+export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
 `;
 
 /**

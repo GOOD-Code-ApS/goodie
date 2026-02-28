@@ -21,7 +21,9 @@ const DECORATOR_NAMES = {
   Inject: 'Inject',
   Optional: 'Optional',
   PreDestroy: 'PreDestroy',
+  PostConstruct: 'PostConstruct',
   PostProcessor: 'PostProcessor',
+  Value: 'Value',
 } as const;
 
 /** A class decorated with @Injectable or @Singleton (but not @Module). */
@@ -35,8 +37,12 @@ export interface ScannedBean {
   fieldInjections: ScannedFieldInjection[];
   /** Method names decorated with @PreDestroy(). */
   preDestroyMethods: string[];
+  /** Method names decorated with @PostConstruct(). */
+  postConstructMethods: string[];
   /** Whether @PostProcessor() is present on this class. */
   isBeanPostProcessor: boolean;
+  /** Fields decorated with @Value('key'). */
+  valueFields: ScannedValueField[];
   /** All ancestor classes (direct parent first, root last). */
   baseClasses: Array<{ className: string; sourceFile: SourceFile | undefined }>;
   sourceLocation: SourceLocation;
@@ -58,7 +64,23 @@ export interface ScannedConstructorParam {
   typeArguments: ScannedTypeArgument[];
   /** The resolved base type name (e.g. 'Repository' for Repository<User>). */
   resolvedBaseTypeName: string | undefined;
+  /** True when the parameter is typed as T[] or Array<T>. */
+  isCollection: boolean;
+  /** When isCollection is true, the element type info for the array. */
+  elementTypeName: string | undefined;
+  elementTypeSourceFile: SourceFile | undefined;
+  elementTypeArguments: ScannedTypeArgument[];
+  elementResolvedBaseTypeName: string | undefined;
   sourceLocation: SourceLocation;
+}
+
+/** A @Value('key') field discovered on an accessor. */
+export interface ScannedValueField {
+  fieldName: string;
+  /** The config key string from @Value('key'). */
+  key: string;
+  /** Default value if provided via @Value('key', { default: ... }). */
+  defaultValue: string | undefined;
 }
 
 /** A field injection discovered from @Inject / @Optional on an accessor. */
@@ -184,10 +206,12 @@ function scanBean(
   const constructorParams = scanConstructorParams(cls);
   const fieldInjections = scanFieldInjections(cls);
   const preDestroyMethods = scanPreDestroyMethods(cls);
+  const postConstructMethods = scanPostConstructMethods(cls);
   const isBeanPostProcessor = hasDecorator(
     decorators,
     DECORATOR_NAMES.PostProcessor,
   );
+  const valueFields = scanValueFields(cls);
   const baseClasses = extractBaseClassChain(cls);
 
   return {
@@ -203,7 +227,9 @@ function scanBean(
     constructorParams,
     fieldInjections,
     preDestroyMethods,
+    postConstructMethods,
     isBeanPostProcessor,
+    valueFields,
     baseClasses,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
@@ -246,19 +272,43 @@ function scanConstructorParams(
     let typeSourceFile: SourceFile | undefined;
     let typeArguments: ScannedTypeArgument[] = [];
     let resolvedBaseTypeName: string | undefined;
+    let isCollection = false;
+    let elementTypeName: string | undefined;
+    let elementTypeSourceFile: SourceFile | undefined;
+    let elementTypeArguments: ScannedTypeArgument[] = [];
+    let elementResolvedBaseTypeName: string | undefined;
 
     if (typeNode) {
       typeName = typeNode.getText();
       const paramType = param.getType();
-      const typeSymbol = paramType.getSymbol();
-      if (typeSymbol) {
-        const decls = typeSymbol.getDeclarations();
-        if (decls.length > 0) {
-          typeSourceFile = decls[0].getSourceFile();
+
+      // Detect array types: T[] or Array<T>
+      if (paramType.isArray()) {
+        isCollection = true;
+        const elementType = paramType.getArrayElementTypeOrThrow();
+        const elemSymbol = elementType.getSymbol();
+        if (elemSymbol) {
+          elementTypeName = elemSymbol.getName();
+          const decls = elemSymbol.getDeclarations();
+          if (decls.length > 0) {
+            elementTypeSourceFile = decls[0].getSourceFile();
+          }
+          elementResolvedBaseTypeName = elemSymbol.getName();
+        } else {
+          elementTypeName = elementType.getText();
         }
-        resolvedBaseTypeName = typeSymbol.getName();
+        elementTypeArguments = extractTypeArguments(elementType);
+      } else {
+        const typeSymbol = paramType.getSymbol();
+        if (typeSymbol) {
+          const decls = typeSymbol.getDeclarations();
+          if (decls.length > 0) {
+            typeSourceFile = decls[0].getSourceFile();
+          }
+          resolvedBaseTypeName = typeSymbol.getName();
+        }
+        typeArguments = extractTypeArguments(paramType);
       }
-      typeArguments = extractTypeArguments(paramType);
     }
 
     return {
@@ -267,6 +317,11 @@ function scanConstructorParams(
       typeSourceFile,
       typeArguments,
       resolvedBaseTypeName,
+      isCollection,
+      elementTypeName,
+      elementTypeSourceFile,
+      elementTypeArguments,
+      elementResolvedBaseTypeName,
       sourceLocation: getSourceLocation(param, param.getSourceFile()),
     };
   });
@@ -395,6 +450,11 @@ function scanProvidesMethods(
         typeSourceFile,
         typeArguments,
         resolvedBaseTypeName,
+        isCollection: false,
+        elementTypeName: undefined,
+        elementTypeSourceFile: undefined,
+        elementTypeArguments: [],
+        elementResolvedBaseTypeName: undefined,
         sourceLocation: getSourceLocation(param, param.getSourceFile()),
       };
     });
@@ -425,6 +485,89 @@ function scanPreDestroyMethods(cls: ClassDeclaration): string[] {
     }
   }
   return methods;
+}
+
+// ── @PostConstruct scanning ──
+
+function scanPostConstructMethods(cls: ClassDeclaration): string[] {
+  const methods: string[] = [];
+  for (const method of cls.getMethods()) {
+    const decorators = method.getDecorators();
+    if (hasDecorator(decorators, DECORATOR_NAMES.PostConstruct)) {
+      methods.push(method.getName());
+    }
+  }
+  return methods;
+}
+
+// ── @Value scanning ──
+
+function scanValueFields(cls: ClassDeclaration): ScannedValueField[] {
+  const results: ScannedValueField[] = [];
+
+  for (const prop of cls.getProperties()) {
+    const decorators = prop.getDecorators();
+    const valueDec = findDecorator(decorators, DECORATOR_NAMES.Value);
+    if (!valueDec) continue;
+
+    const hasAccessor = prop.hasAccessorKeyword?.() ?? false;
+    if (!hasAccessor) {
+      throw new InvalidDecoratorUsageError(
+        'Value',
+        `@Value() must be applied to an accessor property. Change "${prop.getName()}" in ${cls.getName()} to use the accessor keyword: accessor ${prop.getName()}`,
+        getSourceLocation(prop, prop.getSourceFile()),
+      );
+    }
+
+    const args = valueDec.getArguments();
+    if (args.length === 0) {
+      throw new InvalidDecoratorUsageError(
+        'Value',
+        `@Value() requires a config key argument. Use @Value('KEY_NAME') on "${prop.getName()}" in ${cls.getName()}.`,
+        getSourceLocation(prop, prop.getSourceFile()),
+      );
+    }
+
+    // First argument is the config key (string literal)
+    const keyArg = args[0].getText();
+    let key: string;
+    if (
+      (keyArg.startsWith("'") && keyArg.endsWith("'")) ||
+      (keyArg.startsWith('"') && keyArg.endsWith('"'))
+    ) {
+      key = keyArg.slice(1, -1);
+    } else {
+      key = keyArg;
+    }
+
+    // Second argument is optional: { default: ... }
+    let defaultValue: string | undefined;
+    if (args.length > 1) {
+      const optArg = args[1];
+      if (optArg.getKind() === SyntaxKind.ObjectLiteralExpression) {
+        const objLiteral = optArg.asKind(SyntaxKind.ObjectLiteralExpression);
+        if (objLiteral) {
+          const defaultProp = objLiteral.getProperty('default');
+          if (defaultProp) {
+            const initializer = defaultProp
+              .asKind(SyntaxKind.PropertyAssignment)
+              ?.getInitializer();
+            if (initializer) {
+              defaultValue = initializer.getText();
+            }
+          }
+        }
+      }
+    }
+
+    results.push({
+      fieldName: String(prop.getName()),
+      key,
+      defaultValue,
+    });
+  }
+
+  return results;
 }
 
 // ── Base class extraction ──

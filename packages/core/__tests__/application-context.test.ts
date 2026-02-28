@@ -14,7 +14,7 @@ import type { Scope } from '../src/types.js';
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function dep(token: Dependency['token'], optional = false): Dependency {
-  return { token, optional };
+  return { token, optional, collection: false };
 }
 
 function makeDef<T>(
@@ -192,6 +192,19 @@ describe('ApplicationContext — async', () => {
         factory: async () => new AsyncBean(),
       }),
     ]);
+    expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
+  });
+
+  it('get() throws AsyncBeanNotReadyError on second call too (not UNRESOLVED symbol)', async () => {
+    class AsyncBean {}
+    const ctx = await ApplicationContext.create([
+      makeDef(AsyncBean, {
+        factory: async () => new AsyncBean(),
+      }),
+    ]);
+    // First call sets UNRESOLVED in cache and throws
+    expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
+    // Second call must also throw (not return the UNRESOLVED Symbol)
     expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
   });
 
@@ -448,7 +461,7 @@ describe('ApplicationContext — BeanPostProcessor', () => {
       }),
       makeDef<BeanPostProcessor>(pp2Token, {
         deps: [dep(Config)],
-        factory: (config) => {
+        factory: (_config) => {
           // pp2 depends on Config; Config should be post-processed by pp1
           return {
             afterInit(bean, def) {
@@ -561,6 +574,276 @@ describe('ApplicationContext — errors', () => {
   it('throws MissingDependencyError for get() with unknown token', async () => {
     const ctx = await ApplicationContext.create([]);
     expect(() => ctx.get(class Unknown {})).toThrow(MissingDependencyError);
+  });
+});
+
+// ── Collection injection ─────────────────────────────────────────────
+
+describe('ApplicationContext — collection injection', () => {
+  it('resolves collection dep via getAll()', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(HANDLER, { factory: () => ({ name: 'a' }) }),
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: (handlers) => new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    const svc = ctx.get(Service);
+    expect(svc.handlers).toHaveLength(1);
+    expect(svc.handlers[0].name).toBe('a');
+  });
+
+  it('returns empty array when no providers exist for collection dep', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: (handlers) => new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    const svc = ctx.get(Service);
+    expect(svc.handlers).toEqual([]);
+  });
+
+  it('resolves collection dep via getAll() in async path', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(HANDLER, { factory: () => ({ name: 'x' }) }),
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: async (handlers) =>
+          new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    const svc = await ctx.getAsync(Service);
+    expect(svc.handlers).toHaveLength(1);
+    expect(svc.handlers[0].name).toBe('x');
+  });
+
+  it('resolves collection deps with async factories via getAllAsync', async () => {
+    const HANDLER = new InjectionToken<{ name: string }>('Handler');
+    class Service {
+      constructor(readonly handlers: Array<{ name: string }>) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(HANDLER, { factory: async () => ({ name: 'async-a' }) }),
+      makeDef(Service, {
+        deps: [{ token: HANDLER, optional: false, collection: true }],
+        factory: async (handlers) =>
+          new Service(handlers as Array<{ name: string }>),
+      }),
+    ]);
+    // getAsync resolves the collection through getAllAsync internally
+    const svc = await ctx.getAsync(Service);
+    expect(svc.handlers).toHaveLength(1);
+    expect(svc.handlers[0].name).toBe('async-a');
+  });
+
+  it('getAllAsync resolves async bean in collection', async () => {
+    const TOKEN = new InjectionToken<number>('Num');
+    const ctx = await ApplicationContext.create([
+      makeDef(TOKEN, { factory: async () => 42 }),
+    ]);
+    const all = await ctx.getAllAsync(TOKEN);
+    expect(all).toEqual([42]);
+  });
+});
+
+// ── @PostConstruct lifecycle ──────────────────────────────────────────
+
+describe('ApplicationContext — @PostConstruct lifecycle', () => {
+  it('calls @PostConstruct method on sync singleton', async () => {
+    const calls: string[] = [];
+    class Service {
+      init() {
+        calls.push('init');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    ctx.get(Service);
+    expect(calls).toEqual(['init']);
+  });
+
+  it('calls @PostConstruct method on async singleton (via getAsync)', async () => {
+    const calls: string[] = [];
+    class Service {
+      init() {
+        calls.push('init');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: async () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    await ctx.getAsync(Service);
+    expect(calls).toEqual(['init']);
+  });
+
+  it('calls async @PostConstruct method via getAsync', async () => {
+    const calls: string[] = [];
+    class Service {
+      async init() {
+        await new Promise((r) => setTimeout(r, 1));
+        calls.push('async-init');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: async () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    await ctx.getAsync(Service);
+    expect(calls).toEqual(['async-init']);
+  });
+
+  it('calls multiple @PostConstruct methods in order', async () => {
+    const calls: string[] = [];
+    class Service {
+      initCache() {
+        calls.push('cache');
+      }
+      loadConfig() {
+        calls.push('config');
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['initCache', 'loadConfig'] },
+      }),
+    ]);
+    ctx.get(Service);
+    expect(calls).toEqual(['cache', 'config']);
+  });
+
+  it('runs @PostConstruct after beforeInit and before afterInit', async () => {
+    const calls: string[] = [];
+    class Service {
+      init() {
+        calls.push('postConstruct');
+      }
+    }
+    const processor: BeanPostProcessor = {
+      beforeInit(bean, def) {
+        if (def.token === Service) calls.push('beforeInit');
+        return bean;
+      },
+      afterInit(bean, def) {
+        if (def.token === Service) calls.push('afterInit');
+        return bean;
+      },
+    };
+    const ppToken = new InjectionToken<BeanPostProcessor>('pp');
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+      makeDef<BeanPostProcessor>(ppToken, {
+        factory: () => processor,
+        metadata: { isBeanPostProcessor: true },
+      }),
+    ]);
+    ctx.get(Service);
+    expect(calls).toEqual(['beforeInit', 'postConstruct', 'afterInit']);
+  });
+
+  it('calls @PostConstruct on prototype beans each time', async () => {
+    let callCount = 0;
+    class Proto {
+      init() {
+        callCount++;
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Proto, {
+        scope: 'prototype',
+        factory: () => new Proto(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    ctx.get(Proto);
+    ctx.get(Proto);
+    expect(callCount).toBe(2);
+  });
+
+  it('calls @PostConstruct on eager beans during context creation', async () => {
+    const calls: string[] = [];
+    class Startup {
+      init() {
+        calls.push('eager-init');
+      }
+    }
+    await ApplicationContext.create([
+      makeDef(Startup, {
+        eager: true,
+        factory: async () => new Startup(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    expect(calls).toEqual(['eager-init']);
+  });
+
+  it('@PostConstruct throwing synchronously does not leave stale cache — second get() retries factory', async () => {
+    let factoryCallCount = 0;
+    let shouldThrow = true;
+    class Service {
+      init() {
+        if (shouldThrow) {
+          throw new Error('init failed');
+        }
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => {
+          factoryCallCount++;
+          return new Service();
+        },
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    // First get() — @PostConstruct throws
+    expect(() => ctx.get(Service)).toThrow('init failed');
+    // Second get() — factory should be called again (no stale cache)
+    shouldThrow = false;
+    const svc = ctx.get(Service);
+    expect(svc).toBeInstanceOf(Service);
+    expect(factoryCallCount).toBe(2);
+  });
+
+  it('throws AsyncBeanNotReadyError for async @PostConstruct in sync path without unhandled rejection', async () => {
+    class Service {
+      async init() {
+        // async PostConstruct
+      }
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        factory: () => new Service(),
+        metadata: { postConstructMethods: ['init'] },
+      }),
+    ]);
+    // sync get() should throw, but NOT cause unhandled promise rejection
+    expect(() => ctx.get(Service)).toThrow(AsyncBeanNotReadyError);
   });
 });
 

@@ -319,6 +319,36 @@ describe('Resolver', () => {
   });
 
   describe('module resolution', () => {
+    it('should warn when module import cannot be resolved', () => {
+      const loc = { filePath: '/src/AppModule.ts', line: 1, column: 1 };
+      const result = resolve({
+        beans: [],
+        modules: [
+          {
+            classDeclaration: undefined as any,
+            classTokenRef: {
+              kind: 'class' as const,
+              className: 'AppModule',
+              importPath: '/src/AppModule.ts',
+            },
+            imports: [{ className: 'MissingModule', sourceFile: undefined }],
+            provides: [],
+            sourceLocation: loc,
+          },
+        ],
+        warnings: [],
+      });
+
+      const appModule = result.modules.find(
+        (m) => m.classTokenRef.className === 'AppModule',
+      )!;
+      // Unresolvable imports are skipped with a warning
+      expect(appModule.imports).toHaveLength(0);
+      expect(result.warnings.some((w) => w.includes('MissingModule'))).toBe(
+        true,
+      );
+    });
+
     it('should resolve module imports to ClassTokenRefs', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
@@ -597,6 +627,42 @@ describe('Resolver', () => {
           ['Repository', '/src/Repository.ts'],
           ['Order', '/src/Order.ts'],
         ]),
+      });
+    });
+  });
+
+  describe('collection parameter resolution', () => {
+    it('should produce collection: true for Service[] parameter', () => {
+      const result = scanAndResolve({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Injectable() { return (t: any, c: any) => {} }
+        `,
+        '/src/Handler.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Handler[]) {}
+          }
+        `,
+      });
+
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps).toHaveLength(1);
+      expect(service.constructorDeps[0].collection).toBe(true);
+      expect(service.constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'Handler',
       });
     });
   });
