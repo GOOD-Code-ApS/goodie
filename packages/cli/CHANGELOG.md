@@ -1,4 +1,4 @@
-# @goodie-ts/testing
+# @goodie-ts/cli
 
 ## 0.2.0
 
@@ -40,12 +40,4 @@
 ### Patch Changes
 
 - Updated dependencies [69e21c1]
-  - @goodie-ts/core@0.2.0
-
-## 0.1.1
-
-### Patch Changes
-
-- Add README to each package for npm
-- Updated dependencies
-  - @goodie-ts/core@0.1.1
+  - @goodie-ts/transformer@0.2.0
