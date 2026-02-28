@@ -8,8 +8,12 @@ import type { ResolveResult } from './resolver.js';
 import {
   AmbiguousProviderError,
   CircularDependencyError,
+  InvalidDecoratorUsageError,
   MissingProviderError,
 } from './transformer-errors.js';
+
+/** Reserved token name used internally by codegen for the config bean. */
+const RESERVED_CONFIG_TOKEN = '__Goodie_Config';
 
 /** Result of the graph builder stage. */
 export interface GraphResult {
@@ -30,6 +34,20 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
   const processedModules = new Set<string>();
   expandModules(resolveResult.modules, allBeans, processedModules);
 
+  // Guard: no user-defined bean may use the reserved config token name
+  for (const bean of allBeans) {
+    if (
+      bean.tokenRef.kind === 'injection-token' &&
+      bean.tokenRef.tokenName === RESERVED_CONFIG_TOKEN
+    ) {
+      throw new InvalidDecoratorUsageError(
+        'Provides',
+        `Token name "${RESERVED_CONFIG_TOKEN}" is reserved for internal use by the @Value system. Rename the @Provides method or use a different token name.`,
+        bean.sourceLocation,
+      );
+    }
+  }
+
   // Build name-based lookup for @Named → @Inject('name') matching
   resolveNamedQualifiers(allBeans, warnings);
 
@@ -45,15 +63,48 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
 /**
  * Recursively expand modules: register the module class as a singleton,
  * and each @Provides method as a separate bean.
+ * Handles transitive imports (A imports B, B imports C) with cycle detection.
  */
 function expandModules(
   modules: IRModule[],
   allBeans: IRBeanDefinition[],
   processed: Set<string>,
 ): void {
+  // Build a lookup map: tokenRefKey → IRModule (for transitive resolution)
+  const moduleLookup = new Map<string, IRModule>();
   for (const mod of modules) {
+    moduleLookup.set(tokenRefKey(mod.classTokenRef), mod);
+  }
+
+  const visiting = new Set<string>(); // cycle detection
+  const displayPath: string[] = []; // human-readable names parallel to visiting
+
+  function expandModule(mod: IRModule): void {
     const key = tokenRefKey(mod.classTokenRef);
-    if (processed.has(key)) continue;
+    if (processed.has(key)) return; // already expanded (handles diamond imports)
+
+    if (visiting.has(key)) {
+      throw new CircularDependencyError(
+        [...displayPath, tokenRefDisplayName(mod.classTokenRef)],
+        mod.sourceLocation,
+      );
+    }
+
+    visiting.add(key);
+    displayPath.push(tokenRefDisplayName(mod.classTokenRef));
+
+    // Recursively expand imported modules first
+    for (const importRef of mod.imports) {
+      const importKey = tokenRefKey(importRef);
+      const importedModule = moduleLookup.get(importKey);
+      if (importedModule) {
+        expandModule(importedModule);
+      }
+      // Non-module imports are silently ignored (they may be regular beans)
+    }
+
+    visiting.delete(key);
+    displayPath.pop();
     processed.add(key);
 
     // Register the module class itself as an implicit singleton
@@ -76,6 +127,7 @@ function expandModules(
       const moduleDep: IRDependency = {
         tokenRef: mod.classTokenRef,
         optional: false,
+        collection: false,
         sourceLocation: provides.sourceLocation,
       };
 
@@ -95,9 +147,10 @@ function expandModules(
         sourceLocation: provides.sourceLocation,
       });
     }
+  }
 
-    // Note: transitive module imports would be expanded here in Phase 3
-    // For now we support flat imports only
+  for (const mod of modules) {
+    expandModule(mod);
   }
 }
 
@@ -170,6 +223,7 @@ function validateProviders(beans: IRBeanDefinition[]): void {
   // Rewrite unresolved deps via subtype map before validation
   for (const bean of beans) {
     for (const dep of bean.constructorDeps) {
+      if (dep.collection) continue; // Collection deps resolve all providers at runtime
       rewriteDepViaSubtype(dep, registered, subtypeMap, bean);
     }
     for (const field of bean.fieldDeps) {
@@ -185,7 +239,7 @@ function validateProviders(beans: IRBeanDefinition[]): void {
         : bean.tokenRef.tokenName;
 
     for (const dep of bean.constructorDeps) {
-      if (dep.optional) continue;
+      if (dep.optional || dep.collection) continue;
       const key = tokenRefKey(dep.tokenRef);
       if (!registered.has(key)) {
         const depName =

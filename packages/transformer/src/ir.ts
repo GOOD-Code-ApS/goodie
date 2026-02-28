@@ -48,6 +48,8 @@ export interface InjectionTokenRef {
 export interface IRDependency {
   tokenRef: TokenRef;
   optional: boolean;
+  /** When true, inject all beans under this token as an array (T[]). */
+  collection: boolean;
   sourceLocation: SourceLocation;
 }
 

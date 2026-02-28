@@ -7,10 +7,7 @@ import {
 import { Hono } from 'hono';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  Database_Url_Token,
-  definitions,
-} from '../src/AppContext.generated.js';
+import { definitions } from '../src/AppContext.generated.js';
 import { createTodoRoutes } from '../src/routes.js';
 import { TodoService } from '../src/TodoService.js';
 
@@ -35,8 +32,7 @@ describe('Hono + PostgreSQL Todo API', () => {
     await sql.end();
 
     ctx = await TestContext.from(definitions)
-      .override(Database_Url_Token)
-      .withFactory(() => connectionUri)
+      .withConfig({ DATABASE_URL: connectionUri })
       .build();
 
     const todoService = ctx.get(TodoService);

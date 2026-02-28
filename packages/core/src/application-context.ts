@@ -75,11 +75,11 @@ export class ApplicationContext {
 
     if (def.scope === 'singleton') {
       const cached = this.singletonCache.get(token as Token);
-      if (cached !== undefined) {
-        return cached as T;
-      }
       if (cached === UNRESOLVED || this.asyncInFlight.has(token as Token)) {
         throw new AsyncBeanNotReadyError(tokenName(token as Token));
+      }
+      if (cached !== undefined) {
+        return cached as T;
       }
       // Attempt synchronous resolution
       const instance = this.resolveSync<T>(def);
@@ -128,6 +128,7 @@ export class ApplicationContext {
 
   /**
    * Get all beans registered under the given token.
+   * Throws if any bean has an async factory — use `getAllAsync()` instead.
    */
   getAll<T>(token: Constructor<T> | InjectionToken<T>): T[] {
     this.assertOpen();
@@ -144,6 +145,32 @@ export class ApplicationContext {
       }
       return this.resolveSync<T>(def);
     });
+  }
+
+  /**
+   * Asynchronously get all beans registered under the given token.
+   * Safe to use when beans may have async factories.
+   */
+  async getAllAsync<T>(
+    token: Constructor<T> | InjectionToken<T>,
+  ): Promise<T[]> {
+    this.assertOpen();
+    const defs = this.defsByToken.get(token as Token);
+    if (!defs || defs.length === 0) {
+      return [];
+    }
+    const results: T[] = [];
+    for (const def of defs) {
+      if (def.scope === 'singleton') {
+        const cached = this.singletonCache.get(def.token);
+        if (cached !== undefined && cached !== UNRESOLVED) {
+          results.push(cached as T);
+          continue;
+        }
+      }
+      results.push((await this.resolveAsyncRaw(def, false)) as T);
+    }
+    return results;
   }
 
   /**
@@ -196,7 +223,11 @@ export class ApplicationContext {
   private validateDependencies(): void {
     for (const def of this.sortedDefs) {
       for (const dep of def.dependencies) {
-        if (!dep.optional && !this.primaryDef.has(dep.token)) {
+        if (
+          !dep.optional &&
+          !dep.collection &&
+          !this.primaryDef.has(dep.token)
+        ) {
           throw new MissingDependencyError(
             tokenName(dep.token),
             tokenName(def.token),
@@ -225,6 +256,9 @@ export class ApplicationContext {
 
   private resolveDepsSync(deps: Dependency[]): unknown[] {
     return deps.map((dep) => {
+      if (dep.collection) {
+        return this.getAll(dep.token);
+      }
       const depDef = this.primaryDef.get(dep.token);
       if (!depDef) {
         if (dep.optional) return undefined;
@@ -241,6 +275,10 @@ export class ApplicationContext {
   private async resolveDepsAsync(deps: Dependency[]): Promise<unknown[]> {
     const resolved: unknown[] = [];
     for (const dep of deps) {
+      if (dep.collection) {
+        resolved.push(await this.getAllAsync(dep.token));
+        continue;
+      }
       const depDef = this.primaryDef.get(dep.token);
       if (!depDef) {
         if (dep.optional) {
@@ -314,15 +352,30 @@ export class ApplicationContext {
       if (pp.beforeInit) {
         const result = pp.beforeInit(current, def as BeanDefinition<T>);
         if (result instanceof Promise) {
+          result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
         }
         current = result as T;
+      }
+    }
+    // @PostConstruct — runs after beforeInit, before afterInit
+    const postConstructMethods = def.metadata.postConstructMethods as
+      | string[]
+      | undefined;
+    if (postConstructMethods) {
+      for (const methodName of postConstructMethods) {
+        const result = (current as Record<string, () => unknown>)[methodName]();
+        if (result instanceof Promise) {
+          result.catch(() => {});
+          throw new AsyncBeanNotReadyError(tokenName(def.token));
+        }
       }
     }
     for (const pp of this.postProcessors) {
       if (pp.afterInit) {
         const result = pp.afterInit(current, def as BeanDefinition<T>);
         if (result instanceof Promise) {
+          result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
         }
         current = result as T;
@@ -339,6 +392,15 @@ export class ApplicationContext {
     for (const pp of this.postProcessors) {
       if (pp.beforeInit) {
         current = await pp.beforeInit(current, def);
+      }
+    }
+    // @PostConstruct — runs after beforeInit, before afterInit
+    const postConstructMethods = def.metadata.postConstructMethods as
+      | string[]
+      | undefined;
+    if (postConstructMethods) {
+      for (const methodName of postConstructMethods) {
+        await (current as Record<string, () => unknown>)[methodName]();
       }
     }
     for (const pp of this.postProcessors) {

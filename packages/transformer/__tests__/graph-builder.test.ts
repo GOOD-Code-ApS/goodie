@@ -248,6 +248,155 @@ describe('Graph Builder', () => {
     });
   });
 
+  describe('transitive module imports', () => {
+    it('should expand transitive imports (A imports B, B imports C)', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/CModule.ts': `
+          import { Module, Provides } from './decorators.js'
+          @Module()
+          export class CModule {
+            @Provides()
+            cValue(): string { return 'c' }
+          }
+        `,
+        '/src/BModule.ts': `
+          import { Module, Provides } from './decorators.js'
+          import { CModule } from './CModule.js'
+          @Module({ imports: [CModule] })
+          export class BModule {
+            @Provides()
+            bValue(): number { return 2 }
+          }
+        `,
+        '/src/AModule.ts': `
+          import { Module } from './decorators.js'
+          import { BModule } from './BModule.js'
+          @Module({ imports: [BModule] })
+          export class AModule {}
+        `,
+      });
+
+      const names = result.beans.map((b) =>
+        b.tokenRef.kind === 'class'
+          ? b.tokenRef.className
+          : b.tokenRef.tokenName,
+      );
+      // All modules and their provides should be expanded
+      expect(names).toContain('CModule');
+      expect(names).toContain('cValue');
+      expect(names).toContain('BModule');
+      expect(names).toContain('bValue');
+      expect(names).toContain('AModule');
+    });
+
+    it('should handle diamond imports (A→B+C, B→D, C→D)', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/DModule.ts': `
+          import { Module, Provides } from './decorators.js'
+          @Module()
+          export class DModule {
+            @Provides()
+            dValue(): string { return 'd' }
+          }
+        `,
+        '/src/BModule.ts': `
+          import { Module, Provides } from './decorators.js'
+          import { DModule } from './DModule.js'
+          @Module({ imports: [DModule] })
+          export class BModule {
+            @Provides()
+            bValue(): number { return 2 }
+          }
+        `,
+        '/src/CModule.ts': `
+          import { Module, Provides } from './decorators.js'
+          import { DModule } from './DModule.js'
+          @Module({ imports: [DModule] })
+          export class CModule {
+            @Provides()
+            cValue(): boolean { return true }
+          }
+        `,
+        '/src/AModule.ts': `
+          import { Module } from './decorators.js'
+          import { BModule } from './BModule.js'
+          import { CModule } from './CModule.js'
+          @Module({ imports: [BModule, CModule] })
+          export class AModule {}
+        `,
+      });
+
+      const names = result.beans.map((b) =>
+        b.tokenRef.kind === 'class'
+          ? b.tokenRef.className
+          : b.tokenRef.tokenName,
+      );
+      // DModule should appear only once (diamond dedup)
+      expect(names.filter((n) => n === 'DModule')).toHaveLength(1);
+      expect(names).toContain('BModule');
+      expect(names).toContain('CModule');
+      expect(names).toContain('AModule');
+      expect(names).toContain('dValue');
+    });
+
+    it('should throw CircularDependencyError for circular module imports with class names', () => {
+      const act = () =>
+        pipeline({
+          '/src/decorators.ts': decoratorsFile,
+          '/src/AModule.ts': `
+            import { Module } from './decorators.js'
+            import { BModule } from './BModule.js'
+            @Module({ imports: [BModule] })
+            export class AModule {}
+          `,
+          '/src/BModule.ts': `
+            import { Module } from './decorators.js'
+            import { AModule } from './AModule.js'
+            @Module({ imports: [AModule] })
+            export class BModule {}
+          `,
+        });
+      expect(act).toThrow(CircularDependencyError);
+      // Error message should contain class names, not internal key format
+      expect(act).toThrow(/AModule/);
+      expect(act).toThrow(/BModule/);
+      // Should NOT contain internal key format like "class:/src/..."
+      try {
+        act();
+      } catch (err) {
+        expect((err as Error).message).not.toMatch(/class:\/src\//);
+      }
+    });
+
+    it('should silently ignore import of non-module class', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/Config.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Config {}
+        `,
+        '/src/AppModule.ts': `
+          import { Module } from './decorators.js'
+          import { Config } from './Config.js'
+          @Module({ imports: [Config] })
+          export class AppModule {}
+        `,
+      });
+
+      // Config should be a regular bean, AppModule a module bean
+      const names = result.beans.map((b) =>
+        b.tokenRef.kind === 'class'
+          ? b.tokenRef.className
+          : b.tokenRef.tokenName,
+      );
+      expect(names).toContain('Config');
+      expect(names).toContain('AppModule');
+    });
+  });
+
   describe('error cases', () => {
     it('should throw CircularDependencyError for A → B → A', () => {
       expect(() =>
@@ -287,6 +436,66 @@ describe('Graph Builder', () => {
           `,
         }),
       ).toThrow(MissingProviderError);
+    });
+  });
+
+  describe('collection injection', () => {
+    it('should allow multiple providers for collection dep without ambiguity error', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/Handler.ts': `
+          import { Injectable } from './decorators.js'
+          @Injectable()
+          export class Handler {}
+        `,
+        '/src/HandlerB.ts': `
+          import { Injectable } from './decorators.js'
+          import { Handler } from './Handler.js'
+          @Injectable()
+          export class HandlerB extends Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Handler[]) {}
+          }
+        `,
+      });
+
+      // Should not throw AmbiguousProviderError
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].collection).toBe(true);
+    });
+
+    it('should allow empty collection deps (no providers)', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/Handler.ts': `
+          export class Handler {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { Handler } from './Handler.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private handlers: Handler[]) {}
+          }
+        `,
+      });
+
+      // Should not throw MissingProviderError for collection dep
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].collection).toBe(true);
     });
   });
 

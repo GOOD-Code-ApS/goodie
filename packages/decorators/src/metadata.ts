@@ -16,6 +16,8 @@ export const META = {
   INJECT: Symbol('goodie:inject'),
   OPTIONAL: Symbol('goodie:optional'),
   PRE_DESTROY: Symbol('goodie:pre-destroy'),
+  POST_CONSTRUCT: Symbol('goodie:post-construct'),
+  VALUE: Symbol('goodie:value'),
 } as const;
 
 type MetadataObject = DecoratorMetadataObject | Record<PropertyKey, unknown>;
