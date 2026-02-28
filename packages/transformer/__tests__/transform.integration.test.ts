@@ -547,6 +547,41 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
+  describe('@Eager on @Provides method', () => {
+    it('should set eager: true on @Provides bean when @Eager is present', () => {
+      const result = createTestProject({
+        '/src/AppModule.ts': `
+          import { Module, Provides, Eager } from './decorators.js'
+
+          @Module()
+          export class AppModule {
+            @Eager()
+            @Provides()
+            startupService(): string { return 'started' }
+
+            @Provides()
+            lazyService(): number { return 42 }
+          }
+        `,
+      });
+
+      const eagerBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'injection-token' &&
+          b.tokenRef.tokenName === 'startupService',
+      )!;
+      const lazyBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'injection-token' &&
+          b.tokenRef.tokenName === 'lazyService',
+      )!;
+
+      expect(eagerBean.eager).toBe(true);
+      expect(lazyBean.eager).toBe(false);
+      expect(result.code).toContain('eager: true');
+    });
+  });
+
   describe('@Eager + generic bean', () => {
     it('should generate eager generic @Provides bean', () => {
       const result = createTestProject({
@@ -638,6 +673,39 @@ describe('Transform Pipeline (Integration)', () => {
         postConstructMethods: ['init'],
         preDestroyMethods: ['shutdown'],
       });
+    });
+  });
+
+  describe('@PostProcessor metadata', () => {
+    it('should emit isBeanPostProcessor in metadata for @PostProcessor class', () => {
+      const result = createTestProject({
+        '/src/LoggingBPP.ts': `
+          import { Singleton, PostProcessor } from './decorators.js'
+
+          @PostProcessor()
+          @Singleton()
+          export class LoggingBPP {}
+        `,
+      });
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].metadata).toEqual({
+        isBeanPostProcessor: true,
+      });
+      expect(result.code).toContain('isBeanPostProcessor: true');
+    });
+
+    it('should not emit isBeanPostProcessor for regular beans', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      expect(result.beans[0].metadata).toEqual({});
     });
   });
 

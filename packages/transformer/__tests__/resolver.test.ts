@@ -232,6 +232,39 @@ describe('Resolver', () => {
       });
     });
 
+    it('should preserve @Eager flag on @Provides method', () => {
+      const result = scanAndResolve({
+        '/src/decorators.ts': `
+          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Provides() { return (t: any, c: any) => {} }
+          export function Eager() { return (t: any, c: any) => {} }
+        `,
+        '/src/AppModule.ts': `
+          import { Module, Provides, Eager } from './decorators.js'
+
+          @Module()
+          export class AppModule {
+            @Eager()
+            @Provides()
+            startupService(): string { return 'started' }
+
+            @Provides()
+            lazyService(): string { return 'lazy' }
+          }
+        `,
+      });
+
+      expect(result.modules).toHaveLength(1);
+      const eager = result.modules[0].provides.find(
+        (p) => p.methodName === 'startupService',
+      )!;
+      const lazy = result.modules[0].provides.find(
+        (p) => p.methodName === 'lazyService',
+      )!;
+      expect(eager.eager).toBe(true);
+      expect(lazy.eager).toBe(false);
+    });
+
     it('should default @Provides scope to singleton', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
@@ -343,6 +376,46 @@ describe('Resolver', () => {
         kind: 'class',
         className: 'DbModule',
       });
+    });
+  });
+
+  describe('@PostProcessor metadata', () => {
+    it('should set isBeanPostProcessor in metadata when @PostProcessor is present', () => {
+      const result = scanAndResolve({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function PostProcessor() { return (t: any, c: any) => {} }
+        `,
+        '/src/LoggingBPP.ts': `
+          import { Singleton, PostProcessor } from './decorators.js'
+
+          @PostProcessor()
+          @Singleton()
+          export class LoggingBPP {}
+        `,
+      });
+
+      const bpp = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'LoggingBPP',
+      )!;
+      expect(bpp.metadata.isBeanPostProcessor).toBe(true);
+    });
+
+    it('should not set isBeanPostProcessor for regular beans', () => {
+      const result = scanAndResolve({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      expect(result.beans[0].metadata.isBeanPostProcessor).toBeUndefined();
     });
   });
 

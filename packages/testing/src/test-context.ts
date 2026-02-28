@@ -24,6 +24,8 @@ export class OverrideBuilder<T> {
   constructor(
     private readonly token: Token,
     private readonly commit: (def: BeanDefinition) => void,
+    private readonly findOriginal: (token: Token) => BeanDefinition | undefined,
+    private readonly owner: TestContextBuilder,
   ) {}
 
   /**
@@ -39,7 +41,7 @@ export class OverrideBuilder<T> {
       metadata: {},
     };
     this.commit(def);
-    return builder;
+    return this.owner;
   }
 
   /**
@@ -55,7 +57,7 @@ export class OverrideBuilder<T> {
       metadata: {},
     };
     this.commit(def);
-    return builder;
+    return this.owner;
   }
 
   /**
@@ -71,13 +73,40 @@ export class OverrideBuilder<T> {
       metadata: {},
     };
     this.commit(def);
-    return builder;
+    return this.owner;
+  }
+
+  /**
+   * Override with a factory that receives the original bean's resolved
+   * dependencies. Keeps the original dependency list — only replaces the
+   * factory function.
+   *
+   * @example
+   * TestContext.from(definitions)
+   *   .override(UserService).withDeps((repo: UserRepo) => new MockUserService(repo))
+   *   .build()
+   */
+  withDeps(
+    factory: (...deps: unknown[]) => T | Promise<T>,
+  ): TestContextBuilder {
+    const original = this.findOriginal(this.token);
+    if (!original) {
+      throw new DIError(
+        `withDeps(): no original bean definition found for token "${tokenName(this.token)}"`,
+      );
+    }
+    const def: BeanDefinition = {
+      token: this.token,
+      scope: original.scope,
+      dependencies: [...original.dependencies],
+      factory,
+      eager: original.eager,
+      metadata: { ...original.metadata },
+    };
+    this.commit(def);
+    return this.owner;
   }
 }
-
-// Module-level reference that OverrideBuilder methods return.
-// Set by TestContextBuilder before creating OverrideBuilder instances.
-let builder: TestContextBuilder;
 
 /**
  * Accumulates bean overrides and builds a fresh ApplicationContext.
@@ -99,10 +128,14 @@ export class TestContextBuilder {
     if (!this.tokenSet.has(token as Token)) {
       throw new OverrideError(tokenName(token as Token));
     }
-    builder = this;
-    return new OverrideBuilder<T>(token as Token, (def) => {
-      this.overrides.set(def.token, def);
-    });
+    return new OverrideBuilder<T>(
+      token as Token,
+      (def) => {
+        this.overrides.set(def.token, def);
+      },
+      (t) => this.baseDefs.find((d) => d.token === t),
+      this,
+    );
   }
 
   /**

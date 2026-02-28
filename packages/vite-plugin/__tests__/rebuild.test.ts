@@ -24,7 +24,7 @@ const defaultOptions: ResolvedOptions = {
 };
 
 describe('runRebuild', () => {
-  it('returns success with TransformResult on successful transform', () => {
+  it('returns success with TransformResult', () => {
     const fakeResult = {
       code: '// generated',
       outputPath: defaultOptions.outputPath,
@@ -41,7 +41,7 @@ describe('runRebuild', () => {
     }
   });
 
-  it('passes correct options to transform', () => {
+  it('passes tsConfigFilePath, outputPath, and include to transform', () => {
     mockTransform.mockReturnValue({
       code: '',
       outputPath: '',
@@ -50,17 +50,14 @@ describe('runRebuild', () => {
     } as any);
 
     const opts: ResolvedOptions = {
-      tsConfigPath: '/custom/tsconfig.json',
-      outputPath: '/custom/output.ts',
+      ...defaultOptions,
       include: ['src/**/*.ts'],
-      debounceMs: 200,
     };
-
     runRebuild(opts);
 
     expect(mockTransform).toHaveBeenCalledWith({
-      tsConfigFilePath: '/custom/tsconfig.json',
-      outputPath: '/custom/output.ts',
+      tsConfigFilePath: '/project/tsconfig.json',
+      outputPath: '/project/src/AppContext.generated.ts',
       include: ['src/**/*.ts'],
     });
   });

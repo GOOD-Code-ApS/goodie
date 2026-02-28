@@ -95,6 +95,9 @@ function resolveBean(
   if (scanned.postConstructMethods.length > 0) {
     metadata.postConstructMethods = scanned.postConstructMethods;
   }
+  if (scanned.isBeanPostProcessor) {
+    metadata.isBeanPostProcessor = true;
+  }
   if (scanned.valueFields.length > 0) {
     metadata.valueFields = scanned.valueFields.map((vf) => ({
       fieldName: vf.fieldName,
@@ -181,7 +184,7 @@ function resolveModule(
         methodName: p.methodName,
         tokenRef,
         scope: 'singleton' as const,
-        eager: false,
+        eager: p.eager,
         dependencies,
         sourceLocation: p.sourceLocation,
       };

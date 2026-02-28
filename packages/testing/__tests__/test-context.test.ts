@@ -83,6 +83,44 @@ describe('TestContext.from()', () => {
   });
 });
 
+// ── interleaved builders (regression: module-level builder variable) ─
+
+describe('interleaved builders', () => {
+  it('override() returns the correct builder when interleaved', async () => {
+    class Foo {
+      constructor(readonly value: string) {}
+    }
+    class Bar {
+      constructor(readonly value: string) {}
+    }
+    const defs = [
+      makeDef(Foo, { factory: () => new Foo('orig-foo') }),
+      makeDef(Bar, { factory: () => new Bar('orig-bar') }),
+    ];
+
+    const b1 = TestContext.from(defs);
+    const b2 = TestContext.from(defs);
+
+    // Interleave: start override on b1, then start override on b2,
+    // then finish both. With the old module-level variable both
+    // terminators would return b2.
+    const ob1 = b1.override(Foo);
+    const ob2 = b2.override(Bar);
+
+    const returned1 = ob1.withValue(new Foo('b1-foo'));
+    const returned2 = ob2.withValue(new Bar('b2-bar'));
+
+    expect(returned1).toBe(b1);
+    expect(returned2).toBe(b2);
+
+    const ctx1 = await b1.build();
+    const ctx2 = await b2.build();
+
+    expect(ctx1.get(Foo).value).toBe('b1-foo');
+    expect(ctx2.get(Bar).value).toBe('b2-bar');
+  });
+});
+
 // ── override() validation ───────────────────────────────────────────
 
 describe('override() validation', () => {
@@ -344,6 +382,121 @@ describe('build()', () => {
       .build();
 
     expect(ctx.get(Proto)).not.toBe(ctx.get(Proto));
+  });
+});
+
+// ── withDeps() ──────────────────────────────────────────────────────
+
+describe('withDeps()', () => {
+  it('uses the original deps but replaces the factory', async () => {
+    class Repo {
+      constructor(readonly name: string) {}
+    }
+    class Service {
+      constructor(readonly repo: Repo) {}
+    }
+    const defs = [
+      makeDef(Repo, { factory: () => new Repo('real-repo') }),
+      makeDef(Service, {
+        deps: [dep(Repo)],
+        factory: (r) => new Service(r as Repo),
+      }),
+    ];
+
+    const ctx = await TestContext.from(defs)
+      .override(Service)
+      .withDeps((r) => {
+        const repo = r as Repo;
+        return { repo, replaced: true } as unknown as Service;
+      })
+      .build();
+
+    const svc = ctx.get(Service) as unknown as {
+      repo: Repo;
+      replaced: boolean;
+    };
+    expect(svc.replaced).toBe(true);
+    expect(svc.repo.name).toBe('real-repo');
+  });
+
+  it('receives all original dependencies in order', async () => {
+    class A {
+      value = 'a';
+    }
+    class B {
+      value = 'b';
+    }
+    class Target {
+      constructor(
+        readonly a: A,
+        readonly b: B,
+      ) {}
+    }
+    const defs = [
+      makeDef(A, { factory: () => new A() }),
+      makeDef(B, { factory: () => new B() }),
+      makeDef(Target, {
+        deps: [dep(A), dep(B)],
+        factory: (a, b) => new Target(a as A, b as B),
+      }),
+    ];
+
+    const receivedArgs: unknown[] = [];
+    const ctx = await TestContext.from(defs)
+      .override(Target)
+      .withDeps((...args) => {
+        receivedArgs.push(...args);
+        return new Target(args[0] as A, args[1] as B);
+      })
+      .build();
+
+    ctx.get(Target);
+    expect(receivedArgs).toHaveLength(2);
+    expect((receivedArgs[0] as A).value).toBe('a');
+    expect((receivedArgs[1] as B).value).toBe('b');
+  });
+
+  it('preserves scope, eager, and metadata from the original bean', async () => {
+    class Foo {}
+    const defs = [
+      makeDef(Foo, {
+        factory: () => new Foo(),
+        scope: 'prototype',
+        eager: true,
+        metadata: { isBeanPostProcessor: true },
+      }),
+    ];
+
+    const ctx = await TestContext.from(defs)
+      .override(Foo)
+      .withDeps(() => new Foo())
+      .build();
+
+    const overriddenDef = ctx.getDefinitions().find((d) => d.token === Foo)!;
+    expect(overriddenDef.scope).toBe('prototype');
+    expect(overriddenDef.eager).toBe(true);
+    expect(overriddenDef.metadata).toEqual({ isBeanPostProcessor: true });
+  });
+
+  it('works with InjectionToken-based provides beans', async () => {
+    class Config {
+      host = 'localhost';
+    }
+    const DB_URL = new InjectionToken<string>('DB_URL');
+    const defs = [
+      makeDef(Config, { factory: () => new Config() }),
+      makeDef<string>(DB_URL, {
+        deps: [dep(Config)],
+        factory: (c) => `postgres://${(c as Config).host}`,
+      }),
+    ];
+
+    const ctx = await TestContext.from(defs)
+      .override(DB_URL)
+      .withDeps((c) => `test://${(c as Config).host}`)
+      .build();
+
+    expect(ctx.get(DB_URL)).toBe('test://localhost');
   });
 });
 

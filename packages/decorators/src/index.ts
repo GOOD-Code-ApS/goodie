@@ -7,6 +7,7 @@ export { Module } from './module.js';
 export { Named } from './named.js';
 export { Optional } from './optional.js';
 export { PostConstruct } from './post-construct.js';
+export { PostProcessor } from './post-processor.js';
 export { PreDestroy } from './pre-destroy.js';
 export { Provides } from './provides.js';
 export { Singleton } from './singleton.js';

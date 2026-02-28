@@ -21,6 +21,7 @@ export default defineConfig({
         __dirname,
         'packages/testing/src/index.ts',
       ),
+      '@goodie-ts/cli': path.resolve(__dirname, 'packages/cli/src/index.ts'),
     },
   },
   test: {

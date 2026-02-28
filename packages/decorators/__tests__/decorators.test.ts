@@ -10,6 +10,7 @@ import {
   Named,
   Optional,
   PostConstruct,
+  PostProcessor,
   PreDestroy,
   Provides,
   Singleton,
@@ -226,6 +227,17 @@ describe('@PostConstruct()', () => {
     expect(postConstruct).toHaveLength(2);
     expect(postConstruct[0].methodName).toBe('initCache');
     expect(postConstruct[1].methodName).toBe('loadConfig');
+  });
+});
+
+describe('@PostProcessor()', () => {
+  it('sets POST_PROCESSOR to true', () => {
+    @PostProcessor()
+    @Singleton()
+    class LoggingBPP {}
+
+    const meta = getClassMetadata(LoggingBPP)!;
+    expect(meta[META.POST_PROCESSOR]).toBe(true);
   });
 });
 

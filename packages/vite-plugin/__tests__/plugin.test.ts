@@ -83,7 +83,6 @@ describe('diPlugin', () => {
   describe('configResolved', () => {
     it('resolves options using config.root', () => {
       const plugin = setupPlugin(undefined, '/my/root');
-      // Verify by running buildStart — it will use the resolved options
       mockRunRebuild.mockReturnValue(successResult(0));
       plugin.buildStart();
       expect(mockRunRebuild).toHaveBeenCalledWith({
@@ -154,7 +153,6 @@ describe('diPlugin', () => {
       plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
       vi.advanceTimersByTime(100);
 
-      // First call is from buildStart setup? No — we didn't call buildStart
       expect(mockRunRebuild).toHaveBeenCalledTimes(1);
       expect(console.log).toHaveBeenCalledWith(
         '[goodie] Rebuild complete: 3 bean(s) registered.',
@@ -261,6 +259,30 @@ describe('diPlugin', () => {
       vi.advanceTimersByTime(100);
 
       expect(mockRunRebuild).toHaveBeenCalledTimes(2);
+    });
+
+    it('calls runRebuild with resolved options only', () => {
+      const plugin = setupPlugin();
+      mockRunRebuild.mockReturnValue(successResult(0));
+
+      // buildStart
+      plugin.buildStart();
+      mockRunRebuild.mockClear();
+
+      // HMR should call runRebuild with just the resolved options
+      mockRunRebuild.mockReturnValue(successResult(0));
+      plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
+      vi.advanceTimersByTime(100);
+
+      expect(mockRunRebuild).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tsConfigPath: expect.any(String),
+          outputPath: expect.any(String),
+        }),
+      );
+      // Should only receive one argument (resolved options)
+      expect(mockRunRebuild).toHaveBeenCalledTimes(1);
+      expect(mockRunRebuild.mock.calls[0]).toHaveLength(1);
     });
   });
 });

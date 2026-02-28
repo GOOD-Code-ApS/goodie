@@ -263,6 +263,38 @@ describe('Scanner', () => {
       expect(result.modules[0].provides[0].params[0].typeName).toBe('Repo');
     });
 
+    it('should detect @Eager on @Provides methods', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Provides() { return (t: any, c: any) => {} }
+          export function Eager() { return (t: any, c: any) => {} }
+        `,
+        '/src/AppModule.ts': `
+          import { Module, Provides, Eager } from './decorators.js'
+
+          @Module()
+          export class AppModule {
+            @Eager()
+            @Provides()
+            startupService(): string { return 'started' }
+
+            @Provides()
+            lazyService(): string { return 'lazy' }
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.modules).toHaveLength(1);
+      expect(result.modules[0].provides).toHaveLength(2);
+      expect(result.modules[0].provides[0].methodName).toBe('startupService');
+      expect(result.modules[0].provides[0].eager).toBe(true);
+      expect(result.modules[0].provides[1].methodName).toBe('lazyService');
+      expect(result.modules[0].provides[1].eager).toBe(false);
+    });
+
     it('should scan module imports', () => {
       const project = createProject({
         '/src/decorators.ts': `
@@ -621,6 +653,71 @@ describe('Scanner', () => {
     });
   });
 
+  describe('@PostProcessor detection', () => {
+    it('should detect @PostProcessor on a bean', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function PostProcessor() { return (t: any, c: any) => {} }
+        `,
+        '/src/LoggingBPP.ts': `
+          import { Singleton, PostProcessor } from './decorators.js'
+
+          @PostProcessor()
+          @Singleton()
+          export class LoggingBPP {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].isBeanPostProcessor).toBe(true);
+    });
+
+    it('should default isBeanPostProcessor to false', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].isBeanPostProcessor).toBe(false);
+    });
+  });
+
+  describe('@PostProcessor + @Injectable rejection', () => {
+    it('throws InvalidDecoratorUsageError when combining @PostProcessor with @Injectable', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Injectable() { return (t: any, c: any) => {} }
+          export function PostProcessor() { return (t: any, c: any) => {} }
+        `,
+        '/src/BadProcessor.ts': `
+          import { Injectable, PostProcessor } from './decorators.js'
+
+          @PostProcessor()
+          @Injectable()
+          export class BadProcessor {}
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+      expect(() => scan(project)).toThrow(
+        /@PostProcessor cannot be combined with @Injectable/,
+      );
+    });
+  });
+
   describe('collection (array) type detection', () => {
     it('should detect T[] array parameter', () => {
       const project = createProject({
@@ -876,6 +973,25 @@ describe('Scanner', () => {
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
       expect(() => scan(project)).toThrow(
         /Cannot apply @Module\(\) to abstract class "AbstractModule"/,
+      );
+    });
+
+    it('throws InvalidDecoratorUsageError for abstract @PostProcessor class', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function PostProcessor() { return (t: any, c: any) => {} }
+        `,
+        '/src/AbstractProcessor.ts': `
+          import { PostProcessor } from './decorators.js'
+
+          @PostProcessor()
+          export abstract class AbstractProcessor {}
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+      expect(() => scan(project)).toThrow(
+        /Cannot apply @PostProcessor\(\) to abstract class "AbstractProcessor"/,
       );
     });
 

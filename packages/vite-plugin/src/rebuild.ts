@@ -2,13 +2,15 @@ import type { TransformResult } from '@goodie-ts/transformer';
 import { TransformerError, transform } from '@goodie-ts/transformer';
 import type { ResolvedOptions } from './options.js';
 
-export type RebuildSuccess = { success: true; result: TransformResult };
+export type RebuildSuccess = {
+  success: true;
+  result: TransformResult;
+};
 export type RebuildFailure = { success: false; error: Error };
 export type RebuildOutcome = RebuildSuccess | RebuildFailure;
 
 /**
- * Run the full DI transform pipeline, returning a discriminated union.
- * This is the single swap-point for incremental rebuilds later.
+ * Run the DI transform pipeline with full rebuild every time.
  */
 export function runRebuild(options: ResolvedOptions): RebuildOutcome {
   try {

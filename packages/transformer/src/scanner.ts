@@ -22,6 +22,7 @@ const DECORATOR_NAMES = {
   Optional: 'Optional',
   PreDestroy: 'PreDestroy',
   PostConstruct: 'PostConstruct',
+  PostProcessor: 'PostProcessor',
   Value: 'Value',
 } as const;
 
@@ -38,6 +39,8 @@ export interface ScannedBean {
   preDestroyMethods: string[];
   /** Method names decorated with @PostConstruct(). */
   postConstructMethods: string[];
+  /** Whether @PostProcessor() is present on this class. */
+  isBeanPostProcessor: boolean;
   /** Fields decorated with @Value('key'). */
   valueFields: ScannedValueField[];
   /** All ancestor classes (direct parent first, root last). */
@@ -121,6 +124,8 @@ export interface ScannedProvides {
   /** The resolved base type name of the return type. */
   returnResolvedBaseTypeName: string | undefined;
   params: ScannedConstructorParam[];
+  /** Whether @Eager() is present on this @Provides method. */
+  eager: boolean;
   sourceLocation: SourceLocation;
 }
 
@@ -145,13 +150,22 @@ export function scan(project: Project): ScanResult {
       const isModule = hasDecorator(decorators, DECORATOR_NAMES.Module);
       const isInjectable = hasDecorator(decorators, DECORATOR_NAMES.Injectable);
       const isSingleton = hasDecorator(decorators, DECORATOR_NAMES.Singleton);
+      const isPostProcessor = hasDecorator(
+        decorators,
+        DECORATOR_NAMES.PostProcessor,
+      );
 
-      if ((isModule || isInjectable || isSingleton) && cls.isAbstract()) {
+      if (
+        (isModule || isInjectable || isSingleton || isPostProcessor) &&
+        cls.isAbstract()
+      ) {
         const decoratorName = isModule
           ? 'Module'
           : isSingleton
             ? 'Singleton'
-            : 'Injectable';
+            : isPostProcessor
+              ? 'PostProcessor'
+              : 'Injectable';
         throw new InvalidDecoratorUsageError(
           decoratorName,
           `Cannot apply @${decoratorName}() to abstract class "${cls.getName()}". Abstract classes cannot be instantiated. Remove the decorator or make the class concrete.`,
@@ -159,11 +173,24 @@ export function scan(project: Project): ScanResult {
         );
       }
 
+      if (isPostProcessor && isInjectable) {
+        throw new InvalidDecoratorUsageError(
+          'PostProcessor',
+          `@PostProcessor cannot be combined with @Injectable — post-processors must be singletons. Use @PostProcessor() @Singleton() instead.`,
+          getSourceLocation(cls, sourceFile),
+        );
+      }
+
       if (isModule) {
         const scannedModule = scanModule(cls, decorators, sourceFile);
         if (scannedModule) modules.push(scannedModule);
-      } else if (isInjectable || isSingleton) {
-        const scannedBean = scanBean(cls, decorators, sourceFile, isSingleton);
+      } else if (isInjectable || isSingleton || isPostProcessor) {
+        const scannedBean = scanBean(
+          cls,
+          decorators,
+          sourceFile,
+          isSingleton || isPostProcessor,
+        );
         if (scannedBean) beans.push(scannedBean);
       }
     }
@@ -188,6 +215,10 @@ function scanBean(
   const fieldInjections = scanFieldInjections(cls);
   const preDestroyMethods = scanPreDestroyMethods(cls);
   const postConstructMethods = scanPostConstructMethods(cls);
+  const isBeanPostProcessor = hasDecorator(
+    decorators,
+    DECORATOR_NAMES.PostProcessor,
+  );
   const valueFields = scanValueFields(cls);
   const baseClasses = extractBaseClassChain(cls);
 
@@ -205,6 +236,7 @@ function scanBean(
     fieldInjections,
     preDestroyMethods,
     postConstructMethods,
+    isBeanPostProcessor,
     valueFields,
     baseClasses,
     sourceLocation: getSourceLocation(cls, sourceFile),
@@ -442,6 +474,7 @@ function scanProvidesMethods(
       returnTypeArguments,
       returnResolvedBaseTypeName,
       params,
+      eager: hasDecorator(decorators, DECORATOR_NAMES.Eager),
       sourceLocation: getSourceLocation(method, sourceFile),
     });
   }

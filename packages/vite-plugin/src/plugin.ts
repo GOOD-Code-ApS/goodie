@@ -8,7 +8,7 @@ import { runRebuild } from './rebuild.js';
  * Vite plugin that runs the @goodie compile-time DI transformer.
  *
  * - On `buildStart`: full transform, throws on error (aborts build).
- * - On `handleHotUpdate`: debounced rebuild on `.ts` changes, logs errors without crashing.
+ * - On `handleHotUpdate`: debounced rebuild on `.ts` changes.
  */
 export function diPlugin(userOptions?: DiPluginOptions): Plugin {
   let resolved: ResolvedOptions;

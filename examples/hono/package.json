@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "generate": "node scripts/generate.js",
+    "generate": "goodie generate",
     "start": "node dist/main.js"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "postgres": "^3.4.0"
   },
   "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/testing": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@goodie-ts/vite-plugin": "workspace:*",
