@@ -173,6 +173,14 @@ export function scan(project: Project): ScanResult {
         );
       }
 
+      if (isPostProcessor && isInjectable) {
+        throw new InvalidDecoratorUsageError(
+          'PostProcessor',
+          `@PostProcessor cannot be combined with @Injectable — post-processors must be singletons. Use @PostProcessor() @Singleton() instead.`,
+          getSourceLocation(cls, sourceFile),
+        );
+      }
+
       if (isModule) {
         const scannedModule = scanModule(cls, decorators, sourceFile);
         if (scannedModule) modules.push(scannedModule);

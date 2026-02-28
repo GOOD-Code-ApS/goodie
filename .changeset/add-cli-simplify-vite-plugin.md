@@ -24,7 +24,6 @@ Add `@goodie-ts/cli` package with `goodie generate` command, simplify vite-plugi
 
 **New: `@goodie-ts/core`**
 - `@PostProcessor` support in ApplicationContext
-- `withDeps()` partial test overrides
 
 **New: `@goodie-ts/decorators`**
 - `@PostProcessor()` class decorator

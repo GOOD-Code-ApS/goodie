@@ -83,6 +83,44 @@ describe('TestContext.from()', () => {
   });
 });
 
+// ── interleaved builders (regression: module-level builder variable) ─
+
+describe('interleaved builders', () => {
+  it('override() returns the correct builder when interleaved', async () => {
+    class Foo {
+      constructor(readonly value: string) {}
+    }
+    class Bar {
+      constructor(readonly value: string) {}
+    }
+    const defs = [
+      makeDef(Foo, { factory: () => new Foo('orig-foo') }),
+      makeDef(Bar, { factory: () => new Bar('orig-bar') }),
+    ];
+
+    const b1 = TestContext.from(defs);
+    const b2 = TestContext.from(defs);
+
+    // Interleave: start override on b1, then start override on b2,
+    // then finish both. With the old module-level variable both
+    // terminators would return b2.
+    const ob1 = b1.override(Foo);
+    const ob2 = b2.override(Bar);
+
+    const returned1 = ob1.withValue(new Foo('b1-foo'));
+    const returned2 = ob2.withValue(new Bar('b2-bar'));
+
+    expect(returned1).toBe(b1);
+    expect(returned2).toBe(b2);
+
+    const ctx1 = await b1.build();
+    const ctx2 = await b2.build();
+
+    expect(ctx1.get(Foo).value).toBe('b1-foo');
+    expect(ctx2.get(Bar).value).toBe('b2-bar');
+  });
+});
+
 // ── override() validation ───────────────────────────────────────────
 
 describe('override() validation', () => {

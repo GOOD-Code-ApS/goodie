@@ -695,6 +695,29 @@ describe('Scanner', () => {
     });
   });
 
+  describe('@PostProcessor + @Injectable rejection', () => {
+    it('throws InvalidDecoratorUsageError when combining @PostProcessor with @Injectable', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Injectable() { return (t: any, c: any) => {} }
+          export function PostProcessor() { return (t: any, c: any) => {} }
+        `,
+        '/src/BadProcessor.ts': `
+          import { Injectable, PostProcessor } from './decorators.js'
+
+          @PostProcessor()
+          @Injectable()
+          export class BadProcessor {}
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+      expect(() => scan(project)).toThrow(
+        /@PostProcessor cannot be combined with @Injectable/,
+      );
+    });
+  });
+
   describe('collection (array) type detection', () => {
     it('should detect T[] array parameter', () => {
       const project = createProject({

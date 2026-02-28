@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
+> **Alpha software.** APIs may change between minor versions until 1.0. Pin your versions and check the [changelog](./.changeset) before upgrading.
+
 Compile-time dependency injection for TypeScript. No `reflect-metadata`, no runtime scanning — just decorators and code generation.
 
 ## How It Works

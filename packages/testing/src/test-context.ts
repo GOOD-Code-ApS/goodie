@@ -2,7 +2,6 @@ import {
   ApplicationContext,
   type BeanDefinition,
   type Constructor,
-  type Dependency,
   DIError,
   InjectionToken,
   OverrideError,
@@ -26,6 +25,7 @@ export class OverrideBuilder<T> {
     private readonly token: Token,
     private readonly commit: (def: BeanDefinition) => void,
     private readonly findOriginal: (token: Token) => BeanDefinition | undefined,
+    private readonly owner: TestContextBuilder,
   ) {}
 
   /**
@@ -41,7 +41,7 @@ export class OverrideBuilder<T> {
       metadata: {},
     };
     this.commit(def);
-    return builder;
+    return this.owner;
   }
 
   /**
@@ -57,7 +57,7 @@ export class OverrideBuilder<T> {
       metadata: {},
     };
     this.commit(def);
-    return builder;
+    return this.owner;
   }
 
   /**
@@ -73,7 +73,7 @@ export class OverrideBuilder<T> {
       metadata: {},
     };
     this.commit(def);
-    return builder;
+    return this.owner;
   }
 
   /**
@@ -90,25 +90,23 @@ export class OverrideBuilder<T> {
     factory: (...deps: unknown[]) => T | Promise<T>,
   ): TestContextBuilder {
     const original = this.findOriginal(this.token);
-    const dependencies: Dependency[] = original
-      ? [...original.dependencies]
-      : [];
+    if (!original) {
+      throw new DIError(
+        `withDeps(): no original bean definition found for token "${tokenName(this.token)}"`,
+      );
+    }
     const def: BeanDefinition = {
       token: this.token,
-      scope: original?.scope ?? 'singleton',
-      dependencies,
+      scope: original.scope,
+      dependencies: [...original.dependencies],
       factory,
-      eager: original?.eager ?? false,
-      metadata: original?.metadata ? { ...original.metadata } : {},
+      eager: original.eager,
+      metadata: { ...original.metadata },
     };
     this.commit(def);
-    return builder;
+    return this.owner;
   }
 }
-
-// Module-level reference that OverrideBuilder methods return.
-// Set by TestContextBuilder before creating OverrideBuilder instances.
-let builder: TestContextBuilder;
 
 /**
  * Accumulates bean overrides and builds a fresh ApplicationContext.
@@ -130,13 +128,13 @@ export class TestContextBuilder {
     if (!this.tokenSet.has(token as Token)) {
       throw new OverrideError(tokenName(token as Token));
     }
-    builder = this;
     return new OverrideBuilder<T>(
       token as Token,
       (def) => {
         this.overrides.set(def.token, def);
       },
       (t) => this.baseDefs.find((d) => d.token === t),
+      this,
     );
   }
 
