@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "generate": "node scripts/generate.js"
+    "generate": "goodie generate"
   },
   "dependencies": {
     "@goodie-ts/core": "workspace:*",
     "@goodie-ts/decorators": "workspace:*"
   },
   "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/testing": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@goodie-ts/vite-plugin": "workspace:*",

@@ -1,19 +1,22 @@
 {
-  "name": "@goodie-ts/vite-plugin",
+  "name": "@goodie-ts/cli",
   "version": "0.1.1",
-  "description": "Vite plugin for goodie-ts compile-time dependency injection",
+  "description": "CLI for goodie-ts compile-time dependency injection",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/GOOD-Code-ApS/goodie.git",
-    "directory": "packages/vite-plugin"
+    "directory": "packages/cli"
   },
   "publishConfig": {
     "access": "public"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "goodie": "dist/bin.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -25,13 +28,11 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/transformer": "workspace:*"
-  },
-  "peerDependencies": {
-    "vite": "^5.0.0 || ^6.0.0"
+    "@goodie-ts/transformer": "workspace:*",
+    "citty": "^0.1.6"
   },
   "devDependencies": {
-    "vite": "^6.0.0"
+    "@types/node": "^22.0.0"
   },
   "files": [
     "dist"
