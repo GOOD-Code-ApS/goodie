@@ -41,11 +41,7 @@ export type {
 // Scanner
 export { scan } from './scanner.js';
 // Pipeline
-export {
-  transform,
-  transformInMemory,
-  transformWithProject,
-} from './transform.js';
+export { transform, transformInMemory } from './transform.js';
 // Errors
 export {
   AmbiguousProviderError,

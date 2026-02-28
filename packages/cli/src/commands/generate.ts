@@ -23,6 +23,11 @@ export const generate = defineCommand({
       description: 'Watch for changes and rebuild',
       default: false,
     },
+    'watch-dir': {
+      type: 'string',
+      description:
+        'Directory to watch (default: cwd). Requires Node >= 22.13 for recursive watching.',
+    },
   },
   run({ args }) {
     const cwd = process.cwd();
@@ -39,11 +44,16 @@ export const generate = defineCommand({
     }
 
     if (args.watch) {
-      console.log('[goodie] Watching for changes...');
+      const watchDir = args['watch-dir']
+        ? path.resolve(cwd, args['watch-dir'])
+        : cwd;
+      console.log(
+        `[goodie] Watching ${path.relative(cwd, watchDir) || '.'} for changes...`,
+      );
       watchAndRebuild({
         tsConfigPath,
         outputPath,
-        watchDir: path.dirname(outputPath),
+        watchDir,
       });
     }
   },

@@ -79,31 +79,3 @@ export function transformInMemory(
     warnings: graphResult.warnings,
   };
 }
-
-/**
- * Run the pipeline on an existing ts-morph Project and write to disk.
- * Used by the Vite plugin for incremental rebuilds with a persistent Project.
- */
-export function transformWithProject(
-  project: Project,
-  outputPath: string,
-): TransformResult {
-  const scanResult = scan(project);
-  const resolveResult = resolve(scanResult);
-  const graphResult = buildGraph(resolveResult);
-  const code = generateCode(graphResult.beans, {
-    outputPath,
-    version: PKG_VERSION,
-  });
-
-  const outputDir = path.dirname(outputPath);
-  fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(outputPath, code, 'utf-8');
-
-  return {
-    code,
-    outputPath,
-    beans: graphResult.beans,
-    warnings: graphResult.warnings,
-  };
-}
