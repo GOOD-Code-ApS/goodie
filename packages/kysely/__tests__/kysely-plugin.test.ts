@@ -143,13 +143,13 @@ describe('Kysely Transformer Plugin', () => {
     expect(result.code).toContain('instance.update = buildInterceptorChain');
   });
 
-  it('should add database bean as TransactionManager constructor dep when database option is set', () => {
+  it('should auto-detect Kysely provider and wire TransactionManager dependency', () => {
     const project = createProject({
       '/src/Database.ts': `
         import { Singleton } from './decorators.js'
         @Singleton()
         export class Database {
-          kysely: any
+          kysely!: Kysely<any>
         }
       `,
       '/src/MyService.ts': `
@@ -163,18 +163,54 @@ describe('Kysely Transformer Plugin', () => {
     });
 
     const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createKyselyPlugin({ database: 'Database' }),
+      createKyselyPlugin(),
     ]);
 
-    // TransactionManager factory should receive a dep (dep0 = Database)
+    // TransactionManager factory should receive Database as dep0
     expect(result.code).toContain(
       '(dep0: any) => new TransactionManager(dep0)',
     );
-    // Database should be listed as a dependency of TransactionManager
     expect(result.code).toContain('token: Database');
   });
 
-  it('should have zero constructor deps for TransactionManager when no database option is set', () => {
+  it('should use explicit database option over auto-detection', () => {
+    const project = createProject({
+      '/src/Database.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class Database {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/DbClient.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class DbClient {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/MyService.ts': `
+        import { Singleton, Transactional } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Transactional()
+          async create() {}
+        }
+      `,
+    });
+
+    // Two Kysely providers, but explicit option picks DbClient
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin({ database: 'DbClient' }),
+    ]);
+
+    expect(result.code).toContain(
+      '(dep0: any) => new TransactionManager(dep0)',
+    );
+    expect(result.code).toContain('token: DbClient');
+  });
+
+  it('should have zero deps when no Kysely provider exists and no database option', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton, Transactional } from './decorators.js'
@@ -190,11 +226,50 @@ describe('Kysely Transformer Plugin', () => {
       createKyselyPlugin(),
     ]);
 
-    // TransactionManager factory should have no deps
     expect(result.code).toContain('() => new TransactionManager()');
   });
 
-  it('should warn and fall back to zero deps when database class is not found', () => {
+  it('should warn on multiple Kysely providers without explicit database option', () => {
+    const project = createProject({
+      '/src/Database.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class Database {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/DbClient.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class DbClient {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/MyService.ts': `
+        import { Singleton, Transactional } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Transactional()
+          async create() {}
+        }
+      `,
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin(),
+    ]);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Multiple Kysely providers detected'),
+    );
+    expect(result.code).toContain('() => new TransactionManager()');
+
+    warnSpy.mockRestore();
+  });
+
+  it('should warn and fall back when explicit database class is not found', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton, Transactional } from './decorators.js'
@@ -215,7 +290,6 @@ describe('Kysely Transformer Plugin', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("'NonExistentDb' not found"),
     );
-    // Falls back to zero-arg constructor
     expect(result.code).toContain('() => new TransactionManager()');
 
     warnSpy.mockRestore();

@@ -1,4 +1,5 @@
 import type {
+  ClassVisitorContext,
   CodegenContribution,
   IRBeanDefinition,
   MethodVisitorContext,
@@ -8,9 +9,9 @@ import type {
 /** Options for the Kysely transformer plugin. */
 export interface KyselyPluginOptions {
   /**
-   * Class name of the bean that provides a `.kysely` property (e.g. `'Database'`).
-   * When set, TransactionManager is auto-wired with this bean as a constructor
-   * dependency — no manual `configure()` call needed.
+   * Explicit class name of the bean that provides a `Kysely<...>` property.
+   * Overrides auto-detection. Use this to disambiguate when multiple classes
+   * expose a `Kysely` property.
    */
   database?: string;
 }
@@ -27,22 +28,41 @@ interface TransactionalMethodInfo {
  * Scans @Transactional decorators on methods and wires
  * TransactionalInterceptor as an AOP interceptor dependency at compile time.
  *
+ * **Auto-detection:** The plugin scans decorated classes for properties typed
+ * as `Kysely<...>` and auto-wires the owning class as a TransactionManager
+ * constructor dependency. Use `options.database` to override when multiple
+ * classes expose a `Kysely` property.
+ *
  * **Limitation:** Propagation is detected via AST text matching
  * (`text.includes('REQUIRES_NEW')`). Only string literal values in the
  * decorator argument are supported — const references or computed values
  * will fall back to `'REQUIRED'` silently.
- *
- * @param options.database - Class name of the bean providing `.kysely`.
- *   When set, TransactionManager is auto-wired with this bean as a
- *   constructor dependency, eliminating the need for manual `configure()`.
  */
 export function createKyselyPlugin(
   options?: KyselyPluginOptions,
 ): TransformerPlugin {
   const classTransactionalInfo = new Map<string, TransactionalMethodInfo[]>();
 
+  /** Classes discovered with a `Kysely<...>` property. Keyed by filePath:className. */
+  const kyselyProviders: Array<{ className: string; filePath: string }> = [];
+
   return {
     name: 'kysely',
+
+    visitClass(ctx: ClassVisitorContext): void {
+      for (const prop of ctx.classDeclaration.getProperties()) {
+        // Check the type annotation text (AST-level), not the resolved type.
+        // This avoids requiring the 'kysely' package to be resolvable at transform time.
+        const typeAnnotation = prop.getTypeNode()?.getText();
+        if (typeAnnotation?.startsWith('Kysely<')) {
+          kyselyProviders.push({
+            className: ctx.className,
+            filePath: ctx.filePath,
+          });
+          break; // one match per class is enough
+        }
+      }
+    },
 
     visitMethod(ctx: MethodVisitorContext): void {
       const decorators = ctx.methodDeclaration.getDecorators();
@@ -120,41 +140,13 @@ export function createKyselyPlugin(
 
       if (!needsInterceptor) return beans;
 
-      // Resolve the database bean for auto-wiring TransactionManager
-      const databaseClassName = options?.database;
-      let databaseDeps: IRBeanDefinition['constructorDeps'] = [];
-
-      if (databaseClassName) {
-        const databaseBean = beans.find(
-          (b) =>
-            b.tokenRef.kind === 'class' &&
-            b.tokenRef.className === databaseClassName,
-        );
-
-        if (databaseBean && databaseBean.tokenRef.kind === 'class') {
-          databaseDeps = [
-            {
-              tokenRef: {
-                kind: 'class',
-                className: databaseBean.tokenRef.className,
-                importPath: databaseBean.tokenRef.importPath,
-              },
-              optional: false,
-              collection: false,
-              sourceLocation: {
-                filePath: '@goodie-ts/kysely',
-                line: 0,
-                column: 0,
-              },
-            },
-          ];
-        } else {
-          console.warn(
-            `[@goodie-ts/kysely] database option '${databaseClassName}' not found in beans. ` +
-              'TransactionManager will require manual configure().',
-          );
-        }
-      }
+      // Resolve the database bean for auto-wiring TransactionManager.
+      // Priority: explicit `database` option > auto-detected Kysely provider.
+      const databaseDeps = resolveKyselyProvider(
+        beans,
+        options?.database,
+        kyselyProviders,
+      );
 
       // Add synthetic TransactionManager bean.
       const transactionManagerBean: IRBeanDefinition = {
@@ -242,4 +234,69 @@ export function createKyselyPlugin(
       };
     },
   };
+}
+
+/**
+ * Resolve which bean provides the Kysely instance for TransactionManager auto-wiring.
+ *
+ * Priority:
+ * 1. Explicit `database` option (string class name)
+ * 2. Auto-detected class with a `Kysely<...>` property (single match)
+ * 3. No wiring (zero matches, or multiple matches without explicit option)
+ */
+function resolveKyselyProvider(
+  beans: IRBeanDefinition[],
+  explicitDatabase: string | undefined,
+  autoDetected: Array<{ className: string; filePath: string }>,
+): IRBeanDefinition['constructorDeps'] {
+  // Determine target class name
+  let targetClassName: string | undefined;
+
+  if (explicitDatabase) {
+    targetClassName = explicitDatabase;
+  } else if (autoDetected.length === 1) {
+    targetClassName = autoDetected[0].className;
+  } else if (autoDetected.length > 1) {
+    const names = autoDetected.map((p) => p.className).join(', ');
+    console.warn(
+      `[@goodie-ts/kysely] Multiple Kysely providers detected: ${names}. ` +
+        "Use createKyselyPlugin({ database: 'ClassName' }) to disambiguate. " +
+        'TransactionManager will require manual configure().',
+    );
+    return [];
+  } else {
+    // Zero providers — no auto-wiring
+    return [];
+  }
+
+  // Find the bean matching the target class name
+  const databaseBean = beans.find(
+    (b) =>
+      b.tokenRef.kind === 'class' && b.tokenRef.className === targetClassName,
+  );
+
+  if (databaseBean && databaseBean.tokenRef.kind === 'class') {
+    return [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: databaseBean.tokenRef.className,
+          importPath: databaseBean.tokenRef.importPath,
+        },
+        optional: false,
+        collection: false,
+        sourceLocation: {
+          filePath: '@goodie-ts/kysely',
+          line: 0,
+          column: 0,
+        },
+      },
+    ];
+  }
+
+  console.warn(
+    `[@goodie-ts/kysely] Database class '${targetClassName}' not found in beans. ` +
+      'TransactionManager will require manual configure().',
+  );
+  return [];
 }
