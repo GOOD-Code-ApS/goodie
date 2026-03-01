@@ -52,21 +52,21 @@ export function transform(options: TransformOptions): TransformResult {
   // 5. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 6. afterResolve hook
+  // 6. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
+  mergePluginMetadata(beans, pluginClassMetadata);
+
+  // 7. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
     }
   }
 
-  // Merge plugin class metadata into matching beans
-  mergePluginMetadata(beans, pluginClassMetadata);
-
-  // 7. Build graph (validate + topo sort)
+  // 8. Build graph (validate + topo sort)
   const graphResult = buildGraph({ ...resolveResult, beans });
 
-  // 8. beforeCodegen hook
+  // 9. beforeCodegen hook
   let finalBeans = graphResult.beans;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
@@ -74,7 +74,7 @@ export function transform(options: TransformOptions): TransformResult {
     }
   }
 
-  // 9. Collect codegen contributions
+  // 10. Collect codegen contributions
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
@@ -82,14 +82,14 @@ export function transform(options: TransformOptions): TransformResult {
     }
   }
 
-  // 10. Generate code
+  // 11. Generate code
   const code = generateCode(
     finalBeans,
     { outputPath: options.outputPath, version: PKG_VERSION },
     contributions,
   );
 
-  // 11. Write output
+  // 12. Write output
   const outputDir = path.dirname(options.outputPath);
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(options.outputPath, code, 'utf-8');
@@ -127,18 +127,18 @@ export function transformInMemory(
   // 4. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 5. afterResolve hook
+  // 5. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
+  mergePluginMetadata(beans, pluginClassMetadata);
+
+  // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
     }
   }
 
-  // Merge plugin class metadata into matching beans
-  mergePluginMetadata(beans, pluginClassMetadata);
-
-  // 6. Build graph (validate + topo sort)
+  // 7. Build graph (validate + topo sort)
   const graphResult = buildGraph({ ...resolveResult, beans });
 
   // 7. beforeCodegen hook

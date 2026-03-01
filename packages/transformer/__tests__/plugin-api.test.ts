@@ -152,6 +152,37 @@ describe('TransformerPlugin API', () => {
   });
 
   describe('afterResolve', () => {
+    it('can see visitor metadata from visitClass', () => {
+      const plugin: TransformerPlugin = {
+        name: 'test-visitor-metadata-in-afterResolve',
+        visitClass(ctx) {
+          ctx.metadata.myTag = 'tagged';
+        },
+        afterResolve(beans) {
+          // Visitor metadata should already be merged at this point
+          return beans.filter((b) => b.metadata.myTag === 'tagged');
+        },
+      };
+
+      const project = createProject({
+        '/src/Foo.ts': `
+          import { Singleton } from './decorators.js'
+          @Singleton()
+          export class Foo {}
+        `,
+      });
+
+      const result = transformInMemory(
+        project,
+        '/out/AppContext.generated.ts',
+        [plugin],
+      );
+      // If metadata wasn't merged before afterResolve, the filter would
+      // remove all beans and the result would be empty
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].metadata.myTag).toBe('tagged');
+    });
+
     it('can mutate IR bean metadata', () => {
       const plugin: TransformerPlugin = {
         name: 'test-after-resolve',
