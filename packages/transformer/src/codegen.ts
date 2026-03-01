@@ -430,8 +430,13 @@ function depsToCode(
   // If this bean has intercepted methods, add interceptor class tokens as deps
   const interceptorDeps = collectInterceptorDeps(bean);
   for (const ref of interceptorDeps.values()) {
+    const tokenRef: TokenRef = {
+      kind: 'class',
+      className: ref.className,
+      importPath: ref.importPath,
+    };
     allDeps.push({
-      token: ref.className,
+      token: resolveTokenRef(tokenRef),
       optional: false,
       collection: false,
     });

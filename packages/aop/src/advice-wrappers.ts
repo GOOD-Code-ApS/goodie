@@ -23,39 +23,37 @@ export function wrapBeforeAdvice(advice: BeforeAdvice): MethodInterceptor {
   };
 }
 
-/** Wrap an AfterAdvice into a MethodInterceptor for the interceptor chain. */
+/**
+ * Wrap an AfterAdvice into a MethodInterceptor for the interceptor chain.
+ *
+ * **Note:** If the after-advice is async but the intercepted method is sync,
+ * the return type changes from `T` to `Promise<T>`. This is inherent to
+ * async interceptor chains — callers should `await` the result when using
+ * async advice on sync methods.
+ */
 export function wrapAfterAdvice(advice: AfterAdvice): MethodInterceptor {
   return {
     intercept(ctx: InvocationContext) {
+      const adviceCtx = {
+        className: ctx.className,
+        methodName: ctx.methodName,
+        args: ctx.args,
+        target: ctx.target,
+      };
       const result = ctx.proceed();
       if (result && typeof (result as Promise<unknown>).then === 'function') {
+        // Async original method: wait for result, run advice, return original value
         return (result as Promise<unknown>).then((value) =>
-          Promise.resolve(
-            advice.after(
-              {
-                className: ctx.className,
-                methodName: ctx.methodName,
-                args: ctx.args,
-                target: ctx.target,
-              },
-              value,
-            ),
-          ).then(() => value),
+          Promise.resolve(advice.after(adviceCtx, value)).then(() => value),
         );
       }
-      const adviceResult = advice.after(
-        {
-          className: ctx.className,
-          methodName: ctx.methodName,
-          args: ctx.args,
-          target: ctx.target,
-        },
-        result,
-      );
+      // Sync original method
+      const adviceResult = advice.after(adviceCtx, result);
       if (
         adviceResult &&
         typeof (adviceResult as Promise<void>).then === 'function'
       ) {
+        // Async advice on sync method: returns Promise<T> wrapping the sync result
         return (adviceResult as Promise<void>).then(() => result);
       }
       return result;
