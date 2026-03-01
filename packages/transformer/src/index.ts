@@ -11,15 +11,20 @@ export type {
   ClassTokenRef,
   InjectionTokenRef,
   IRBeanDefinition,
+  IRControllerDefinition,
   IRDependency,
   IRFieldInjection,
   IRModule,
   IRProvides,
+  IRRouteDefinition,
   SourceLocation,
   TokenRef,
 } from './ir.js';
 // Options
 export type {
+  ClassVisitorContext,
+  CodegenContribution,
+  MethodVisitorContext,
   TransformerPlugin,
   TransformOptions,
   TransformResult,
@@ -28,12 +33,15 @@ export type { ResolveResult } from './resolver.js';
 // Resolver
 export { resolve } from './resolver.js';
 export type {
+  HttpMethod,
   ScannedBean,
   ScannedConstructorParam,
+  ScannedController,
   ScannedFieldInjection,
   ScannedModule,
   ScannedModuleImport,
   ScannedProvides,
+  ScannedRoute,
   ScannedTypeArgument,
   ScanResult,
 } from './scanner.js';

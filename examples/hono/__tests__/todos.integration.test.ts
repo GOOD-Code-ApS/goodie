@@ -4,12 +4,10 @@ import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
-import { Hono } from 'hono';
-import pg from 'pg';
+import type { Hono } from 'hono';
+import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { definitions } from '../src/AppContext.generated.js';
-import { createTodoRoutes } from '../src/routes.js';
-import { TodoService } from '../src/TodoService.js';
+import { createRouter, definitions } from '../src/AppContext.generated.js';
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
@@ -35,9 +33,7 @@ describe('Hono + PostgreSQL Todo API', () => {
       .withConfig({ DATABASE_URL: connectionUri })
       .build();
 
-    const todoService = ctx.get(TodoService);
-    honoApp = new Hono();
-    honoApp.route('/api', createTodoRoutes(todoService));
+    honoApp = createRouter(ctx);
   }, 60_000);
 
   afterAll(async () => {
