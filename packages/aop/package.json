@@ -1,0 +1,37 @@
+{
+  "name": "@goodie-ts/aop",
+  "version": "0.2.0",
+  "description": "Aspect-oriented programming support for goodie-ts",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/aop"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@goodie-ts/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "ts-morph": "^24.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

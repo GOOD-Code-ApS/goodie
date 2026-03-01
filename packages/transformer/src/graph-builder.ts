@@ -264,6 +264,18 @@ function validateProviders(beans: IRBeanDefinition[]): void {
         throw new MissingProviderError(depName, ownerName, bean.sourceLocation);
       }
     }
+
+    // Validate interceptor dependencies from AOP metadata
+    for (const interceptorDep of getInterceptorDependencies(bean)) {
+      const key = tokenRefKey(interceptorDep.tokenRef);
+      if (!registered.has(key)) {
+        const depName =
+          interceptorDep.tokenRef.kind === 'class'
+            ? interceptorDep.tokenRef.className
+            : interceptorDep.tokenRef.tokenName;
+        throw new MissingProviderError(depName, ownerName, bean.sourceLocation);
+      }
+    }
   }
 }
 
@@ -381,14 +393,56 @@ function topoSort(beans: IRBeanDefinition[]): IRBeanDefinition[] {
   return sorted;
 }
 
-/** Get all dependencies of a bean (constructor + field). */
+/** Get all dependencies of a bean (constructor + field + interceptor). */
 function getAllDependencies(
   bean: IRBeanDefinition,
 ): Array<{ tokenRef: TokenRef }> {
   return [
     ...bean.constructorDeps,
     ...bean.fieldDeps.map((f) => ({ tokenRef: f.tokenRef })),
+    ...getInterceptorDependencies(bean),
   ];
+}
+
+/**
+ * Extract unique interceptor class dependencies from bean metadata.
+ * Returns ClassTokenRef objects that the graph validator and topo sort can use.
+ */
+function getInterceptorDependencies(
+  bean: IRBeanDefinition,
+): Array<{ tokenRef: TokenRef }> {
+  const interceptedMethods = bean.metadata.interceptedMethods as
+    | Array<{
+        methodName: string;
+        interceptors: Array<{
+          className: string;
+          importPath: string;
+          adviceType: string;
+          order: number;
+        }>;
+      }>
+    | undefined;
+  if (!interceptedMethods || interceptedMethods.length === 0) return [];
+
+  const seen = new Set<string>();
+  const deps: Array<{ tokenRef: TokenRef }> = [];
+
+  for (const method of interceptedMethods) {
+    for (const ref of method.interceptors) {
+      const key = `${ref.importPath}:${ref.className}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deps.push({
+        tokenRef: {
+          kind: 'class',
+          className: ref.className,
+          importPath: ref.importPath,
+        },
+      });
+    }
+  }
+
+  return deps;
 }
 
 /** Stable key for a TokenRef for use in Maps/Sets. */
