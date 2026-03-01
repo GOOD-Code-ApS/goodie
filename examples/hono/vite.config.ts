@@ -14,6 +14,7 @@ export default defineConfig({
       external: [
         '@goodie-ts/core',
         '@goodie-ts/decorators',
+        '@goodie-ts/health',
         'hono',
         '@hono/node-server',
         'kysely',

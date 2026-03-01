@@ -66,6 +66,9 @@ importers:
       '@goodie-ts/decorators':
         specifier: workspace:*
         version: link:../../packages/decorators
+      '@goodie-ts/health':
+        specifier: workspace:*
+        version: link:../../packages/health
       '@goodie-ts/hono':
         specifier: workspace:*
         version: link:../../packages/hono
@@ -146,6 +149,8 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/health: {}
 
   packages/hono:
     dependencies:
