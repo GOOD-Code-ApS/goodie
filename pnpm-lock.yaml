@@ -72,6 +72,9 @@ importers:
       '@goodie-ts/hono':
         specifier: workspace:*
         version: link:../../packages/hono
+      '@goodie-ts/kysely':
+        specifier: workspace:*
+        version: link:../../packages/kysely
       '@goodie-ts/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -161,6 +164,25 @@ importers:
       hono:
         specifier: '>=4.0.0'
         version: 4.12.2
+
+  packages/kysely:
+    dependencies:
+      '@goodie-ts/aop':
+        specifier: workspace:*
+        version: link:../aop
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      kysely:
+        specifier: ^0.27.0
+        version: 0.27.6
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
 
   packages/logging:
     dependencies:

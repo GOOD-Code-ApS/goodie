@@ -28,6 +28,10 @@ export default defineConfig({
         __dirname,
         'packages/logging/src/index.ts',
       ),
+      '@goodie-ts/kysely': path.resolve(
+        __dirname,
+        'packages/kysely/src/index.ts',
+      ),
     },
   },
   test: {

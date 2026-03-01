@@ -25,6 +25,7 @@ export function Put(path?: string) { return (t: any, c: any) => {} }
 export function Delete(path?: string) { return (t: any, c: any) => {} }
 export function Patch(path?: string) { return (t: any, c: any) => {} }
 export function Log(opts?: any) { return (t: any, c: any) => {} }
+export function Transactional(opts?: any) { return (t: any, c: any) => {} }
 `;
 
 /**

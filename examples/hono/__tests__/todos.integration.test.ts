@@ -1,4 +1,5 @@
 import type { ApplicationContext } from '@goodie-ts/core';
+import { TransactionManager } from '@goodie-ts/kysely';
 import { TestContext } from '@goodie-ts/testing';
 import {
   PostgreSqlContainer,
@@ -8,6 +9,7 @@ import type { Hono } from 'hono';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createRouter, definitions } from '../src/AppContext.generated.js';
+import { Database } from '../src/Database.js';
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
@@ -32,6 +34,11 @@ describe('Hono + PostgreSQL Todo API', () => {
     ctx = await TestContext.from(definitions)
       .withConfig({ DATABASE_URL: connectionUri })
       .build();
+
+    // Configure TransactionManager with the Kysely instance
+    const database = ctx.get(Database);
+    const transactionManager = ctx.get(TransactionManager);
+    transactionManager.configure(database.kysely);
 
     honoApp = createRouter(ctx);
   }, 60_000);
