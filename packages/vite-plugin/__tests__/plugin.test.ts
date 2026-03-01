@@ -90,6 +90,7 @@ describe('diPlugin', () => {
         outputPath: path.resolve('/my/root', 'src/AppContext.generated.ts'),
         include: undefined,
         debounceMs: 100,
+        plugins: [],
       });
     });
 

@@ -83,9 +83,14 @@ export function generateCode(
     lines.push(`import type { ${typeName} } from '${importSpec}'`);
   }
 
-  // Plugin contribution imports (deduplicated)
+  // Plugin contribution imports (deduplicated against class imports and each other)
   if (contributions && contributions.length > 0) {
     const seen = new Set<string>();
+    // Pre-populate with already-generated class import lines to avoid duplicates
+    for (const [className, importPath] of classImports) {
+      const relativePath = computeRelativeImport(outputDir, importPath);
+      seen.add(`import { ${className} } from '${relativePath}'`);
+    }
     for (const contrib of contributions) {
       if (contrib.imports) {
         for (const imp of contrib.imports) {
@@ -363,12 +368,13 @@ function tokenVarName(tokenName: string): string {
   return [...words, 'Token'].join('_');
 }
 
-/** Metadata shape for intercepted methods (from AOP plugin). */
+/** Metadata shape for intercepted methods (from AOP plugin or other plugins). */
 interface InterceptorRefMeta {
   className: string;
   importPath: string;
   adviceType: 'around' | 'before' | 'after';
   order: number;
+  metadata?: Record<string, unknown>;
 }
 interface InterceptedMethodMeta {
   methodName: string;
@@ -552,9 +558,19 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
         return paramName;
       });
 
+      // Build per-interceptor metadata array if any interceptor has metadata
+      const hasMetadata = desc.interceptors.some((ref) => ref.metadata);
+      let metadataArg = '';
+      if (hasMetadata) {
+        const metadataItems = desc.interceptors.map((ref) =>
+          ref.metadata ? JSON.stringify(ref.metadata) : 'undefined',
+        );
+        metadataArg = `, [${metadataItems.join(', ')}]`;
+      }
+
       const safeMethodName = escapeStringLiteral(desc.methodName);
       bodyLines.push(
-        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance))`,
+        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance)${metadataArg})`,
       );
     }
   }
@@ -599,6 +615,11 @@ function computeRelativeImport(
   // Handle node_modules paths → extract bare package specifier
   if (absolutePath.includes('node_modules')) {
     return extractPackageName(absolutePath);
+  }
+
+  // Bare module specifiers (e.g. '@goodie-ts/logging', 'lodash') — return as-is
+  if (!path.isAbsolute(absolutePath)) {
+    return absolutePath;
   }
 
   let relative = path.relative(outputDir, absolutePath);

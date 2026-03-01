@@ -60,6 +60,9 @@ importers:
 
   examples/hono:
     dependencies:
+      '@goodie-ts/aop':
+        specifier: workspace:*
+        version: link:../../packages/aop
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -69,6 +72,9 @@ importers:
       '@goodie-ts/hono':
         specifier: workspace:*
         version: link:../../packages/hono
+      '@goodie-ts/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.9(hono@4.12.2)
@@ -155,6 +161,22 @@ importers:
       hono:
         specifier: '>=4.0.0'
         version: 4.12.2
+
+  packages/logging:
+    dependencies:
+      '@goodie-ts/aop':
+        specifier: workspace:*
+        version: link:../aop
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
 
   packages/testing:
     dependencies:

@@ -18,6 +18,7 @@ export function runRebuild(options: ResolvedOptions): RebuildOutcome {
       tsConfigFilePath: options.tsConfigPath,
       outputPath: options.outputPath,
       include: options.include,
+      plugins: options.plugins,
     });
     return { success: true, result };
   } catch (error) {
