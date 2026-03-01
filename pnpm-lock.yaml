@@ -110,6 +110,19 @@ importers:
         specifier: ^6.0.0
         version: 6.4.1(@types/node@22.19.11)(yaml@2.8.2)
 
+  packages/aop:
+    dependencies:
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
   packages/cli:
     dependencies:
       '@goodie-ts/transformer':

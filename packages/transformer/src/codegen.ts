@@ -239,6 +239,14 @@ function collectClassImports(beans: IRBeanDefinition[]): Map<string, string> {
     if (bean.providesSource) {
       addClassImport(imports, bean.providesSource.moduleTokenRef);
     }
+
+    // Interceptor classes referenced in metadata also need imports
+    const interceptorDeps = collectInterceptorDeps(bean);
+    for (const ref of interceptorDeps.values()) {
+      if (ref.importPath) {
+        imports.set(ref.className, ref.importPath);
+      }
+    }
   }
 
   return imports;
@@ -355,7 +363,40 @@ function tokenVarName(tokenName: string): string {
   return [...words, 'Token'].join('_');
 }
 
-/** Convert all dependencies of a bean (constructor + field) to code. */
+/** Metadata shape for intercepted methods (from AOP plugin). */
+interface InterceptorRefMeta {
+  className: string;
+  importPath: string;
+  adviceType: 'around' | 'before' | 'after';
+  order: number;
+}
+interface InterceptedMethodMeta {
+  methodName: string;
+  interceptors: InterceptorRefMeta[];
+}
+
+/** Collect unique interceptor class tokens from bean metadata, in stable order. */
+function collectInterceptorDeps(
+  bean: IRBeanDefinition,
+): Map<string, InterceptorRefMeta> {
+  const interceptedMethods = bean.metadata.interceptedMethods as
+    | InterceptedMethodMeta[]
+    | undefined;
+  if (!interceptedMethods || interceptedMethods.length === 0) return new Map();
+
+  const unique = new Map<string, InterceptorRefMeta>();
+  for (const method of interceptedMethods) {
+    for (const ref of method.interceptors) {
+      const key = `${ref.importPath}:${ref.className}`;
+      if (!unique.has(key)) {
+        unique.set(key, ref);
+      }
+    }
+  }
+  return unique;
+}
+
+/** Convert all dependencies of a bean (constructor + field + interceptor) to code. */
 function depsToCode(
   bean: IRBeanDefinition,
   resolveTokenRef: (ref: TokenRef) => string,
@@ -381,6 +422,16 @@ function depsToCode(
   if (hasValueFields && beanValueFields && beanValueFields.length > 0) {
     allDeps.push({
       token: '__Goodie_Config',
+      optional: false,
+      collection: false,
+    });
+  }
+
+  // If this bean has intercepted methods, add interceptor class tokens as deps
+  const interceptorDeps = collectInterceptorDeps(bean);
+  for (const ref of interceptorDeps.values()) {
+    allDeps.push({
+      token: ref.className,
       optional: false,
       collection: false,
     });
@@ -419,6 +470,13 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
     | undefined;
   const hasValues = beanValueFields && beanValueFields.length > 0;
 
+  const interceptedMethods = bean.metadata.interceptedMethods as
+    | InterceptedMethodMeta[]
+    | undefined;
+  const hasInterception =
+    interceptedMethods !== undefined && interceptedMethods.length > 0;
+  const interceptorDeps = collectInterceptorDeps(bean);
+
   const ctorParams = bean.constructorDeps.map((_, i) => `dep${i}`);
   const allParams = [...ctorParams];
   const fieldParams = bean.fieldDeps.map((_, i) => `field${i}`);
@@ -427,41 +485,88 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
     allParams.push('__config');
   }
 
-  if (allParams.length === 0 && bean.fieldDeps.length === 0 && !hasValues) {
+  // Add interceptor params after config
+  const interceptorParamNames: string[] = [];
+  if (hasInterception) {
+    let i = 0;
+    for (const _ref of interceptorDeps.values()) {
+      interceptorParamNames.push(`__interceptor${i}`);
+      i++;
+    }
+    allParams.push(...interceptorParamNames);
+  }
+
+  // Build a map: interceptor key -> param name
+  const interceptorParamMap = new Map<string, string>();
+  if (hasInterception) {
+    let i = 0;
+    for (const [key] of interceptorDeps) {
+      interceptorParamMap.set(key, `__interceptor${i}`);
+      i++;
+    }
+  }
+
+  const needsBody = bean.fieldDeps.length > 0 || hasValues || hasInterception;
+
+  if (allParams.length === 0 && !needsBody) {
     return `() => new ${className}()`;
   }
 
   const paramList = allParams.map((p) => `${p}: any`).join(', ');
   const ctorArgs = ctorParams.join(', ');
 
-  if (bean.fieldDeps.length === 0 && !hasValues) {
+  if (!needsBody) {
     return `(${paramList}) => new ${className}(${ctorArgs})`;
   }
 
-  // Constructor + field injection + value injection
-  const fieldAssignments = bean.fieldDeps
-    .map((f, i) => `    instance.${f.fieldName} = field${i}`)
-    .join('\n');
+  // Constructor + field injection + value injection + interception
+  const bodyLines: string[] = [];
 
-  const valueAssignments = hasValues
-    ? beanValueFields
-        .map((vf) => {
-          const safeKey = escapeStringLiteral(vf.key);
-          if (vf.default !== undefined) {
-            return `    instance.${vf.fieldName} = __config['${safeKey}'] ?? ${vf.default}`;
-          }
-          return `    instance.${vf.fieldName} = __config['${safeKey}']`;
-        })
-        .join('\n')
-    : '';
+  // Field assignments
+  for (let i = 0; i < bean.fieldDeps.length; i++) {
+    bodyLines.push(`    instance.${bean.fieldDeps[i].fieldName} = field${i}`);
+  }
 
-  const assignments = [fieldAssignments, valueAssignments]
-    .filter(Boolean)
-    .join('\n');
+  // Value assignments
+  if (hasValues) {
+    for (const vf of beanValueFields) {
+      const safeKey = escapeStringLiteral(vf.key);
+      if (vf.default !== undefined) {
+        bodyLines.push(
+          `    instance.${vf.fieldName} = __config['${safeKey}'] ?? ${vf.default}`,
+        );
+      } else {
+        bodyLines.push(`    instance.${vf.fieldName} = __config['${safeKey}']`);
+      }
+    }
+  }
 
+  // Interceptor wrapping
+  if (hasInterception) {
+    for (const desc of interceptedMethods) {
+      const interceptorArgs = desc.interceptors.map((ref) => {
+        const key = `${ref.importPath}:${ref.className}`;
+        const paramName = interceptorParamMap.get(key)!;
+        if (ref.adviceType === 'before') {
+          return `wrapBeforeAdvice(${paramName})`;
+        }
+        if (ref.adviceType === 'after') {
+          return `wrapAfterAdvice(${paramName})`;
+        }
+        return paramName;
+      });
+
+      const safeMethodName = escapeStringLiteral(desc.methodName);
+      bodyLines.push(
+        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance))`,
+      );
+    }
+  }
+
+  const body = bodyLines.join('\n');
   return `(${paramList}) => {
     const instance = new ${className}(${ctorArgs})
-${assignments}
+${body}
     return instance
   }`;
 }
