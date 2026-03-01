@@ -1,4 +1,4 @@
-import { scan } from '@goodie-ts/transformer';
+import { InvalidDecoratorUsageError, scan } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 
@@ -251,6 +251,42 @@ describe('Controller Scanner', () => {
       )!;
       expect(ctrlBean.constructorParams).toHaveLength(1);
       expect(ctrlBean.constructorParams[0].typeName).toBe('UserService');
+    });
+
+    it('should throw when @Controller is combined with @Module', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Module(opts?: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/Bad.ts': `
+          import { Controller, Module } from './decorators.js'
+
+          @Controller('/api')
+          @Module()
+          export class Bad {}
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+    });
+
+    it('should throw when @Controller is combined with @Injectable', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Injectable() { return (t: any, c: any) => {} }
+        `,
+        '/src/Bad.ts': `
+          import { Controller, Injectable } from './decorators.js'
+
+          @Controller('/api')
+          @Injectable()
+          export class Bad {}
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
     });
 
     it('should ignore methods without route decorators', () => {

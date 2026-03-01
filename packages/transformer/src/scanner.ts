@@ -217,6 +217,22 @@ export function scan(project: Project): ScanResult {
         );
       }
 
+      if (isController && isModule) {
+        throw new InvalidDecoratorUsageError(
+          'Controller',
+          `@Controller cannot be combined with @Module on class "${cls.getName()}". Controllers and modules are separate concepts.`,
+          getSourceLocation(cls, sourceFile),
+        );
+      }
+
+      if (isController && isInjectable) {
+        throw new InvalidDecoratorUsageError(
+          'Controller',
+          `@Controller cannot be combined with @Injectable on class "${cls.getName()}". Controllers are implicitly singletons — use @Controller() alone or @Controller() @Singleton().`,
+          getSourceLocation(cls, sourceFile),
+        );
+      }
+
       if (isController) {
         // Controllers are implicitly singletons — scan as bean too
         const scannedBean = scanBean(cls, decorators, sourceFile, true);
@@ -355,7 +371,12 @@ function scanController(
   };
 }
 
-/** HTTP method decorator names mapped to their HTTP method. */
+/**
+ * HTTP method decorator names mapped to their HTTP method.
+ * Note: Like all decorator detection in the scanner, matching is by name only
+ * (no import source verification). Route decorators are only scanned on
+ * @Controller classes, limiting false positives to unlikely edge cases.
+ */
 const ROUTE_DECORATOR_MAP: Record<string, HttpMethod> = {
   [DECORATOR_NAMES.Get]: 'get',
   [DECORATOR_NAMES.Post]: 'post',

@@ -28,6 +28,14 @@
     "@goodie-ts/core": "workspace:*",
     "ts-morph": "^24.0.0"
   },
+  "peerDependencies": {
+    "hono": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.0.0"
   },

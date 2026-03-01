@@ -287,6 +287,119 @@ describe('Controller Codegen', () => {
     expect(code).toContain('return c.json(result)');
   });
 
+  it('should generate void/null guard for route handlers', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Ctrl',
+          importPath: '/src/Ctrl.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const controllers: IRControllerDefinition[] = [
+      {
+        classTokenRef: {
+          kind: 'class',
+          className: 'Ctrl',
+          importPath: '/src/Ctrl.ts',
+        },
+        basePath: '/',
+        routes: [{ methodName: 'action', httpMethod: 'post', path: '/' }],
+      },
+    ];
+
+    const code = generateCode(
+      beans,
+      { outputPath: '/out/AppContext.generated.ts' },
+      controllers,
+    );
+
+    expect(code).toContain(
+      'if (result === undefined || result === null) return c.body(null, 204)',
+    );
+  });
+
+  it('should use collision-safe variable names for controllers with same camelCase', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'UserController',
+          importPath: '/src/UserController.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'UserControllerV2',
+          importPath: '/src/UserControllerV2.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const controllers: IRControllerDefinition[] = [
+      {
+        classTokenRef: {
+          kind: 'class',
+          className: 'UserController',
+          importPath: '/src/UserController.ts',
+        },
+        basePath: '/v1/users',
+        routes: [{ methodName: 'list', httpMethod: 'get', path: '/' }],
+      },
+      {
+        classTokenRef: {
+          kind: 'class',
+          className: 'UserControllerV2',
+          importPath: '/src/UserControllerV2.ts',
+        },
+        basePath: '/v2/users',
+        routes: [{ methodName: 'list', httpMethod: 'get', path: '/' }],
+      },
+    ];
+
+    const code = generateCode(
+      beans,
+      { outputPath: '/out/AppContext.generated.ts' },
+      controllers,
+    );
+
+    // Different class names produce different variable names
+    expect(code).toContain('const userController = ctx.get(UserController)');
+    expect(code).toContain(
+      'const userControllerV2 = ctx.get(UserControllerV2)',
+    );
+  });
+
   it('should handle all HTTP methods in routes', () => {
     const beans: IRBeanDefinition[] = [
       {

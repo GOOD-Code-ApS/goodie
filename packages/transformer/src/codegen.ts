@@ -555,8 +555,11 @@ function generateCreateRouter(
   lines.push('export function createRouter(ctx: ApplicationContext): Hono {');
   lines.push('  const app = new Hono()');
 
+  // Build collision-safe variable names for controllers
+  const ctrlVarNames = buildControllerVarNames(controllers);
+
   for (const ctrl of controllers) {
-    const varName = controllerVarName(ctrl.classTokenRef.className);
+    const varName = ctrlVarNames.get(ctrl.classTokenRef.className)!;
     lines.push(`  const ${varName} = ctx.get(${ctrl.classTokenRef.className})`);
 
     for (const route of ctrl.routes) {
@@ -564,6 +567,9 @@ function generateCreateRouter(
       lines.push(`  app.${route.httpMethod}('${fullPath}', async (c) => {`);
       lines.push(`    const result = await ${varName}.${route.methodName}(c)`);
       lines.push('    if (result instanceof Response) return result');
+      lines.push(
+        '    if (result === undefined || result === null) return c.body(null, 204)',
+      );
       lines.push('    return c.json(result)');
       lines.push('  })');
     }
@@ -576,9 +582,30 @@ function generateCreateRouter(
   return lines;
 }
 
-/** Generate a camelCase variable name for a controller class. */
-function controllerVarName(className: string): string {
-  return className.charAt(0).toLowerCase() + className.slice(1);
+/**
+ * Build a Map<className, uniqueVarName> with collision detection.
+ * When two controllers produce the same camelCase name, append _2, _3, etc.
+ */
+function buildControllerVarNames(
+  controllers: IRControllerDefinition[],
+): Map<string, string> {
+  const result = new Map<string, string>();
+  const varNameCounts = new Map<string, number>();
+
+  for (const ctrl of controllers) {
+    const className = ctrl.classTokenRef.className;
+    const baseVarName = className.charAt(0).toLowerCase() + className.slice(1);
+    const count = varNameCounts.get(baseVarName) ?? 0;
+
+    if (count === 0) {
+      result.set(className, baseVarName);
+    } else {
+      result.set(className, `${baseVarName}_${count + 1}`);
+    }
+    varNameCounts.set(baseVarName, count + 1);
+  }
+
+  return result;
 }
 
 /** Join a base path and a route path, normalizing slashes. */
