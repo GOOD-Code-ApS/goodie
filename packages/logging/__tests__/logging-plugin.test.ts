@@ -1,8 +1,8 @@
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
-import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
 import { createLoggingPlugin } from '../src/logging-transformer-plugin.js';
+import { DECORATOR_STUBS } from './helpers.js';
 
 function createProject(files: Record<string, string>) {
   const project = new Project({ useInMemoryFileSystem: true });
