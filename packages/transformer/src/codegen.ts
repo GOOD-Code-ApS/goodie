@@ -490,23 +490,14 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
     allParams.push('__config');
   }
 
-  // Add interceptor params after config
-  const interceptorParamNames: string[] = [];
-  if (hasInterception) {
-    let i = 0;
-    for (const _ref of interceptorDeps.values()) {
-      interceptorParamNames.push(`__interceptor${i}`);
-      i++;
-    }
-    allParams.push(...interceptorParamNames);
-  }
-
-  // Build a map: interceptor key -> param name
+  // Add interceptor params after config and build key -> param name map
   const interceptorParamMap = new Map<string, string>();
   if (hasInterception) {
     let i = 0;
     for (const [key] of interceptorDeps) {
-      interceptorParamMap.set(key, `__interceptor${i}`);
+      const paramName = `__interceptor${i}`;
+      interceptorParamMap.set(key, paramName);
+      allParams.push(paramName);
       i++;
     }
   }
