@@ -289,6 +289,24 @@ describe('Controller Scanner', () => {
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
     });
 
+    it('should throw when @Controller is combined with @Singleton', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Bad.ts': `
+          import { Controller, Singleton } from './decorators.js'
+
+          @Controller('/api')
+          @Singleton()
+          export class Bad {}
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+    });
+
     it('should ignore methods without route decorators', () => {
       const project = createProject({
         '/src/decorators.ts': `

@@ -40,7 +40,7 @@ describe('Controller Pipeline (Integration)', () => {
     expect(result.code).toContain('userController.create(c)');
   });
 
-  it('should handle @Controller with @Singleton and constructor deps', () => {
+  it('should handle @Controller with constructor deps', () => {
     const result = createTestProject({
       '/src/UserService.ts': `
         import { Singleton } from './decorators.js'

@@ -228,7 +228,15 @@ export function scan(project: Project): ScanResult {
       if (isController && isInjectable) {
         throw new InvalidDecoratorUsageError(
           'Controller',
-          `@Controller cannot be combined with @Injectable on class "${cls.getName()}". Controllers are implicitly singletons — use @Controller() alone or @Controller() @Singleton().`,
+          `@Controller cannot be combined with @Injectable on class "${cls.getName()}". Controllers are implicitly singletons — use @Controller() alone.`,
+          getSourceLocation(cls, sourceFile),
+        );
+      }
+
+      if (isController && isSingleton) {
+        throw new InvalidDecoratorUsageError(
+          'Controller',
+          `@Controller cannot be combined with @Singleton on class "${cls.getName()}". Controllers are implicitly singletons — use @Controller() alone.`,
           getSourceLocation(cls, sourceFile),
         );
       }
