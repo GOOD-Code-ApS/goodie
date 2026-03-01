@@ -47,7 +47,13 @@ export function createConfigPlugin(): TransformerPlugin {
 
       // Extract prefix from first argument
       const args = configDec.getArguments();
-      if (args.length === 0) return;
+      if (args.length === 0) {
+        const className = ctx.classDeclaration.getName() ?? '<anonymous>';
+        console.warn(
+          `[config] @ConfigurationProperties on '${className}' is missing a prefix argument — config values will not be injected.`,
+        );
+        return;
+      }
 
       const prefixArg = args[0].getText();
       let prefix: string;

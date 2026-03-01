@@ -6,7 +6,7 @@ import { createConfigPlugin } from '../src/config-transformer-plugin.js';
 const DECORATOR_STUBS = `
 export function Injectable() { return (t: any, c: any) => {} }
 export function Singleton() { return (t: any, c: any) => {} }
-export function ConfigurationProperties(prefix: string) { return (t: any, c: any) => {} }
+export function ConfigurationProperties(prefix?: string) { return (t: any, c: any) => {} }
 export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
 `;
 
@@ -306,6 +306,33 @@ describe('Config Transformer Plugin', () => {
 
     expect(valueFields).toHaveLength(1);
     expect(valueFields[0].fieldName).toBe('name');
+  });
+
+  it('should warn when @ConfigurationProperties is called without prefix argument', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = createTestProject({
+      '/src/Config.ts': `
+        import { Singleton, ConfigurationProperties } from './decorators.js'
+
+        @Singleton()
+        @ConfigurationProperties()
+        export class Config {
+          name = 'my-app'
+        }
+      `,
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('missing a prefix argument'),
+    );
+    // Bean exists (has @Singleton) but no valueFields (prefix missing)
+    const bean = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
+    );
+    expect(bean).toBeDefined();
+    expect(bean!.metadata.valueFields).toBeUndefined();
+    warnSpy.mockRestore();
   });
 
   it('should warn and skip when @ConfigurationProperties is used without @Singleton', () => {
