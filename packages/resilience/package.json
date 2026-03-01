@@ -27,6 +27,9 @@
   "dependencies": {
     "@goodie-ts/aop": "workspace:*"
   },
+  "peerDependencies": {
+    "@goodie-ts/transformer": "workspace:*"
+  },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",

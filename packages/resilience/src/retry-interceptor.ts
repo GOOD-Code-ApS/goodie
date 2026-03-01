@@ -13,6 +13,12 @@ interface RetryMetadata {
  *
  * Reads retry configuration from `ctx.metadata` (set by the resilience
  * transformer plugin).
+ *
+ * **Design note:** Retry sits innermost in the interceptor chain (order -10).
+ * On retry, `proceed()` calls the target method directly — outer interceptors
+ * (circuit breaker, timeout) are NOT re-entered. This is intentional: the
+ * timeout deadline applies to the total call including all retries, and the
+ * circuit breaker tracks the overall outcome, not individual retry attempts.
  */
 export class RetryInterceptor implements MethodInterceptor {
   intercept(ctx: InvocationContext): unknown {

@@ -180,6 +180,19 @@ export function createResiliencePlugin(): TransformerPlugin {
   };
 }
 
+/** Strip TypeScript numeric separators: 1_000 → 1000 */
+function stripSeparators(s: string): string {
+  return s.replace(/_/g, '');
+}
+
+/**
+ * Parse decorator arguments into metadata.
+ *
+ * **Limitation:** Only literal numeric values are supported. Const references
+ * or computed expressions (e.g. `maxAttempts: MAX_RETRIES`) will fall back to
+ * defaults silently. This matches the compile-time AST text parsing approach
+ * used by all goodie-ts transformer plugins.
+ */
 function parseMetadata(
   kind: 'retry' | 'circuitBreaker' | 'timeout',
   args: ReturnType<
@@ -193,16 +206,18 @@ function parseMetadata(
       const defaults = { maxAttempts: 3, delay: 1000, multiplier: 1 };
       if (args.length === 0) return defaults;
       const text = args[0].getText();
-      const maxMatch = text.match(/maxAttempts\s*:\s*(\d+)/);
-      const delayMatch = text.match(/delay\s*:\s*(\d+)/);
-      const multMatch = text.match(/multiplier\s*:\s*([\d.]+)/);
+      const maxMatch = text.match(/maxAttempts\s*:\s*(\d[\d_]*)/);
+      const delayMatch = text.match(/delay\s*:\s*(\d[\d_]*)/);
+      const multMatch = text.match(/multiplier\s*:\s*([\d_]+(?:\.[\d_]+)?)/);
       return {
         maxAttempts: maxMatch
-          ? Number.parseInt(maxMatch[1], 10)
+          ? Number.parseInt(stripSeparators(maxMatch[1]), 10)
           : defaults.maxAttempts,
-        delay: delayMatch ? Number.parseInt(delayMatch[1], 10) : defaults.delay,
+        delay: delayMatch
+          ? Number.parseInt(stripSeparators(delayMatch[1]), 10)
+          : defaults.delay,
         multiplier: multMatch
-          ? Number.parseFloat(multMatch[1])
+          ? Number.parseFloat(stripSeparators(multMatch[1]))
           : defaults.multiplier,
       };
     }
@@ -214,24 +229,24 @@ function parseMetadata(
       };
       if (args.length === 0) return defaults;
       const text = args[0].getText();
-      const threshMatch = text.match(/failureThreshold\s*:\s*(\d+)/);
-      const resetMatch = text.match(/resetTimeout\s*:\s*(\d+)/);
-      const halfMatch = text.match(/halfOpenAttempts\s*:\s*(\d+)/);
+      const threshMatch = text.match(/failureThreshold\s*:\s*(\d[\d_]*)/);
+      const resetMatch = text.match(/resetTimeout\s*:\s*(\d[\d_]*)/);
+      const halfMatch = text.match(/halfOpenAttempts\s*:\s*(\d[\d_]*)/);
       return {
         failureThreshold: threshMatch
-          ? Number.parseInt(threshMatch[1], 10)
+          ? Number.parseInt(stripSeparators(threshMatch[1]), 10)
           : defaults.failureThreshold,
         resetTimeout: resetMatch
-          ? Number.parseInt(resetMatch[1], 10)
+          ? Number.parseInt(stripSeparators(resetMatch[1]), 10)
           : defaults.resetTimeout,
         halfOpenAttempts: halfMatch
-          ? Number.parseInt(halfMatch[1], 10)
+          ? Number.parseInt(stripSeparators(halfMatch[1]), 10)
           : defaults.halfOpenAttempts,
       };
     }
     case 'timeout': {
       if (args.length === 0) return { duration: 5000 };
-      const text = args[0].getText();
+      const text = stripSeparators(args[0].getText());
       const num = Number.parseInt(text, 10);
       return { duration: Number.isNaN(num) ? 5000 : num };
     }

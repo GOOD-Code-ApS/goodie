@@ -189,4 +189,24 @@ describe('Resilience Transformer Plugin', () => {
     expect(result.code).not.toContain('CircuitBreakerInterceptor');
     expect(result.code).not.toContain('TimeoutInterceptor');
   });
+
+  it('should handle TypeScript numeric separators in options', () => {
+    const project = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Retryable } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Retryable({ maxAttempts: 5, delay: 1_000 })
+          fetchData() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createResiliencePlugin(),
+    ]);
+
+    expect(result.code).toContain('"maxAttempts":5');
+    expect(result.code).toContain('"delay":1000');
+  });
 });

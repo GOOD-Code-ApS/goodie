@@ -18,7 +18,7 @@ export class TimeoutError extends Error {
  *
  * For async methods, uses `Promise.race` with a timeout promise.
  * For sync methods, the timeout cannot be enforced (sync code blocks the
- * event loop), so it wraps the result in a Promise with a race.
+ * event loop), so the result is returned as-is.
  */
 export class TimeoutInterceptor implements MethodInterceptor {
   intercept(ctx: InvocationContext): unknown {
@@ -30,15 +30,16 @@ export class TimeoutInterceptor implements MethodInterceptor {
 
     // Timeout only applies to async methods (sync methods can't be interrupted)
     if (result instanceof Promise) {
-      return Promise.race([
-        result,
-        new Promise<never>((_, reject) => {
-          setTimeout(
-            () => reject(new TimeoutError(key, meta.duration)),
-            meta.duration,
-          );
-        }),
-      ]);
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new TimeoutError(key, meta.duration)),
+          meta.duration,
+        );
+      });
+      return Promise.race([result, timeoutPromise]).finally(() =>
+        clearTimeout(timeoutId),
+      );
     }
 
     return result;
