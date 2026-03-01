@@ -1,6 +1,6 @@
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createConfigPlugin } from '../src/config-transformer-plugin.js';
 
 const DECORATOR_STUBS = `
@@ -279,5 +279,57 @@ describe('Config Transformer Plugin', () => {
     expect(result.code).toContain(
       'export function buildDefinitions(config?: Record<string, unknown>)',
     );
+  });
+
+  it('should skip private and protected fields by TypeScript modifier', () => {
+    const result = createTestProject({
+      '/src/Config.ts': `
+        import { Singleton, ConfigurationProperties } from './decorators.js'
+
+        @Singleton()
+        @ConfigurationProperties('app')
+        export class Config {
+          name = 'my-app'
+          private secret = 'hidden'
+          protected internal = 'also-hidden'
+        }
+      `,
+    });
+
+    const bean = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
+    );
+    const valueFields = bean!.metadata.valueFields as Array<{
+      fieldName: string;
+      key: string;
+    }>;
+
+    expect(valueFields).toHaveLength(1);
+    expect(valueFields[0].fieldName).toBe('name');
+  });
+
+  it('should warn and skip when @ConfigurationProperties is used without @Singleton', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = createTestProject({
+      '/src/Config.ts': `
+        import { ConfigurationProperties } from './decorators.js'
+
+        @ConfigurationProperties('app')
+        export class Config {
+          name = 'my-app'
+        }
+      `,
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('@ConfigurationProperties'),
+    );
+    // Class shouldn't be in beans at all (no @Singleton)
+    const bean = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
+    );
+    expect(bean).toBeUndefined();
+    warnSpy.mockRestore();
   });
 });

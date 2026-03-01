@@ -24,6 +24,9 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
+  "peerDependencies": {
+    "@goodie-ts/transformer": "workspace:*"
+  },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
     "ts-morph": "^24.0.0"
