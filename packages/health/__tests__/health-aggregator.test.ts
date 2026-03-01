@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HealthAggregator } from '../src/health-aggregator.js';
 import type { HealthIndicator } from '../src/health-indicator.js';
 
@@ -110,19 +110,40 @@ describe('HealthAggregator', () => {
 
   it('should run all checks concurrently', async () => {
     const startTime = Date.now();
-    const slow: HealthIndicator = {
-      name: 'slow',
+    const makeSlowIndicator = (name: string): HealthIndicator => ({
+      name,
       check: async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
         return { status: 'UP' };
       },
-    };
+    });
 
-    const aggregator = new HealthAggregator([slow, slow, slow]);
-    await aggregator.checkAll();
+    const aggregator = new HealthAggregator([
+      makeSlowIndicator('slow-a'),
+      makeSlowIndicator('slow-b'),
+      makeSlowIndicator('slow-c'),
+    ]);
+    const result = await aggregator.checkAll();
 
     const elapsed = Date.now() - startTime;
     // If sequential, would be ~150ms. Concurrent should be ~50ms.
     expect(elapsed).toBeLessThan(120);
+    expect(Object.keys(result.indicators)).toHaveLength(3);
+  });
+
+  it('should warn on duplicate indicator names', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const dup: HealthIndicator = {
+      name: 'db',
+      check: async () => ({ status: 'UP' }),
+    };
+
+    const aggregator = new HealthAggregator([dup, dup]);
+    await aggregator.checkAll();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Duplicate indicator name 'db'"),
+    );
+    warnSpy.mockRestore();
   });
 });

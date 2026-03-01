@@ -18,6 +18,18 @@ export class HealthAggregator {
   async checkAll(): Promise<AggregatedHealth> {
     // Capture names before any async work so rejection branches can identify the indicator
     const names = this.indicators.map((i) => i.name);
+
+    // Warn about duplicate names — later entries silently overwrite earlier ones
+    const seen = new Set<string>();
+    for (const name of names) {
+      if (seen.has(name)) {
+        console.warn(
+          `[health] Duplicate indicator name '${name}' — earlier result will be overwritten`,
+        );
+      }
+      seen.add(name);
+    }
+
     const results = await Promise.allSettled(
       this.indicators.map(async (indicator) => indicator.check()),
     );
