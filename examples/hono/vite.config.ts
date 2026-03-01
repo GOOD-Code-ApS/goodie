@@ -6,7 +6,10 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [
     diPlugin({
-      plugins: [createLoggingPlugin(), createKyselyPlugin()],
+      plugins: [
+        createLoggingPlugin(),
+        createKyselyPlugin({ database: 'Database' }),
+      ],
     }),
   ],
   esbuild: { target: 'es2022' },

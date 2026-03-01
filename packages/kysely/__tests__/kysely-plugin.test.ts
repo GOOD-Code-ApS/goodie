@@ -1,6 +1,6 @@
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
 import { createKyselyPlugin } from '../src/kysely-transformer-plugin.js';
 
@@ -141,5 +141,83 @@ describe('Kysely Transformer Plugin', () => {
 
     expect(result.code).toContain('instance.create = buildInterceptorChain');
     expect(result.code).toContain('instance.update = buildInterceptorChain');
+  });
+
+  it('should add database bean as TransactionManager constructor dep when database option is set', () => {
+    const project = createProject({
+      '/src/Database.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class Database {
+          kysely: any
+        }
+      `,
+      '/src/MyService.ts': `
+        import { Singleton, Transactional } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Transactional()
+          async create() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin({ database: 'Database' }),
+    ]);
+
+    // TransactionManager factory should receive a dep (dep0 = Database)
+    expect(result.code).toContain(
+      '(dep0: any) => new TransactionManager(dep0)',
+    );
+    // Database should be listed as a dependency of TransactionManager
+    expect(result.code).toContain('token: Database');
+  });
+
+  it('should have zero constructor deps for TransactionManager when no database option is set', () => {
+    const project = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Transactional } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Transactional()
+          async create() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin(),
+    ]);
+
+    // TransactionManager factory should have no deps
+    expect(result.code).toContain('() => new TransactionManager()');
+  });
+
+  it('should warn and fall back to zero deps when database class is not found', () => {
+    const project = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Transactional } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Transactional()
+          async create() {}
+        }
+      `,
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin({ database: 'NonExistentDb' }),
+    ]);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("'NonExistentDb' not found"),
+    );
+    // Falls back to zero-arg constructor
+    expect(result.code).toContain('() => new TransactionManager()');
+
+    warnSpy.mockRestore();
   });
 });

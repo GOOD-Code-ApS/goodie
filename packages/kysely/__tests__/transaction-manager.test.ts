@@ -134,4 +134,31 @@ describe('TransactionManager', () => {
     const result = await tm.runInTransaction(async () => 'via constructor');
     expect(result).toBe('via constructor');
   });
+
+  it('should accept a KyselyProvider (duck-typed object with .kysely) in constructor', async () => {
+    const { kysely } = createMockKysely();
+    const provider = { kysely: kysely as never };
+    const tm = new TransactionManager(provider);
+
+    const result = await tm.runInTransaction(async () => 'via provider');
+    expect(result).toBe('via provider');
+  });
+
+  it('should use the .kysely property from a KyselyProvider, not the provider itself', () => {
+    const { kysely } = createMockKysely();
+    const provider = { kysely: kysely as never };
+    const tm = new TransactionManager(provider);
+
+    // getConnection() should return the raw kysely, not the provider wrapper
+    expect(tm.getConnection()).toBe(kysely);
+  });
+
+  it('should accept no args and fall back to configure()', async () => {
+    const tm = new TransactionManager();
+    const { kysely } = createMockKysely();
+    tm.configure(kysely as never);
+
+    const result = await tm.runInTransaction(async () => 'via configure');
+    expect(result).toBe('via configure');
+  });
 });

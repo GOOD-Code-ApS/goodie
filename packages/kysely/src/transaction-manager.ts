@@ -2,26 +2,39 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Kysely, Transaction } from 'kysely';
 
 /**
+ * An object that exposes a `.kysely` property — e.g. a Database wrapper class.
+ * Used for duck-type detection in the TransactionManager constructor.
+ */
+export interface KyselyProvider {
+  kysely: Kysely<any>;
+}
+
+/**
  * Manages database transactions using AsyncLocalStorage.
  *
  * Provides transaction propagation across async call chains without
  * explicitly threading a transaction object through every method.
  *
- * The plugin registers this as a synthetic bean. The user must call
- * `configure(kysely)` during application startup (e.g. in a @PostConstruct)
- * to provide the Kysely instance.
+ * When auto-wired via `createKyselyPlugin({ database: 'Database' })`,
+ * the constructor receives the Database bean and reads its `.kysely` property.
+ * Manual `configure()` is still supported for backward compatibility.
  */
 export class TransactionManager {
   private readonly storage = new AsyncLocalStorage<Transaction<any>>();
   private kyselyRef?: Kysely<any>;
 
-  constructor(kysely?: Kysely<any>) {
-    this.kyselyRef = kysely;
+  constructor(kyselyOrProvider?: Kysely<any> | KyselyProvider) {
+    if (kyselyOrProvider) {
+      this.kyselyRef =
+        'kysely' in kyselyOrProvider
+          ? kyselyOrProvider.kysely
+          : kyselyOrProvider;
+    }
   }
 
   /**
    * Configure the Kysely instance used for transactions.
-   * Must be called before `runInTransaction` is used.
+   * Unnecessary when auto-wired via `createKyselyPlugin({ database: '...' })`.
    */
   configure(kysely: Kysely<any>): void {
     this.kyselyRef = kysely;
@@ -30,7 +43,7 @@ export class TransactionManager {
   private get kysely(): Kysely<any> {
     if (!this.kyselyRef) {
       throw new Error(
-        'TransactionManager not configured. Call transactionManager.configure(kysely) in a @PostConstruct method.',
+        'TransactionManager not configured. Call transactionManager.configure(kysely) or use createKyselyPlugin({ database: "YourDatabase" }).',
       );
     }
     return this.kyselyRef;
