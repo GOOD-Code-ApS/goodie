@@ -1,30 +1,30 @@
-import type { MethodInterceptor } from '../types.js';
+import type { BeforeAdvice } from '../types.js';
 import { AOP_META, type AopDecoratorEntry } from './metadata.js';
 
-type Constructor<T = MethodInterceptor> = new (...args: any[]) => T;
+type Constructor<T = BeforeAdvice> = new (...args: any[]) => T;
 
 export interface BeforeOptions {
   order?: number;
 }
 
 /**
- * Method decorator that runs an interceptor before the method.
- * Convenience wrapper -- the interceptor should call ctx.proceed() after its logic.
+ * Method decorator that runs advice before the method.
+ * The advice class should implement `BeforeAdvice`.
  */
 export function Before(
-  interceptorClass: Constructor,
+  adviceClass: Constructor,
   opts?: BeforeOptions,
 ): MethodDecorator {
   return ((_target: any, context: ClassMethodDecoratorContext) => {
     const methodName = String(context.name);
     const existing: AopDecoratorEntry[] =
-      (context.metadata[AOP_META.BEFORE] as AopDecoratorEntry[]) ?? [];
+      (context.metadata[AOP_META.INTERCEPTORS] as AopDecoratorEntry[]) ?? [];
     existing.push({
       methodName,
-      interceptorClass,
-      type: 'before',
+      interceptorClass: adviceClass,
+      adviceType: 'before',
       order: opts?.order,
     });
-    context.metadata[AOP_META.BEFORE] = existing;
+    context.metadata[AOP_META.INTERCEPTORS] = existing;
   }) as MethodDecorator;
 }

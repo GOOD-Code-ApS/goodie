@@ -4,13 +4,14 @@ import type {
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
-import type { InterceptedMethodDescriptor } from './types.js';
+import type { InterceptedMethodDescriptor, InterceptorRef } from './types.js';
 
 /** Internal tracking of AOP annotations found during method visiting. */
 interface AopMethodInfo {
   methodName: string;
   interceptorClassName: string;
-  type: 'around' | 'before' | 'after';
+  interceptorImportPath: string;
+  adviceType: 'around' | 'before' | 'after';
   order: number;
 }
 
@@ -18,11 +19,14 @@ const AOP_DECORATOR_NAMES = ['Around', 'Before', 'After'] as const;
 
 /**
  * Create the AOP transformer plugin.
- * Scans @Around/@Before/@After decorators on methods and generates
- * metadata for the AopPostProcessor.
+ *
+ * Scans @Around/@Before/@After decorators on methods. At compile time,
+ * interceptors become normal bean dependencies and the codegen generates
+ * `buildInterceptorChain()` calls inside factory functions — no runtime
+ * post-processor needed.
  */
 export function createAopPlugin(): TransformerPlugin {
-  // Map className -> list of AOP method info
+  // Map (filePath:className) -> list of AOP method info
   const classAopInfo = new Map<string, AopMethodInfo[]>();
 
   return {
@@ -43,58 +47,83 @@ export function createAopPlugin(): TransformerPlugin {
         const args = decorator.getArguments();
         if (args.length === 0) continue;
 
-        const interceptorClassName = args[0].getText();
-        let order = 0;
+        const interceptorArg = args[0];
 
-        // Check for options object with order
+        // Resolve the interceptor class via ts-morph type system
+        let className = interceptorArg.getText();
+        let importPath = '';
+
+        const interceptorType = interceptorArg.getType();
+        const symbol = interceptorType.getSymbol();
+        if (symbol) {
+          className = symbol.getName();
+          const decls = symbol.getDeclarations();
+          if (decls.length > 0) {
+            importPath = decls[0].getSourceFile().getFilePath();
+          }
+        }
+
+        // Parse order from options argument
+        let order = 0;
         if (args.length > 1) {
-          const optArg = args[1];
-          const text = optArg.getText();
+          const text = args[1].getText();
           const orderMatch = text.match(/order\s*:\s*(\d+)/);
           if (orderMatch) {
             order = Number.parseInt(orderMatch[1], 10);
           }
         }
 
-        const existing = classAopInfo.get(ctx.className) ?? [];
+        // Key by filePath:className to avoid collisions
+        const key = `${ctx.filePath}:${ctx.className}`;
+        const existing = classAopInfo.get(key) ?? [];
         existing.push({
           methodName: ctx.methodName,
-          interceptorClassName,
-          type: decoratorName.toLowerCase() as 'around' | 'before' | 'after',
+          interceptorClassName: className,
+          interceptorImportPath: importPath,
+          adviceType: decoratorName.toLowerCase() as
+            | 'around'
+            | 'before'
+            | 'after',
           order,
         });
-        classAopInfo.set(ctx.className, existing);
+        classAopInfo.set(key, existing);
       }
     },
 
     afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
-      // Populate metadata.interceptedMethods on beans that have AOP decorators
       for (const bean of beans) {
         const className =
           bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
         if (!className) continue;
 
-        const aopInfos = classAopInfo.get(className);
+        // Match by importPath:className (consistent with plugin metadata keying)
+        const key = `${bean.tokenRef.importPath}:${className}`;
+        const aopInfos = classAopInfo.get(key);
         if (!aopInfos || aopInfos.length === 0) continue;
 
-        // Group by method name and sort by order
+        // Group by method name
         const methodMap = new Map<string, AopMethodInfo[]>();
         for (const info of aopInfos) {
-          const existing = methodMap.get(info.methodName) ?? [];
-          existing.push(info);
-          methodMap.set(info.methodName, existing);
+          const list = methodMap.get(info.methodName) ?? [];
+          list.push(info);
+          methodMap.set(info.methodName, list);
         }
 
+        // Build InterceptedMethodDescriptor[] and collect unique interceptors
         const interceptedMethods: InterceptedMethodDescriptor[] = [];
+
         for (const [methodName, infos] of methodMap) {
           const sorted = infos.sort((a, b) => a.order - b.order);
           interceptedMethods.push({
             methodName,
-            interceptorTokenRefs: sorted.map((info) => ({
-              className: info.interceptorClassName,
-              importPath: '', // resolved at runtime via DI container
-            })),
-            order: sorted[0].order,
+            interceptors: sorted.map(
+              (info): InterceptorRef => ({
+                className: info.interceptorClassName,
+                importPath: info.interceptorImportPath,
+                adviceType: info.adviceType,
+                order: info.order,
+              }),
+            ),
           });
         }
 
@@ -102,37 +131,6 @@ export function createAopPlugin(): TransformerPlugin {
       }
 
       return beans;
-    },
-
-    beforeCodegen(beans: IRBeanDefinition[]): IRBeanDefinition[] {
-      // Check if any bean has intercepted methods
-      const hasAop = beans.some(
-        (b) =>
-          b.metadata.interceptedMethods &&
-          (b.metadata.interceptedMethods as unknown[]).length > 0,
-      );
-
-      if (!hasAop) return beans;
-
-      // Inject synthetic AopPostProcessor bean definition
-      const aopPostProcessorBean: IRBeanDefinition = {
-        tokenRef: {
-          kind: 'class',
-          className: 'AopPostProcessor',
-          importPath: '@goodie-ts/aop',
-        },
-        scope: 'singleton',
-        eager: false,
-        name: undefined,
-        constructorDeps: [],
-        fieldDeps: [],
-        factoryKind: 'constructor',
-        providesSource: undefined,
-        metadata: { isBeanPostProcessor: true },
-        sourceLocation: { filePath: '@goodie-ts/aop', line: 0, column: 0 },
-      };
-
-      return [aopPostProcessorBean, ...beans];
     },
 
     codegen(beans: IRBeanDefinition[]): CodegenContribution {
@@ -144,8 +142,24 @@ export function createAopPlugin(): TransformerPlugin {
 
       if (!hasAop) return {};
 
+      // Check which wrapper imports are needed
+      const allMethods = beans.flatMap(
+        (b) =>
+          (b.metadata.interceptedMethods as InterceptedMethodDescriptor[]) ??
+          [],
+      );
+      const allInterceptors = allMethods.flatMap((m) => m.interceptors);
+      const hasBefore = allInterceptors.some((i) => i.adviceType === 'before');
+      const hasAfter = allInterceptors.some((i) => i.adviceType === 'after');
+
+      const importSymbols = ['buildInterceptorChain'];
+      if (hasBefore) importSymbols.push('wrapBeforeAdvice');
+      if (hasAfter) importSymbols.push('wrapAfterAdvice');
+
       return {
-        imports: ["import { AopPostProcessor } from '@goodie-ts/aop'"],
+        imports: [
+          `import { ${importSymbols.join(', ')} } from '@goodie-ts/aop'`,
+        ],
       };
     },
   };

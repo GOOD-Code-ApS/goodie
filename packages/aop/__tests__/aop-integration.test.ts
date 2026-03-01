@@ -3,31 +3,27 @@ import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
 import { createAopPlugin } from '../src/aop-transformer-plugin.js';
-import type { InterceptedMethodDescriptor } from '../src/types.js';
 
-describe('AOP Integration', () => {
+describe('AOP Integration — Generated Code', () => {
   function createProject(files: Record<string, string>) {
     const project = new Project({ useInMemoryFileSystem: true });
     project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
-    for (const [path, content] of Object.entries(files)) {
-      project.createSourceFile(path, content);
+    for (const [filePath, content] of Object.entries(files)) {
+      project.createSourceFile(filePath, content);
     }
     return project;
   }
 
-  it('full pipeline: @Singleton + @Around produces metadata, AopPostProcessor bean, and AOP import', () => {
+  it('generates buildInterceptorChain call in factory (not AopPostProcessor)', () => {
     const project = createProject({
       '/src/TimingInterceptor.ts': `
         import { Singleton } from './decorators.js'
-        @Singleton()
-        export class TimingInterceptor {}
+        @Singleton() export class TimingInterceptor {}
       `,
       '/src/MyService.ts': `
         import { Singleton, Around } from './decorators.js'
         import { TimingInterceptor } from './TimingInterceptor.js'
-
-        @Singleton()
-        class MyService {
+        @Singleton() class MyService {
           @Around(TimingInterceptor)
           doWork() {}
         }
@@ -38,62 +34,85 @@ describe('AOP Integration', () => {
       createAopPlugin(),
     ]);
 
-    // 1. MyService has interceptedMethods in metadata
-    const myService = result.beans.find(
-      (b) =>
-        b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyService',
-    );
-    expect(myService).toBeDefined();
-    const methods = myService!.metadata
-      .interceptedMethods as InterceptedMethodDescriptor[];
-    expect(methods).toHaveLength(1);
-    expect(methods[0].methodName).toBe('doWork');
-    expect(methods[0].interceptorTokenRefs[0].className).toBe(
-      'TimingInterceptor',
-    );
+    // buildInterceptorChain is used instead of AopPostProcessor
+    expect(result.code).toContain('buildInterceptorChain');
+    expect(result.code).not.toContain('AopPostProcessor');
 
-    // 2. AopPostProcessor synthetic bean is injected
-    const aopBean = result.beans.find(
+    // No synthetic AopPostProcessor bean
+    const postProcessorBean = result.beans.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'AopPostProcessor',
     );
-    expect(aopBean).toBeDefined();
-    expect(aopBean!.metadata.isBeanPostProcessor).toBe(true);
-
-    // 3. Generated code contains AOP import
-    expect(result.code).toContain(
-      "import { AopPostProcessor } from '@goodie-ts/aop'",
-    );
-
-    // 4. Generated code contains interceptedMethods in metadata
-    expect(result.code).toContain('interceptedMethods');
-
-    // 5. Generated code contains AopPostProcessor token
-    expect(result.code).toContain('token: AopPostProcessor');
+    expect(postProcessorBean).toBeUndefined();
   });
 
-  it('@Before and @After decorators are also recognized', () => {
+  it('imports buildInterceptorChain from @goodie-ts/aop', () => {
     const project = createProject({
-      '/src/LogInterceptor.ts': `
+      '/src/TimingInterceptor.ts': `
         import { Singleton } from './decorators.js'
-        @Singleton()
-        export class LogInterceptor {}
+        @Singleton() export class TimingInterceptor {}
       `,
-      '/src/MetricsInterceptor.ts': `
+      '/src/MyService.ts': `
+        import { Singleton, Around } from './decorators.js'
+        import { TimingInterceptor } from './TimingInterceptor.js'
+        @Singleton() class MyService {
+          @Around(TimingInterceptor)
+          doWork() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createAopPlugin(),
+    ]);
+
+    expect(result.code).toContain(
+      "import { buildInterceptorChain } from '@goodie-ts/aop'",
+    );
+  });
+
+  it('interceptor class appears in dependencies array', () => {
+    const project = createProject({
+      '/src/TimingInterceptor.ts': `
         import { Singleton } from './decorators.js'
-        @Singleton()
-        export class MetricsInterceptor {}
+        @Singleton() export class TimingInterceptor {}
+      `,
+      '/src/MyService.ts': `
+        import { Singleton, Around } from './decorators.js'
+        import { TimingInterceptor } from './TimingInterceptor.js'
+        @Singleton() class MyService {
+          @Around(TimingInterceptor)
+          doWork() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createAopPlugin(),
+    ]);
+
+    // The generated code should have TimingInterceptor as a dependency token for MyService
+    expect(result.code).toContain('token: TimingInterceptor');
+  });
+
+  it('@Before and @After generate wrapper calls in factory', () => {
+    const project = createProject({
+      '/src/LogAdvice.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton() export class LogAdvice {}
+      `,
+      '/src/MetricsAdvice.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton() export class MetricsAdvice {}
       `,
       '/src/MyService.ts': `
         import { Singleton, Before, After } from './decorators.js'
-        import { LogInterceptor } from './LogInterceptor.js'
-        import { MetricsInterceptor } from './MetricsInterceptor.js'
-
-        @Singleton()
-        class MyService {
-          @Before(LogInterceptor)
-          @After(MetricsInterceptor)
+        import { LogAdvice } from './LogAdvice.js'
+        import { MetricsAdvice } from './MetricsAdvice.js'
+        @Singleton() class MyService {
+          @Before(LogAdvice)
+          @After(MetricsAdvice)
           process() {}
         }
       `,
@@ -103,19 +122,14 @@ describe('AOP Integration', () => {
       createAopPlugin(),
     ]);
 
-    const myService = result.beans.find(
-      (b) =>
-        b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyService',
+    expect(result.code).toContain('wrapBeforeAdvice');
+    expect(result.code).toContain('wrapAfterAdvice');
+    expect(result.code).toContain(
+      "import { buildInterceptorChain, wrapBeforeAdvice, wrapAfterAdvice } from '@goodie-ts/aop'",
     );
-    expect(myService).toBeDefined();
-    const methods = myService!.metadata
-      .interceptedMethods as InterceptedMethodDescriptor[];
-    expect(methods).toHaveLength(1);
-    expect(methods[0].methodName).toBe('process');
-    expect(methods[0].interceptorTokenRefs).toHaveLength(2);
   });
 
-  it('multiple methods can have separate interceptors', () => {
+  it('multiple methods with different interceptors', () => {
     const project = createProject({
       '/src/AuthInterceptor.ts': `
         import { Singleton } from './decorators.js'
@@ -129,9 +143,7 @@ describe('AOP Integration', () => {
         import { Singleton, Around } from './decorators.js'
         import { AuthInterceptor } from './AuthInterceptor.js'
         import { CacheInterceptor } from './CacheInterceptor.js'
-
-        @Singleton()
-        class MyService {
+        @Singleton() class MyService {
           @Around(AuthInterceptor)
           secure() {}
 
@@ -145,16 +157,48 @@ describe('AOP Integration', () => {
       createAopPlugin(),
     ]);
 
-    const myService = result.beans.find(
-      (b) =>
-        b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyService',
-    );
-    const methods = myService!.metadata
-      .interceptedMethods as InterceptedMethodDescriptor[];
-    expect(methods).toHaveLength(2);
+    // Both methods should be wrapped
+    expect(result.code).toContain("'secure'");
+    expect(result.code).toContain("'getData'");
+    expect(result.code).toContain('buildInterceptorChain');
+  });
 
-    const methodNames = methods.map((m) => m.methodName);
-    expect(methodNames).toContain('secure');
-    expect(methodNames).toContain('getData');
+  it('bean with no interception has normal factory (no buildInterceptorChain)', () => {
+    const project = createProject({
+      '/src/TimingInterceptor.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton() export class TimingInterceptor {}
+      `,
+      '/src/PlainService.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton() class PlainService {
+          doWork() {}
+        }
+      `,
+      '/src/InterceptedService.ts': `
+        import { Singleton, Around } from './decorators.js'
+        import { TimingInterceptor } from './TimingInterceptor.js'
+        @Singleton() class InterceptedService {
+          @Around(TimingInterceptor)
+          doWork() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createAopPlugin(),
+    ]);
+
+    // PlainService should have a simple factory
+    // InterceptedService should have buildInterceptorChain
+    const lines = result.code.split('\n');
+    const plainServiceLine = lines.find((l) => l.includes('new PlainService'));
+    const interceptedLine = lines.find((l) =>
+      l.includes('new InterceptedService'),
+    );
+
+    expect(plainServiceLine).toBeDefined();
+    expect(plainServiceLine).not.toContain('buildInterceptorChain');
+    expect(interceptedLine).toBeDefined();
   });
 });

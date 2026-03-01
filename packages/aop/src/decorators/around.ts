@@ -18,13 +18,13 @@ export function Around(
   return ((_target: any, context: ClassMethodDecoratorContext) => {
     const methodName = String(context.name);
     const existing: AopDecoratorEntry[] =
-      (context.metadata[AOP_META.AROUND] as AopDecoratorEntry[]) ?? [];
+      (context.metadata[AOP_META.INTERCEPTORS] as AopDecoratorEntry[]) ?? [];
     existing.push({
       methodName,
       interceptorClass,
-      type: 'around',
+      adviceType: 'around',
       order: opts?.order,
     });
-    context.metadata[AOP_META.AROUND] = existing;
+    context.metadata[AOP_META.INTERCEPTORS] = existing;
   }) as MethodDecorator;
 }
