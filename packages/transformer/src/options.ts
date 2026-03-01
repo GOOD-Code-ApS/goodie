@@ -24,10 +24,3 @@ export interface TransformResult {
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
 }
-
-/** Stub for future plugin support (Phase 3+). */
-export interface TransformerPlugin {
-  name: string;
-  beforeScan?(): void;
-  afterScan?(beans: IRBeanDefinition[]): IRBeanDefinition[];
-}

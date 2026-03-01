@@ -38,10 +38,14 @@ export function transform(options: TransformOptions): TransformResult {
   const graphResult = buildGraph(resolveResult);
 
   // 5. Generate code
-  const code = generateCode(graphResult.beans, {
-    outputPath: options.outputPath,
-    version: PKG_VERSION,
-  });
+  const code = generateCode(
+    graphResult.beans,
+    {
+      outputPath: options.outputPath,
+      version: PKG_VERSION,
+    },
+    graphResult.controllers,
+  );
 
   // 6. Write output
   const outputDir = path.dirname(options.outputPath);
@@ -67,10 +71,14 @@ export function transformInMemory(
   const scanResult = scan(project);
   const resolveResult = resolve(scanResult);
   const graphResult = buildGraph(resolveResult);
-  const code = generateCode(graphResult.beans, {
-    outputPath,
-    version: PKG_VERSION,
-  });
+  const code = generateCode(
+    graphResult.beans,
+    {
+      outputPath,
+      version: PKG_VERSION,
+    },
+    graphResult.controllers,
+  );
 
   return {
     code,
