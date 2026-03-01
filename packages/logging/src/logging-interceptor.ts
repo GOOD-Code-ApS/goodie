@@ -62,12 +62,12 @@ export class LoggingInterceptor implements MethodInterceptor {
       }
 
       const ms = (performance.now() - start).toFixed(1);
-      logger[level](`← ${ctx.methodName}() [${ms}ms]`, mdcContext);
+      logger[level](`← ${ctx.methodName}() [${ms}ms]`, MDC.getAll());
       return result;
     } catch (error) {
       const ms = (performance.now() - start).toFixed(1);
       logger.error(`✗ ${ctx.methodName}() [${ms}ms]`, {
-        ...mdcContext,
+        ...MDC.getAll(),
         error: String(error),
       });
       throw error;

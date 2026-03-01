@@ -17,6 +17,12 @@ interface LogMethodInfo {
  * Scans @Log() decorators on methods and wires LoggingInterceptor as an AOP
  * interceptor dependency at compile time. The interceptor is added as a synthetic
  * bean so users don't need to register it manually.
+ *
+ * **Custom LoggerFactory:** The synthetic `LoggingInterceptor` bean is created with
+ * zero constructor deps (uses the default `ConsoleLogger`). To use a custom logger
+ * (pino, winston, etc.), register your own `LoggingInterceptor` bean with a
+ * `LoggerFactory` constructor argument — the container will use it instead of the
+ * synthetic bean due to duplicate resolution.
  */
 export function createLoggingPlugin(): TransformerPlugin {
   const classLogInfo = new Map<string, LogMethodInfo[]>();
