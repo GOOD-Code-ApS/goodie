@@ -87,6 +87,7 @@ export function transform(options: TransformOptions): TransformResult {
     finalBeans,
     { outputPath: options.outputPath, version: PKG_VERSION },
     contributions,
+    graphResult.controllers,
   );
 
   // 12. Write output
@@ -162,6 +163,7 @@ export function transformInMemory(
     finalBeans,
     { outputPath, version: PKG_VERSION },
     contributions,
+    graphResult.controllers,
   );
 
   return {

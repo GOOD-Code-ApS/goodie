@@ -83,6 +83,20 @@ export interface IRModule {
   sourceLocation: SourceLocation;
 }
 
+/** A route method in an IR controller. */
+export interface IRRouteDefinition {
+  methodName: string;
+  httpMethod: 'get' | 'post' | 'put' | 'delete' | 'patch';
+  path: string;
+}
+
+/** A controller class with routes. */
+export interface IRControllerDefinition {
+  classTokenRef: ClassTokenRef;
+  basePath: string;
+  routes: IRRouteDefinition[];
+}
+
 /** Full intermediate representation of a single bean. */
 export interface IRBeanDefinition {
   tokenRef: TokenRef;

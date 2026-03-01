@@ -15,6 +15,12 @@ export function PreDestroy() { return (t: any, c: any) => {} }
 export function PostConstruct() { return (t: any, c: any) => {} }
 export function PostProcessor() { return (t: any, c: any) => {} }
 export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
+export function Controller(path?: string) { return (t: any, c: any) => {} }
+export function Get(path?: string) { return (t: any, c: any) => {} }
+export function Post(path?: string) { return (t: any, c: any) => {} }
+export function Put(path?: string) { return (t: any, c: any) => {} }
+export function Delete(path?: string) { return (t: any, c: any) => {} }
+export function Patch(path?: string) { return (t: any, c: any) => {} }
 `;
 
 /**
