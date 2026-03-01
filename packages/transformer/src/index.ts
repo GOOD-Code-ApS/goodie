@@ -20,6 +20,9 @@ export type {
 } from './ir.js';
 // Options
 export type {
+  ClassVisitorContext,
+  CodegenContribution,
+  MethodVisitorContext,
   TransformerPlugin,
   TransformOptions,
   TransformResult,

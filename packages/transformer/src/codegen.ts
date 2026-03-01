@@ -1,5 +1,6 @@
 import path from 'node:path';
 import type { IRBeanDefinition, TokenRef } from './ir.js';
+import type { CodegenContribution } from './options.js';
 
 /** Info about an auto-generated InjectionToken. */
 interface TokenInfo {
@@ -21,6 +22,7 @@ export interface CodegenOptions {
 export function generateCode(
   beans: IRBeanDefinition[],
   options: CodegenOptions,
+  contributions?: CodegenContribution[],
 ): string {
   const outputDir = path.dirname(options.outputPath);
   const lines: string[] = [];
@@ -74,6 +76,17 @@ export function generateCode(
   );
   for (const [typeName, importSpec] of typeOnlyImports) {
     lines.push(`import type { ${typeName} } from '${importSpec}'`);
+  }
+
+  // Plugin contribution imports
+  if (contributions && contributions.length > 0) {
+    const importLines: string[] = [];
+    for (const contrib of contributions) {
+      if (contrib.imports) importLines.push(...contrib.imports);
+    }
+    if (importLines.length > 0) {
+      lines.push(...importLines);
+    }
   }
 
   lines.push('');
@@ -172,6 +185,19 @@ export function generateCode(
     lines.push('export const app = Goodie.build(definitions)');
   }
   lines.push('');
+
+  // Plugin contribution code
+  if (contributions && contributions.length > 0) {
+    const codeLines: string[] = [];
+    for (const contrib of contributions) {
+      if (contrib.code) codeLines.push(...contrib.code);
+    }
+    if (codeLines.length > 0) {
+      lines.push('// Plugin contributions');
+      lines.push(...codeLines);
+      lines.push('');
+    }
+  }
 
   return lines.join('\n');
 }
