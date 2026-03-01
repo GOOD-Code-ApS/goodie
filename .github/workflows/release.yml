@@ -27,11 +27,32 @@ jobs:
       - run: pnpm test
 
       - name: Create Release PR or Publish
+        id: changesets
         uses: changesets/action@v1
         with:
-          publish: pnpm release
+          publish: bash scripts/publish.sh
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ""
+
+      - name: Create unified GitHub release
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          TAG="v${VERSION}"
+
+          # Collect changelog entries from all packages
+          BODY="## Packages published\n"
+          for pkg in packages/*/; do
+            NAME=$(node -p "require('./${pkg}package.json').name")
+            BODY="${BODY}\n- \`${NAME}@${VERSION}\`"
+          done
+
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes "$(echo -e "${BODY}")" \
+            --latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
