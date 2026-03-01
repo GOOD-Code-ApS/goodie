@@ -6,6 +6,7 @@ interface CacheMetadata {
   cacheName: string;
   cacheAction: 'get' | 'evict' | 'put';
   ttlMs?: number;
+  allEntries?: boolean;
 }
 
 /**
@@ -85,19 +86,44 @@ export class CacheInterceptor implements MethodInterceptor {
   ): unknown {
     const result = ctx.proceed();
 
+    const doEvict = () => {
+      if (meta.allEntries) {
+        this.cacheManager.evictAll(meta.cacheName);
+      } else {
+        this.cacheManager.evict(meta.cacheName, cacheKey);
+      }
+    };
+
     if (result instanceof Promise) {
       return result.then((value) => {
-        this.cacheManager.evict(meta.cacheName, cacheKey);
+        doEvict();
         return value;
       });
     }
 
-    this.cacheManager.evict(meta.cacheName, cacheKey);
+    doEvict();
     return result;
   }
 
   private buildKey(methodName: string, args: unknown[]): string {
     if (args.length === 0) return methodName;
-    return `${methodName}:${args.map((a) => JSON.stringify(a)).join(',')}`;
+    return `${methodName}:${args.map((a) => this.stringifyArg(a)).join(',')}`;
+  }
+
+  private stringifyArg(arg: unknown): string {
+    if (arg === null) return 'null';
+    if (arg === undefined) return 'undefined';
+    const type = typeof arg;
+    if (type === 'string' || type === 'number' || type === 'boolean') {
+      return String(arg);
+    }
+    try {
+      return JSON.stringify(arg);
+    } catch {
+      throw new Error(
+        `Cache key generation failed: argument of type ${type} is not serializable. ` +
+          'Use primitive arguments or provide a custom key strategy.',
+      );
+    }
   }
 }

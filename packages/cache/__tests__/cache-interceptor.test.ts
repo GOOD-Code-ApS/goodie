@@ -117,11 +117,11 @@ describe('CacheInterceptor', () => {
     interceptor.intercept(ctx1);
     interceptor.intercept(ctx2);
 
-    expect(manager.get('todos', 'findById:"id-1"')).toEqual({
+    expect(manager.get('todos', 'findById:id-1')).toEqual({
       id: 'id-1',
       title: 'First',
     });
-    expect(manager.get('todos', 'findById:"id-2"')).toEqual({
+    expect(manager.get('todos', 'findById:id-2')).toEqual({
       id: 'id-2',
       title: 'Second',
     });
@@ -136,6 +136,60 @@ describe('CacheInterceptor', () => {
     });
 
     expect(interceptor.intercept(ctx)).toBe('direct');
+  });
+
+  it('should evict all entries when allEntries is true', () => {
+    const manager = new CacheManager();
+    const interceptor = new CacheInterceptor(manager);
+
+    // Pre-populate cache with multiple entries
+    manager.put('todos', 'findAll', [{ id: 1 }, { id: 2 }]);
+    manager.put('todos', 'findById:1', { id: 1 });
+    manager.put('todos', 'findById:2', { id: 2 });
+
+    const ctx = createContext({
+      methodName: 'create',
+      proceed: () => ({ id: 3 }),
+      metadata: { cacheName: 'todos', cacheAction: 'evict', allEntries: true },
+    });
+
+    interceptor.intercept(ctx);
+
+    expect(manager.size('todos')).toBe(0);
+  });
+
+  it('should throw on non-serializable arguments', () => {
+    const manager = new CacheManager();
+    const interceptor = new CacheInterceptor(manager);
+
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    const ctx = createContext({
+      args: [circular],
+      metadata: { cacheName: 'todos', cacheAction: 'get' },
+    });
+
+    expect(() => interceptor.intercept(ctx)).toThrow(
+      'Cache key generation failed',
+    );
+  });
+
+  it('should use primitive string representation for cache keys', () => {
+    const manager = new CacheManager();
+    const interceptor = new CacheInterceptor(manager);
+
+    const ctx = createContext({
+      methodName: 'findById',
+      args: [42],
+      proceed: () => ({ id: 42 }),
+      metadata: { cacheName: 'items', cacheAction: 'get' },
+    });
+
+    interceptor.intercept(ctx);
+
+    // Number args should use String() not JSON.stringify
+    expect(manager.get('items', 'findById:42')).toEqual({ id: 42 });
   });
 
   it('should not cache null/undefined results on @Cacheable', () => {

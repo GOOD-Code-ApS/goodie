@@ -11,6 +11,7 @@ interface CacheMethodInfo {
   cacheName: string;
   cacheAction: 'get' | 'evict' | 'put';
   ttlMs?: number;
+  allEntries?: boolean;
 }
 
 const CACHE_DECORATORS: Record<string, 'get' | 'evict' | 'put'> = {
@@ -47,16 +48,29 @@ export function createCachePlugin(): TransformerPlugin {
         // Strip quotes: 'todos' or "todos" → todos
         const cacheName = cacheNameText.replace(/^['"]|['"]$/g, '');
 
-        // Parse TTL from second argument (Cacheable and CachePut only)
+        // Parse options from second argument
         let ttlMs: number | undefined;
-        if (
-          args.length > 1 &&
-          (cacheAction === 'get' || cacheAction === 'put')
-        ) {
+        let allEntries: boolean | undefined;
+
+        if (args.length > 1) {
           const optsText = args[1].getText();
-          const ttlMatch = optsText.match(/ttlMs\s*:\s*(\d+)/);
-          if (ttlMatch) {
-            ttlMs = Number.parseInt(ttlMatch[1], 10);
+
+          // Parse TTL (Cacheable and CachePut only) — only literal numbers are supported
+          if (cacheAction === 'get' || cacheAction === 'put') {
+            const ttlMatch = optsText.match(/ttlMs\s*:\s*(\d+)/);
+            if (ttlMatch) {
+              ttlMs = Number.parseInt(ttlMatch[1], 10);
+            }
+          }
+
+          // Parse allEntries (CacheEvict only)
+          if (cacheAction === 'evict') {
+            const allEntriesMatch = optsText.match(
+              /allEntries\s*:\s*(true|false)/,
+            );
+            if (allEntriesMatch) {
+              allEntries = allEntriesMatch[1] === 'true';
+            }
           }
         }
 
@@ -67,6 +81,7 @@ export function createCachePlugin(): TransformerPlugin {
           cacheName,
           cacheAction,
           ttlMs,
+          allEntries,
         });
         classCacheInfo.set(key, existing);
       }
@@ -111,6 +126,7 @@ export function createCachePlugin(): TransformerPlugin {
               cacheName: info.cacheName,
               cacheAction: info.cacheAction,
               ...(info.ttlMs !== undefined ? { ttlMs: info.ttlMs } : {}),
+              ...(info.allEntries ? { allEntries: true } : {}),
             },
           };
 

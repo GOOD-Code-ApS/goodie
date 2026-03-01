@@ -157,4 +157,43 @@ describe('Cache Transformer Plugin', () => {
     expect(result.code).toContain('instance.findAll = buildInterceptorChain');
     expect(result.code).toContain('instance.create = buildInterceptorChain');
   });
+
+  it('should pass allEntries metadata for @CacheEvict({ allEntries: true })', () => {
+    const project = createProject({
+      '/src/TodoService.ts': `
+        import { Singleton, CacheEvict } from './decorators.js'
+        @Singleton()
+        class TodoService {
+          @CacheEvict('todos', { allEntries: true })
+          clearAll() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/gen.ts', [
+      createCachePlugin(),
+    ]);
+
+    expect(result.code).toContain('"cacheAction":"evict"');
+    expect(result.code).toContain('"allEntries":true');
+  });
+
+  it('should parse ttlMs option for @Cacheable', () => {
+    const project = createProject({
+      '/src/TodoService.ts': `
+        import { Singleton, Cacheable } from './decorators.js'
+        @Singleton()
+        class TodoService {
+          @Cacheable('todos', { ttlMs: 30000 })
+          findAll() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/gen.ts', [
+      createCachePlugin(),
+    ]);
+
+    expect(result.code).toContain('"ttlMs":30000');
+  });
 });
