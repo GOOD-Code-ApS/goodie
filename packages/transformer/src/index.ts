@@ -21,11 +21,7 @@ export type {
   TokenRef,
 } from './ir.js';
 // Options
-export type {
-  TransformerPlugin,
-  TransformOptions,
-  TransformResult,
-} from './options.js';
+export type { TransformOptions, TransformResult } from './options.js';
 export type { ResolveResult } from './resolver.js';
 // Resolver
 export { resolve } from './resolver.js';

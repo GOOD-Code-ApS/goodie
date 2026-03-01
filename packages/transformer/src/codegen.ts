@@ -539,8 +539,10 @@ function generateCreateRouter(
   lines.push("import { Hono } from 'hono'");
 
   // Add controller imports for any controllers not already imported via beans
+  // Track by importPath to handle same-named classes from different files
+  const importedPaths = new Set<string>(classImports.values());
   for (const ctrl of controllers) {
-    if (!classImports.has(ctrl.classTokenRef.className)) {
+    if (!importedPaths.has(ctrl.classTokenRef.importPath)) {
       const relativePath = computeRelativeImport(
         outputDir,
         ctrl.classTokenRef.importPath,
@@ -548,6 +550,7 @@ function generateCreateRouter(
       lines.push(
         `import { ${ctrl.classTokenRef.className} } from '${relativePath}'`,
       );
+      importedPaths.add(ctrl.classTokenRef.importPath);
     }
   }
 
@@ -559,7 +562,7 @@ function generateCreateRouter(
   const ctrlVarNames = buildControllerVarNames(controllers);
 
   for (const ctrl of controllers) {
-    const varName = ctrlVarNames.get(ctrl.classTokenRef.className)!;
+    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     lines.push(`  const ${varName} = ctx.get(${ctrl.classTokenRef.className})`);
 
     for (const route of ctrl.routes) {
@@ -583,8 +586,9 @@ function generateCreateRouter(
 }
 
 /**
- * Build a Map<className, uniqueVarName> with collision detection.
+ * Build a Map<"className:importPath", uniqueVarName> with collision detection.
  * When two controllers produce the same camelCase name, append _2, _3, etc.
+ * Uses composite key to handle same-named controllers from different files.
  */
 function buildControllerVarNames(
   controllers: IRControllerDefinition[],
@@ -593,19 +597,25 @@ function buildControllerVarNames(
   const varNameCounts = new Map<string, number>();
 
   for (const ctrl of controllers) {
+    const key = controllerKey(ctrl);
     const className = ctrl.classTokenRef.className;
     const baseVarName = className.charAt(0).toLowerCase() + className.slice(1);
     const count = varNameCounts.get(baseVarName) ?? 0;
 
     if (count === 0) {
-      result.set(className, baseVarName);
+      result.set(key, baseVarName);
     } else {
-      result.set(className, `${baseVarName}_${count + 1}`);
+      result.set(key, `${baseVarName}_${count + 1}`);
     }
     varNameCounts.set(baseVarName, count + 1);
   }
 
   return result;
+}
+
+/** Stable key for a controller to avoid same-name collisions across files. */
+function controllerKey(ctrl: IRControllerDefinition): string {
+  return `${ctrl.classTokenRef.className}:${ctrl.classTokenRef.importPath}`;
 }
 
 /** Join a base path and a route path, normalizing slashes. */
