@@ -17,9 +17,14 @@ interface TransactionalMethodInfo {
  * Scans @Transactional decorators on methods and wires
  * TransactionalInterceptor as an AOP interceptor dependency at compile time.
  *
- * Note: The user must register a `TransactionManager` bean themselves
- * (e.g. via @Provides in a module) since it requires a Kysely instance.
- * The plugin only adds the `TransactionalInterceptor` synthetic bean.
+ * **Limitation:** Propagation is detected via AST text matching
+ * (`text.includes('REQUIRES_NEW')`). Only string literal values in the
+ * decorator argument are supported — const references or computed values
+ * will fall back to `'REQUIRED'` silently.
+ *
+ * Note: The plugin adds a synthetic TransactionManager bean. The user must
+ * call `transactionManager.configure(kysely)` during startup (e.g. in a
+ * `@PostConstruct` method) to provide the Kysely instance.
  */
 export function createKyselyPlugin(): TransformerPlugin {
   const classTransactionalInfo = new Map<string, TransactionalMethodInfo[]>();

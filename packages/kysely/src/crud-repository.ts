@@ -4,15 +4,23 @@ import type { TransactionManager } from './transaction-manager.js';
 /**
  * Abstract base class for CRUD repositories backed by Kysely.
  *
+ * **PostgreSQL-only:** Uses `RETURNING` clauses in `save()` and `deleteById()`.
+ * MySQL and SQLite do not support `RETURNING`. For other dialects, override
+ * these methods in your subclass.
+ *
  * Provides standard `findAll`, `findById`, `save`, and `deleteById` operations.
  * All queries use `TransactionManager.getConnection()` to be transaction-aware.
+ *
+ * The `db` getter returns `Kysely<any>` — typed table access is intentionally
+ * erased because the transformer cannot generate clean tokens for `Kysely<DB>`
+ * generic types. Subclasses can cast as needed for custom queries.
  *
  * @typeParam T - The entity/row type returned by queries.
  *
  * @example
  * ```typescript
  * class TodoRepository extends CrudRepository<Todo> {
- *   constructor(transactionManager: TransactionManager<DB>) {
+ *   constructor(transactionManager: TransactionManager) {
  *     super('todos', transactionManager);
  *   }
  * }

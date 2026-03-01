@@ -28,6 +28,7 @@
     "@goodie-ts/aop": "workspace:*"
   },
   "peerDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
     "kysely": ">=0.27.0"
   },
   "devDependencies": {
