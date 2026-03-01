@@ -5,7 +5,7 @@ import {
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import { Hono } from 'hono';
-import postgres from 'postgres';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { definitions } from '../src/AppContext.generated.js';
 import { createTodoRoutes } from '../src/routes.js';
@@ -20,16 +20,16 @@ describe('Hono + PostgreSQL Todo API', () => {
     container = await new PostgreSqlContainer('postgres:17-alpine').start();
 
     const connectionUri = container.getConnectionUri();
-    const sql = postgres(connectionUri);
-    await sql`
+    const pool = new pg.Pool({ connectionString: connectionUri });
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS todos (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         title TEXT NOT NULL,
         completed BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMP NOT NULL DEFAULT now()
       )
-    `;
-    await sql.end();
+    `);
+    await pool.end();
 
     ctx = await TestContext.from(definitions)
       .withConfig({ DATABASE_URL: connectionUri })

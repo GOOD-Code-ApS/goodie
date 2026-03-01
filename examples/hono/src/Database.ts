@@ -1,21 +1,28 @@
-import { PostConstruct, Singleton, Value } from '@goodie-ts/decorators';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import * as schema from './db/schema.js';
+import {
+  PostConstruct,
+  PreDestroy,
+  Singleton,
+  Value,
+} from '@goodie-ts/decorators';
+import { Kysely, PostgresDialect } from 'kysely';
+import pg from 'pg';
+import type { Database as DB } from './db/schema.js';
 
 @Singleton()
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class Database {
   @Value('DATABASE_URL', { default: 'postgres://localhost:5432/todos' })
   accessor databaseUrl!: string;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  drizzle!: PostgresJsDatabase<any>;
+  kysely!: Kysely<DB>;
 
   @PostConstruct()
   init() {
-    const client = postgres(this.databaseUrl);
-    this.drizzle = drizzle(client, { schema });
+    const pool = new pg.Pool({ connectionString: this.databaseUrl });
+    this.kysely = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+  }
+
+  @PreDestroy()
+  async destroy() {
+    await this.kysely.destroy();
   }
 }
