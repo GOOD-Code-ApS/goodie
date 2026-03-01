@@ -28,6 +28,10 @@ export default defineConfig({
         __dirname,
         'packages/logging/src/index.ts',
       ),
+      '@goodie-ts/config': path.resolve(
+        __dirname,
+        'packages/config/src/index.ts',
+      ),
     },
   },
   test: {

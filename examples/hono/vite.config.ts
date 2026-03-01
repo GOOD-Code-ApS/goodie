@@ -1,3 +1,4 @@
+import { createConfigPlugin } from '@goodie-ts/config';
 import { createLoggingPlugin } from '@goodie-ts/logging';
 import { diPlugin } from '@goodie-ts/vite-plugin';
 import { defineConfig } from 'vite';
@@ -5,7 +6,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [
     diPlugin({
-      plugins: [createLoggingPlugin()],
+      plugins: [createLoggingPlugin(), createConfigPlugin()],
     }),
   ],
   esbuild: { target: 'es2022' },
@@ -17,6 +18,7 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
+        '@goodie-ts/config',
         '@goodie-ts/core',
         '@goodie-ts/decorators',
         '@goodie-ts/aop',

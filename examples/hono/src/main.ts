@@ -2,6 +2,7 @@ import { MDC } from '@goodie-ts/logging';
 import { serve } from '@hono/node-server';
 import { requestId } from 'hono/request-id';
 import { app, createRouter } from './AppContext.generated.js';
+import { ServerConfig } from './ServerConfig.js';
 
 async function main() {
   const ctx = await app.start();
@@ -15,8 +16,11 @@ async function main() {
     await MDC.run(new Map([['traceId', traceId]]), () => next());
   });
 
-  console.log('Server starting on http://localhost:3000');
-  serve({ fetch: server.fetch, port: 3000 });
+  const serverConfig = ctx.get(ServerConfig);
+  console.log(
+    `Server starting on http://${serverConfig.host}:${serverConfig.port}`,
+  );
+  serve({ fetch: server.fetch, port: serverConfig.port });
 }
 
 main().catch(console.error);
