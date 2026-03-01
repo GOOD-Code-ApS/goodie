@@ -22,9 +22,9 @@ export class TransactionalInterceptor implements MethodInterceptor {
     const requiresNew = meta.propagation === 'REQUIRES_NEW';
 
     return this.transactionManager.runInTransaction(async () => {
-      const result = ctx.proceed();
-      // Ensure we await the result if it's a promise
-      return result instanceof Promise ? result : result;
+      // Must await so rejected promises propagate within the transaction scope,
+      // ensuring Kysely rolls back on failure.
+      return await ctx.proceed();
     }, requiresNew);
   }
 }
