@@ -46,6 +46,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 
@@ -99,6 +100,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 
@@ -166,6 +168,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 
@@ -238,6 +241,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 
@@ -280,6 +284,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 
@@ -322,6 +327,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 
@@ -390,6 +396,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 
@@ -441,6 +448,7 @@ describe('Controller Codegen', () => {
     const code = generateCode(
       beans,
       { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
       controllers,
     );
 

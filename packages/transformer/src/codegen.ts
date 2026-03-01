@@ -4,6 +4,7 @@ import type {
   IRControllerDefinition,
   TokenRef,
 } from './ir.js';
+import type { CodegenContribution } from './options.js';
 
 /** Info about an auto-generated InjectionToken. */
 interface TokenInfo {
@@ -25,6 +26,7 @@ export interface CodegenOptions {
 export function generateCode(
   beans: IRBeanDefinition[],
   options: CodegenOptions,
+  contributions?: CodegenContribution[],
   controllers?: IRControllerDefinition[],
 ): string {
   const outputDir = path.dirname(options.outputPath);
@@ -79,6 +81,21 @@ export function generateCode(
   );
   for (const [typeName, importSpec] of typeOnlyImports) {
     lines.push(`import type { ${typeName} } from '${importSpec}'`);
+  }
+
+  // Plugin contribution imports (deduplicated)
+  if (contributions && contributions.length > 0) {
+    const seen = new Set<string>();
+    for (const contrib of contributions) {
+      if (contrib.imports) {
+        for (const imp of contrib.imports) {
+          if (!seen.has(imp)) {
+            seen.add(imp);
+            lines.push(imp);
+          }
+        }
+      }
+    }
   }
 
   lines.push('');
@@ -177,6 +194,19 @@ export function generateCode(
     lines.push('export const app = Goodie.build(definitions)');
   }
   lines.push('');
+
+  // Plugin contribution code
+  if (contributions && contributions.length > 0) {
+    const codeLines: string[] = [];
+    for (const contrib of contributions) {
+      if (contrib.code) codeLines.push(...contrib.code);
+    }
+    if (codeLines.length > 0) {
+      lines.push('// Plugin contributions');
+      lines.push(...codeLines);
+      lines.push('');
+    }
+  }
 
   // Generate createRouter() if controllers with routes exist
   const activeControllers = (controllers ?? []).filter(
