@@ -1,4 +1,5 @@
 import { Singleton } from '@goodie-ts/decorators';
+import { Retryable } from '@goodie-ts/resilience';
 import type { Database } from './Database.js';
 import type { Todo } from './db/schema.js';
 
@@ -6,10 +7,12 @@ import type { Todo } from './db/schema.js';
 export class TodoRepository {
   constructor(private database: Database) {}
 
+  @Retryable({ maxAttempts: 3, delay: 100 })
   async findAll(): Promise<Todo[]> {
     return this.database.kysely.selectFrom('todos').selectAll().execute();
   }
 
+  @Retryable({ maxAttempts: 3, delay: 100 })
   async findById(id: string): Promise<Todo | undefined> {
     return this.database.kysely
       .selectFrom('todos')

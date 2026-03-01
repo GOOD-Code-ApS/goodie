@@ -25,6 +25,12 @@ export function Put(path?: string) { return (t: any, c: any) => {} }
 export function Delete(path?: string) { return (t: any, c: any) => {} }
 export function Patch(path?: string) { return (t: any, c: any) => {} }
 export function Log(opts?: any) { return (t: any, c: any) => {} }
+export function Cacheable(name: string, opts?: any) { return (t: any, c: any) => {} }
+export function CacheEvict(name: string) { return (t: any, c: any) => {} }
+export function CachePut(name: string, opts?: any) { return (t: any, c: any) => {} }
+export function Retryable(opts?: any) { return (t: any, c: any) => {} }
+export function CircuitBreaker(opts?: any) { return (t: any, c: any) => {} }
+export function Timeout(duration: number) { return (t: any, c: any) => {} }
 `;
 
 /**

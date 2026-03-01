@@ -28,6 +28,10 @@ export default defineConfig({
         __dirname,
         'packages/logging/src/index.ts',
       ),
+      '@goodie-ts/resilience': path.resolve(
+        __dirname,
+        'packages/resilience/src/index.ts',
+      ),
     },
   },
   test: {
