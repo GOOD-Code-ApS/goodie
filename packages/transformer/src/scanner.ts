@@ -24,6 +24,12 @@ const DECORATOR_NAMES = {
   PostConstruct: 'PostConstruct',
   PostProcessor: 'PostProcessor',
   Value: 'Value',
+  Controller: 'Controller',
+  Get: 'Get',
+  Post: 'Post',
+  Put: 'Put',
+  Delete: 'Delete',
+  Patch: 'Patch',
 } as const;
 
 /** A class decorated with @Injectable or @Singleton (but not @Module). */
@@ -129,10 +135,32 @@ export interface ScannedProvides {
   sourceLocation: SourceLocation;
 }
 
+/** HTTP method for a route. */
+export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
+
+/** A route method discovered on a @Controller class. */
+export interface ScannedRoute {
+  methodName: string;
+  httpMethod: HttpMethod;
+  path: string;
+}
+
+/** A class decorated with @Controller(basePath). */
+export interface ScannedController {
+  classDeclaration: ClassDeclaration;
+  classTokenRef: ClassTokenRef;
+  basePath: string;
+  routes: ScannedRoute[];
+  /** The ScannedBean for this controller (controllers are singletons). */
+  beanRef: ScannedBean;
+  sourceLocation: SourceLocation;
+}
+
 /** Result of scanning source files. */
 export interface ScanResult {
   beans: ScannedBean[];
   modules: ScannedModule[];
+  controllers: ScannedController[];
   warnings: string[];
 }
 
@@ -140,6 +168,7 @@ export interface ScanResult {
 export function scan(project: Project): ScanResult {
   const beans: ScannedBean[] = [];
   const modules: ScannedModule[] = [];
+  const controllers: ScannedController[] = [];
   const warnings: string[] = [];
 
   for (const sourceFile of project.getSourceFiles()) {
@@ -154,18 +183,25 @@ export function scan(project: Project): ScanResult {
         decorators,
         DECORATOR_NAMES.PostProcessor,
       );
+      const isController = hasDecorator(decorators, DECORATOR_NAMES.Controller);
 
       if (
-        (isModule || isInjectable || isSingleton || isPostProcessor) &&
+        (isModule ||
+          isInjectable ||
+          isSingleton ||
+          isPostProcessor ||
+          isController) &&
         cls.isAbstract()
       ) {
         const decoratorName = isModule
           ? 'Module'
-          : isSingleton
-            ? 'Singleton'
-            : isPostProcessor
-              ? 'PostProcessor'
-              : 'Injectable';
+          : isController
+            ? 'Controller'
+            : isSingleton
+              ? 'Singleton'
+              : isPostProcessor
+                ? 'PostProcessor'
+                : 'Injectable';
         throw new InvalidDecoratorUsageError(
           decoratorName,
           `Cannot apply @${decoratorName}() to abstract class "${cls.getName()}". Abstract classes cannot be instantiated. Remove the decorator or make the class concrete.`,
@@ -181,7 +217,20 @@ export function scan(project: Project): ScanResult {
         );
       }
 
-      if (isModule) {
+      if (isController) {
+        // Controllers are implicitly singletons — scan as bean too
+        const scannedBean = scanBean(cls, decorators, sourceFile, true);
+        if (scannedBean) {
+          beans.push(scannedBean);
+          const scannedController = scanController(
+            cls,
+            decorators,
+            sourceFile,
+            scannedBean,
+          );
+          if (scannedController) controllers.push(scannedController);
+        }
+      } else if (isModule) {
         const scannedModule = scanModule(cls, decorators, sourceFile);
         if (scannedModule) modules.push(scannedModule);
       } else if (isInjectable || isSingleton || isPostProcessor) {
@@ -196,7 +245,7 @@ export function scan(project: Project): ScanResult {
     }
   }
 
-  return { beans, modules, warnings };
+  return { beans, modules, controllers, warnings };
 }
 
 function scanBean(
@@ -266,6 +315,85 @@ function scanModule(
     provides,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
+}
+
+function scanController(
+  cls: ClassDeclaration,
+  decorators: Decorator[],
+  sourceFile: SourceFile,
+  beanRef: ScannedBean,
+): ScannedController | undefined {
+  const className = cls.getName();
+  if (!className) return undefined;
+
+  const controllerDec = findDecorator(decorators, DECORATOR_NAMES.Controller)!;
+  const args = controllerDec.getArguments();
+  let basePath = '/';
+  if (args.length > 0) {
+    const argText = args[0].getText();
+    if (
+      (argText.startsWith("'") && argText.endsWith("'")) ||
+      (argText.startsWith('"') && argText.endsWith('"'))
+    ) {
+      basePath = argText.slice(1, -1);
+    }
+  }
+
+  const routes = scanControllerRoutes(cls);
+
+  return {
+    classDeclaration: cls,
+    classTokenRef: {
+      kind: 'class',
+      className,
+      importPath: sourceFile.getFilePath(),
+    },
+    basePath,
+    routes,
+    beanRef,
+    sourceLocation: getSourceLocation(cls, sourceFile),
+  };
+}
+
+/** HTTP method decorator names mapped to their HTTP method. */
+const ROUTE_DECORATOR_MAP: Record<string, HttpMethod> = {
+  [DECORATOR_NAMES.Get]: 'get',
+  [DECORATOR_NAMES.Post]: 'post',
+  [DECORATOR_NAMES.Put]: 'put',
+  [DECORATOR_NAMES.Delete]: 'delete',
+  [DECORATOR_NAMES.Patch]: 'patch',
+};
+
+function scanControllerRoutes(cls: ClassDeclaration): ScannedRoute[] {
+  const routes: ScannedRoute[] = [];
+
+  for (const method of cls.getMethods()) {
+    const decorators = method.getDecorators();
+    for (const dec of decorators) {
+      const httpMethod = ROUTE_DECORATOR_MAP[dec.getName()];
+      if (!httpMethod) continue;
+
+      const args = dec.getArguments();
+      let path = '/';
+      if (args.length > 0) {
+        const argText = args[0].getText();
+        if (
+          (argText.startsWith("'") && argText.endsWith("'")) ||
+          (argText.startsWith('"') && argText.endsWith('"'))
+        ) {
+          path = argText.slice(1, -1);
+        }
+      }
+
+      routes.push({
+        methodName: method.getName(),
+        httpMethod,
+        path,
+      });
+    }
+  }
+
+  return routes;
 }
 
 function scanConstructorParams(

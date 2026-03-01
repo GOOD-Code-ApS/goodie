@@ -1,5 +1,9 @@
 import path from 'node:path';
-import type { IRBeanDefinition, TokenRef } from './ir.js';
+import type {
+  IRBeanDefinition,
+  IRControllerDefinition,
+  TokenRef,
+} from './ir.js';
 
 /** Info about an auto-generated InjectionToken. */
 interface TokenInfo {
@@ -21,6 +25,7 @@ export interface CodegenOptions {
 export function generateCode(
   beans: IRBeanDefinition[],
   options: CodegenOptions,
+  controllers?: IRControllerDefinition[],
 ): string {
   const outputDir = path.dirname(options.outputPath);
   const lines: string[] = [];
@@ -172,6 +177,16 @@ export function generateCode(
     lines.push('export const app = Goodie.build(definitions)');
   }
   lines.push('');
+
+  // Generate createRouter() if controllers with routes exist
+  const activeControllers = (controllers ?? []).filter(
+    (c) => c.routes.length > 0,
+  );
+  if (activeControllers.length > 0) {
+    lines.push(
+      ...generateCreateRouter(activeControllers, classImports, outputDir),
+    );
+  }
 
   return lines.join('\n');
 }
@@ -505,4 +520,75 @@ function escapeStringLiteral(value: string): string {
     .replace(/'/g, "\\'")
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r');
+}
+
+// ── createRouter generation ──
+
+/**
+ * Generate a createRouter() function that registers all controller routes on a Hono app.
+ * The generated function takes an ApplicationContext and returns a Hono instance.
+ */
+function generateCreateRouter(
+  controllers: IRControllerDefinition[],
+  classImports: Map<string, string>,
+  outputDir: string,
+): string[] {
+  const lines: string[] = [];
+
+  // Add Hono import
+  lines.push("import { Hono } from 'hono'");
+
+  // Add controller imports for any controllers not already imported via beans
+  for (const ctrl of controllers) {
+    if (!classImports.has(ctrl.classTokenRef.className)) {
+      const relativePath = computeRelativeImport(
+        outputDir,
+        ctrl.classTokenRef.importPath,
+      );
+      lines.push(
+        `import { ${ctrl.classTokenRef.className} } from '${relativePath}'`,
+      );
+    }
+  }
+
+  lines.push('');
+  lines.push('export function createRouter(ctx: ApplicationContext): Hono {');
+  lines.push('  const app = new Hono()');
+
+  for (const ctrl of controllers) {
+    const varName = controllerVarName(ctrl.classTokenRef.className);
+    lines.push(`  const ${varName} = ctx.get(${ctrl.classTokenRef.className})`);
+
+    for (const route of ctrl.routes) {
+      const fullPath = joinPaths(ctrl.basePath, route.path);
+      lines.push(`  app.${route.httpMethod}('${fullPath}', async (c) => {`);
+      lines.push(`    const result = await ${varName}.${route.methodName}(c)`);
+      lines.push('    if (result instanceof Response) return result');
+      lines.push('    return c.json(result)');
+      lines.push('  })');
+    }
+  }
+
+  lines.push('  return app');
+  lines.push('}');
+  lines.push('');
+
+  return lines;
+}
+
+/** Generate a camelCase variable name for a controller class. */
+function controllerVarName(className: string): string {
+  return className.charAt(0).toLowerCase() + className.slice(1);
+}
+
+/** Join a base path and a route path, normalizing slashes. */
+function joinPaths(basePath: string, routePath: string): string {
+  // Normalize: remove trailing slash from base, ensure leading slash on route
+  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+  const route = routePath.startsWith('/') ? routePath : `/${routePath}`;
+
+  // Special case: if route is just '/', return the base
+  if (route === '/') return base || '/';
+
+  return `${base}${route}`;
 }

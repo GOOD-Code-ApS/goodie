@@ -11,6 +11,7 @@
   "dependencies": {
     "@goodie-ts/core": "workspace:*",
     "@goodie-ts/decorators": "workspace:*",
+    "@goodie-ts/hono": "workspace:*",
     "hono": "^4.7.0",
     "@hono/node-server": "^1.14.0",
     "drizzle-orm": "^0.39.0",

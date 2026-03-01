@@ -66,6 +66,9 @@ importers:
       '@goodie-ts/decorators':
         specifier: workspace:*
         version: link:../../packages/decorators
+      '@goodie-ts/hono':
+        specifier: workspace:*
+        version: link:../../packages/hono
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.9(hono@4.12.2)
@@ -127,6 +130,15 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/hono:
+    dependencies:
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
+      hono:
+        specifier: '>=4.0.0'
+        version: 4.12.2
 
   packages/testing:
     dependencies:

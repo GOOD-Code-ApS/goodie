@@ -1,0 +1,36 @@
+{
+  "name": "@goodie-ts/hono",
+  "version": "0.2.0",
+  "description": "Hono HTTP controller integration for goodie-ts",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/hono"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@goodie-ts/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "hono": ">=4.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
