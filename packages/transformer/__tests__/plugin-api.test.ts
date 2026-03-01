@@ -152,6 +152,37 @@ describe('TransformerPlugin API', () => {
   });
 
   describe('afterResolve', () => {
+    it('can see visitor metadata from visitClass', () => {
+      const plugin: TransformerPlugin = {
+        name: 'test-visitor-metadata-in-afterResolve',
+        visitClass(ctx) {
+          ctx.metadata.myTag = 'tagged';
+        },
+        afterResolve(beans) {
+          // Visitor metadata should already be merged at this point
+          return beans.filter((b) => b.metadata.myTag === 'tagged');
+        },
+      };
+
+      const project = createProject({
+        '/src/Foo.ts': `
+          import { Singleton } from './decorators.js'
+          @Singleton()
+          export class Foo {}
+        `,
+      });
+
+      const result = transformInMemory(
+        project,
+        '/out/AppContext.generated.ts',
+        [plugin],
+      );
+      // If metadata wasn't merged before afterResolve, the filter would
+      // remove all beans and the result would be empty
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].metadata.myTag).toBe('tagged');
+    });
+
     it('can mutate IR bean metadata', () => {
       const plugin: TransformerPlugin = {
         name: 'test-after-resolve',
@@ -331,10 +362,6 @@ describe('TransformerPlugin API', () => {
         visitClass(ctx) {
           order.push(`plugin-1:visitClass:${ctx.className}`);
         },
-        afterScan(beans) {
-          order.push('plugin-1:afterScan');
-          return beans;
-        },
         afterResolve(beans) {
           order.push('plugin-1:afterResolve');
           return beans;
@@ -348,10 +375,6 @@ describe('TransformerPlugin API', () => {
         },
         visitClass(ctx) {
           order.push(`plugin-2:visitClass:${ctx.className}`);
-        },
-        afterScan(beans) {
-          order.push('plugin-2:afterScan');
-          return beans;
         },
         afterResolve(beans) {
           order.push('plugin-2:afterResolve');
@@ -380,11 +403,6 @@ describe('TransformerPlugin API', () => {
       // Both visit the same class
       expect(order).toContain('plugin-1:visitClass:Foo');
       expect(order).toContain('plugin-2:visitClass:Foo');
-
-      // afterScan runs in order
-      expect(order.indexOf('plugin-1:afterScan')).toBeLessThan(
-        order.indexOf('plugin-2:afterScan'),
-      );
 
       // afterResolve runs in order
       expect(order.indexOf('plugin-1:afterResolve')).toBeLessThan(
@@ -430,6 +448,48 @@ describe('TransformerPlugin API', () => {
       expect(result.code).toContain("import { bar } from './bar.js'");
       expect(result.code).toContain('export const fromPlugin1 = foo()');
       expect(result.code).toContain('export const fromPlugin2 = bar()');
+    });
+
+    it('deduplicates identical imports from multiple plugins', () => {
+      const plugin1: TransformerPlugin = {
+        name: 'plugin-dup-1',
+        codegen() {
+          return {
+            imports: ["import { shared } from './shared.js'"],
+          };
+        },
+      };
+
+      const plugin2: TransformerPlugin = {
+        name: 'plugin-dup-2',
+        codegen() {
+          return {
+            imports: ["import { shared } from './shared.js'"],
+          };
+        },
+      };
+
+      const project = createProject({
+        '/src/Foo.ts': `
+          import { Singleton } from './decorators.js'
+          @Singleton()
+          export class Foo {}
+        `,
+      });
+
+      const result = transformInMemory(
+        project,
+        '/out/AppContext.generated.ts',
+        [plugin1, plugin2],
+      );
+
+      // The import should appear exactly once
+      const matches = result.code
+        .split('\n')
+        .filter(
+          (line: string) => line === "import { shared } from './shared.js'",
+        );
+      expect(matches).toHaveLength(1);
     });
   });
 
@@ -501,6 +561,45 @@ describe('TransformerPlugin API', () => {
       expect(serviceBean!.metadata.customAnnotation).toBe('test-value');
     });
 
+    it('does not collide when two files have same-named classes', () => {
+      const plugin: TransformerPlugin = {
+        name: 'test-no-collision',
+        visitClass(ctx) {
+          ctx.metadata.sourceFile = ctx.filePath;
+        },
+      };
+
+      const project = createProject({
+        '/src/a/Service.ts': `
+          import { Singleton } from '../decorators.js'
+          @Singleton()
+          export class Service {}
+        `,
+        '/src/b/Service.ts': `
+          import { Singleton } from '../decorators.js'
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      const result = transformInMemory(
+        project,
+        '/out/AppContext.generated.ts',
+        [plugin],
+      );
+
+      const serviceBeans = result.beans.filter(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      );
+      expect(serviceBeans).toHaveLength(2);
+
+      // Each bean should have metadata pointing to its own source file
+      const sourceFiles = serviceBeans.map((b) => b.metadata.sourceFile);
+      expect(sourceFiles).toContain('/src/a/Service.ts');
+      expect(sourceFiles).toContain('/src/b/Service.ts');
+    });
+
     it('metadata from visitClass is included in generated code', () => {
       const plugin: TransformerPlugin = {
         name: 'test-metadata-in-codegen',
@@ -549,11 +648,11 @@ describe('TransformerPlugin API', () => {
     });
   });
 
-  describe('afterScan', () => {
+  describe('afterResolve — filtering', () => {
     it('can filter out beans', () => {
       const plugin: TransformerPlugin = {
-        name: 'test-after-scan-filter',
-        afterScan(beans) {
+        name: 'test-after-resolve-filter',
+        afterResolve(beans) {
           return beans.filter(
             (b) =>
               !(b.tokenRef.kind === 'class' && b.tokenRef.className === 'Foo'),

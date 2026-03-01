@@ -23,6 +23,7 @@ export default defineConfig({
       ),
       '@goodie-ts/cli': path.resolve(__dirname, 'packages/cli/src/index.ts'),
       '@goodie-ts/aop': path.resolve(__dirname, 'packages/aop/src/index.ts'),
+      '@goodie-ts/hono': path.resolve(__dirname, 'packages/hono/src/index.ts'),
     },
   },
   test: {

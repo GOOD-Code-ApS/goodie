@@ -1,5 +1,9 @@
 import path from 'node:path';
-import type { IRBeanDefinition, TokenRef } from './ir.js';
+import type {
+  IRBeanDefinition,
+  IRControllerDefinition,
+  TokenRef,
+} from './ir.js';
 import type { CodegenContribution } from './options.js';
 
 /** Info about an auto-generated InjectionToken. */
@@ -23,6 +27,7 @@ export function generateCode(
   beans: IRBeanDefinition[],
   options: CodegenOptions,
   contributions?: CodegenContribution[],
+  controllers?: IRControllerDefinition[],
 ): string {
   const outputDir = path.dirname(options.outputPath);
   const lines: string[] = [];
@@ -78,14 +83,18 @@ export function generateCode(
     lines.push(`import type { ${typeName} } from '${importSpec}'`);
   }
 
-  // Plugin contribution imports
+  // Plugin contribution imports (deduplicated)
   if (contributions && contributions.length > 0) {
-    const importLines: string[] = [];
+    const seen = new Set<string>();
     for (const contrib of contributions) {
-      if (contrib.imports) importLines.push(...contrib.imports);
-    }
-    if (importLines.length > 0) {
-      lines.push(...importLines);
+      if (contrib.imports) {
+        for (const imp of contrib.imports) {
+          if (!seen.has(imp)) {
+            seen.add(imp);
+            lines.push(imp);
+          }
+        }
+      }
     }
   }
 
@@ -197,6 +206,16 @@ export function generateCode(
       lines.push(...codeLines);
       lines.push('');
     }
+  }
+
+  // Generate createRouter() if controllers with routes exist
+  const activeControllers = (controllers ?? []).filter(
+    (c) => c.routes.length > 0,
+  );
+  if (activeControllers.length > 0) {
+    lines.push(
+      ...generateCreateRouter(activeControllers, classImports, outputDir),
+    );
   }
 
   return lines.join('\n');
@@ -636,4 +655,112 @@ function escapeStringLiteral(value: string): string {
     .replace(/'/g, "\\'")
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r');
+}
+
+// ── createRouter generation ──
+
+/**
+ * Generate a createRouter() function that registers all controller routes on a Hono app.
+ * The generated function takes an ApplicationContext and returns a Hono instance.
+ */
+function generateCreateRouter(
+  controllers: IRControllerDefinition[],
+  classImports: Map<string, string>,
+  outputDir: string,
+): string[] {
+  const lines: string[] = [];
+
+  // Add Hono import
+  lines.push("import { Hono } from 'hono'");
+
+  // Add controller imports for any controllers not already imported via beans
+  // Track by importPath to handle same-named classes from different files
+  const importedPaths = new Set<string>(classImports.values());
+  for (const ctrl of controllers) {
+    if (!importedPaths.has(ctrl.classTokenRef.importPath)) {
+      const relativePath = computeRelativeImport(
+        outputDir,
+        ctrl.classTokenRef.importPath,
+      );
+      lines.push(
+        `import { ${ctrl.classTokenRef.className} } from '${relativePath}'`,
+      );
+      importedPaths.add(ctrl.classTokenRef.importPath);
+    }
+  }
+
+  lines.push('');
+  lines.push('export function createRouter(ctx: ApplicationContext): Hono {');
+  lines.push('  const app = new Hono()');
+
+  // Build collision-safe variable names for controllers
+  const ctrlVarNames = buildControllerVarNames(controllers);
+
+  for (const ctrl of controllers) {
+    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
+    lines.push(`  const ${varName} = ctx.get(${ctrl.classTokenRef.className})`);
+
+    for (const route of ctrl.routes) {
+      const fullPath = joinPaths(ctrl.basePath, route.path);
+      lines.push(`  app.${route.httpMethod}('${fullPath}', async (c) => {`);
+      lines.push(`    const result = await ${varName}.${route.methodName}(c)`);
+      lines.push('    if (result instanceof Response) return result');
+      lines.push(
+        '    if (result === undefined || result === null) return c.body(null, 204)',
+      );
+      lines.push('    return c.json(result)');
+      lines.push('  })');
+    }
+  }
+
+  lines.push('  return app');
+  lines.push('}');
+  lines.push('');
+
+  return lines;
+}
+
+/**
+ * Build a Map<"className:importPath", uniqueVarName> with collision detection.
+ * When two controllers produce the same camelCase name, append _2, _3, etc.
+ * Uses composite key to handle same-named controllers from different files.
+ */
+function buildControllerVarNames(
+  controllers: IRControllerDefinition[],
+): Map<string, string> {
+  const result = new Map<string, string>();
+  const varNameCounts = new Map<string, number>();
+
+  for (const ctrl of controllers) {
+    const key = controllerKey(ctrl);
+    const className = ctrl.classTokenRef.className;
+    const baseVarName = className.charAt(0).toLowerCase() + className.slice(1);
+    const count = varNameCounts.get(baseVarName) ?? 0;
+
+    if (count === 0) {
+      result.set(key, baseVarName);
+    } else {
+      result.set(key, `${baseVarName}_${count + 1}`);
+    }
+    varNameCounts.set(baseVarName, count + 1);
+  }
+
+  return result;
+}
+
+/** Stable key for a controller to avoid same-name collisions across files. */
+function controllerKey(ctrl: IRControllerDefinition): string {
+  return `${ctrl.classTokenRef.className}:${ctrl.classTokenRef.importPath}`;
+}
+
+/** Join a base path and a route path, normalizing slashes. */
+function joinPaths(basePath: string, routePath: string): string {
+  // Normalize: remove trailing slash from base, ensure leading slash on route
+  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+  const route = routePath.startsWith('/') ? routePath : `/${routePath}`;
+
+  // Special case: if route is just '/', return the base
+  if (route === '/') return base || '/';
+
+  return `${base}${route}`;
 }

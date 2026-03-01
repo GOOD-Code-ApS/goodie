@@ -18,6 +18,12 @@ export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
 export function Around(interceptor: any, opts?: any) { return (t: any, c: any) => {} }
 export function Before(interceptor: any, opts?: any) { return (t: any, c: any) => {} }
 export function After(interceptor: any, opts?: any) { return (t: any, c: any) => {} }
+export function Controller(path?: string) { return (t: any, c: any) => {} }
+export function Get(path?: string) { return (t: any, c: any) => {} }
+export function Post(path?: string) { return (t: any, c: any) => {} }
+export function Put(path?: string) { return (t: any, c: any) => {} }
+export function Delete(path?: string) { return (t: any, c: any) => {} }
+export function Patch(path?: string) { return (t: any, c: any) => {} }
 `;
 
 /**
