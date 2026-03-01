@@ -1,10 +1,8 @@
-import { Singleton } from '@goodie-ts/decorators';
 import { Controller, Delete, Get, Patch, Post } from '@goodie-ts/hono';
 import type { Context } from 'hono';
 import type { TodoService } from './TodoService.js';
 
 @Controller('/api/todos')
-@Singleton()
 export class TodoController {
   constructor(private todoService: TodoService) {}
 
