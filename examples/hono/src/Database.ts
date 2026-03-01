@@ -1,4 +1,9 @@
-import { PostConstruct, Singleton, Value } from '@goodie-ts/decorators';
+import {
+  PostConstruct,
+  PreDestroy,
+  Singleton,
+  Value,
+} from '@goodie-ts/decorators';
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
 import type { Database as DB } from './db/schema.js';
@@ -14,5 +19,10 @@ export class Database {
   init() {
     const pool = new pg.Pool({ connectionString: this.databaseUrl });
     this.kysely = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
+  }
+
+  @PreDestroy()
+  async destroy() {
+    await this.kysely.destroy();
   }
 }

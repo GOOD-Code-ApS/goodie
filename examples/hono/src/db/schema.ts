@@ -1,4 +1,4 @@
-import type { Generated, Insertable, Selectable, Updateable } from 'kysely';
+import type { Generated, Selectable } from 'kysely';
 
 export interface Database {
   todos: TodoTable;
@@ -12,5 +12,3 @@ export interface TodoTable {
 }
 
 export type Todo = Selectable<TodoTable>;
-export type NewTodo = Insertable<TodoTable>;
-export type TodoUpdate = Updateable<TodoTable>;
