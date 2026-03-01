@@ -103,7 +103,9 @@ export function createLoggingPlugin(): TransformerPlugin {
 
       if (!needsInterceptor) return beans;
 
-      // Add synthetic LoggingInterceptor bean (no constructor deps)
+      // Synthetic bean must be in afterResolve (not beforeCodegen) because
+      // the graph builder validates that interceptor references have matching
+      // bean providers. beforeCodegen runs after graph building.
       const syntheticBean: IRBeanDefinition = {
         tokenRef: {
           kind: 'class',
