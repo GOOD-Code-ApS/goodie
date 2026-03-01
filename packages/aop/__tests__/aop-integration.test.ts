@@ -1,4 +1,7 @@
-import { transformInMemory } from '@goodie-ts/transformer';
+import {
+  MissingProviderError,
+  transformInMemory,
+} from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
@@ -161,6 +164,62 @@ describe('AOP Integration — Generated Code', () => {
     expect(result.code).toContain("'secure'");
     expect(result.code).toContain("'getData'");
     expect(result.code).toContain('buildInterceptorChain');
+  });
+
+  it('throws MissingProviderError when interceptor class is not a registered bean', () => {
+    const project = createProject({
+      '/src/UnregisteredInterceptor.ts': `
+        export class UnregisteredInterceptor {}
+      `,
+      '/src/MyService.ts': `
+        import { Singleton, Around } from './decorators.js'
+        import { UnregisteredInterceptor } from './UnregisteredInterceptor.js'
+        @Singleton() class MyService {
+          @Around(UnregisteredInterceptor)
+          doWork() {}
+        }
+      `,
+    });
+
+    expect(() =>
+      transformInMemory(project, '/out/AppContext.generated.ts', [
+        createAopPlugin(),
+      ]),
+    ).toThrow(MissingProviderError);
+  });
+
+  it('handles combined @Value fields and @Around interception on same bean', () => {
+    const project = createProject({
+      '/src/TimingInterceptor.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton() export class TimingInterceptor {}
+      `,
+      '/src/ConfigService.ts': `
+        import { Singleton, Around, Value } from './decorators.js'
+        import { TimingInterceptor } from './TimingInterceptor.js'
+        @Singleton() class ConfigService {
+          @Value('app.name')
+          accessor appName: string = 'default'
+
+          @Around(TimingInterceptor)
+          process() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createAopPlugin(),
+    ]);
+
+    // Should have both __config and __interceptor params in factory
+    expect(result.code).toContain('__config');
+    expect(result.code).toContain('__interceptor0');
+    expect(result.code).toContain('buildInterceptorChain');
+    expect(result.code).toContain('app.name');
+
+    // Dependencies should include both config token and interceptor
+    expect(result.code).toContain('token: __Goodie_Config');
+    expect(result.code).toContain('token: TimingInterceptor');
   });
 
   it('bean with no interception has normal factory (no buildInterceptorChain)', () => {
