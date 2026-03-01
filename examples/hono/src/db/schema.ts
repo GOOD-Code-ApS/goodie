@@ -1,8 +1,16 @@
-import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import type { Generated, Insertable, Selectable, Updateable } from 'kysely';
 
-export const todos = pgTable('todos', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  title: text('title').notNull(),
-  completed: boolean('completed').notNull().default(false),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+export interface Database {
+  todos: TodoTable;
+}
+
+export interface TodoTable {
+  id: Generated<string>;
+  title: string;
+  completed: boolean;
+  created_at: Generated<Date>;
+}
+
+export type Todo = Selectable<TodoTable>;
+export type NewTodo = Insertable<TodoTable>;
+export type TodoUpdate = Updateable<TodoTable>;
