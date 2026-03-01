@@ -52,13 +52,9 @@ export function transform(options: TransformOptions): TransformResult {
   // 5. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 6. afterScan hook (operates on IR beans)
+  // 6. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
-  for (const plugin of activePlugins) {
-    if (plugin.afterScan) {
-      beans = plugin.afterScan(beans);
-    }
-  }
+  mergePluginMetadata(beans, pluginClassMetadata);
 
   // 7. afterResolve hook
   for (const plugin of activePlugins) {
@@ -66,9 +62,6 @@ export function transform(options: TransformOptions): TransformResult {
       beans = plugin.afterResolve(beans);
     }
   }
-
-  // Merge plugin class metadata into matching beans
-  mergePluginMetadata(beans, pluginClassMetadata);
 
   // 8. Build graph (validate + topo sort)
   const graphResult = buildGraph({ ...resolveResult, beans });
@@ -134,13 +127,9 @@ export function transformInMemory(
   // 4. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 5. afterScan hook (operates on IR beans)
+  // 5. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
-  for (const plugin of activePlugins) {
-    if (plugin.afterScan) {
-      beans = plugin.afterScan(beans);
-    }
-  }
+  mergePluginMetadata(beans, pluginClassMetadata);
 
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
@@ -148,9 +137,6 @@ export function transformInMemory(
       beans = plugin.afterResolve(beans);
     }
   }
-
-  // Merge plugin class metadata into matching beans
-  mergePluginMetadata(beans, pluginClassMetadata);
 
   // 7. Build graph (validate + topo sort)
   const graphResult = buildGraph({ ...resolveResult, beans });
@@ -188,7 +174,7 @@ export function transformInMemory(
 
 /**
  * Run visitClass and visitMethod hooks across all plugins.
- * Returns a map of className -> accumulated metadata.
+ * Returns a map of "filePath:className" -> accumulated metadata.
  */
 function runPluginVisitors(
   project: Project,
@@ -209,7 +195,8 @@ function runPluginVisitors(
       if (decorators.length === 0) continue;
 
       const metadata: Record<string, unknown> = {};
-      classMetadataMap.set(className, metadata);
+      const metadataKey = `${sourceFile.getFilePath()}:${className}`;
+      classMetadataMap.set(metadataKey, metadata);
 
       const classCtx: ClassVisitorContext = {
         classDeclaration: cls,
@@ -244,17 +231,17 @@ function runPluginVisitors(
 
 /**
  * Merge plugin-accumulated class metadata into the matching IR beans.
+ * Keys are "filePath:className" to avoid collisions between same-named classes in different files.
  */
 function mergePluginMetadata(
   beans: IRBeanDefinition[],
   pluginMetadata: Map<string, Record<string, unknown>>,
 ): void {
   for (const bean of beans) {
-    const className =
-      bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
-    if (!className) continue;
+    if (bean.tokenRef.kind !== 'class') continue;
 
-    const meta = pluginMetadata.get(className);
+    const metadataKey = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
+    const meta = pluginMetadata.get(metadataKey);
     if (meta && Object.keys(meta).length > 0) {
       Object.assign(bean.metadata, meta);
     }
