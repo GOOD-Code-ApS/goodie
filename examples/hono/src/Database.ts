@@ -5,7 +5,7 @@ import {
   Value,
 } from '@goodie-ts/decorators';
 import { Kysely, PostgresDialect } from 'kysely';
-import pg from 'pg';
+import { Pool } from 'pg';
 import type { Database as DB } from './db/schema.js';
 
 @Singleton()
@@ -17,7 +17,7 @@ export class Database {
 
   @PostConstruct()
   init() {
-    const pool = new pg.Pool({ connectionString: this.databaseUrl });
+    const pool = new Pool({ connectionString: this.databaseUrl });
     this.kysely = new Kysely<DB>({ dialect: new PostgresDialect({ pool }) });
   }
 
