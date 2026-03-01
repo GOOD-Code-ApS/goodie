@@ -32,6 +32,6 @@
   },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
-    "ts-morph": "^25.0.0"
+    "ts-morph": "^24.0.0"
   }
 }
