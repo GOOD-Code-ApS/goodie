@@ -89,6 +89,10 @@ export interface TransformerPlugin {
    * Mutate IR beans after type resolution, before graph building.
    * Can modify metadata, add dependencies, filter beans, etc.
    *
+   * Metadata accumulated via `visitClass` (`ctx.metadata`) is already merged
+   * into each bean's `metadata` before this hook runs, so you can read
+   * visitor-produced tags here.
+   *
    * **Note:** This hook receives only `@Injectable`/`@Singleton` beans.
    * Beans created by `@Provides` methods inside `@Module` classes are expanded
    * during graph building (the next pipeline stage) and are not visible here.

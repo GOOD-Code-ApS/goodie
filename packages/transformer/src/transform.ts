@@ -141,7 +141,7 @@ export function transformInMemory(
   // 7. Build graph (validate + topo sort)
   const graphResult = buildGraph({ ...resolveResult, beans });
 
-  // 7. beforeCodegen hook
+  // 8. beforeCodegen hook
   let finalBeans = graphResult.beans;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
@@ -149,7 +149,7 @@ export function transformInMemory(
     }
   }
 
-  // 8. Collect codegen contributions
+  // 9. Collect codegen contributions
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
@@ -157,7 +157,7 @@ export function transformInMemory(
     }
   }
 
-  // 9. Generate code
+  // 10. Generate code
   const code = generateCode(
     finalBeans,
     { outputPath, version: PKG_VERSION },
