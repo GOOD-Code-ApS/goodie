@@ -1,17 +1,18 @@
 import { HealthAggregator, UptimeHealthIndicator } from '@goodie-ts/health';
 import { Controller, Get } from '@goodie-ts/hono';
 import type { Context } from 'hono';
-import type { Database } from './Database.js';
-import { DatabaseHealthIndicator } from './DatabaseHealthIndicator.js';
+import type { DatabaseHealthIndicator } from './DatabaseHealthIndicator.js';
 
 @Controller('/health')
 export class HealthController {
   private readonly aggregator: HealthAggregator;
 
-  constructor(database: Database) {
+  constructor(databaseIndicator: DatabaseHealthIndicator) {
+    // DatabaseHealthIndicator is DI-managed (receives Database via constructor injection).
+    // UptimeHealthIndicator has no dependencies — safe to construct directly.
     this.aggregator = new HealthAggregator([
       new UptimeHealthIndicator(),
-      new DatabaseHealthIndicator(database),
+      databaseIndicator,
     ]);
   }
 

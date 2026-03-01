@@ -24,6 +24,9 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
+  "peerDependencies": {
+    "@goodie-ts/core": "workspace:*"
+  },
   "files": [
     "dist"
   ]

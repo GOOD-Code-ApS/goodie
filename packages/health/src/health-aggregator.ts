@@ -16,31 +16,34 @@ export class HealthAggregator {
   constructor(private readonly indicators: HealthIndicator[]) {}
 
   async checkAll(): Promise<AggregatedHealth> {
+    // Capture names before any async work so rejection branches can identify the indicator
+    const names = this.indicators.map((i) => i.name);
     const results = await Promise.allSettled(
-      this.indicators.map(async (indicator) => ({
-        name: indicator.name,
-        result: await indicator.check(),
-      })),
+      this.indicators.map(async (indicator) => indicator.check()),
     );
 
     const indicators: Record<string, HealthResult> = {};
     let overallUp = true;
 
-    for (const settled of results) {
+    for (let i = 0; i < results.length; i++) {
+      const settled = results[i];
+      const name = names[i];
+
       if (settled.status === 'fulfilled') {
-        indicators[settled.value.name] = settled.value.result;
-        if (settled.value.result.status === 'DOWN') {
+        indicators[name] = settled.value;
+        if (settled.value.status === 'DOWN') {
           overallUp = false;
         }
       } else {
-        // If check() rejects, treat it as DOWN
+        // If check() rejects, treat it as DOWN with error type info
+        const error = settled.reason;
+        const errorType =
+          error instanceof Error ? error.constructor.name : 'Unknown';
         const errorMessage =
-          settled.reason instanceof Error
-            ? settled.reason.message
-            : String(settled.reason);
-        indicators['unknown'] = {
+          error instanceof Error ? error.message : String(error);
+        indicators[name] = {
           status: 'DOWN',
-          details: { error: errorMessage },
+          details: { error: errorMessage, errorType },
         };
         overallUp = false;
       }

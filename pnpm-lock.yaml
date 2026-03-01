@@ -150,7 +150,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/health: {}
+  packages/health:
+    dependencies:
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/hono:
     dependencies:

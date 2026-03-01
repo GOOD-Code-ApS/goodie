@@ -62,7 +62,7 @@ describe('HealthAggregator', () => {
     });
   });
 
-  it('should handle indicator check() rejection as DOWN', async () => {
+  it('should handle indicator check() rejection as DOWN with indicator name', async () => {
     const failing: HealthIndicator = {
       name: 'redis',
       check: async () => {
@@ -76,8 +76,36 @@ describe('HealthAggregator', () => {
 
     expect(result.status).toBe('DOWN');
     expect(result.indicators.db.status).toBe('UP');
-    expect(result.indicators.unknown.status).toBe('DOWN');
-    expect(result.indicators.unknown.details?.error).toBe('Connection refused');
+    expect(result.indicators.redis.status).toBe('DOWN');
+    expect(result.indicators.redis.details?.error).toBe('Connection refused');
+    expect(result.indicators.redis.details?.errorType).toBe('Error');
+  });
+
+  it('should preserve all indicator names when multiple rejections occur', async () => {
+    const failingRedis: HealthIndicator = {
+      name: 'redis',
+      check: async () => {
+        throw new Error('Redis down');
+      },
+    };
+    const failingKafka: HealthIndicator = {
+      name: 'kafka',
+      check: async () => {
+        throw new TypeError('Kafka timeout');
+      },
+    };
+
+    const aggregator = new HealthAggregator([failingRedis, failingKafka]);
+
+    const result = await aggregator.checkAll();
+
+    expect(result.status).toBe('DOWN');
+    expect(result.indicators.redis.status).toBe('DOWN');
+    expect(result.indicators.redis.details?.error).toBe('Redis down');
+    expect(result.indicators.redis.details?.errorType).toBe('Error');
+    expect(result.indicators.kafka.status).toBe('DOWN');
+    expect(result.indicators.kafka.details?.error).toBe('Kafka timeout');
+    expect(result.indicators.kafka.details?.errorType).toBe('TypeError');
   });
 
   it('should run all checks concurrently', async () => {

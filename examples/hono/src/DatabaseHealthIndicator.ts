@@ -1,6 +1,8 @@
+import { Singleton } from '@goodie-ts/decorators';
 import type { HealthIndicator, HealthResult } from '@goodie-ts/health';
 import type { Database } from './Database.js';
 
+@Singleton()
 export class DatabaseHealthIndicator implements HealthIndicator {
   readonly name = 'database';
 
