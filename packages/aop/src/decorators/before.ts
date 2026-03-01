@@ -18,8 +18,13 @@ export interface BeforeOptions {
 export function Before(
   _adviceClass: Constructor,
   _opts?: BeforeOptions,
-): MethodDecorator {
-  return ((_target: any, _context: ClassMethodDecoratorContext) => {
+): MethodDecorator_Stage3 {
+  return (_target, _context) => {
     // No-op: decorator arguments are read at compile time by the AOP transformer plugin
-  }) as MethodDecorator;
+  };
 }
+
+type MethodDecorator_Stage3 = (
+  target: (...args: never) => unknown,
+  context: ClassMethodDecoratorContext,
+) => void;
