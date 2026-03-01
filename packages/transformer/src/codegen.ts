@@ -78,14 +78,18 @@ export function generateCode(
     lines.push(`import type { ${typeName} } from '${importSpec}'`);
   }
 
-  // Plugin contribution imports
+  // Plugin contribution imports (deduplicated)
   if (contributions && contributions.length > 0) {
-    const importLines: string[] = [];
+    const seen = new Set<string>();
     for (const contrib of contributions) {
-      if (contrib.imports) importLines.push(...contrib.imports);
-    }
-    if (importLines.length > 0) {
-      lines.push(...importLines);
+      if (contrib.imports) {
+        for (const imp of contrib.imports) {
+          if (!seen.has(imp)) {
+            seen.add(imp);
+            lines.push(imp);
+          }
+        }
+      }
     }
   }
 

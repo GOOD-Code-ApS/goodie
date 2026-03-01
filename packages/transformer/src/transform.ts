@@ -52,15 +52,8 @@ export function transform(options: TransformOptions): TransformResult {
   // 5. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 6. afterScan hook (operates on IR beans)
+  // 6. afterResolve hook
   let beans = resolveResult.beans;
-  for (const plugin of activePlugins) {
-    if (plugin.afterScan) {
-      beans = plugin.afterScan(beans);
-    }
-  }
-
-  // 7. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
@@ -70,10 +63,10 @@ export function transform(options: TransformOptions): TransformResult {
   // Merge plugin class metadata into matching beans
   mergePluginMetadata(beans, pluginClassMetadata);
 
-  // 8. Build graph (validate + topo sort)
+  // 7. Build graph (validate + topo sort)
   const graphResult = buildGraph({ ...resolveResult, beans });
 
-  // 9. beforeCodegen hook
+  // 8. beforeCodegen hook
   let finalBeans = graphResult.beans;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
@@ -81,7 +74,7 @@ export function transform(options: TransformOptions): TransformResult {
     }
   }
 
-  // 10. Collect codegen contributions
+  // 9. Collect codegen contributions
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
@@ -89,14 +82,14 @@ export function transform(options: TransformOptions): TransformResult {
     }
   }
 
-  // 11. Generate code
+  // 10. Generate code
   const code = generateCode(
     finalBeans,
     { outputPath: options.outputPath, version: PKG_VERSION },
     contributions,
   );
 
-  // 12. Write output
+  // 11. Write output
   const outputDir = path.dirname(options.outputPath);
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(options.outputPath, code, 'utf-8');
@@ -134,15 +127,8 @@ export function transformInMemory(
   // 4. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 5. afterScan hook (operates on IR beans)
+  // 5. afterResolve hook
   let beans = resolveResult.beans;
-  for (const plugin of activePlugins) {
-    if (plugin.afterScan) {
-      beans = plugin.afterScan(beans);
-    }
-  }
-
-  // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
@@ -152,10 +138,10 @@ export function transformInMemory(
   // Merge plugin class metadata into matching beans
   mergePluginMetadata(beans, pluginClassMetadata);
 
-  // 7. Build graph (validate + topo sort)
+  // 6. Build graph (validate + topo sort)
   const graphResult = buildGraph({ ...resolveResult, beans });
 
-  // 8. beforeCodegen hook
+  // 7. beforeCodegen hook
   let finalBeans = graphResult.beans;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
@@ -163,7 +149,7 @@ export function transformInMemory(
     }
   }
 
-  // 9. Collect codegen contributions
+  // 8. Collect codegen contributions
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
@@ -171,7 +157,7 @@ export function transformInMemory(
     }
   }
 
-  // 10. Generate code
+  // 9. Generate code
   const code = generateCode(
     finalBeans,
     { outputPath, version: PKG_VERSION },
@@ -188,7 +174,7 @@ export function transformInMemory(
 
 /**
  * Run visitClass and visitMethod hooks across all plugins.
- * Returns a map of className -> accumulated metadata.
+ * Returns a map of "filePath:className" -> accumulated metadata.
  */
 function runPluginVisitors(
   project: Project,
@@ -209,7 +195,8 @@ function runPluginVisitors(
       if (decorators.length === 0) continue;
 
       const metadata: Record<string, unknown> = {};
-      classMetadataMap.set(className, metadata);
+      const metadataKey = `${sourceFile.getFilePath()}:${className}`;
+      classMetadataMap.set(metadataKey, metadata);
 
       const classCtx: ClassVisitorContext = {
         classDeclaration: cls,
@@ -244,17 +231,17 @@ function runPluginVisitors(
 
 /**
  * Merge plugin-accumulated class metadata into the matching IR beans.
+ * Keys are "filePath:className" to avoid collisions between same-named classes in different files.
  */
 function mergePluginMetadata(
   beans: IRBeanDefinition[],
   pluginMetadata: Map<string, Record<string, unknown>>,
 ): void {
   for (const bean of beans) {
-    const className =
-      bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
-    if (!className) continue;
+    if (bean.tokenRef.kind !== 'class') continue;
 
-    const meta = pluginMetadata.get(className);
+    const metadataKey = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
+    const meta = pluginMetadata.get(metadataKey);
     if (meta && Object.keys(meta).length > 0) {
       Object.assign(bean.metadata, meta);
     }

@@ -70,36 +70,48 @@ export interface TransformerPlugin {
   /** Called before scanning begins. */
   beforeScan?(): void;
 
-  /** Called after scanning completes, receives all scanned beans as IR. */
-  afterScan?(beans: IRBeanDefinition[]): IRBeanDefinition[];
-
   /**
-   * Visit each class found during scanning.
-   * Called for every decorated class (beans and modules).
+   * Visit each decorated class found during scanning.
+   * Called for every class with at least one decorator (beans, modules, etc.).
+   * Use `ctx.metadata` to store data that will be merged into the bean's IR metadata.
    */
   visitClass?(ctx: ClassVisitorContext): void;
 
   /**
-   * Visit each method on bean classes during scanning.
-   * Called for every method on classes that have visitClass called on them.
+   * Visit each method on decorated classes during scanning.
+   * Called for **all** methods on classes that have `visitClass` called on them,
+   * including non-DI methods (helpers, lifecycle methods, etc.).
+   * Use `ctx.classMetadata` to accumulate data (shared with `visitClass`).
    */
   visitMethod?(ctx: MethodVisitorContext): void;
 
   /**
-   * Mutate IR beans after resolution, before graph building.
-   * Can modify metadata, add dependencies, etc.
+   * Mutate IR beans after type resolution, before graph building.
+   * Can modify metadata, add dependencies, filter beans, etc.
+   *
+   * **Note:** This hook receives only `@Injectable`/`@Singleton` beans.
+   * Beans created by `@Provides` methods inside `@Module` classes are expanded
+   * during graph building (the next pipeline stage) and are not visible here.
+   * Use `beforeCodegen` if you need to see the full expanded bean set.
    */
   afterResolve?(beans: IRBeanDefinition[]): IRBeanDefinition[];
 
   /**
-   * Inject synthetic bean definitions before codegen.
-   * Runs after graph building -- returned beans are added to the final list.
+   * Inject or modify bean definitions before code generation.
+   * Runs after graph building (validation + topo sort).
+   *
+   * This is the only hook that sees the full bean set including `@Provides` beans.
+   *
+   * **Warning:** Synthetic beans added here bypass dependency validation and
+   * topological sorting. Ensure any injected beans have their dependencies
+   * already present in the bean list, or are self-contained (no dependencies).
    */
   beforeCodegen?(beans: IRBeanDefinition[]): IRBeanDefinition[];
 
   /**
    * Contribute additional imports and code to the generated file.
-   * Called during code generation.
+   * Called during code generation. Duplicate imports across plugins are
+   * automatically deduplicated.
    */
   codegen?(beans: IRBeanDefinition[]): CodegenContribution;
 }
