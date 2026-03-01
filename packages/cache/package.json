@@ -1,0 +1,37 @@
+{
+  "name": "@goodie-ts/cache",
+  "version": "0.3.0",
+  "description": "Compile-time caching decorators and interceptor for goodie-ts",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/cache"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@goodie-ts/aop": "workspace:*"
+  },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "ts-morph": "^25.0.0"
+  }
+}

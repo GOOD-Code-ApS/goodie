@@ -13,6 +13,7 @@
     "@goodie-ts/decorators": "workspace:*",
     "@goodie-ts/hono": "workspace:*",
     "@goodie-ts/aop": "workspace:*",
+    "@goodie-ts/cache": "workspace:*",
     "@goodie-ts/logging": "workspace:*",
     "hono": "^4.7.0",
     "@hono/node-server": "^1.14.0",
