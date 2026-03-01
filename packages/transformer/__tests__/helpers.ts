@@ -15,6 +15,9 @@ export function PreDestroy() { return (t: any, c: any) => {} }
 export function PostConstruct() { return (t: any, c: any) => {} }
 export function PostProcessor() { return (t: any, c: any) => {} }
 export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
+export function Around(interceptor: any, opts?: any) { return (t: any, c: any) => {} }
+export function Before(interceptor: any, opts?: any) { return (t: any, c: any) => {} }
+export function After(interceptor: any, opts?: any) { return (t: any, c: any) => {} }
 `;
 
 /**
