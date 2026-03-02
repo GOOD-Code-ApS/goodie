@@ -40,7 +40,11 @@ export function watchAndRebuild(options: WatchOptions): WatchHandle {
 
       debounceTimer = setTimeout(() => {
         debounceTimer = undefined;
-        runTransform(options).then(logOutcome);
+        runTransform(options)
+          .then(logOutcome)
+          .catch((err) => {
+            console.error('[goodie] Unexpected error:', err);
+          });
       }, debounceMs);
     },
   );

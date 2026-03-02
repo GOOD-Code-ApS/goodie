@@ -719,29 +719,29 @@ function generateEmbeddedServerBeanDef(
   lines.push("    scope: 'singleton',");
   lines.push(`    dependencies: [${deps.join(', ')}],`);
   lines.push(`    factory: (${params.join(', ')}) => {`);
-  lines.push('    const __honoApp = new Hono()');
+  lines.push('      const __honoApp = new Hono()');
 
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     for (const route of ctrl.routes) {
       const fullPath = joinPaths(ctrl.basePath, route.path);
       lines.push(
-        `    __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
+        `      __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
       );
       lines.push(
-        `      const result = await ${varName}.${route.methodName}(c)`,
+        `        const result = await ${varName}.${route.methodName}(c)`,
       );
-      lines.push('      if (result instanceof Response) return result');
+      lines.push('        if (result instanceof Response) return result');
       lines.push(
-        '      if (result === undefined || result === null) return c.body(null, 204)',
+        '        if (result === undefined || result === null) return c.body(null, 204)',
       );
-      lines.push('      return c.json(result)');
-      lines.push('    })');
+      lines.push('        return c.json(result)');
+      lines.push('      })');
     }
   }
 
-  lines.push('    return new EmbeddedServer(__honoApp)');
-  lines.push('  },');
+  lines.push('      return new EmbeddedServer(__honoApp)');
+  lines.push('    },');
   lines.push('    eager: false,');
   lines.push('    metadata: {},');
   lines.push('  },');
