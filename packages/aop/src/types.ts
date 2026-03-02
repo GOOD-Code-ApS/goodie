@@ -42,6 +42,8 @@ export interface InterceptorRef {
   adviceType: 'around' | 'before' | 'after';
   /** Execution order (lower = runs first). */
   order: number;
+  /** Per-interceptor metadata passed to InvocationContext (e.g. cache name, log level). */
+  metadata?: Record<string, unknown>;
 }
 
 /** Descriptor for an intercepted method (stored in bean metadata). */

@@ -1,5 +1,6 @@
 import type { InvocationContext } from '@goodie-ts/aop';
 import { describe, expect, it, vi } from 'vitest';
+import type { Logger } from '../src/logger.js';
 import { LoggingInterceptor } from '../src/logging-interceptor.js';
 import { MDC } from '../src/mdc.js';
 
@@ -123,6 +124,43 @@ describe('LoggingInterceptor', () => {
 
     // Exit log should contain [Xms]
     expect(logSpy.mock.calls[1][0]).toMatch(/\[\d+\.\d+ms\]/);
+    logSpy.mockRestore();
+  });
+
+  it('should use custom logger factory when provided', () => {
+    const messages: string[] = [];
+    const customLogger: Logger = {
+      debug: (msg) => messages.push(`DEBUG: ${msg}`),
+      info: (msg) => messages.push(`INFO: ${msg}`),
+      warn: (msg) => messages.push(`WARN: ${msg}`),
+      error: (msg) => messages.push(`ERROR: ${msg}`),
+    };
+
+    const interceptor = new LoggingInterceptor(() => customLogger);
+    interceptor.intercept(createContext());
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toContain('→ doWork()');
+    expect(messages[1]).toContain('← doWork()');
+  });
+
+  it('should capture fresh MDC context at async exit (not stale snapshot)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const interceptor = new LoggingInterceptor();
+
+    await MDC.run(new Map([['traceId', 'trace-123']]), async () => {
+      const ctx = createContext({
+        proceed: async () => {
+          MDC.put('spanId', 'span-456');
+          return 'done';
+        },
+      });
+      await interceptor.intercept(ctx);
+    });
+
+    // Exit log should include the spanId added during execution
+    const exitLog = logSpy.mock.calls[1][0];
+    expect(exitLog).toContain('span-456');
     logSpy.mockRestore();
   });
 });
