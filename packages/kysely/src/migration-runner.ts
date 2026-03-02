@@ -1,5 +1,6 @@
 import type { Migration as KyselyMigration } from 'kysely';
 import { Migrator } from 'kysely';
+import type { AbstractMigration } from './abstract-migration.js';
 import { getMigrationName } from './decorators/migration.js';
 import type { KyselyProvider } from './transaction-manager.js';
 
@@ -12,9 +13,12 @@ import type { KyselyProvider } from './transaction-manager.js';
  */
 export class MigrationRunner {
   private readonly kyselyProvider: KyselyProvider;
-  private readonly migrations: object[];
+  private readonly migrations: AbstractMigration[];
 
-  constructor(kyselyProvider: KyselyProvider, ...migrations: object[]) {
+  constructor(
+    kyselyProvider: KyselyProvider,
+    ...migrations: AbstractMigration[]
+  ) {
     this.kyselyProvider = kyselyProvider;
     this.migrations = migrations;
   }
@@ -30,10 +34,9 @@ export class MigrationRunner {
       }
       // Kysely's Migrator spreads migration objects (...migration), which
       // drops prototype methods from class instances. Bind explicitly.
-      const typed = m as KyselyMigration;
       migrationMap[name] = {
-        up: typed.up.bind(m),
-        down: typed.down?.bind(m),
+        up: m.up.bind(m),
+        down: m.down?.bind(m),
       };
     }
 

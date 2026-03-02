@@ -11,7 +11,8 @@ type ClassDecorator_Stage3 = (
  * At compile time, the Kysely transformer plugin discovers @Migration classes
  * and wires them into an auto-managed MigrationRunner.
  *
- * Classes must implement Kysely's Migration interface (up/down methods).
+ * Classes should extend {@link AbstractMigration} which enforces the required
+ * `up()` method and optional `down()` method at compile time.
  *
  * @param name - Unique migration key, e.g. '001_create_todos'. Migrations
  *   are executed in lexicographic order by name.

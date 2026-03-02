@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { AbstractMigration } from '../src/abstract-migration.js';
 import { Migration } from '../src/decorators/migration.js';
 import { MigrationRunner } from '../src/migration-runner.js';
 
@@ -16,10 +17,10 @@ function createMockKyselyProvider() {
   return { kysely: { __brand: 'mock-kysely' } as any };
 }
 
-/** Create a migration class with @Migration decorator applied. */
+/** Create a migration class extending AbstractMigration with @Migration decorator applied. */
 function createMigrationClass(name: string) {
   @Migration(name)
-  class TestMigration {
+  class TestMigration extends AbstractMigration {
     async up(_db: any) {}
     async down(_db: any) {}
   }
@@ -96,8 +97,11 @@ describe('MigrationRunner', () => {
     vi.mocked(Migrator).mockImplementation(() => ({ migrateToLatest }) as any);
 
     const provider = createMockKyselyProvider();
-    // Plain object without @Migration decorator
-    const badMigration = { up: async () => {}, down: async () => {} };
+    // AbstractMigration subclass without @Migration decorator
+    class UndecoratedMigration extends AbstractMigration {
+      async up() {}
+    }
+    const badMigration = new UndecoratedMigration();
 
     const runner = new MigrationRunner(provider, badMigration);
 
