@@ -38,7 +38,7 @@ export function createHonoPlugin(): TransformerPlugin {
           'export async function startServer(options?: { port?: number }) {',
           '  const ctx = await app.start()',
           '  const router = createRouter(ctx)',
-          '  const port = options?.port ?? Number(process.env.PORT) || 3000',
+          '  const port = options?.port ?? (Number(process.env.PORT) || 3000)',
           '  serve({ fetch: router.fetch, port })',
           // biome-ignore lint/suspicious/noTemplateCurlyInString: generated code template literal
           '  console.log(`Server started on http://localhost:${port}`)',

@@ -1,3 +1,3 @@
 import { startServer } from './AppContext.generated.js';
 
-await startServer();
+startServer().catch(console.error);
