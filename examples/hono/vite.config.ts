@@ -1,3 +1,4 @@
+import { createHonoPlugin } from '@goodie-ts/hono';
 import { createKyselyPlugin } from '@goodie-ts/kysely';
 import { createLoggingPlugin } from '@goodie-ts/logging';
 import { diPlugin } from '@goodie-ts/vite-plugin';
@@ -6,7 +7,11 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [
     diPlugin({
-      plugins: [createLoggingPlugin(), createKyselyPlugin()],
+      plugins: [
+        createLoggingPlugin(),
+        createKyselyPlugin(),
+        createHonoPlugin(),
+      ],
     }),
   ],
   esbuild: { target: 'es2022' },
