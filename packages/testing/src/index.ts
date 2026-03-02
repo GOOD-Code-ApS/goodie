@@ -1,9 +1,4 @@
 export {
-  describeGoodie,
-  type GoodieTest,
-  type GoodieTestOptions,
-} from './describe-goodie.js';
-export {
   getMockTarget,
   MockDefinition,
   MockDefinitionError,
