@@ -4,7 +4,7 @@ import type {
   Constructor,
   InjectionToken,
 } from '@goodie-ts/core';
-import { test as base } from 'vitest';
+import { test as base, type TestAPI } from 'vitest';
 import { TestContext, type TestContextBuilder } from './test-context.js';
 
 /**
@@ -78,7 +78,7 @@ async function discoverTransactionManager(
 export function createGoodieTest(
   definitions: BeanDefinition[],
   options?: GoodieTestOptions,
-) {
+): TestAPI<GoodieFixtures> {
   const transactional = options?.transactional ?? false;
   const rollback = options?.rollback ?? transactional;
 
@@ -113,6 +113,7 @@ export function createGoodieTest(
 
   if (!transactional || !rollback) return extended;
 
+  // _rollback is auto:true (invisible to users), so cast to GoodieFixtures
   // biome-ignore lint/suspicious/noConfusingVoidType: vitest auto-fixture provides no value
   return extended.extend<{ _rollback: void }>({
     _rollback: [
