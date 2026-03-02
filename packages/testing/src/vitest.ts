@@ -15,9 +15,13 @@ export interface GoodieTestOptions {
   config?: Record<string, unknown> | (() => Record<string, unknown>);
   /** Escape hatch to customise the builder (e.g. `.override()`, `.mock()`). */
   setup?: (builder: TestContextBuilder) => TestContextBuilder;
-  /** Wrap each test in a transaction. Requires `@goodie-ts/kysely`. */
-  transactional?: boolean;
-  /** Whether to rollback after each test. Defaults to `true` when `transactional` is `true`. */
+  /**
+   * Wrap each test in a transaction that rolls back after the test.
+   * Pass the class or InjectionToken of your TransactionManager bean.
+   * The resolved bean must have `startTestTransaction(): Promise<() => Promise<void>>`.
+   */
+  transactional?: Constructor | InjectionToken<any>;
+  /** Whether to rollback after each test. Defaults to `true` when `transactional` is set. */
   rollback?: boolean;
 }
 
@@ -29,34 +33,13 @@ export interface GoodieFixtures {
   resolve: <T>(token: Constructor<T> | InjectionToken<T>) => T;
 }
 
-/** Sentinel error used to force Kysely transaction rollback. */
-class RollbackSignal extends Error {
-  constructor() {
-    super('RollbackSignal');
-    this.name = 'RollbackSignal';
-  }
-}
-
-/** Minimal interface for TransactionManager — avoids compile-time dep on @goodie-ts/kysely. */
-interface TransactionManagerLike {
-  runInTransaction<T>(fn: () => Promise<T>, requiresNew?: boolean): Promise<T>;
-}
-
-async function discoverTransactionManager(
-  ctx: ApplicationContext,
-): Promise<TransactionManagerLike> {
-  try {
-    const moduleName = '@goodie-ts/kysely';
-    const kyselyModule = (await import(moduleName)) as {
-      TransactionManager: Constructor;
-    };
-    const tm = ctx.get(kyselyModule.TransactionManager);
-    return tm as TransactionManagerLike;
-  } catch {
-    throw new Error(
-      'createGoodieTest: transactional mode requires @goodie-ts/kysely to be installed and TransactionManager registered in the context',
-    );
-  }
+/**
+ * Duck-type contract for any transaction manager bean used in test rollback.
+ * The resolved bean must provide `startTestTransaction()` which replaces
+ * the internal DB connection with a transaction, and returns a rollback function.
+ */
+interface TestTransactionManagerLike {
+  startTestTransaction(): Promise<() => Promise<void>>;
 }
 
 /**
@@ -79,8 +62,8 @@ export function createGoodieTest(
   definitions: BeanDefinition[],
   options?: GoodieTestOptions,
 ): TestAPI<GoodieFixtures> {
-  const transactional = options?.transactional ?? false;
-  const rollback = options?.rollback ?? transactional;
+  const transactional = options?.transactional;
+  const rollback = options?.rollback ?? !!transactional;
 
   const extended = base.extend<GoodieFixtures>({
     // biome-ignore lint/correctness/noEmptyPattern: vitest requires destructuring pattern
@@ -113,29 +96,19 @@ export function createGoodieTest(
 
   if (!transactional || !rollback) return extended;
 
+  const transactionalToken = transactional;
+
   // _rollback is auto:true (invisible to users), so cast to GoodieFixtures
   // biome-ignore lint/suspicious/noConfusingVoidType: vitest auto-fixture provides no value
   return extended.extend<{ _rollback: void }>({
     _rollback: [
       async ({ ctx }, use) => {
-        const tm = await discoverTransactionManager(ctx);
-        let testError: unknown;
+        const tm = ctx.get(transactionalToken) as TestTransactionManagerLike;
+        const rollbackFn = await tm.startTestTransaction();
         try {
-          await tm.runInTransaction(async () => {
-            try {
-              await use();
-            } catch (e) {
-              testError = e;
-            }
-            throw new RollbackSignal();
-          }, true);
-        } catch (e) {
-          if (!(e instanceof RollbackSignal)) {
-            throw e;
-          }
-        }
-        if (testError) {
-          throw testError;
+          await use();
+        } finally {
+          await rollbackFn();
         }
       },
       { auto: true },

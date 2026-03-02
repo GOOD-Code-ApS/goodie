@@ -1,37 +1,50 @@
-import type { ApplicationContext } from '@goodie-ts/core';
 import { EmbeddedServer } from '@goodie-ts/hono';
-import { TestContext } from '@goodie-ts/testing';
+import { TransactionManager } from '@goodie-ts/kysely';
+import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import type { Hono } from 'hono';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { buildDefinitions } from '../src/AppContext.generated.js';
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
-  let ctx: ApplicationContext;
-  let honoApp: Hono;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:17-alpine').start();
-
-    // Build context with TestContainers connection URI.
-    // Migrations are run automatically by the eager MigrationRunner bean.
-    ctx = await TestContext.from(
-      buildDefinitions({ DATABASE_URL: container.getConnectionUri() }),
-    ).build();
-
-    honoApp = ctx.get(EmbeddedServer).app;
   }, 60_000);
 
   afterAll(async () => {
-    await ctx?.close();
     await container?.stop();
   });
 
-  it('POST /api/todos creates a todo and returns 201', async () => {
+  const test = createGoodieTest(buildDefinitions(), {
+    config: () => ({ DATABASE_URL: container.getConnectionUri() }),
+    transactional: TransactionManager,
+  });
+
+  function app(
+    resolve: (token: typeof EmbeddedServer) => EmbeddedServer,
+  ): Hono {
+    return resolve(EmbeddedServer).app;
+  }
+
+  async function createTodo(honoApp: Hono, title: string) {
+    const res = await honoApp.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    return res.json();
+  }
+
+  test('POST /api/todos creates a todo and returns 201', async ({
+    resolve,
+  }) => {
+    const honoApp = app(resolve);
+
     const res = await honoApp.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -45,34 +58,39 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.id).toBeDefined();
   });
 
-  it('GET /api/todos lists all todos', async () => {
+  test('GET /api/todos lists all todos', async ({ resolve }) => {
+    const honoApp = app(resolve);
+    await createTodo(honoApp, 'First item');
+    await createTodo(honoApp, 'Second item');
+
     const res = await honoApp.request('/api/todos');
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.length).toBeGreaterThanOrEqual(1);
-    expect(body[0].title).toBe('Buy groceries');
+    expect(body).toHaveLength(2);
+    expect(body.map((t: { title: string }) => t.title)).toEqual([
+      'First item',
+      'Second item',
+    ]);
   });
 
-  it('GET /api/todos/:id returns a specific todo', async () => {
-    const listRes = await honoApp.request('/api/todos');
-    const todos = await listRes.json();
-    const todoId = todos[0].id;
+  test('GET /api/todos/:id returns a specific todo', async ({ resolve }) => {
+    const honoApp = app(resolve);
+    const created = await createTodo(honoApp, 'Specific todo');
 
-    const res = await honoApp.request(`/api/todos/${todoId}`);
+    const res = await honoApp.request(`/api/todos/${created.id}`);
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.id).toBe(todoId);
-    expect(body.title).toBe('Buy groceries');
+    expect(body.id).toBe(created.id);
+    expect(body.title).toBe('Specific todo');
   });
 
-  it('PATCH /api/todos/:id updates a todo', async () => {
-    const listRes = await honoApp.request('/api/todos');
-    const todos = await listRes.json();
-    const todoId = todos[0].id;
+  test('PATCH /api/todos/:id updates a todo', async ({ resolve }) => {
+    const honoApp = app(resolve);
+    const created = await createTodo(honoApp, 'To be updated');
 
-    const res = await honoApp.request(`/api/todos/${todoId}`, {
+    const res = await honoApp.request(`/api/todos/${created.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed: true }),
@@ -80,17 +98,13 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.id).toBe(todoId);
+    expect(body.id).toBe(created.id);
     expect(body.completed).toBe(true);
   });
 
-  it('DELETE /api/todos/:id removes a todo', async () => {
-    const createRes = await honoApp.request('/api/todos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'To be deleted' }),
-    });
-    const created = await createRes.json();
+  test('DELETE /api/todos/:id removes a todo', async ({ resolve }) => {
+    const honoApp = app(resolve);
+    const created = await createTodo(honoApp, 'To be deleted');
 
     const res = await honoApp.request(`/api/todos/${created.id}`, {
       method: 'DELETE',
@@ -101,8 +115,12 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.id).toBe(created.id);
   });
 
-  it('GET /api/todos/:id returns 404 for missing todo', async () => {
+  test('GET /api/todos/:id returns 404 for missing todo', async ({
+    resolve,
+  }) => {
+    const honoApp = app(resolve);
     const fakeId = '00000000-0000-0000-0000-000000000000';
+
     const res = await honoApp.request(`/api/todos/${fakeId}`);
 
     expect(res.status).toBe(404);

@@ -153,6 +153,23 @@ describe('TransactionManager', () => {
     expect(tm.getConnection()).toBe(kysely);
   });
 
+  it('should make provider.kysely transaction-aware via property redefinition', async () => {
+    const { kysely, mockTransaction } = createMockKysely();
+    const provider = { kysely: kysely as never };
+    const tm = new TransactionManager(provider);
+
+    // Outside a transaction: provider.kysely returns the raw Kysely
+    expect(provider.kysely).toBe(kysely);
+
+    // Inside a transaction: provider.kysely returns the active transaction
+    let connectionDuringTx: unknown;
+    await tm.runInTransaction(async () => {
+      connectionDuringTx = provider.kysely;
+    });
+
+    expect(connectionDuringTx).toBe(mockTransaction);
+  });
+
   it('should accept no args and fall back to configure()', async () => {
     const tm = new TransactionManager();
     const { kysely } = createMockKysely();
