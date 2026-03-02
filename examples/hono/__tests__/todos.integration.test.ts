@@ -1,47 +1,36 @@
-import { createGoodieTest } from '@goodie-ts/testing/vitest';
+import type { ApplicationContext } from '@goodie-ts/core';
+import { TestContext } from '@goodie-ts/testing';
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import type { Hono } from 'hono';
-import { Pool } from 'pg';
-import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { createRouter, definitions } from '../src/AppContext.generated.js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
+  let ctx: ApplicationContext;
   let honoApp: Hono;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:17-alpine').start();
 
-    const connectionUri = container.getConnectionUri();
-    const pool = new Pool({ connectionString: connectionUri });
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS todos (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        title TEXT NOT NULL,
-        completed BOOLEAN NOT NULL DEFAULT false,
-        created_at TIMESTAMP NOT NULL DEFAULT now()
-      )
-    `);
-    await pool.end();
+    // Build context with TestContainers connection URI.
+    // Migrations are run automatically by the eager MigrationRunner bean.
+    ctx = await TestContext.from(
+      buildDefinitions({ DATABASE_URL: container.getConnectionUri() }),
+    ).build();
+
+    honoApp = createRouter(ctx);
   }, 60_000);
 
   afterAll(async () => {
+    await ctx?.close();
     await container?.stop();
   });
 
-  const test = createGoodieTest(definitions, {
-    config: () => ({ DATABASE_URL: container.getConnectionUri() }),
-  });
-
-  test('setup: create router from ctx', ({ ctx }) => {
-    honoApp = createRouter(ctx);
-    expect(honoApp).toBeDefined();
-  });
-
-  test('POST /api/todos creates a todo and returns 201', async () => {
+  it('POST /api/todos creates a todo and returns 201', async () => {
     const res = await honoApp.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,7 +44,7 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.id).toBeDefined();
   });
 
-  test('GET /api/todos lists all todos', async () => {
+  it('GET /api/todos lists all todos', async () => {
     const res = await honoApp.request('/api/todos');
 
     expect(res.status).toBe(200);
@@ -64,7 +53,7 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body[0].title).toBe('Buy groceries');
   });
 
-  test('GET /api/todos/:id returns a specific todo', async () => {
+  it('GET /api/todos/:id returns a specific todo', async () => {
     const listRes = await honoApp.request('/api/todos');
     const todos = await listRes.json();
     const todoId = todos[0].id;
@@ -77,7 +66,7 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.title).toBe('Buy groceries');
   });
 
-  test('PATCH /api/todos/:id updates a todo', async () => {
+  it('PATCH /api/todos/:id updates a todo', async () => {
     const listRes = await honoApp.request('/api/todos');
     const todos = await listRes.json();
     const todoId = todos[0].id;
@@ -94,7 +83,7 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.completed).toBe(true);
   });
 
-  test('DELETE /api/todos/:id removes a todo', async () => {
+  it('DELETE /api/todos/:id removes a todo', async () => {
     const createRes = await honoApp.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -111,7 +100,7 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.id).toBe(created.id);
   });
 
-  test('GET /api/todos/:id returns 404 for missing todo', async () => {
+  it('GET /api/todos/:id returns 404 for missing todo', async () => {
     const fakeId = '00000000-0000-0000-0000-000000000000';
     const res = await honoApp.request(`/api/todos/${fakeId}`);
 

@@ -294,4 +294,173 @@ describe('Kysely Transformer Plugin', () => {
 
     warnSpy.mockRestore();
   });
+
+  // --- @Migration tests ---
+
+  it('should create synthetic beans for @Migration classes and MigrationRunner', () => {
+    const project = createProject({
+      '/src/Database.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class Database {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/migrations/CreateTodos.ts': `
+        import { Migration } from './decorators.js'
+        @Migration('001_create_todos')
+        export class CreateTodos {
+          async up(db: any) {}
+          async down(db: any) {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin(),
+    ]);
+
+    // MigrationRunner should appear as a bean
+    expect(result.code).toContain('MigrationRunner');
+    expect(result.code).toContain(
+      "import { MigrationRunner } from '@goodie-ts/kysely'",
+    );
+    // Migration class should appear as a synthetic bean
+    expect(result.code).toContain('token: CreateTodos');
+    // MigrationRunner should be eager
+    expect(result.code).toContain('eager: true');
+    // MigrationRunner should have postConstructMethods metadata
+    expect(result.code).toContain('postConstructMethods: ["migrate"]');
+  });
+
+  it('should wire MigrationRunner with Database dependency and all migration beans', () => {
+    const project = createProject({
+      '/src/Database.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class Database {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/migrations/CreateTodos.ts': `
+        import { Migration } from './decorators.js'
+        @Migration('001_create_todos')
+        export class CreateTodos {
+          async up(db: any) {}
+          async down(db: any) {}
+        }
+      `,
+      '/src/migrations/AddIndex.ts': `
+        import { Migration } from './decorators.js'
+        @Migration('002_add_index')
+        export class AddIndex {
+          async up(db: any) {}
+          async down(db: any) {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin(),
+    ]);
+
+    // MigrationRunner factory should receive Database + both migration beans
+    expect(result.code).toContain(
+      '(dep0: any, dep1: any, dep2: any) => new MigrationRunner(dep0, dep1, dep2)',
+    );
+    // Both migration classes should appear as beans
+    expect(result.code).toContain('token: CreateTodos');
+    expect(result.code).toContain('token: AddIndex');
+  });
+
+  it('should warn and skip MigrationRunner when no Kysely provider exists', () => {
+    const project = createProject({
+      '/src/migrations/CreateTodos.ts': `
+        import { Migration } from './decorators.js'
+        @Migration('001_create_todos')
+        export class CreateTodos {
+          async up(db: any) {}
+          async down(db: any) {}
+        }
+      `,
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin(),
+    ]);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '@Migration classes found but no Kysely provider detected',
+      ),
+    );
+    expect(result.code).not.toContain('MigrationRunner');
+
+    warnSpy.mockRestore();
+  });
+
+  it('should not create MigrationRunner when no @Migration classes exist', () => {
+    const project = createProject({
+      '/src/Database.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class Database {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/MyService.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        class MyService {
+          async doWork() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin(),
+    ]);
+
+    expect(result.code).not.toContain('MigrationRunner');
+  });
+
+  it('should support @Migration alongside @Transactional in the same project', () => {
+    const project = createProject({
+      '/src/Database.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        export class Database {
+          kysely!: Kysely<any>
+        }
+      `,
+      '/src/MyService.ts': `
+        import { Singleton, Transactional } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Transactional()
+          async create() {}
+        }
+      `,
+      '/src/migrations/CreateTodos.ts': `
+        import { Migration } from './decorators.js'
+        @Migration('001_create_todos')
+        export class CreateTodos {
+          async up(db: any) {}
+          async down(db: any) {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createKyselyPlugin(),
+    ]);
+
+    // Both features should be present
+    expect(result.code).toContain('TransactionalInterceptor');
+    expect(result.code).toContain('TransactionManager');
+    expect(result.code).toContain('MigrationRunner');
+    expect(result.code).toContain('token: CreateTodos');
+  });
 });
