@@ -850,6 +850,86 @@ describe('Code Generator', () => {
     expect(code).not.toContain('buildDefinitions');
   });
 
+  it('should emit baseTokens when baseTokenRefs are present', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'AbstractMigration',
+          importPath: '/src/AbstractMigration.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'CreateTodos',
+          importPath: '/src/CreateTodos.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        baseTokenRefs: [
+          {
+            kind: 'class',
+            className: 'AbstractMigration',
+            importPath: '/src/AbstractMigration.ts',
+          },
+        ],
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).toContain('baseTokens: [AbstractMigration],');
+    expect(code).toContain(
+      "import { AbstractMigration } from '../src/AbstractMigration.js'",
+    );
+  });
+
+  it('should not emit baseTokens when baseTokenRefs is absent', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Repo',
+          importPath: '/src/Repo.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).not.toContain('baseTokens');
+  });
+
   it('should always generate collection field in dependency output', () => {
     const beans: IRBeanDefinition[] = [
       {

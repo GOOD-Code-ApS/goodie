@@ -252,7 +252,7 @@ export function createKyselyPlugin(
             a.migrationName.localeCompare(b.migrationName),
           );
 
-          // Synthetic bean per @Migration class
+          // Synthetic bean per @Migration class, with baseTokenRefs pointing to AbstractMigration
           for (const m of migrationClasses) {
             syntheticBeans.push({
               tokenRef: {
@@ -268,6 +268,13 @@ export function createKyselyPlugin(
               factoryKind: 'constructor',
               providesSource: undefined,
               metadata: {},
+              baseTokenRefs: [
+                {
+                  kind: 'class',
+                  className: 'AbstractMigration',
+                  importPath: '@goodie-ts/kysely',
+                },
+              ],
               sourceLocation: {
                 filePath: m.filePath,
                 line: 0,
@@ -276,7 +283,7 @@ export function createKyselyPlugin(
             });
           }
 
-          // MigrationRunner: eager singleton, depends on KyselyProvider + all migration beans
+          // MigrationRunner: eager singleton, depends on KyselyProvider + collection of AbstractMigration
           syntheticBeans.push({
             tokenRef: {
               kind: 'class',
@@ -288,20 +295,20 @@ export function createKyselyPlugin(
             name: undefined,
             constructorDeps: [
               kyselyProviderDep[0],
-              ...migrationClasses.map((m) => ({
+              {
                 tokenRef: {
-                  kind: 'class' as const,
-                  className: m.className,
-                  importPath: m.filePath,
+                  kind: 'class',
+                  className: 'AbstractMigration',
+                  importPath: '@goodie-ts/kysely',
                 },
                 optional: false,
-                collection: false,
+                collection: true,
                 sourceLocation: {
                   filePath: '@goodie-ts/kysely',
                   line: 0,
                   column: 0,
                 },
-              })),
+              },
             ],
             fieldDeps: [],
             factoryKind: 'constructor',

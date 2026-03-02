@@ -1046,6 +1046,108 @@ describe('ApplicationContext — getDefinitions', () => {
   });
 });
 
+// ── Subtype collection injection ─────────────────────────────────────
+
+describe('ApplicationContext — subtype collection injection', () => {
+  it('getAll(BaseClass) returns subtypes registered via baseTokens', async () => {
+    abstract class Animal {
+      abstract sound(): string;
+    }
+    class Dog extends Animal {
+      sound() {
+        return 'woof';
+      }
+    }
+    class Cat extends Animal {
+      sound() {
+        return 'meow';
+      }
+    }
+    const ctx = await ApplicationContext.create(
+      [
+        makeDef(Dog, { factory: () => new Dog(), metadata: {}, deps: [] }),
+        makeDef(Cat, { factory: () => new Cat(), metadata: {}, deps: [] }),
+      ].map((d) => ({ ...d, baseTokens: [Animal] })),
+    );
+
+    const animals = ctx.getAll(Animal);
+    expect(animals).toHaveLength(2);
+    expect(animals.map((a) => a.sound()).sort()).toEqual(['meow', 'woof']);
+  });
+
+  it('get(BaseClass) throws when no bean is directly registered under base token', async () => {
+    abstract class Base {}
+    class Sub extends Base {}
+    const ctx = await ApplicationContext.create([
+      { ...makeDef(Sub, { factory: () => new Sub() }), baseTokens: [Base] },
+    ]);
+
+    expect(() => ctx.get(Base)).toThrow(MissingDependencyError);
+  });
+
+  it('getAll(BaseClass) returns empty when no subtypes registered', async () => {
+    abstract class Base {}
+    const ctx = await ApplicationContext.create([]);
+
+    expect(ctx.getAll(Base)).toEqual([]);
+  });
+
+  it('collection dep resolves subtypes via baseTokens', async () => {
+    abstract class Handler {
+      abstract handle(): string;
+    }
+    class HandlerA extends Handler {
+      handle() {
+        return 'a';
+      }
+    }
+    class HandlerB extends Handler {
+      handle() {
+        return 'b';
+      }
+    }
+    class Dispatcher {
+      constructor(readonly handlers: Handler[]) {}
+    }
+    const ctx = await ApplicationContext.create([
+      {
+        ...makeDef(HandlerA, { factory: () => new HandlerA() }),
+        baseTokens: [Handler],
+      },
+      {
+        ...makeDef(HandlerB, { factory: () => new HandlerB() }),
+        baseTokens: [Handler],
+      },
+      makeDef(Dispatcher, {
+        deps: [{ token: Handler, optional: false, collection: true }],
+        factory: (handlers) => new Dispatcher(handlers as Handler[]),
+      }),
+    ]);
+
+    const dispatcher = ctx.get(Dispatcher);
+    expect(dispatcher.handlers).toHaveLength(2);
+    expect(dispatcher.handlers.map((h) => h.handle()).sort()).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+
+  it('subtypes registered via baseTokens are singletons when cached', async () => {
+    abstract class Base {}
+    class Sub extends Base {}
+    const ctx = await ApplicationContext.create([
+      {
+        ...makeDef(Sub, { scope: 'singleton', factory: () => new Sub() }),
+        baseTokens: [Base],
+      },
+    ]);
+
+    const direct = ctx.get(Sub);
+    const viaBase = ctx.getAll(Base);
+    expect(viaBase[0]).toBe(direct);
+  });
+});
+
 // ── Helper ───────────────────────────────────────────────────────────
 
 function tokenDesc(token: unknown): string {

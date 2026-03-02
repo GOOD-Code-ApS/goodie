@@ -38,6 +38,20 @@ export class ApplicationContext {
       }
       // Last definition wins as primary (matches typical DI override semantics)
       this.primaryDef.set(def.token, def);
+
+      // Register under ancestor tokens for subtype collection injection.
+      // Only adds to defsByToken (not primaryDef) — get(BaseClass) still throws,
+      // but getAll(BaseClass) returns all subtypes.
+      if (def.baseTokens) {
+        for (const baseToken of def.baseTokens) {
+          const baseDefs = this.defsByToken.get(baseToken);
+          if (baseDefs) {
+            baseDefs.push(def);
+          } else {
+            this.defsByToken.set(baseToken, [def]);
+          }
+        }
+      }
     }
   }
 

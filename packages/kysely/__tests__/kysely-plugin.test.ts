@@ -333,7 +333,7 @@ describe('Kysely Transformer Plugin', () => {
     expect(result.code).toContain('postConstructMethods: ["migrate"]');
   });
 
-  it('should wire MigrationRunner with Database dependency and all migration beans', () => {
+  it('should wire MigrationRunner with Database dependency and collection dep on AbstractMigration', () => {
     const project = createProject({
       '/src/Database.ts': `
         import { Singleton } from './decorators.js'
@@ -364,13 +364,18 @@ describe('Kysely Transformer Plugin', () => {
       createKyselyPlugin(),
     ]);
 
-    // MigrationRunner factory should receive Database + both migration beans
+    // MigrationRunner factory should receive Database + AbstractMigration[] collection
     expect(result.code).toContain(
-      '(dep0: any, dep1: any, dep2: any) => new MigrationRunner(dep0, dep1, dep2)',
+      '(dep0: any, dep1: any) => new MigrationRunner(dep0, dep1)',
     );
-    // Both migration classes should appear as beans
+    // Collection dep on AbstractMigration
+    expect(result.code).toContain(
+      '{ token: AbstractMigration, optional: false, collection: true }',
+    );
+    // Both migration classes should appear as beans with baseTokens
     expect(result.code).toContain('token: CreateTodos');
     expect(result.code).toContain('token: AddIndex');
+    expect(result.code).toContain('baseTokens: [AbstractMigration]');
   });
 
   it('should warn and skip MigrationRunner when no Kysely provider exists', () => {

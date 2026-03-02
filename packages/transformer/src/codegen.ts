@@ -158,6 +158,10 @@ export function generateCode(
     lines.push(`    factory: ${factoryToCode(bean)},`);
     lines.push(`    eager: ${bean.eager},`);
     lines.push(`    metadata: ${metadataToCode(bean.metadata)},`);
+    if (bean.baseTokenRefs && bean.baseTokenRefs.length > 0) {
+      const tokens = bean.baseTokenRefs.map((ref) => ref.className).join(', ');
+      lines.push(`    baseTokens: [${tokens}],`);
+    }
     lines.push('  },');
   }
 
@@ -243,6 +247,13 @@ function collectClassImports(beans: IRBeanDefinition[]): Map<string, string> {
 
     if (bean.providesSource) {
       addClassImport(imports, bean.providesSource.moduleTokenRef);
+    }
+
+    // Ancestor class tokens for subtype collection injection
+    if (bean.baseTokenRefs) {
+      for (const ref of bean.baseTokenRefs) {
+        addClassImport(imports, ref);
+      }
     }
 
     // Interceptor classes referenced in metadata also need imports
