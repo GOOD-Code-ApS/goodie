@@ -1,4 +1,5 @@
 import type { ApplicationContext } from '@goodie-ts/core';
+import { EmbeddedServer } from '@goodie-ts/hono';
 import { TestContext } from '@goodie-ts/testing';
 import {
   PostgreSqlContainer,
@@ -6,7 +7,7 @@ import {
 } from '@testcontainers/postgresql';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
+import { buildDefinitions } from '../src/AppContext.generated.js';
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
@@ -22,7 +23,7 @@ describe('Hono + PostgreSQL Todo API', () => {
       buildDefinitions({ DATABASE_URL: container.getConnectionUri() }),
     ).build();
 
-    honoApp = createRouter(ctx);
+    honoApp = ctx.get(EmbeddedServer).app;
   }, 60_000);
 
   afterAll(async () => {

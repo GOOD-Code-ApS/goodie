@@ -32,6 +32,9 @@ export function generateCode(
   const outputDir = path.dirname(options.outputPath);
   const lines: string[] = [];
 
+  // Generate EmbeddedServer when controllers exist (implies @goodie-ts/hono is installed)
+  const needsEmbeddedServer = (controllers ?? []).length > 0;
+
   // Check if any bean uses @Value
   const hasValueFields = beans.some(
     (b) =>
@@ -71,6 +74,12 @@ export function generateCode(
   for (const [className, importPath] of classImports) {
     const relativePath = computeRelativeImport(outputDir, importPath);
     lines.push(`import { ${className} } from '${relativePath}'`);
+  }
+
+  // EmbeddedServer imports (when controllers exist)
+  if (needsEmbeddedServer) {
+    lines.push("import { Hono } from 'hono'");
+    lines.push("import { EmbeddedServer } from '@goodie-ts/hono'");
   }
 
   // Type-only imports for types referenced in token generics
@@ -158,11 +167,12 @@ export function generateCode(
     lines.push(`    factory: ${factoryToCode(bean)},`);
     lines.push(`    eager: ${bean.eager},`);
     lines.push(`    metadata: ${metadataToCode(bean.metadata)},`);
-    if (bean.baseTokenRefs && bean.baseTokenRefs.length > 0) {
-      const tokens = bean.baseTokenRefs.map((ref) => ref.className).join(', ');
-      lines.push(`    baseTokens: [${tokens}],`);
-    }
     lines.push('  },');
+  }
+
+  // EmbeddedServer bean definition (when controllers with routes exist)
+  if (needsEmbeddedServer) {
+    lines.push(...generateEmbeddedServerBeanDef(controllers!));
   }
 
   if (hasValueFields) {
@@ -217,14 +227,16 @@ export function generateCode(
     }
   }
 
-  // Generate createRouter() if controllers with routes exist
-  const activeControllers = (controllers ?? []).filter(
-    (c) => c.routes.length > 0,
-  );
-  if (activeControllers.length > 0) {
+  // Generate startServer() when controllers exist
+  if (needsEmbeddedServer) {
     lines.push(
-      ...generateCreateRouter(activeControllers, classImports, outputDir),
+      'export async function startServer(options?: { port?: number }) {',
     );
+    lines.push('  const ctx = await app.start()');
+    lines.push('  ctx.get(EmbeddedServer).listen(options)');
+    lines.push('  return ctx');
+    lines.push('}');
+    lines.push('');
   }
 
   return lines.join('\n');
@@ -247,13 +259,6 @@ function collectClassImports(beans: IRBeanDefinition[]): Map<string, string> {
 
     if (bean.providesSource) {
       addClassImport(imports, bean.providesSource.moduleTokenRef);
-    }
-
-    // Ancestor class tokens for subtype collection injection
-    if (bean.baseTokenRefs) {
-      for (const ref of bean.baseTokenRefs) {
-        addClassImport(imports, ref);
-      }
     }
 
     // Interceptor classes referenced in metadata also need imports
@@ -685,65 +690,61 @@ function escapeStringLiteral(value: string): string {
     .replace(/\r/g, '\\r');
 }
 
-// ── createRouter generation ──
+// ── EmbeddedServer bean generation ──
 
 /**
- * Generate a createRouter() function that registers all controller routes on a Hono app.
- * The generated function takes an ApplicationContext and returns a Hono instance.
+ * Generate the EmbeddedServer bean definition lines (to be inserted inside the definitions array).
+ * The factory creates a Hono app, wires all controller routes, and returns new EmbeddedServer(app).
  */
-function generateCreateRouter(
+function generateEmbeddedServerBeanDef(
   controllers: IRControllerDefinition[],
-  classImports: Map<string, string>,
-  outputDir: string,
 ): string[] {
   const lines: string[] = [];
-
-  // Add Hono import
-  lines.push("import { Hono } from 'hono'");
-
-  // Add controller imports for any controllers not already imported via beans
-  // Track by importPath to handle same-named classes from different files
-  const importedPaths = new Set<string>(classImports.values());
-  for (const ctrl of controllers) {
-    if (!importedPaths.has(ctrl.classTokenRef.importPath)) {
-      const relativePath = computeRelativeImport(
-        outputDir,
-        ctrl.classTokenRef.importPath,
-      );
-      lines.push(
-        `import { ${ctrl.classTokenRef.className} } from '${relativePath}'`,
-      );
-      importedPaths.add(ctrl.classTokenRef.importPath);
-    }
-  }
-
-  lines.push('');
-  lines.push('export function createRouter(ctx: ApplicationContext): Hono {');
-  lines.push('  const app = new Hono()');
-
-  // Build collision-safe variable names for controllers
   const ctrlVarNames = buildControllerVarNames(controllers);
+
+  // Dependencies: one per controller
+  const deps = controllers.map(
+    (ctrl) =>
+      `{ token: ${ctrl.classTokenRef.className}, optional: false, collection: false }`,
+  );
+
+  // Factory params: collision-safe controller variable names
+  const params = controllers.map((ctrl) => {
+    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
+    return `${varName}: any`;
+  });
+
+  lines.push('  {');
+  lines.push('    token: EmbeddedServer,');
+  lines.push("    scope: 'singleton',");
+  lines.push(`    dependencies: [${deps.join(', ')}],`);
+  lines.push(`    factory: (${params.join(', ')}) => {`);
+  lines.push('    const __honoApp = new Hono()');
 
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
-    lines.push(`  const ${varName} = ctx.get(${ctrl.classTokenRef.className})`);
-
     for (const route of ctrl.routes) {
       const fullPath = joinPaths(ctrl.basePath, route.path);
-      lines.push(`  app.${route.httpMethod}('${fullPath}', async (c) => {`);
-      lines.push(`    const result = await ${varName}.${route.methodName}(c)`);
-      lines.push('    if (result instanceof Response) return result');
       lines.push(
-        '    if (result === undefined || result === null) return c.body(null, 204)',
+        `    __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
       );
-      lines.push('    return c.json(result)');
-      lines.push('  })');
+      lines.push(
+        `      const result = await ${varName}.${route.methodName}(c)`,
+      );
+      lines.push('      if (result instanceof Response) return result');
+      lines.push(
+        '      if (result === undefined || result === null) return c.body(null, 204)',
+      );
+      lines.push('      return c.json(result)');
+      lines.push('    })');
     }
   }
 
-  lines.push('  return app');
-  lines.push('}');
-  lines.push('');
+  lines.push('    return new EmbeddedServer(__honoApp)');
+  lines.push('  },');
+  lines.push('    eager: false,');
+  lines.push('    metadata: {},');
+  lines.push('  },');
 
   return lines;
 }
