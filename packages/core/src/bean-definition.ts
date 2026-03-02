@@ -25,6 +25,4 @@ export interface BeanDefinition<T = unknown> {
   eager: boolean;
   /** Arbitrary metadata stashed by decorators — extension libraries use this. */
   metadata: Record<string, unknown>;
-  /** Ancestor class/token this bean is assignable to. Enables subtype collection injection via getAll(). */
-  baseTokens?: (Constructor | InjectionToken<unknown>)[];
 }

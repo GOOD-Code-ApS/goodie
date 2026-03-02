@@ -21,19 +21,20 @@ const defaultOptions: ResolvedOptions = {
   outputPath: '/project/src/AppContext.generated.ts',
   include: undefined,
   debounceMs: 100,
+  plugins: [],
 };
 
 describe('runRebuild', () => {
-  it('returns success with TransformResult', () => {
+  it('returns success with TransformResult', async () => {
     const fakeResult = {
       code: '// generated',
       outputPath: defaultOptions.outputPath,
       beans: [{ id: 'A' }],
       warnings: [],
     };
-    mockTransform.mockReturnValue(fakeResult as any);
+    mockTransform.mockResolvedValue(fakeResult as any);
 
-    const outcome = runRebuild(defaultOptions);
+    const outcome = await runRebuild(defaultOptions);
 
     expect(outcome.success).toBe(true);
     if (outcome.success) {
@@ -41,8 +42,8 @@ describe('runRebuild', () => {
     }
   });
 
-  it('passes tsConfigFilePath, outputPath, and include to transform', () => {
-    mockTransform.mockReturnValue({
+  it('passes tsConfigFilePath, outputPath, and include to transform', async () => {
+    mockTransform.mockResolvedValue({
       code: '',
       outputPath: '',
       beans: [],
@@ -53,26 +54,25 @@ describe('runRebuild', () => {
       ...defaultOptions,
       include: ['src/**/*.ts'],
     };
-    runRebuild(opts);
+    await runRebuild(opts);
 
     expect(mockTransform).toHaveBeenCalledWith({
       tsConfigFilePath: '/project/tsconfig.json',
       outputPath: '/project/src/AppContext.generated.ts',
       include: ['src/**/*.ts'],
+      plugins: [],
     });
   });
 
-  it('returns failure with TransformerError', () => {
+  it('returns failure with TransformerError', async () => {
     const transformerError = new TransformerError(
       'Missing provider',
       { filePath: 'foo.ts', line: 1, column: 0 },
       'Add @Injectable()',
     );
-    mockTransform.mockImplementation(() => {
-      throw transformerError;
-    });
+    mockTransform.mockRejectedValue(transformerError);
 
-    const outcome = runRebuild(defaultOptions);
+    const outcome = await runRebuild(defaultOptions);
 
     expect(outcome.success).toBe(false);
     if (!outcome.success) {
@@ -80,12 +80,12 @@ describe('runRebuild', () => {
     }
   });
 
-  it('returns failure wrapping non-TransformerError exceptions', () => {
-    mockTransform.mockImplementation(() => {
-      throw new TypeError('Cannot read properties of undefined');
-    });
+  it('returns failure wrapping non-TransformerError exceptions', async () => {
+    mockTransform.mockRejectedValue(
+      new TypeError('Cannot read properties of undefined'),
+    );
 
-    const outcome = runRebuild(defaultOptions);
+    const outcome = await runRebuild(defaultOptions);
 
     expect(outcome.success).toBe(false);
     if (!outcome.success) {
@@ -94,12 +94,10 @@ describe('runRebuild', () => {
     }
   });
 
-  it('wraps non-Error throws into an Error', () => {
-    mockTransform.mockImplementation(() => {
-      throw 'string error';
-    });
+  it('wraps non-Error throws into an Error', async () => {
+    mockTransform.mockRejectedValue('string error');
 
-    const outcome = runRebuild(defaultOptions);
+    const outcome = await runRebuild(defaultOptions);
 
     expect(outcome.success).toBe(false);
     if (!outcome.success) {

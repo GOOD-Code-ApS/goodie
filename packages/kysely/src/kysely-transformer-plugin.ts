@@ -252,7 +252,8 @@ export function createKyselyPlugin(
             a.migrationName.localeCompare(b.migrationName),
           );
 
-          // Synthetic bean per @Migration class, with baseTokenRefs pointing to AbstractMigration
+          // Synthetic bean per @Migration class (no baseTokenRefs — wired as individual deps)
+          const migrationDeps: IRBeanDefinition['constructorDeps'] = [];
           for (const m of migrationClasses) {
             syntheticBeans.push({
               tokenRef: {
@@ -268,22 +269,30 @@ export function createKyselyPlugin(
               factoryKind: 'constructor',
               providesSource: undefined,
               metadata: {},
-              baseTokenRefs: [
-                {
-                  kind: 'class',
-                  className: 'AbstractMigration',
-                  importPath: '@goodie-ts/kysely',
-                },
-              ],
               sourceLocation: {
                 filePath: m.filePath,
                 line: 0,
                 column: 0,
               },
             });
+
+            migrationDeps.push({
+              tokenRef: {
+                kind: 'class',
+                className: m.className,
+                importPath: m.filePath,
+              },
+              optional: false,
+              collection: false,
+              sourceLocation: {
+                filePath: '@goodie-ts/kysely',
+                line: 0,
+                column: 0,
+              },
+            });
           }
 
-          // MigrationRunner: eager singleton, depends on KyselyProvider + collection of AbstractMigration
+          // MigrationRunner: eager singleton, depends on KyselyProvider + individual migration deps
           syntheticBeans.push({
             tokenRef: {
               kind: 'class',
@@ -293,23 +302,7 @@ export function createKyselyPlugin(
             scope: 'singleton',
             eager: true,
             name: undefined,
-            constructorDeps: [
-              kyselyProviderDep[0],
-              {
-                tokenRef: {
-                  kind: 'class',
-                  className: 'AbstractMigration',
-                  importPath: '@goodie-ts/kysely',
-                },
-                optional: false,
-                collection: true,
-                sourceLocation: {
-                  filePath: '@goodie-ts/kysely',
-                  line: 0,
-                  column: 0,
-                },
-              },
-            ],
+            constructorDeps: [kyselyProviderDep[0], ...migrationDeps],
             fieldDeps: [],
             factoryKind: 'constructor',
             providesSource: undefined,
@@ -416,3 +409,5 @@ function resolveKyselyProvider(
   );
   return [];
 }
+
+export default createKyselyPlugin;

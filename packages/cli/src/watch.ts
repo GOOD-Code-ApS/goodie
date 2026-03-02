@@ -40,8 +40,7 @@ export function watchAndRebuild(options: WatchOptions): WatchHandle {
 
       debounceTimer = setTimeout(() => {
         debounceTimer = undefined;
-        const outcome = runTransform(options);
-        logOutcome(outcome);
+        runTransform(options).then(logOutcome);
       }, debounceMs);
     },
   );

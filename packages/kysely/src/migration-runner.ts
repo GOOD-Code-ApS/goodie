@@ -15,7 +15,10 @@ export class MigrationRunner {
   private readonly kyselyProvider: KyselyProvider;
   private readonly migrations: AbstractMigration[];
 
-  constructor(kyselyProvider: KyselyProvider, migrations: AbstractMigration[]) {
+  constructor(
+    kyselyProvider: KyselyProvider,
+    ...migrations: AbstractMigration[]
+  ) {
     this.kyselyProvider = kyselyProvider;
     this.migrations = migrations;
   }
