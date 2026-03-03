@@ -1,6 +1,7 @@
+import { createCachePlugin } from '@goodie-ts/cache';
 import { createConfigPlugin } from '@goodie-ts/config';
-import { createKyselyPlugin } from '@goodie-ts/kysely';
 import { createLoggingPlugin } from '@goodie-ts/logging';
+import { createResiliencePlugin } from '@goodie-ts/resilience';
 import { diPlugin } from '@goodie-ts/vite-plugin';
 import { defineConfig } from 'vite';
 
@@ -9,7 +10,8 @@ export default defineConfig({
     diPlugin({
       plugins: [
         createLoggingPlugin(),
-        createKyselyPlugin(),
+        createCachePlugin(),
+        createResiliencePlugin(),
         createConfigPlugin(),
       ],
     }),
@@ -27,9 +29,9 @@ export default defineConfig({
         '@goodie-ts/core',
         '@goodie-ts/decorators',
         '@goodie-ts/aop',
+        '@goodie-ts/cache',
         '@goodie-ts/logging',
-        '@goodie-ts/kysely',
-        '@goodie-ts/hono',
+        '@goodie-ts/resilience',
         'hono',
         'hono/request-id',
         '@hono/node-server',
