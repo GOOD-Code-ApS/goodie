@@ -26,6 +26,8 @@ export function Delete(path?: string) { return (t: any, c: any) => {} }
 export function Patch(path?: string) { return (t: any, c: any) => {} }
 export function Log(opts?: any) { return (t: any, c: any) => {} }
 export function ConfigurationProperties(prefix: string) { return (t: any, c: any) => {} }
+export function Transactional(opts?: any) { return (t: any, c: any) => {} }
+export function Migration(name: string) { return (t: any, c: any) => {} }
 `;
 
 /**

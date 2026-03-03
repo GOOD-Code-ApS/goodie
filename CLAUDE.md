@@ -23,12 +23,12 @@ testing → core
 
 ## Key Design Decisions
 
+- **Always favour compile-time code generation over runtime scanning.** If the transformer knows something at build time (controllers, migrations, interceptors, routes), generate the wiring code directly. Never use runtime scanning, marker classes, or collection injection for statically-known information. Reserve runtime mechanisms (`getAll()`, `baseTokens`) for genuinely dynamic cases where the set of beans isn't known until runtime. This is the framework's core differentiator — violating it undermines the entire architecture.
 - **Native Stage 3 decorators** — no `experimentalDecorators`, no reflect-metadata
 - **`accessor` keyword** for `@Inject`/`@Optional` (Stage 3 has no parameter decorators)
 - **Lazy singletons** by default, `@Eager()` opt-in
 - **Async factories** supported from day one (`getAsync()`)
 - **Typed InjectionTokens** for interfaces, primitives, generics
-- **No runtime scanning** — all wiring is code-generated at compile time
 
 ## Commands
 

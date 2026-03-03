@@ -17,6 +17,10 @@ export default defineConfig({
         __dirname,
         'packages/vite-plugin/src/index.ts',
       ),
+      '@goodie-ts/testing/vitest': path.resolve(
+        __dirname,
+        'packages/testing/src/vitest.ts',
+      ),
       '@goodie-ts/testing': path.resolve(
         __dirname,
         'packages/testing/src/index.ts',
@@ -31,6 +35,10 @@ export default defineConfig({
       '@goodie-ts/config': path.resolve(
         __dirname,
         'packages/config/src/index.ts',
+      ),
+      '@goodie-ts/kysely': path.resolve(
+        __dirname,
+        'packages/kysely/src/index.ts',
       ),
     },
   },

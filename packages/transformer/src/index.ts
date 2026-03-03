@@ -3,6 +3,8 @@
 export type { CodegenOptions } from './codegen.js';
 // Code Generator
 export { generateCode } from './codegen.js';
+// Plugin discovery
+export { discoverPlugins, mergePlugins } from './discover-plugins.js';
 export type { GraphResult } from './graph-builder.js';
 // Graph Builder
 export { buildGraph } from './graph-builder.js';
@@ -45,7 +47,6 @@ export type {
   ScannedTypeArgument,
   ScanResult,
 } from './scanner.js';
-
 // Scanner
 export { scan } from './scanner.js';
 // Pipeline

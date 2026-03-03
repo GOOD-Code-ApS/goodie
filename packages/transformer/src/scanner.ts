@@ -49,8 +49,6 @@ export interface ScannedBean {
   isBeanPostProcessor: boolean;
   /** Fields decorated with @Value('key'). */
   valueFields: ScannedValueField[];
-  /** All ancestor classes (direct parent first, root last). */
-  baseClasses: Array<{ className: string; sourceFile: SourceFile | undefined }>;
   sourceLocation: SourceLocation;
 }
 
@@ -293,7 +291,6 @@ function scanBean(
     DECORATOR_NAMES.PostProcessor,
   );
   const valueFields = scanValueFields(cls);
-  const baseClasses = extractBaseClassChain(cls);
 
   return {
     classDeclaration: cls,
@@ -311,7 +308,6 @@ function scanBean(
     postConstructMethods,
     isBeanPostProcessor,
     valueFields,
-    baseClasses,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
 }
@@ -733,52 +729,6 @@ function scanValueFields(cls: ClassDeclaration): ScannedValueField[] {
   }
 
   return results;
-}
-
-// ── Base class extraction ──
-
-/**
- * Walk the full inheritance chain and return all ancestor classes
- * (direct parent first, root last).
- */
-function extractBaseClassChain(
-  cls: ClassDeclaration,
-): Array<{ className: string; sourceFile: SourceFile | undefined }> {
-  const result: Array<{
-    className: string;
-    sourceFile: SourceFile | undefined;
-  }> = [];
-  const seen = new Set<string>();
-  let current: ClassDeclaration | undefined = cls;
-
-  while (current) {
-    const extendsExpr = current.getExtends();
-    if (!extendsExpr) break;
-
-    const baseType = extendsExpr.getType();
-    const symbol = baseType.getSymbol();
-    if (!symbol) break;
-
-    const className = symbol.getName();
-    if (seen.has(className)) break; // guard against cycles
-    seen.add(className);
-
-    let sourceFile: SourceFile | undefined;
-    const decls = symbol.getDeclarations();
-    if (decls.length > 0) {
-      sourceFile = decls[0].getSourceFile();
-    }
-
-    result.push({ className, sourceFile });
-
-    // Try to get the ClassDeclaration for the parent to continue walking
-    const parentDecl = decls.find(
-      (d) => d.getKindName() === 'ClassDeclaration',
-    );
-    current = parentDecl as ClassDeclaration | undefined;
-  }
-
-  return result;
 }
 
 // ── Generic type helpers ──

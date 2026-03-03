@@ -18,6 +18,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./vitest": {
+      "types": "./dist/vitest.d.ts",
+      "import": "./dist/vitest.js"
     }
   },
   "scripts": {
@@ -26,6 +30,18 @@
   },
   "dependencies": {
     "@goodie-ts/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "vitest": ">=3.0.0",
+    "@goodie-ts/kysely": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    },
+    "@goodie-ts/kysely": {
+      "optional": true
+    }
   },
   "files": [
     "dist"

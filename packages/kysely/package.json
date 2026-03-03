@@ -1,0 +1,51 @@
+{
+  "name": "@goodie-ts/kysely",
+  "version": "0.3.0",
+  "description": "Kysely integration for goodie-ts — @Transactional decorator, TransactionManager, CrudRepository",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/kysely"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "goodie": {
+    "plugin": "./dist/kysely-transformer-plugin.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@goodie-ts/aop": "workspace:*"
+  },
+  "peerDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "kysely": ">=0.27.0"
+  },
+  "peerDependenciesMeta": {
+    "@goodie-ts/transformer": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "kysely": "^0.27.0",
+    "ts-morph": "^24.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

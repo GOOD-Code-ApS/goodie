@@ -11,14 +11,14 @@ import type { InvocationContext, MethodInterceptor } from './types.js';
  * @param originalMethod - The original method to call at the end of the chain.
  * @param interceptorMetadata - Optional per-interceptor metadata (indexed by position).
  */
-export function buildInterceptorChain(
+export function buildInterceptorChain<F extends (...args: any[]) => any>(
   interceptors: MethodInterceptor[],
   target: unknown,
   className: string,
   methodName: string,
-  originalMethod: (...args: unknown[]) => unknown,
+  originalMethod: F,
   interceptorMetadata?: Array<Record<string, unknown> | undefined>,
-): (...args: unknown[]) => unknown | Promise<unknown> {
+): F {
   return function intercepted(...args: unknown[]) {
     if (interceptors.length === 0) {
       return originalMethod.apply(target, args);
@@ -48,5 +48,5 @@ export function buildInterceptorChain(
     }
 
     return proceed(...args);
-  };
+  } as unknown as F;
 }

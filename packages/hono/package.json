@@ -27,8 +27,23 @@
   "dependencies": {
     "@goodie-ts/core": "workspace:*"
   },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
+  },
   "peerDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "@hono/node-server": ">=1.0.0",
     "hono": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@goodie-ts/transformer": {
+      "optional": true
+    },
+    "@hono/node-server": {
+      "optional": true
+    }
   },
   "files": [
     "dist"
