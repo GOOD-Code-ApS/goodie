@@ -47,7 +47,7 @@ describe('watchAndRebuild', () => {
     vi.useFakeTimers();
     mockWatcherClose = vi.fn();
     mockFsWatch.mockReturnValue({ close: mockWatcherClose } as any);
-    mockRunTransform.mockResolvedValue({
+    mockRunTransform.mockReturnValue({
       success: true,
       result: { code: '', outputPath: '', beans: [], warnings: [] },
       durationMs: 10,
@@ -69,76 +69,76 @@ describe('watchAndRebuild', () => {
     );
   });
 
-  it('triggers rebuild on .ts file change after debounce', async () => {
+  it('triggers rebuild on .ts file change after debounce', () => {
     watchAndRebuild(defaultOptions);
 
     triggerWatch('service.ts');
-    await vi.advanceTimersByTimeAsync(50);
+    vi.advanceTimersByTime(50);
 
     expect(mockRunTransform).toHaveBeenCalledWith(defaultOptions);
     expect(mockLogOutcome).toHaveBeenCalled();
   });
 
-  it('ignores non-.ts files', async () => {
+  it('ignores non-.ts files', () => {
     watchAndRebuild(defaultOptions);
 
     triggerWatch('styles.css');
-    await vi.advanceTimersByTimeAsync(100);
+    vi.advanceTimersByTime(100);
 
     expect(mockRunTransform).not.toHaveBeenCalled();
   });
 
-  it('ignores null filename', async () => {
+  it('ignores null filename', () => {
     watchAndRebuild(defaultOptions);
 
     triggerWatch(null);
-    await vi.advanceTimersByTimeAsync(100);
+    vi.advanceTimersByTime(100);
 
     expect(mockRunTransform).not.toHaveBeenCalled();
   });
 
-  it('ignores the generated output file', async () => {
+  it('ignores the generated output file', () => {
     watchAndRebuild(defaultOptions);
 
     triggerWatch('AppContext.generated.ts');
-    await vi.advanceTimersByTimeAsync(100);
+    vi.advanceTimersByTime(100);
 
     expect(mockRunTransform).not.toHaveBeenCalled();
   });
 
-  it('debounces rapid changes', async () => {
+  it('debounces rapid changes', () => {
     watchAndRebuild(defaultOptions);
 
     triggerWatch('a.ts');
-    await vi.advanceTimersByTimeAsync(20);
+    vi.advanceTimersByTime(20);
     triggerWatch('b.ts');
-    await vi.advanceTimersByTimeAsync(20);
+    vi.advanceTimersByTime(20);
     triggerWatch('c.ts');
-    await vi.advanceTimersByTimeAsync(50);
+    vi.advanceTimersByTime(50);
 
     expect(mockRunTransform).toHaveBeenCalledTimes(1);
   });
 
-  it('fires separate rebuilds after debounce window passes', async () => {
+  it('fires separate rebuilds after debounce window passes', () => {
     watchAndRebuild(defaultOptions);
 
     triggerWatch('a.ts');
-    await vi.advanceTimersByTimeAsync(50);
+    vi.advanceTimersByTime(50);
 
     triggerWatch('b.ts');
-    await vi.advanceTimersByTimeAsync(50);
+    vi.advanceTimersByTime(50);
 
     expect(mockRunTransform).toHaveBeenCalledTimes(2);
   });
 
-  it('close() stops the watcher and clears pending debounce', async () => {
+  it('close() stops the watcher and clears pending debounce', () => {
     const handle = watchAndRebuild(defaultOptions);
 
     triggerWatch('a.ts');
     // Don't advance timer — close before debounce fires
     handle.close();
 
-    await vi.advanceTimersByTimeAsync(100);
+    vi.advanceTimersByTime(100);
 
     expect(mockRunTransform).not.toHaveBeenCalled();
     expect(mockWatcherClose).toHaveBeenCalled();

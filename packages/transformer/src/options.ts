@@ -14,8 +14,6 @@ export interface TransformOptions {
   include?: string[];
   /** Plugins to extend the transformer pipeline. */
   plugins?: TransformerPlugin[];
-  /** Skip auto-discovery of plugins from installed `@goodie-ts/*` packages. */
-  disablePluginDiscovery?: boolean;
 }
 
 /** Result returned by the transform pipeline. */

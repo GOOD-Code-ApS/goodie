@@ -48,7 +48,7 @@ function setupPlugin(
 ) {
   const plugin = diPlugin(options) as Plugin & {
     configResolved: (config: ResolvedConfig) => void;
-    buildStart: () => Promise<void>;
+    buildStart: () => void;
     handleHotUpdate: (ctx: HmrContext) => void;
   };
   plugin.configResolved(makeConfig(root));
@@ -81,10 +81,10 @@ describe('diPlugin', () => {
   });
 
   describe('configResolved', () => {
-    it('resolves options using config.root', async () => {
+    it('resolves options using config.root', () => {
       const plugin = setupPlugin(undefined, '/my/root');
-      mockRunRebuild.mockResolvedValue(successResult(0));
-      await plugin.buildStart();
+      mockRunRebuild.mockReturnValue(successResult(0));
+      plugin.buildStart();
       expect(mockRunRebuild).toHaveBeenCalledWith({
         tsConfigPath: path.resolve('/my/root', 'tsconfig.json'),
         outputPath: path.resolve('/my/root', 'src/AppContext.generated.ts'),
@@ -94,7 +94,7 @@ describe('diPlugin', () => {
       });
     });
 
-    it('passes custom options through', async () => {
+    it('passes custom options through', () => {
       const plugin = setupPlugin(
         {
           tsConfigPath: 'tsconfig.app.json',
@@ -102,8 +102,8 @@ describe('diPlugin', () => {
         },
         '/project',
       );
-      mockRunRebuild.mockResolvedValue(successResult(0));
-      await plugin.buildStart();
+      mockRunRebuild.mockReturnValue(successResult(0));
+      plugin.buildStart();
       expect(mockRunRebuild).toHaveBeenCalledWith(
         expect.objectContaining({
           tsConfigPath: path.resolve('/project', 'tsconfig.app.json'),
@@ -114,47 +114,45 @@ describe('diPlugin', () => {
   });
 
   describe('buildStart', () => {
-    it('logs bean count on success', async () => {
+    it('logs bean count on success', () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(successResult(5));
+      mockRunRebuild.mockReturnValue(successResult(5));
 
-      await plugin.buildStart();
+      plugin.buildStart();
 
       expect(console.log).toHaveBeenCalledWith(
         '[goodie] Transform complete: 5 bean(s) registered.',
       );
     });
 
-    it('logs warnings on success', async () => {
+    it('logs warnings on success', () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(successResult(1, ['Unused bean: Foo']));
+      mockRunRebuild.mockReturnValue(successResult(1, ['Unused bean: Foo']));
 
-      await plugin.buildStart();
+      plugin.buildStart();
 
       expect(console.warn).toHaveBeenCalledWith(
         '[goodie] Warning: Unused bean: Foo',
       );
     });
 
-    it('throws on failure (aborts build)', async () => {
+    it('throws on failure (aborts build)', () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(
+      mockRunRebuild.mockReturnValue(
         failureResult('Missing provider for "Foo"'),
       );
 
-      await expect(plugin.buildStart()).rejects.toThrow(
-        'Missing provider for "Foo"',
-      );
+      expect(() => plugin.buildStart()).toThrow('Missing provider for "Foo"');
     });
   });
 
   describe('handleHotUpdate', () => {
-    it('triggers rebuild on .ts file change', async () => {
+    it('triggers rebuild on .ts file change', () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(successResult(3));
+      mockRunRebuild.mockReturnValue(successResult(3));
 
       plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       expect(mockRunRebuild).toHaveBeenCalledTimes(1);
       expect(console.log).toHaveBeenCalledWith(
@@ -162,16 +160,16 @@ describe('diPlugin', () => {
       );
     });
 
-    it('ignores non-.ts files', async () => {
+    it('ignores non-.ts files', () => {
       const plugin = setupPlugin();
 
       plugin.handleHotUpdate(makeHmrContext('/project/src/styles.css'));
-      await vi.advanceTimersByTimeAsync(200);
+      vi.advanceTimersByTime(200);
 
       expect(mockRunRebuild).not.toHaveBeenCalled();
     });
 
-    it('ignores the generated output file', async () => {
+    it('ignores the generated output file', () => {
       const plugin = setupPlugin(undefined, '/project');
 
       const outputPath = path.resolve(
@@ -179,65 +177,65 @@ describe('diPlugin', () => {
         'src/AppContext.generated.ts',
       );
       plugin.handleHotUpdate(makeHmrContext(outputPath));
-      await vi.advanceTimersByTimeAsync(200);
+      vi.advanceTimersByTime(200);
 
       expect(mockRunRebuild).not.toHaveBeenCalled();
     });
 
-    it('debounces rapid changes', async () => {
+    it('debounces rapid changes', () => {
       const plugin = setupPlugin({ debounceMs: 100 });
-      mockRunRebuild.mockResolvedValue(successResult(2));
+      mockRunRebuild.mockReturnValue(successResult(2));
 
       plugin.handleHotUpdate(makeHmrContext('/project/src/a.ts'));
-      await vi.advanceTimersByTimeAsync(50);
+      vi.advanceTimersByTime(50);
       plugin.handleHotUpdate(makeHmrContext('/project/src/b.ts'));
-      await vi.advanceTimersByTimeAsync(50);
+      vi.advanceTimersByTime(50);
       plugin.handleHotUpdate(makeHmrContext('/project/src/c.ts'));
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       // Only one rebuild should have fired (the last debounced one)
       expect(mockRunRebuild).toHaveBeenCalledTimes(1);
     });
 
-    it('logs warnings during hot update rebuild', async () => {
+    it('logs warnings during hot update rebuild', () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(
+      mockRunRebuild.mockReturnValue(
         successResult(1, ['Optional dep missing']),
       );
 
       plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       expect(console.warn).toHaveBeenCalledWith(
         '[goodie] Warning: Optional dep missing',
       );
     });
 
-    it('logs errors without crashing on rebuild failure', async () => {
+    it('logs errors without crashing on rebuild failure', () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(failureResult('Circular dependency'));
+      mockRunRebuild.mockReturnValue(failureResult('Circular dependency'));
 
       // Should NOT throw
       plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       expect(console.error).toHaveBeenCalledWith(
         '[goodie] Rebuild failed: Circular dependency',
       );
     });
 
-    it('sends error to Vite HMR overlay on rebuild failure', async () => {
+    it('sends error to Vite HMR overlay on rebuild failure', () => {
       const plugin = setupPlugin();
       const error = new Error('Missing provider for "Foo"');
       error.stack = 'Error: Missing provider for "Foo"\n    at resolve (...)';
-      mockRunRebuild.mockResolvedValue({
+      mockRunRebuild.mockReturnValue({
         success: false as const,
         error,
       });
 
       const ctx = makeHmrContext('/project/src/service.ts');
       plugin.handleHotUpdate(ctx);
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       const wsSend = (ctx.server as { ws: { send: ReturnType<typeof vi.fn> } })
         .ws.send;
@@ -251,31 +249,31 @@ describe('diPlugin', () => {
       });
     });
 
-    it('fires separate rebuilds after debounce window passes', async () => {
+    it('fires separate rebuilds after debounce window passes', () => {
       const plugin = setupPlugin({ debounceMs: 100 });
-      mockRunRebuild.mockResolvedValue(successResult(1));
+      mockRunRebuild.mockReturnValue(successResult(1));
 
       plugin.handleHotUpdate(makeHmrContext('/project/src/a.ts'));
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       plugin.handleHotUpdate(makeHmrContext('/project/src/b.ts'));
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       expect(mockRunRebuild).toHaveBeenCalledTimes(2);
     });
 
-    it('calls runRebuild with resolved options only', async () => {
+    it('calls runRebuild with resolved options only', () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(successResult(0));
+      mockRunRebuild.mockReturnValue(successResult(0));
 
       // buildStart
-      await plugin.buildStart();
+      plugin.buildStart();
       mockRunRebuild.mockClear();
 
       // HMR should call runRebuild with just the resolved options
-      mockRunRebuild.mockResolvedValue(successResult(0));
+      mockRunRebuild.mockReturnValue(successResult(0));
       plugin.handleHotUpdate(makeHmrContext('/project/src/service.ts'));
-      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(100);
 
       expect(mockRunRebuild).toHaveBeenCalledWith(
         expect.objectContaining({

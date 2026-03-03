@@ -22,8 +22,8 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
       resolved = resolveOptions(userOptions, config.root);
     },
 
-    async buildStart() {
-      const outcome = await runRebuild(resolved);
+    buildStart() {
+      const outcome = runRebuild(resolved);
       if (outcome.success) {
         const count = outcome.result.beans.length;
         const warnings = outcome.result.warnings;
@@ -57,27 +57,26 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
       const { server } = ctx;
       debounceTimer = setTimeout(() => {
         debounceTimer = undefined;
-        runRebuild(resolved).then((outcome) => {
-          if (outcome.success) {
-            const count = outcome.result.beans.length;
-            console.log(
-              `[goodie] Rebuild complete: ${count} bean(s) registered.`,
-            );
-            for (const w of outcome.result.warnings) {
-              console.warn(`[goodie] Warning: ${w}`);
-            }
-          } else {
-            console.error(`[goodie] Rebuild failed: ${outcome.error.message}`);
-            server.ws.send({
-              type: 'error',
-              err: {
-                message: outcome.error.message,
-                stack: outcome.error.stack ?? '',
-                plugin: 'goodie',
-              },
-            });
+        const outcome = runRebuild(resolved);
+        if (outcome.success) {
+          const count = outcome.result.beans.length;
+          console.log(
+            `[goodie] Rebuild complete: ${count} bean(s) registered.`,
+          );
+          for (const w of outcome.result.warnings) {
+            console.warn(`[goodie] Warning: ${w}`);
           }
-        });
+        } else {
+          console.error(`[goodie] Rebuild failed: ${outcome.error.message}`);
+          server.ws.send({
+            type: 'error',
+            err: {
+              message: outcome.error.message,
+              stack: outcome.error.stack ?? '',
+              plugin: 'goodie',
+            },
+          });
+        }
       }, resolved.debounceMs);
     },
   };

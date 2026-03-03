@@ -92,6 +92,17 @@ function resolveBean(
     scanned.classTokenRef.className,
   );
 
+  const baseTokenRefs: ClassTokenRef[] = scanned.baseClasses
+    .filter((bc) => bc.sourceFile !== undefined)
+    .map(
+      (bc) =>
+        ({
+          kind: 'class' as const,
+          className: bc.className,
+          importPath: bc.sourceFile!.getFilePath(),
+        }) satisfies ClassTokenRef,
+    );
+
   const metadata: Record<string, unknown> = {};
   if (scanned.preDestroyMethods.length > 0) {
     metadata.preDestroyMethods = scanned.preDestroyMethods;
@@ -120,6 +131,7 @@ function resolveBean(
     factoryKind: 'constructor',
     providesSource: undefined,
     metadata,
+    baseTokenRefs: baseTokenRefs.length > 0 ? baseTokenRefs : undefined,
     sourceLocation: scanned.sourceLocation,
   };
 }

@@ -1,3 +1,4 @@
+import { Cacheable, CacheEvict } from '@goodie-ts/cache';
 import { Singleton } from '@goodie-ts/decorators';
 import { Transactional } from '@goodie-ts/kysely';
 import { Log, LoggerFactory } from '@goodie-ts/logging';
@@ -12,6 +13,7 @@ export class TodoService {
 
   @Log()
   @Timeout(5000)
+  @Cacheable('todos')
   async findAll() {
     return this.todoRepository.findAll();
   }
@@ -24,6 +26,7 @@ export class TodoService {
 
   @Log()
   @Timeout(5000)
+  @CacheEvict('todos')
   @Transactional()
   async create(title: string) {
     if (!title.trim()) {
@@ -48,6 +51,7 @@ export class TodoService {
 
   @Log()
   @Timeout(5000)
+  @CacheEvict('todos')
   @Transactional()
   async delete(id: string) {
     const todo = await this.todoRepository.delete(id);

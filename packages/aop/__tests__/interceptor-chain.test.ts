@@ -20,7 +20,7 @@ describe('InterceptorChain', () => {
       {},
       'Test',
       'method',
-      original,
+      original as (...args: unknown[]) => unknown,
     );
     const result = chain(5);
 
@@ -59,7 +59,7 @@ describe('InterceptorChain', () => {
       {},
       'Test',
       'method',
-      original,
+      original as (...args: unknown[]) => unknown,
     );
     const result = chain();
 
@@ -86,7 +86,7 @@ describe('InterceptorChain', () => {
       {},
       'Test',
       'method',
-      original,
+      original as (...args: unknown[]) => unknown,
     );
 
     expect(chain(5)).toBe(30); // (5 + 10) * 2
@@ -106,7 +106,7 @@ describe('InterceptorChain', () => {
       {},
       'Test',
       'method',
-      original,
+      original as (...args: unknown[]) => unknown,
     );
 
     expect(chain(5)).toBe(110); // 5 * 2 + 100
@@ -131,7 +131,7 @@ describe('InterceptorChain', () => {
       {},
       'Test',
       'method',
-      original,
+      original as (...args: unknown[]) => unknown,
     );
 
     expect(chain()).toBe('short-circuited');
@@ -145,7 +145,13 @@ describe('InterceptorChain', () => {
       return 42;
     };
 
-    const chain = buildInterceptorChain([], {}, 'Test', 'method', original);
+    const chain = buildInterceptorChain(
+      [],
+      {},
+      'Test',
+      'method',
+      original as (...args: unknown[]) => unknown,
+    );
 
     expect(chain()).toBe(42);
     expect(log).toEqual(['original']);
@@ -172,7 +178,7 @@ describe('InterceptorChain', () => {
       {},
       'Test',
       'method',
-      original,
+      original as (...args: unknown[]) => unknown,
     );
 
     const result = await chain();
