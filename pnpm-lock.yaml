@@ -156,9 +156,15 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
 
   packages/hono:
     dependencies:

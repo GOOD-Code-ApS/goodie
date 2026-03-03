@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { HealthIndicator } from '../src/health-indicator.js';
 import { UptimeHealthIndicator } from '../src/uptime-health-indicator.js';
 
 describe('UptimeHealthIndicator', () => {
+  it('should be an instanceof HealthIndicator', () => {
+    const indicator = new UptimeHealthIndicator();
+    expect(indicator).toBeInstanceOf(HealthIndicator);
+  });
+
   it('should always return UP', async () => {
     const indicator = new UptimeHealthIndicator();
     const result = await indicator.check();

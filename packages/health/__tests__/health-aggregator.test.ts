@@ -1,23 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HealthAggregator } from '../src/health-aggregator.js';
-import type { HealthIndicator } from '../src/health-indicator.js';
+import type { HealthResult } from '../src/health-indicator.js';
+import { HealthIndicator } from '../src/health-indicator.js';
 
-function indicator(
-  name: string,
-  status: 'UP' | 'DOWN',
-  details?: Record<string, unknown>,
-): HealthIndicator {
-  return {
-    name,
-    check: async () => ({ status, details }),
-  };
+class TestIndicator extends HealthIndicator {
+  constructor(
+    readonly name: string,
+    private readonly status: 'UP' | 'DOWN',
+    private readonly details?: Record<string, unknown>,
+  ) {
+    super();
+  }
+
+  async check(): Promise<HealthResult> {
+    return { status: this.status, details: this.details };
+  }
 }
 
 describe('HealthAggregator', () => {
   it('should return UP when all indicators are UP', async () => {
     const aggregator = new HealthAggregator([
-      indicator('db', 'UP'),
-      indicator('cache', 'UP'),
+      new TestIndicator('db', 'UP'),
+      new TestIndicator('cache', 'UP'),
     ]);
 
     const result = await aggregator.checkAll();
@@ -29,8 +33,8 @@ describe('HealthAggregator', () => {
 
   it('should return DOWN when any indicator is DOWN', async () => {
     const aggregator = new HealthAggregator([
-      indicator('db', 'UP'),
-      indicator('cache', 'DOWN'),
+      new TestIndicator('db', 'UP'),
+      new TestIndicator('cache', 'DOWN'),
     ]);
 
     const result = await aggregator.checkAll();
@@ -51,7 +55,7 @@ describe('HealthAggregator', () => {
 
   it('should include details from indicators', async () => {
     const aggregator = new HealthAggregator([
-      indicator('db', 'UP', { connections: 5, maxConnections: 20 }),
+      new TestIndicator('db', 'UP', { connections: 5, maxConnections: 20 }),
     ]);
 
     const result = await aggregator.checkAll();
@@ -63,14 +67,17 @@ describe('HealthAggregator', () => {
   });
 
   it('should handle indicator check() rejection as DOWN with indicator name', async () => {
-    const failing: HealthIndicator = {
-      name: 'redis',
-      check: async () => {
+    const failing = new (class extends HealthIndicator {
+      readonly name = 'redis';
+      async check(): Promise<HealthResult> {
         throw new Error('Connection refused');
-      },
-    };
+      }
+    })();
 
-    const aggregator = new HealthAggregator([indicator('db', 'UP'), failing]);
+    const aggregator = new HealthAggregator([
+      new TestIndicator('db', 'UP'),
+      failing,
+    ]);
 
     const result = await aggregator.checkAll();
 
@@ -82,18 +89,18 @@ describe('HealthAggregator', () => {
   });
 
   it('should preserve all indicator names when multiple rejections occur', async () => {
-    const failingRedis: HealthIndicator = {
-      name: 'redis',
-      check: async () => {
+    const failingRedis = new (class extends HealthIndicator {
+      readonly name = 'redis';
+      async check(): Promise<HealthResult> {
         throw new Error('Redis down');
-      },
-    };
-    const failingKafka: HealthIndicator = {
-      name: 'kafka',
-      check: async () => {
+      }
+    })();
+    const failingKafka = new (class extends HealthIndicator {
+      readonly name = 'kafka';
+      async check(): Promise<HealthResult> {
         throw new TypeError('Kafka timeout');
-      },
-    };
+      }
+    })();
 
     const aggregator = new HealthAggregator([failingRedis, failingKafka]);
 
@@ -110,18 +117,21 @@ describe('HealthAggregator', () => {
 
   it('should run all checks concurrently', async () => {
     const startTime = Date.now();
-    const makeSlowIndicator = (name: string): HealthIndicator => ({
-      name,
-      check: async () => {
+
+    class SlowIndicator extends HealthIndicator {
+      constructor(readonly name: string) {
+        super();
+      }
+      async check(): Promise<HealthResult> {
         await new Promise((resolve) => setTimeout(resolve, 50));
         return { status: 'UP' };
-      },
-    });
+      }
+    }
 
     const aggregator = new HealthAggregator([
-      makeSlowIndicator('slow-a'),
-      makeSlowIndicator('slow-b'),
-      makeSlowIndicator('slow-c'),
+      new SlowIndicator('slow-a'),
+      new SlowIndicator('slow-b'),
+      new SlowIndicator('slow-c'),
     ]);
     const result = await aggregator.checkAll();
 
@@ -133,10 +143,7 @@ describe('HealthAggregator', () => {
 
   it('should warn on duplicate indicator names', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const dup: HealthIndicator = {
-      name: 'db',
-      check: async () => ({ status: 'UP' }),
-    };
+    const dup = new TestIndicator('db', 'UP');
 
     const aggregator = new HealthAggregator([dup, dup]);
     await aggregator.checkAll();

@@ -12,6 +12,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "goodie": {
+    "plugin": "dist/health-transformer-plugin.js"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -28,7 +31,9 @@
     "@goodie-ts/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
   },
   "files": [
     "dist"
