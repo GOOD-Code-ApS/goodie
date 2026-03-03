@@ -75,6 +75,9 @@ importers:
       '@goodie-ts/hono':
         specifier: workspace:*
         version: link:../../packages/hono
+      '@goodie-ts/kysely':
+        specifier: workspace:*
+        version: link:../../packages/kysely
       '@goodie-ts/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -174,9 +177,41 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+      '@hono/node-server':
+        specifier: '>=1.0.0'
+        version: 1.19.9(hono@4.12.2)
       hono:
         specifier: '>=4.0.0'
         version: 4.12.2
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
+  packages/kysely:
+    dependencies:
+      '@goodie-ts/aop':
+        specifier: workspace:*
+        version: link:../aop
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      kysely:
+        specifier: ^0.27.0
+        version: 0.27.6
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
 
   packages/logging:
     dependencies:
@@ -199,6 +234,12 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+      '@goodie-ts/kysely':
+        specifier: workspace:*
+        version: link:../kysely
+      vitest:
+        specifier: '>=3.0.0'
+        version: 3.2.4(@types/node@22.19.11)(yaml@2.8.2)
 
   packages/transformer:
     dependencies:

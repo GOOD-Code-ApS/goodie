@@ -28,6 +28,8 @@ export function Log(opts?: any) { return (t: any, c: any) => {} }
 export function Cacheable(name: string, opts?: any) { return (t: any, c: any) => {} }
 export function CacheEvict(name: string, opts?: any) { return (t: any, c: any) => {} }
 export function CachePut(name: string, opts?: any) { return (t: any, c: any) => {} }
+export function Transactional(opts?: any) { return (t: any, c: any) => {} }
+export function Migration(name: string) { return (t: any, c: any) => {} }
 `;
 
 /**

@@ -1,16 +1,19 @@
 {
-  "name": "@goodie-ts/testing",
+  "name": "@goodie-ts/kysely",
   "version": "0.3.0",
-  "description": "Test utilities for goodie-ts with bean overrides and mock definitions",
+  "description": "Kysely integration for goodie-ts — @Transactional decorator, TransactionManager, CrudRepository",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/GOOD-Code-ApS/goodie.git",
-    "directory": "packages/testing"
+    "directory": "packages/kysely"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "goodie": {
+    "plugin": "./dist/kysely-transformer-plugin.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,10 +21,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./vitest": {
-      "types": "./dist/vitest.d.ts",
-      "import": "./dist/vitest.js"
     }
   },
   "scripts": {
@@ -29,19 +28,22 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:*"
+    "@goodie-ts/aop": "workspace:*"
   },
   "peerDependencies": {
-    "vitest": ">=3.0.0",
-    "@goodie-ts/kysely": "workspace:*"
+    "@goodie-ts/transformer": "workspace:*",
+    "kysely": ">=0.27.0"
   },
   "peerDependenciesMeta": {
-    "vitest": {
-      "optional": true
-    },
-    "@goodie-ts/kysely": {
+    "@goodie-ts/transformer": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "kysely": "^0.27.0",
+    "ts-morph": "^24.0.0"
   },
   "files": [
     "dist"
