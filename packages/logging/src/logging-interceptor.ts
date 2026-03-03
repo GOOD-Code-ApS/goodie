@@ -1,13 +1,7 @@
 import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
 import type { Logger } from './logger.js';
-import { ConsoleLogger } from './logger.js';
+import { LoggerFactory } from './logger-factory.js';
 import { MDC } from './mdc.js';
-
-/** Factory function that creates a Logger for a given class name. */
-export type LoggerFactory = (className: string) => Logger;
-
-const defaultLoggerFactory: LoggerFactory = (className) =>
-  new ConsoleLogger(className);
 
 /**
  * Method interceptor that logs entry/exit of intercepted methods.
@@ -19,10 +13,11 @@ const defaultLoggerFactory: LoggerFactory = (className) =>
  */
 export class LoggingInterceptor implements MethodInterceptor {
   private readonly loggers = new Map<string, Logger>();
-  private readonly loggerFactory: LoggerFactory;
+  private readonly loggerFactory: (className: string) => Logger;
 
-  constructor(loggerFactory?: LoggerFactory) {
-    this.loggerFactory = loggerFactory ?? defaultLoggerFactory;
+  constructor(loggerFactory?: (className: string) => Logger) {
+    this.loggerFactory =
+      loggerFactory ?? ((className) => LoggerFactory.getLogger(className));
   }
 
   intercept(ctx: InvocationContext): unknown | Promise<unknown> {

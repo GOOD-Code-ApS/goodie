@@ -1,40 +1,48 @@
 import { Singleton } from '@goodie-ts/decorators';
 import { Transactional } from '@goodie-ts/kysely';
-import { Log } from '@goodie-ts/logging';
+import { LoggerFactory } from '@goodie-ts/logging';
 import type { TodoRepository } from './TodoRepository.js';
 
 @Singleton()
 export class TodoService {
+  private static readonly log = LoggerFactory.getLogger(TodoService);
+
   constructor(private todoRepository: TodoRepository) {}
 
-  @Log()
   async findAll() {
     return this.todoRepository.findAll();
   }
 
-  @Log()
   async findById(id: string) {
     return this.todoRepository.findById(id);
   }
 
-  @Log()
   @Transactional()
   async create(title: string) {
     if (!title.trim()) {
+      TodoService.log.warn('Attempted to create todo with empty title');
       throw new Error('Title must not be empty');
     }
-    return this.todoRepository.create(title.trim());
+    const todo = await this.todoRepository.create(title.trim());
+    TodoService.log.info('Created todo', { id: todo.id, title: todo.title });
+    return todo;
   }
 
-  @Log()
   @Transactional()
   async update(id: string, data: { title?: string; completed?: boolean }) {
-    return this.todoRepository.update(id, data);
+    const todo = await this.todoRepository.update(id, data);
+    if (todo) {
+      TodoService.log.info('Updated todo', { id });
+    }
+    return todo;
   }
 
-  @Log()
   @Transactional()
   async delete(id: string) {
-    return this.todoRepository.delete(id);
+    const todo = await this.todoRepository.delete(id);
+    if (todo) {
+      TodoService.log.info('Deleted todo', { id });
+    }
+    return todo;
   }
 }
