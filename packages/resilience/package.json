@@ -1,0 +1,41 @@
+{
+  "name": "@goodie-ts/resilience",
+  "version": "0.3.0",
+  "description": "Resilience patterns for goodie-ts — @Retryable, @CircuitBreaker, @Timeout decorators",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/resilience"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@goodie-ts/aop": "workspace:*"
+  },
+  "peerDependencies": {
+    "@goodie-ts/transformer": "workspace:*"
+  },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

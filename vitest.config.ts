@@ -36,6 +36,10 @@ export default defineConfig({
         __dirname,
         'packages/cache/src/index.ts',
       ),
+      '@goodie-ts/resilience': path.resolve(
+        __dirname,
+        'packages/resilience/src/index.ts',
+      ),
       '@goodie-ts/kysely': path.resolve(
         __dirname,
         'packages/kysely/src/index.ts',

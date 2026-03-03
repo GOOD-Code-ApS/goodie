@@ -81,6 +81,9 @@ importers:
       '@goodie-ts/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@goodie-ts/resilience':
+        specifier: workspace:*
+        version: link:../../packages/resilience
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.9(hono@4.12.2)
@@ -217,6 +220,22 @@ importers:
         version: 24.0.0
 
   packages/logging:
+    dependencies:
+      '@goodie-ts/aop':
+        specifier: workspace:*
+        version: link:../aop
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
+  packages/resilience:
     dependencies:
       '@goodie-ts/aop':
         specifier: workspace:*
