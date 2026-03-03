@@ -32,6 +32,10 @@ export function createCachePlugin(): TransformerPlugin {
   return {
     name: 'cache',
 
+    beforeScan(): void {
+      classCacheInfo.clear();
+    },
+
     visitMethod(ctx: MethodVisitorContext): void {
       const decorators = ctx.methodDeclaration.getDecorators();
 

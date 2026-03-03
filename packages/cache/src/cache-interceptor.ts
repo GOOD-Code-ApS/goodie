@@ -25,7 +25,7 @@ export class CacheInterceptor implements MethodInterceptor {
     const meta = ctx.metadata as CacheMetadata | undefined;
     if (!meta) return ctx.proceed();
 
-    const cacheKey = this.buildKey(ctx.methodName, ctx.args);
+    const cacheKey = this.buildKey(ctx.className, ctx.methodName, ctx.args);
 
     switch (meta.cacheAction) {
       case 'get':
@@ -129,9 +129,14 @@ export class CacheInterceptor implements MethodInterceptor {
     return result;
   }
 
-  private buildKey(methodName: string, args: unknown[]): string {
-    if (args.length === 0) return methodName;
-    return `${methodName}:${args.map((a) => this.stringifyArg(a)).join(',')}`;
+  private buildKey(
+    className: string,
+    methodName: string,
+    args: unknown[],
+  ): string {
+    const prefix = `${className}#${methodName}`;
+    if (args.length === 0) return prefix;
+    return `${prefix}:${args.map((a) => this.stringifyArg(a)).join(',')}`;
   }
 
   private stringifyArg(arg: unknown): string {

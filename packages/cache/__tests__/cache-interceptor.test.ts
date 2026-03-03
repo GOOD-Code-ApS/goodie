@@ -63,8 +63,8 @@ describe('CacheInterceptor', () => {
     const manager = new CacheManager();
     const interceptor = new CacheInterceptor(manager);
 
-    // Pre-populate cache
-    manager.put('todos', 'findAll', [{ id: 1 }]);
+    // Pre-populate cache (key format: className#methodName)
+    manager.put('todos', 'TodoService#findAll', [{ id: 1 }]);
 
     const ctx = createContext({
       proceed: () => undefined,
@@ -73,7 +73,7 @@ describe('CacheInterceptor', () => {
 
     interceptor.intercept(ctx);
 
-    expect(manager.get('todos', 'findAll')).toBeUndefined();
+    expect(manager.get('todos', 'TodoService#findAll')).toBeUndefined();
   });
 
   it('should always execute and update cache on @CachePut', () => {
@@ -93,7 +93,7 @@ describe('CacheInterceptor', () => {
     interceptor.intercept(ctx);
 
     expect(callCount).toBe(2); // Always executes
-    expect(manager.get('todos', 'findAll')).toEqual([{ id: 2 }]); // Updated with latest
+    expect(manager.get('todos', 'TodoService#findAll')).toEqual([{ id: 2 }]); // Updated with latest
   });
 
   it('should use method args in cache key', () => {
@@ -117,11 +117,11 @@ describe('CacheInterceptor', () => {
     interceptor.intercept(ctx1);
     interceptor.intercept(ctx2);
 
-    expect(manager.get('todos', 'findById:"id-1"')).toEqual({
+    expect(manager.get('todos', 'TodoService#findById:"id-1"')).toEqual({
       id: 'id-1',
       title: 'First',
     });
-    expect(manager.get('todos', 'findById:"id-2"')).toEqual({
+    expect(manager.get('todos', 'TodoService#findById:"id-2"')).toEqual({
       id: 'id-2',
       title: 'Second',
     });
@@ -189,7 +189,7 @@ describe('CacheInterceptor', () => {
     interceptor.intercept(ctx);
 
     // Number 42 via JSON.stringify is still "42"
-    expect(manager.get('items', 'findById:42')).toEqual({ id: 42 });
+    expect(manager.get('items', 'TodoService#findById:42')).toEqual({ id: 42 });
   });
 
   it('should not cache null/undefined results on @Cacheable', () => {
@@ -234,10 +234,10 @@ describe('CacheInterceptor', () => {
     interceptor.intercept(ctx2);
 
     // With JSON.stringify, the keys are now different:
-    // "get:\"a,b\",\"c\"" vs "get:\"a\",\"b,c\""
+    // "TodoService#get:\"a,b\",\"c\"" vs "TodoService#get:\"a\",\"b,c\""
     // So both results should be cached independently
-    const key1 = 'get:"a,b","c"';
-    const key2 = 'get:"a","b,c"';
+    const key1 = 'TodoService#get:"a,b","c"';
+    const key2 = 'TodoService#get:"a","b,c"';
     expect(manager.get('test', key1)).toBe('result-1');
     expect(manager.get('test', key2)).toBe('result-2');
   });
@@ -306,6 +306,33 @@ describe('CacheInterceptor', () => {
     const result = await interceptor.intercept(makeCtx(false));
     expect(result).toBe('ok');
     expect(callCount).toBe(2);
+  });
+
+  it('should produce different cache keys for different classes with same method name', () => {
+    const manager = new CacheManager();
+    const interceptor = new CacheInterceptor(manager);
+
+    const ctxA = createContext({
+      className: 'ServiceA',
+      methodName: 'findAll',
+      args: [],
+      proceed: () => 'from-A',
+      metadata: { cacheName: 'shared', cacheAction: 'get' },
+    });
+
+    const ctxB = createContext({
+      className: 'ServiceB',
+      methodName: 'findAll',
+      args: [],
+      proceed: () => 'from-B',
+      metadata: { cacheName: 'shared', cacheAction: 'get' },
+    });
+
+    interceptor.intercept(ctxA);
+    interceptor.intercept(ctxB);
+
+    expect(manager.get('shared', 'ServiceA#findAll')).toBe('from-A');
+    expect(manager.get('shared', 'ServiceB#findAll')).toBe('from-B');
   });
 
   it('should swallow eviction errors and log them instead of propagating', () => {
