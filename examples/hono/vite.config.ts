@@ -1,5 +1,6 @@
 import { createCachePlugin } from '@goodie-ts/cache';
 import { createConfigPlugin } from '@goodie-ts/config';
+import { createKyselyPlugin } from '@goodie-ts/kysely';
 import { createLoggingPlugin } from '@goodie-ts/logging';
 import { createResiliencePlugin } from '@goodie-ts/resilience';
 import { diPlugin } from '@goodie-ts/vite-plugin';
@@ -13,6 +14,7 @@ export default defineConfig({
         createCachePlugin(),
         createResiliencePlugin(),
         createConfigPlugin(),
+        createKyselyPlugin(),
       ],
     }),
   ],
