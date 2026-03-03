@@ -231,6 +231,63 @@ describe('CircuitBreakerInterceptor', () => {
     );
   });
 
+  it('should reject concurrent calls during HALF_OPEN when a probe is in flight', async () => {
+    vi.useFakeTimers();
+    const interceptor = new CircuitBreakerInterceptor();
+
+    const meta = {
+      failureThreshold: 2,
+      resetTimeout: 1000,
+      halfOpenAttempts: 1,
+    };
+
+    const failCtx = createContext({
+      proceed: () => {
+        throw new Error('fail');
+      },
+      metadata: meta,
+    });
+
+    // Open the circuit
+    for (let i = 0; i < 2; i++) {
+      expect(() => interceptor.intercept(failCtx)).toThrow('fail');
+    }
+    expect(interceptor.getCircuitState('TodoService', 'findAll')).toBe('OPEN');
+
+    // Advance time past reset timeout → HALF_OPEN on next call
+    vi.advanceTimersByTime(1100);
+
+    // Create a slow async probe that will be in-flight
+    let resolveProbe: (v: string) => void;
+    const probePromise = new Promise<string>((resolve) => {
+      resolveProbe = resolve;
+    });
+    const probeCtx = createContext({
+      proceed: () => probePromise,
+      metadata: meta,
+    });
+
+    // Start the probe — it's now in-flight
+    const probeResult = interceptor.intercept(probeCtx) as Promise<string>;
+
+    // A second call during HALF_OPEN should be rejected immediately
+    const secondCtx = createContext({
+      proceed: () => 'should not run',
+      metadata: meta,
+    });
+    expect(() => interceptor.intercept(secondCtx)).toThrow(CircuitOpenError);
+
+    // Complete the probe — circuit should close
+    resolveProbe!('recovered');
+    const result = await probeResult;
+    expect(result).toBe('recovered');
+    expect(interceptor.getCircuitState('TodoService', 'findAll')).toBe(
+      'CLOSED',
+    );
+
+    vi.useRealTimers();
+  });
+
   it('should maintain separate circuits per method', () => {
     const interceptor = new CircuitBreakerInterceptor();
 

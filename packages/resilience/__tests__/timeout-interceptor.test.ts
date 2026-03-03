@@ -1,5 +1,5 @@
 import type { InvocationContext } from '@goodie-ts/aop';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   TimeoutError,
   TimeoutInterceptor,
@@ -63,6 +63,39 @@ describe('TimeoutInterceptor', () => {
     await expect(interceptor.intercept(ctx)).rejects.toThrow(
       'timed out after 50ms',
     );
+  });
+
+  it('should clear the timeout timer when the main promise resolves', async () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    const interceptor = new TimeoutInterceptor();
+
+    const ctx = createContext({
+      proceed: () =>
+        new Promise((resolve) => setTimeout(() => resolve('fast'), 10)),
+      metadata: { duration: 5000 },
+    });
+
+    await interceptor.intercept(ctx);
+
+    // The .finally() should have called clearTimeout
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it('should clear the timeout timer when the main promise rejects with TimeoutError', async () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    const interceptor = new TimeoutInterceptor();
+
+    const ctx = createContext({
+      proceed: () =>
+        new Promise((resolve) => setTimeout(() => resolve('slow'), 500)),
+      metadata: { duration: 50 },
+    });
+
+    await expect(interceptor.intercept(ctx)).rejects.toThrow(TimeoutError);
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
   });
 
   it('should propagate errors from the original method', async () => {

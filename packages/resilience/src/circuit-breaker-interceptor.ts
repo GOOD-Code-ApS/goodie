@@ -16,6 +16,8 @@ interface CircuitEntry {
   failureThreshold: number;
   resetTimeout: number;
   halfOpenAttempts: number;
+  /** True while a HALF_OPEN probe call is in flight. */
+  halfOpenProbeInFlight: boolean;
 }
 
 /** Error thrown when the circuit breaker is open and rejecting calls. */
@@ -53,25 +55,41 @@ export class CircuitBreakerInterceptor implements MethodInterceptor {
       }
     }
 
+    // Only allow one probe at a time during HALF_OPEN. Concurrent calls are
+    // rejected immediately so a burst of requests doesn't overwhelm a
+    // recovering backend.
+    if (circuit.state === 'HALF_OPEN' && circuit.halfOpenProbeInFlight) {
+      throw new CircuitOpenError(key);
+    }
+
+    const isProbe = circuit.state === 'HALF_OPEN';
+    if (isProbe) {
+      circuit.halfOpenProbeInFlight = true;
+    }
+
     try {
       const result = ctx.proceed();
 
       if (result instanceof Promise) {
         return result.then(
           (value) => {
+            if (isProbe) circuit.halfOpenProbeInFlight = false;
             this.onSuccess(circuit);
             return value;
           },
           (error) => {
+            if (isProbe) circuit.halfOpenProbeInFlight = false;
             this.onFailure(circuit);
             throw error;
           },
         );
       }
 
+      if (isProbe) circuit.halfOpenProbeInFlight = false;
       this.onSuccess(circuit);
       return result;
     } catch (error) {
+      if (isProbe) circuit.halfOpenProbeInFlight = false;
       this.onFailure(circuit);
       throw error;
     }
@@ -94,6 +112,7 @@ export class CircuitBreakerInterceptor implements MethodInterceptor {
         failureThreshold: meta.failureThreshold,
         resetTimeout: meta.resetTimeout,
         halfOpenAttempts: meta.halfOpenAttempts,
+        halfOpenProbeInFlight: false,
       };
       this.circuits.set(key, circuit);
     }

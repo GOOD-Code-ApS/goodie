@@ -9,16 +9,23 @@ interface RetryMetadata {
 
 /**
  * AOP interceptor that retries failed method calls with configurable
- * backoff strategy.
+ * backoff strategy (exponential backoff with random jitter).
  *
  * Reads retry configuration from `ctx.metadata` (set by the resilience
  * transformer plugin).
  *
- * **Design note:** Retry sits innermost in the interceptor chain (order -10).
- * On retry, `proceed()` calls the target method directly — outer interceptors
- * (circuit breaker, timeout) are NOT re-entered. This is intentional: the
- * timeout deadline applies to the total call including all retries, and the
- * circuit breaker tracks the overall outcome, not individual retry attempts.
+ * **Design note — interceptor chain:** Retry sits innermost in the interceptor
+ * chain (order -10). On retry, `proceed()` calls the target method directly —
+ * outer interceptors (circuit breaker, timeout) are NOT re-entered. This is
+ * intentional: the timeout deadline applies to the total call including all
+ * retries, and the circuit breaker tracks the overall outcome, not individual
+ * retry attempts.
+ *
+ * **Design note — sync methods:** When a sync method fails and retries are
+ * needed, the retry delay uses `setTimeout`, which returns a `Promise`.
+ * As a result, decorated sync methods effectively become async on the first
+ * failure. Callers should always `await` the return value of `@Retryable`
+ * methods.
  */
 export class RetryInterceptor implements MethodInterceptor {
   intercept(ctx: InvocationContext): unknown {
@@ -59,7 +66,10 @@ export class RetryInterceptor implements MethodInterceptor {
       throw error;
     }
 
-    const delayMs = meta.delay * meta.multiplier ** (attempt - 1);
+    // Exponential backoff with random jitter (50–100% of computed delay)
+    // to prevent thundering herd when many callers retry simultaneously.
+    const baseDelay = meta.delay * meta.multiplier ** (attempt - 1);
+    const delayMs = baseDelay * (0.5 + Math.random() * 0.5);
 
     // For async methods, use setTimeout-based delay
     return new Promise<unknown>((resolve, reject) => {

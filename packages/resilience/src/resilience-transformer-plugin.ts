@@ -248,7 +248,16 @@ function parseMetadata(
       if (args.length === 0) return { duration: 5000 };
       const text = stripSeparators(args[0].getText());
       const num = Number.parseInt(text, 10);
-      return { duration: Number.isNaN(num) ? 5000 : num };
+      if (Number.isNaN(num)) {
+        if (text.includes('{')) {
+          console.warn(
+            `[resilience] @Timeout received an object literal argument (${text}). ` +
+              'Only numeric durations are supported — falling back to 5000ms.',
+          );
+        }
+        return { duration: 5000 };
+      }
+      return { duration: num };
     }
   }
 }

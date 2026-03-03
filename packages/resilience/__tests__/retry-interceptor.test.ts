@@ -108,7 +108,7 @@ describe('RetryInterceptor', () => {
     expect(callCount).toBe(2);
   });
 
-  it('should apply exponential backoff delay', async () => {
+  it('should apply exponential backoff delay with jitter', async () => {
     const interceptor = new RetryInterceptor();
     let callCount = 0;
     const timestamps: number[] = [];
@@ -120,19 +120,21 @@ describe('RetryInterceptor', () => {
         if (callCount < 3) throw new Error('fail');
         return 'done';
       },
-      metadata: { maxAttempts: 3, delay: 50, multiplier: 2 },
+      metadata: { maxAttempts: 3, delay: 100, multiplier: 2 },
     });
 
     const result = await interceptor.intercept(ctx);
     expect(result).toBe('done');
     expect(callCount).toBe(3);
 
-    // First retry delay: 50ms * 2^0 = 50ms
-    // Second retry delay: 50ms * 2^1 = 100ms
-    // Allow 20ms tolerance for timer imprecision
+    // First retry delay: base 100ms * 2^0 = 100ms, with jitter [50, 100]
+    // Second retry delay: base 100ms * 2^1 = 200ms, with jitter [100, 200]
+    // Allow extra tolerance for timer imprecision
     const delay1 = timestamps[1] - timestamps[0];
     const delay2 = timestamps[2] - timestamps[1];
-    expect(delay1).toBeGreaterThanOrEqual(30);
-    expect(delay2).toBeGreaterThanOrEqual(70);
+    expect(delay1).toBeGreaterThanOrEqual(35); // 50ms jitter min - tolerance
+    expect(delay1).toBeLessThanOrEqual(150); // 100ms jitter max + tolerance
+    expect(delay2).toBeGreaterThanOrEqual(75); // 100ms jitter min - tolerance
+    expect(delay2).toBeLessThanOrEqual(260); // 200ms jitter max + tolerance
   });
 });

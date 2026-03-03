@@ -1,6 +1,6 @@
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
 import { createResiliencePlugin } from '../src/resilience-transformer-plugin.js';
 
@@ -188,6 +188,34 @@ describe('Resilience Transformer Plugin', () => {
     expect(result.code).toContain('RetryInterceptor');
     expect(result.code).not.toContain('CircuitBreakerInterceptor');
     expect(result.code).not.toContain('TimeoutInterceptor');
+  });
+
+  it('should warn when @Timeout receives an object-form argument', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const project = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Timeout } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Timeout({ duration: 3000 })
+          fetchData() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createResiliencePlugin(),
+    ]);
+
+    // Should fall back to default 5000ms
+    expect(result.code).toContain('"duration":5000');
+    // Should have emitted a warning
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('@Timeout received an object literal argument'),
+    );
+
+    warnSpy.mockRestore();
   });
 
   it('should handle TypeScript numeric separators in options', () => {
