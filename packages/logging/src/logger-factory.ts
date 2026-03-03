@@ -15,7 +15,7 @@ import { ConsoleLogger } from './logger.js';
  *
  * Call `setFactory()` to swap the backing implementation (e.g. pino, winston).
  */
-// biome-ignore lint/complexity/noStaticOnlyClass: Intentional — mirrors SLF4J LoggerFactory API
+// biome-ignore lint/complexity/noStaticOnlyClass: Intentional
 export class LoggerFactory {
   private static factory: (name: string) => Logger = (name) =>
     new ConsoleLogger(name);
