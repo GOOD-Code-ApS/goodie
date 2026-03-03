@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/config",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Configuration properties support for goodie-ts — @ConfigurationProperties decorator",
   "license": "MIT",
   "type": "module",
