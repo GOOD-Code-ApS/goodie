@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/decorators",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Stage 3 decorators for goodie-ts compile-time dependency injection",
   "license": "MIT",
   "type": "module",

@@ -17,6 +17,10 @@ export default defineConfig({
         __dirname,
         'packages/vite-plugin/src/index.ts',
       ),
+      '@goodie-ts/testing/vitest': path.resolve(
+        __dirname,
+        'packages/testing/src/vitest.ts',
+      ),
       '@goodie-ts/testing': path.resolve(
         __dirname,
         'packages/testing/src/index.ts',
@@ -24,6 +28,26 @@ export default defineConfig({
       '@goodie-ts/cli': path.resolve(__dirname, 'packages/cli/src/index.ts'),
       '@goodie-ts/aop': path.resolve(__dirname, 'packages/aop/src/index.ts'),
       '@goodie-ts/hono': path.resolve(__dirname, 'packages/hono/src/index.ts'),
+      '@goodie-ts/logging': path.resolve(
+        __dirname,
+        'packages/logging/src/index.ts',
+      ),
+      '@goodie-ts/cache': path.resolve(
+        __dirname,
+        'packages/cache/src/index.ts',
+      ),
+      '@goodie-ts/resilience': path.resolve(
+        __dirname,
+        'packages/resilience/src/index.ts',
+      ),
+      '@goodie-ts/config': path.resolve(
+        __dirname,
+        'packages/config/src/index.ts',
+      ),
+      '@goodie-ts/kysely': path.resolve(
+        __dirname,
+        'packages/kysely/src/index.ts',
+      ),
     },
   },
   test: {

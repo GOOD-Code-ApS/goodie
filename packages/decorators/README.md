@@ -24,6 +24,10 @@ Provides the decorators you use to annotate your classes. These attach metadata 
 | `@Provides()` | method | Marks a method in a `@Module` as a bean factory |
 | `@Inject(qualifier?)` | accessor field | Field injection |
 | `@Optional()` | accessor field | Marks a field as optional (resolves to `undefined` if missing) |
+| `@Value(key, { default? })` | accessor field | Injects a config value by key |
+| `@PostConstruct()` | method | Called after bean construction and field injection |
+| `@PreDestroy()` | method | Called during `ApplicationContext.close()` |
+| `@PostProcessor()` | class | Marks bean as a `BeanPostProcessor` |
 
 ## Usage
 

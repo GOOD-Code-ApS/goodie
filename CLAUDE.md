@@ -14,21 +14,23 @@ The transformer uses ts-morph to scan decorated classes at build time, producing
 
 ```
 decorators  ─┐
-              ├→  transformer  →  vite-plugin
+              ├→  transformer  →  vite-plugin / cli
 core  ───────┘         │
   ↑                    ↓
-  └──────────── generated code (imports core)
+  └──────────── generated code (imports core + aop)
 testing → core
+aop ──→ transformer (plugin)
+cache / logging / resilience / config / kysely / hono ──→ aop + transformer (plugins)
 ```
 
 ## Key Design Decisions
 
+- **Always favour compile-time code generation over runtime scanning.** If the transformer knows something at build time (controllers, migrations, interceptors, routes), generate the wiring code directly. Never use runtime scanning, marker classes, or collection injection for statically-known information. Reserve runtime mechanisms (`getAll()`, `baseTokens`) for genuinely dynamic cases where the set of beans isn't known until runtime. This is the framework's core differentiator — violating it undermines the entire architecture.
 - **Native Stage 3 decorators** — no `experimentalDecorators`, no reflect-metadata
 - **`accessor` keyword** for `@Inject`/`@Optional` (Stage 3 has no parameter decorators)
 - **Lazy singletons** by default, `@Eager()` opt-in
 - **Async factories** supported from day one (`getAsync()`)
 - **Typed InjectionTokens** for interfaces, primitives, generics
-- **No runtime scanning** — all wiring is code-generated at compile time
 
 ## Commands
 
@@ -46,11 +48,20 @@ pnpm clean          # Clean all dist/
 | Package | Purpose |
 |---------|---------|
 | `packages/core` | Runtime container, BeanDefinition, InjectionToken, topoSort |
-| `packages/decorators` | @Injectable, @Singleton, @Module, @Provides, @Inject, etc. |
-| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen |
-| `packages/testing` | TestContext with bean overrides and @MockDefinition |
+| `packages/decorators` | @Injectable, @Singleton, @Module, @Provides, @Inject, @Value, lifecycle hooks |
+| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system |
+| `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
+| `packages/testing` | TestContext with bean overrides and @MockDefinition |
+| `packages/aop` | AOP foundation — @Before, @Around, @After, interceptor chain |
+| `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
+| `packages/config` | Configuration binding — @ConfigurationProperties |
+| `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc. |
+| `packages/kysely` | Kysely integration — @Transactional, @Migration, CrudRepository |
+| `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
+| `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |
 | `examples/basic` | End-to-end example with generics, modules, testing |
+| `examples/hono` | Full-stack example with Hono, PostgreSQL, Kysely, TestContainers |
 
 ## Testing
 
