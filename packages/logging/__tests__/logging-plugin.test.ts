@@ -166,6 +166,97 @@ describe('Logging Transformer Plugin', () => {
     );
   });
 
+  it('should generate metadata with logArgs false by default', () => {
+    const project = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Log } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Log()
+          doWork() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createLoggingPlugin(),
+    ]);
+
+    expect(result.code).toContain('"logArgs":false');
+  });
+
+  it('should generate metadata with logArgs true when specified', () => {
+    const project = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Log } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Log({ logArgs: true })
+          doWork() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
+      createLoggingPlugin(),
+    ]);
+
+    expect(result.code).toContain('"logArgs":true');
+  });
+
+  it('should clear state between rebuilds (no duplicate entries on plugin reuse)', () => {
+    const plugin = createLoggingPlugin();
+
+    // First transform
+    const project1 = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Log } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Log()
+          doWork() {}
+        }
+      `,
+    });
+    const result1 = transformInMemory(
+      project1,
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    // Second transform with the same plugin instance (simulates watch-mode rebuild)
+    const project2 = createProject({
+      '/src/MyService.ts': `
+        import { Singleton, Log } from './decorators.js'
+        @Singleton()
+        class MyService {
+          @Log()
+          doWork() {}
+        }
+      `,
+    });
+    const result2 = transformInMemory(
+      project2,
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    // Strip timestamp comment (first line) since it varies between runs
+    const stripTimestamp = (code: string) =>
+      code.split('\n').slice(1).join('\n');
+    expect(stripTimestamp(result1.code)).toBe(stripTimestamp(result2.code));
+
+    // There should be exactly one buildInterceptorChain call for doWork
+    const chainCalls1 = result1.code
+      .split('\n')
+      .filter((l) => l.includes('instance.doWork = buildInterceptorChain'));
+    const chainCalls2 = result2.code
+      .split('\n')
+      .filter((l) => l.includes('instance.doWork = buildInterceptorChain'));
+    expect(chainCalls1).toHaveLength(1);
+    expect(chainCalls2).toHaveLength(1);
+  });
+
   it('should coexist with @Around from AOP plugin', async () => {
     const { createAopPlugin } = await import('@goodie-ts/aop');
 
