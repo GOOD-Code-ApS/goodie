@@ -43,6 +43,10 @@ export function createResiliencePlugin(): TransformerPlugin {
   return {
     name: 'resilience',
 
+    beforeScan(): void {
+      classResilienceInfo.clear();
+    },
+
     visitMethod(ctx: MethodVisitorContext): void {
       const decorators = ctx.methodDeclaration.getDecorators();
 

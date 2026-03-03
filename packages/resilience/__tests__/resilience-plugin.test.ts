@@ -237,4 +237,36 @@ describe('Resilience Transformer Plugin', () => {
     expect(result.code).toContain('"maxAttempts":5');
     expect(result.code).toContain('"delay":1000');
   });
+
+  it('should produce identical output when the same plugin instance is reused across transforms (rebuild)', () => {
+    const plugin = createResiliencePlugin();
+
+    const makeProject = () =>
+      createProject({
+        '/src/MyService.ts': `
+          import { Singleton, Retryable } from './decorators.js'
+          @Singleton()
+          class MyService {
+            @Retryable()
+            fetchData() {}
+          }
+        `,
+      });
+
+    const result1 = transformInMemory(
+      makeProject(),
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+    const result2 = transformInMemory(
+      makeProject(),
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    // Strip timestamp comment (first line) since it varies between runs
+    const stripTimestamp = (code: string) =>
+      code.split('\n').slice(1).join('\n');
+    expect(stripTimestamp(result1.code)).toBe(stripTimestamp(result2.code));
+  });
 });
