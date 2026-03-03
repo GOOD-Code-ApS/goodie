@@ -155,3 +155,5 @@ export function createLoggingPlugin(): TransformerPlugin {
     },
   };
 }
+
+export default createLoggingPlugin;

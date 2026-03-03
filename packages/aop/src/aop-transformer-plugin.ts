@@ -164,3 +164,5 @@ export function createAopPlugin(): TransformerPlugin {
     },
   };
 }
+
+export default createAopPlugin;

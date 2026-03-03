@@ -29,13 +29,13 @@ export const generate = defineCommand({
         'Directory to watch (default: cwd). Requires Node >= 22.13 for recursive watching.',
     },
   },
-  run({ args }) {
+  async run({ args }) {
     const cwd = process.cwd();
     const tsConfigPath = path.resolve(cwd, args.tsconfig);
     const outputPath = path.resolve(cwd, args.output);
 
     // Always run an initial transform
-    const outcome = runTransform({ tsConfigPath, outputPath });
+    const outcome = await runTransform({ tsConfigPath, outputPath });
     logOutcome(outcome);
 
     if (!outcome.success) {

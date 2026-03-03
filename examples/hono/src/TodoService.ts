@@ -1,4 +1,5 @@
 import { Singleton } from '@goodie-ts/decorators';
+import { Transactional } from '@goodie-ts/kysely';
 import { Log } from '@goodie-ts/logging';
 import { Timeout } from '@goodie-ts/resilience';
 import type { TodoRepository } from './TodoRepository.js';
@@ -21,6 +22,7 @@ export class TodoService {
 
   @Log()
   @Timeout(5000)
+  @Transactional()
   async create(title: string) {
     if (!title.trim()) {
       throw new Error('Title must not be empty');
@@ -30,12 +32,14 @@ export class TodoService {
 
   @Log()
   @Timeout(5000)
+  @Transactional()
   async update(id: string, data: { title?: string; completed?: boolean }) {
     return this.todoRepository.update(id, data);
   }
 
   @Log()
   @Timeout(5000)
+  @Transactional()
   async delete(id: string) {
     return this.todoRepository.delete(id);
   }
