@@ -1046,6 +1046,160 @@ describe('ApplicationContext — getDefinitions', () => {
   });
 });
 
+// ── baseTokens ──────────────────────────────────────────────────────
+
+describe('ApplicationContext — baseTokens', () => {
+  it('bean with baseTokens is findable via getAll(baseToken)', async () => {
+    class Base {}
+    class Sub extends Base {
+      value = 'sub';
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Sub, {
+        factory: () => new Sub(),
+        metadata: {},
+      }),
+    ]);
+    // Without baseTokens, getAll(Base) returns nothing
+    expect(ctx.getAll(Base)).toEqual([]);
+  });
+
+  it('getAll(baseToken) returns beans registered with baseTokens', async () => {
+    class HealthIndicator {}
+    class UptimeIndicator extends HealthIndicator {
+      name = 'uptime';
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(UptimeIndicator, {
+        factory: () => new UptimeIndicator(),
+        metadata: {},
+      }),
+    ]);
+    // Still empty — no baseTokens set
+    expect(ctx.getAll(HealthIndicator)).toEqual([]);
+
+    // Now with baseTokens
+    const ctx2 = await ApplicationContext.create([
+      {
+        token: UptimeIndicator,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new UptimeIndicator(),
+        eager: false,
+        baseTokens: [HealthIndicator],
+        metadata: {},
+      },
+    ]);
+    const indicators = ctx2.getAll(HealthIndicator);
+    expect(indicators).toHaveLength(1);
+    expect(indicators[0]).toBeInstanceOf(UptimeIndicator);
+  });
+
+  it('multiple beans registering under the same base token', async () => {
+    class HealthIndicator {}
+    class UptimeIndicator extends HealthIndicator {
+      name = 'uptime';
+    }
+    class DiskIndicator extends HealthIndicator {
+      name = 'disk';
+    }
+    const ctx = await ApplicationContext.create([
+      {
+        token: UptimeIndicator,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new UptimeIndicator(),
+        eager: false,
+        baseTokens: [HealthIndicator],
+        metadata: {},
+      },
+      {
+        token: DiskIndicator,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new DiskIndicator(),
+        eager: false,
+        baseTokens: [HealthIndicator],
+        metadata: {},
+      },
+    ]);
+    const indicators = ctx.getAll(HealthIndicator);
+    expect(indicators).toHaveLength(2);
+    expect(indicators[0]).toBeInstanceOf(UptimeIndicator);
+    expect(indicators[1]).toBeInstanceOf(DiskIndicator);
+  });
+
+  it('get() on base token returns the last-registered bean', async () => {
+    class HealthIndicator {}
+    class UptimeIndicator extends HealthIndicator {}
+    class DiskIndicator extends HealthIndicator {}
+    const ctx = await ApplicationContext.create([
+      {
+        token: UptimeIndicator,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new UptimeIndicator(),
+        eager: false,
+        baseTokens: [HealthIndicator],
+        metadata: {},
+      },
+      {
+        token: DiskIndicator,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new DiskIndicator(),
+        eager: false,
+        baseTokens: [HealthIndicator],
+        metadata: {},
+      },
+    ]);
+    const primary = ctx.get(HealthIndicator);
+    expect(primary).toBeInstanceOf(DiskIndicator);
+  });
+
+  it('baseTokens work with InjectionToken', async () => {
+    const BASE = new InjectionToken<{ name: string }>('BaseHandler');
+    class ConcreteHandler {
+      name = 'concrete';
+    }
+    const ctx = await ApplicationContext.create([
+      {
+        token: ConcreteHandler,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new ConcreteHandler(),
+        eager: false,
+        baseTokens: [BASE],
+        metadata: {},
+      },
+    ]);
+    const all = ctx.getAll(BASE);
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe('concrete');
+  });
+
+  it('getAllAsync works with baseTokens', async () => {
+    class HealthIndicator {}
+    class AsyncIndicator extends HealthIndicator {
+      name = 'async';
+    }
+    const ctx = await ApplicationContext.create([
+      {
+        token: AsyncIndicator,
+        scope: 'singleton',
+        dependencies: [],
+        factory: async () => new AsyncIndicator(),
+        eager: false,
+        baseTokens: [HealthIndicator],
+        metadata: {},
+      },
+    ]);
+    const all = await ctx.getAllAsync(HealthIndicator);
+    expect(all).toHaveLength(1);
+    expect(all[0]).toBeInstanceOf(AsyncIndicator);
+  });
+});
+
 // ── Helper ───────────────────────────────────────────────────────────
 
 function tokenDesc(token: unknown): string {

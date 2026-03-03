@@ -23,6 +23,8 @@ export interface BeanDefinition<T = unknown> {
   factory: (...deps: unknown[]) => T | Promise<T>;
   /** Whether to instantiate eagerly during context creation. */
   eager: boolean;
+  /** Additional tokens this bean should be registered under (e.g. base classes). */
+  baseTokens?: (InjectionToken<unknown> | Constructor)[];
   /** Arbitrary metadata stashed by decorators — extension libraries use this. */
   metadata: Record<string, unknown>;
 }

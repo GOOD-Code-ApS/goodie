@@ -75,6 +75,9 @@ importers:
       '@goodie-ts/decorators':
         specifier: workspace:*
         version: link:../../packages/decorators
+      '@goodie-ts/health':
+        specifier: workspace:*
+        version: link:../../packages/health
       '@goodie-ts/hono':
         specifier: workspace:*
         version: link:../../packages/hono
@@ -192,6 +195,18 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/health:
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
 
   packages/hono:
     dependencies:

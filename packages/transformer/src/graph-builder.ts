@@ -120,6 +120,7 @@ function expandModules(
       fieldDeps: [],
       factoryKind: 'constructor',
       providesSource: undefined,
+      baseTokenRefs: [],
       metadata: { isModule: true },
       sourceLocation: mod.sourceLocation,
     });
@@ -146,6 +147,7 @@ function expandModules(
           moduleTokenRef: mod.classTokenRef,
           methodName: provides.methodName,
         },
+        baseTokenRefs: [],
         metadata: {},
         sourceLocation: provides.sourceLocation,
       });
@@ -209,32 +211,7 @@ function validateProviders(beans: IRBeanDefinition[]): void {
     registered.add(tokenRefKey(bean.tokenRef));
   }
 
-  // Build subtype map: baseTokenKey → subtypes (beans that extend that base class)
-  // Uses all ancestors, so C extends B extends A produces entries for both B→[C] and A→[C]
-  const subtypeMap = new Map<string, IRBeanDefinition[]>();
-  for (const bean of beans) {
-    if (bean.baseTokenRefs) {
-      for (const baseRef of bean.baseTokenRefs) {
-        const baseKey = tokenRefKey(baseRef);
-        const existing = subtypeMap.get(baseKey) ?? [];
-        existing.push(bean);
-        subtypeMap.set(baseKey, existing);
-      }
-    }
-  }
-
-  // Rewrite unresolved deps via subtype map before validation
-  for (const bean of beans) {
-    for (const dep of bean.constructorDeps) {
-      if (dep.collection) continue; // Collection deps resolve all providers at runtime
-      rewriteDepViaSubtype(dep, registered, subtypeMap, bean);
-    }
-    for (const field of bean.fieldDeps) {
-      rewriteFieldDepViaSubtype(field, registered, subtypeMap, bean);
-    }
-  }
-
-  // Now validate all required deps have providers
+  // Validate all required deps have providers
   for (const bean of beans) {
     const ownerName =
       bean.tokenRef.kind === 'class'
@@ -276,68 +253,6 @@ function validateProviders(beans: IRBeanDefinition[]): void {
         throw new MissingProviderError(depName, ownerName, bean.sourceLocation);
       }
     }
-  }
-}
-
-/**
- * If a dependency has no direct provider but exactly one subtype provides it,
- * rewrite the tokenRef to point at the subtype. Multiple candidates → ambiguous.
- */
-function rewriteDepViaSubtype(
-  dep: IRDependency,
-  registered: Set<string>,
-  subtypeMap: Map<string, IRBeanDefinition[]>,
-  ownerBean: IRBeanDefinition,
-): void {
-  const key = tokenRefKey(dep.tokenRef);
-  if (registered.has(key)) return;
-
-  const subtypes = subtypeMap.get(key);
-  if (!subtypes || subtypes.length === 0) return;
-
-  if (subtypes.length === 1) {
-    dep.tokenRef = subtypes[0].tokenRef;
-  } else {
-    throw new AmbiguousProviderError(
-      dep.tokenRef.kind === 'class'
-        ? dep.tokenRef.className
-        : dep.tokenRef.tokenName,
-      subtypes.map((s) =>
-        s.tokenRef.kind === 'class'
-          ? s.tokenRef.className
-          : s.tokenRef.tokenName,
-      ),
-      ownerBean.sourceLocation,
-    );
-  }
-}
-
-function rewriteFieldDepViaSubtype(
-  field: { tokenRef: TokenRef; optional: boolean },
-  registered: Set<string>,
-  subtypeMap: Map<string, IRBeanDefinition[]>,
-  ownerBean: IRBeanDefinition,
-): void {
-  const key = tokenRefKey(field.tokenRef);
-  if (registered.has(key)) return;
-
-  const subtypes = subtypeMap.get(key);
-  if (!subtypes || subtypes.length === 0) return;
-
-  if (subtypes.length === 1) {
-    field.tokenRef = subtypes[0].tokenRef;
-  } else {
-    throw new AmbiguousProviderError(
-      field.tokenRef.kind === 'class'
-        ? field.tokenRef.className
-        : field.tokenRef.tokenName,
-      subtypes.map((s) =>
-        s.tokenRef.kind === 'class'
-          ? s.tokenRef.className
-          : s.tokenRef.tokenName,
-      ),
-      ownerBean.sourceLocation,
-    );
   }
 }
 

@@ -1,25 +1,22 @@
 {
-  "name": "@goodie-ts/cli",
+  "name": "@goodie-ts/health",
   "version": "0.5.0",
-  "description": "CLI for goodie-ts compile-time dependency injection",
+  "description": "Health check indicators and aggregation for goodie-ts",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/GOOD-Code-ApS/goodie.git",
-    "directory": "packages/cli"
+    "directory": "packages/health"
   },
   "publishConfig": {
     "access": "public"
   },
-  "engines": {
-    "node": ">=22.13.0"
+  "goodie": {
+    "plugin": "dist/health-transformer-plugin.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": {
-    "goodie": "dist/bin.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -30,12 +27,10 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "dependencies": {
-    "@goodie-ts/transformer": "workspace:*",
-    "citty": "^0.1.6"
-  },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
   },
   "files": [
     "dist"

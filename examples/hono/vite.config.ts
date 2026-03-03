@@ -30,6 +30,7 @@ export default defineConfig({
         '@goodie-ts/config',
         '@goodie-ts/core',
         '@goodie-ts/decorators',
+        '@goodie-ts/health',
         '@goodie-ts/aop',
         '@goodie-ts/cache',
         '@goodie-ts/logging',

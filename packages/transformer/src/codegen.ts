@@ -198,6 +198,12 @@ export function generateCode(
     lines.push(`    factory: ${factoryToCode(bean)},`);
     lines.push(`    eager: ${bean.eager},`);
     lines.push(`    metadata: ${metadataToCode(bean.metadata)},`);
+    if (bean.baseTokenRefs && bean.baseTokenRefs.length > 0) {
+      const baseTokensList = bean.baseTokenRefs
+        .map((ref) => ref.className)
+        .join(', ');
+      lines.push(`    baseTokens: [${baseTokensList}],`);
+    }
     lines.push('  },');
   }
 
@@ -290,6 +296,12 @@ function collectClassImports(beans: IRBeanDefinition[]): Map<string, string> {
 
     if (bean.providesSource) {
       addClassImport(imports, bean.providesSource.moduleTokenRef);
+    }
+
+    if (bean.baseTokenRefs) {
+      for (const ref of bean.baseTokenRefs) {
+        addClassImport(imports, ref);
+      }
     }
 
     // Interceptor classes referenced in metadata also need imports
@@ -617,7 +629,7 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
 
       const safeMethodName = escapeStringLiteral(desc.methodName);
       bodyLines.push(
-        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance) as any${metadataArg}) as any`,
+        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance)${metadataArg})`,
       );
     }
   }

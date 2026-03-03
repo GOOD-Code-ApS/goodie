@@ -118,8 +118,8 @@ export interface IRBeanDefinition {
   providesSource:
     | { moduleTokenRef: ClassTokenRef; methodName: string }
     | undefined;
-  metadata: Record<string, unknown>;
-  /** All ancestor class tokens (direct parent first, root last). */
+  /** Base class tokens this bean should also be registered under. */
   baseTokenRefs?: ClassTokenRef[];
+  metadata: Record<string, unknown>;
   sourceLocation: SourceLocation;
 }

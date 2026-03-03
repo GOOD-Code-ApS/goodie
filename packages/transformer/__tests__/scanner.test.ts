@@ -1018,6 +1018,86 @@ describe('Scanner', () => {
     });
   });
 
+  describe('base class extraction', () => {
+    it('should extract immediate base class from source files', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/HealthIndicator.ts': `
+          export abstract class HealthIndicator {
+            abstract check(): { status: string }
+          }
+        `,
+        '/src/UptimeIndicator.ts': `
+          import { Singleton } from './decorators.js'
+          import { HealthIndicator } from './HealthIndicator.js'
+
+          @Singleton()
+          export class UptimeIndicator extends HealthIndicator {
+            check() { return { status: 'UP' } }
+          }
+        `,
+      });
+
+      const result = scan(project);
+      const bean = result.beans.find(
+        (b) => b.classTokenRef.className === 'UptimeIndicator',
+      )!;
+
+      expect(bean.baseClasses).toHaveLength(1);
+      expect(bean.baseClasses[0].kind).toBe('class');
+      expect(bean.baseClasses[0].className).toBe('HealthIndicator');
+      expect(bean.baseClasses[0].importPath).toBe('/src/HealthIndicator.ts');
+    });
+
+    it('should return empty array for class without base class', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      const result = scan(project);
+      expect(result.beans[0].baseClasses).toEqual([]);
+    });
+
+    it('should extract base class when both parent and child are decorated', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/BaseRepo.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class BaseRepo {}
+        `,
+        '/src/UserRepo.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class UserRepo extends BaseRepo {}
+        `,
+      });
+
+      const result = scan(project);
+      const userRepo = result.beans.find(
+        (b) => b.classTokenRef.className === 'UserRepo',
+      )!;
+
+      expect(userRepo.baseClasses).toHaveLength(1);
+      expect(userRepo.baseClasses[0].className).toBe('BaseRepo');
+    });
+  });
+
   describe('multiple files', () => {
     it('should scan across multiple source files', () => {
       const project = createProject({

@@ -28,6 +28,10 @@ export default defineConfig({
       '@goodie-ts/cli': path.resolve(__dirname, 'packages/cli/src/index.ts'),
       '@goodie-ts/aop': path.resolve(__dirname, 'packages/aop/src/index.ts'),
       '@goodie-ts/hono': path.resolve(__dirname, 'packages/hono/src/index.ts'),
+      '@goodie-ts/health': path.resolve(
+        __dirname,
+        'packages/health/src/index.ts',
+      ),
       '@goodie-ts/logging': path.resolve(
         __dirname,
         'packages/logging/src/index.ts',
