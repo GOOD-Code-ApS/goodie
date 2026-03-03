@@ -1197,6 +1197,84 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
+  describe('baseTokens (collection injection via inheritance)', () => {
+    it('should emit baseTokens for class extending a base class in source', () => {
+      const result = createTestProject({
+        '/src/HealthIndicator.ts': `
+          export abstract class HealthIndicator {
+            abstract check(): { status: string }
+          }
+        `,
+        '/src/UptimeIndicator.ts': `
+          import { Singleton } from './decorators.js'
+          import { HealthIndicator } from './HealthIndicator.js'
+
+          @Singleton()
+          export class UptimeIndicator extends HealthIndicator {
+            check() { return { status: 'UP' } }
+          }
+        `,
+      });
+
+      expect(result.beans).toHaveLength(1);
+      const bean = result.beans[0];
+      expect(bean.baseTokenRefs).toHaveLength(1);
+      expect(bean.baseTokenRefs![0].className).toBe('HealthIndicator');
+
+      expect(result.code).toContain('baseTokens: [HealthIndicator]');
+      expect(result.code).toContain(
+        "import { HealthIndicator } from '../src/HealthIndicator.js'",
+      );
+    });
+
+    it('should not emit baseTokens for class without base class', () => {
+      const result = createTestProject({
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Service {}
+        `,
+      });
+
+      expect(result.code).not.toContain('baseTokens');
+    });
+
+    it('should emit baseTokens for multiple subclasses of the same base', () => {
+      const result = createTestProject({
+        '/src/HealthIndicator.ts': `
+          export abstract class HealthIndicator {}
+        `,
+        '/src/UptimeIndicator.ts': `
+          import { Singleton } from './decorators.js'
+          import { HealthIndicator } from './HealthIndicator.js'
+
+          @Singleton()
+          export class UptimeIndicator extends HealthIndicator {}
+        `,
+        '/src/DiskIndicator.ts': `
+          import { Singleton } from './decorators.js'
+          import { HealthIndicator } from './HealthIndicator.js'
+
+          @Singleton()
+          export class DiskIndicator extends HealthIndicator {}
+        `,
+      });
+
+      expect(result.beans).toHaveLength(2);
+      for (const bean of result.beans) {
+        expect(bean.baseTokenRefs).toHaveLength(1);
+        expect(bean.baseTokenRefs![0].className).toBe('HealthIndicator');
+      }
+
+      // Both should have baseTokens in generated code
+      const baseTokenMatches = result.code.match(
+        /baseTokens: \[HealthIndicator\]/g,
+      );
+      expect(baseTokenMatches).toHaveLength(2);
+    });
+  });
+
   describe('generated code structure', () => {
     it('should include header comment', () => {
       const result = createTestProject({

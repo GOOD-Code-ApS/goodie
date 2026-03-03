@@ -120,6 +120,7 @@ function expandModules(
       fieldDeps: [],
       factoryKind: 'constructor',
       providesSource: undefined,
+      baseTokenRefs: [],
       metadata: { isModule: true },
       sourceLocation: mod.sourceLocation,
     });
@@ -146,6 +147,7 @@ function expandModules(
           moduleTokenRef: mod.classTokenRef,
           methodName: provides.methodName,
         },
+        baseTokenRefs: [],
         metadata: {},
         sourceLocation: provides.sourceLocation,
       });

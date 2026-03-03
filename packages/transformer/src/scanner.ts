@@ -49,8 +49,8 @@ export interface ScannedBean {
   isBeanPostProcessor: boolean;
   /** Fields decorated with @Value('key'). */
   valueFields: ScannedValueField[];
-  /** All ancestor classes (direct parent first, root last). */
-  baseClasses: Array<{ className: string; sourceFile: SourceFile | undefined }>;
+  /** Base classes this bean extends (for baseTokens registration). */
+  baseClasses: ClassTokenRef[];
   sourceLocation: SourceLocation;
 }
 
@@ -293,7 +293,7 @@ function scanBean(
     DECORATOR_NAMES.PostProcessor,
   );
   const valueFields = scanValueFields(cls);
-  const baseClasses = extractBaseClassChain(cls);
+  const baseClasses = extractBaseClasses(cls);
 
   return {
     classDeclaration: cls,
@@ -738,44 +738,40 @@ function scanValueFields(cls: ClassDeclaration): ScannedValueField[] {
 // ── Base class extraction ──
 
 /**
- * Walk the full inheritance chain and return all ancestor classes
- * (direct parent first, root last).
+ * Walk the inheritance chain and return all ancestor classes that exist
+ * in project source files (not from node_modules / lib).
+ * Direct parent first, root last. Stops when a class is from node_modules
+ * or has no further base class.
  */
-function extractBaseClassChain(
-  cls: ClassDeclaration,
-): Array<{ className: string; sourceFile: SourceFile | undefined }> {
-  const result: Array<{
-    className: string;
-    sourceFile: SourceFile | undefined;
-  }> = [];
+function extractBaseClasses(cls: ClassDeclaration): ClassTokenRef[] {
+  const result: ClassTokenRef[] = [];
   const seen = new Set<string>();
   let current: ClassDeclaration | undefined = cls;
 
   while (current) {
-    const extendsExpr = current.getExtends();
-    if (!extendsExpr) break;
+    const baseClass = current.getBaseClass();
+    if (!baseClass) break;
 
-    const baseType = extendsExpr.getType();
-    const symbol = baseType.getSymbol();
-    if (!symbol) break;
+    const baseName = baseClass.getName();
+    if (!baseName) break;
+    if (seen.has(baseName)) break;
+    seen.add(baseName);
 
-    const className = symbol.getName();
-    if (seen.has(className)) break; // guard against cycles
-    seen.add(className);
+    const baseSourceFile = baseClass.getSourceFile();
+    const filePath = baseSourceFile.getFilePath();
 
-    let sourceFile: SourceFile | undefined;
-    const decls = symbol.getDeclarations();
-    if (decls.length > 0) {
-      sourceFile = decls[0].getSourceFile();
+    // Stop at classes from node_modules or TypeScript lib files
+    if (filePath.includes('node_modules') || filePath.includes('/lib.')) {
+      break;
     }
 
-    result.push({ className, sourceFile });
+    result.push({
+      kind: 'class',
+      className: baseName,
+      importPath: filePath,
+    });
 
-    // Try to get the ClassDeclaration for the parent to continue walking
-    const parentDecl = decls.find(
-      (d) => d.getKindName() === 'ClassDeclaration',
-    );
-    current = parentDecl as ClassDeclaration | undefined;
+    current = baseClass;
   }
 
   return result;
