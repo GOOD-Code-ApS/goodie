@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/cache",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Compile-time caching decorators and interceptor for goodie-ts",
   "license": "MIT",
   "type": "module",
