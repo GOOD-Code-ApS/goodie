@@ -28,7 +28,7 @@
     "dist"
   ],
   "dependencies": {
-    "@goodie-ts/aop": "workspace:*"
+    "@goodie-ts/aop": "workspace:^"
   },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",

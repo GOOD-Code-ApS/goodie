@@ -28,7 +28,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:*"
+    "@goodie-ts/core": "workspace:^"
   },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
