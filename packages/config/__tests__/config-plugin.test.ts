@@ -203,10 +203,11 @@ describe('Config Transformer Plugin', () => {
     expect(appBean!.metadata.valueFields).toBeDefined();
     expect(dbBean!.metadata.valueFields).toBeDefined();
 
-    // Only one __Goodie_Config token should exist
-    const configTokenCount = (result.code.match(/__Goodie_Config/g) ?? [])
-      .length;
-    expect(configTokenCount).toBeGreaterThan(0);
+    // Only one __Goodie_Config token declaration should exist
+    const configTokenDeclarations = (
+      result.code.match(/export const __Goodie_Config/g) ?? []
+    ).length;
+    expect(configTokenDeclarations).toBe(1);
   });
 
   it('should not add valueFields for class without @ConfigurationProperties', () => {
@@ -358,5 +359,74 @@ describe('Config Transformer Plugin', () => {
     );
     expect(bean).toBeUndefined();
     warnSpy.mockRestore();
+  });
+
+  it('should warn and skip when prefix is a non-literal expression', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = createTestProject({
+      '/src/Config.ts': `
+        import { Singleton, ConfigurationProperties } from './decorators.js'
+
+        const MY_PREFIX = 'database'
+
+        @Singleton()
+        @ConfigurationProperties(MY_PREFIX)
+        export class Config {
+          host = 'localhost'
+        }
+      `,
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('non-literal prefix argument'),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('MY_PREFIX'));
+    // Bean exists (has @Singleton) but no valueFields (non-literal prefix)
+    const bean = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
+    );
+    expect(bean).toBeDefined();
+    expect(bean!.metadata.valueFields).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it('should merge @Value fields with @ConfigurationProperties fields on the same class', () => {
+    const result = createTestProject({
+      '/src/Config.ts': `
+        import { Singleton, ConfigurationProperties, Value } from './decorators.js'
+
+        @Singleton()
+        @ConfigurationProperties('app')
+        export class Config {
+          name = 'my-app'
+
+          @Value('APP_SECRET')
+          accessor secret!: string
+        }
+      `,
+    });
+
+    const bean = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
+    );
+    expect(bean).toBeDefined();
+
+    const valueFields = bean!.metadata.valueFields as Array<{
+      fieldName: string;
+      key: string;
+      default?: string;
+    }>;
+    expect(valueFields).toBeDefined();
+
+    // @Value field from the scanner
+    const secretField = valueFields.find((f) => f.fieldName === 'secret');
+    expect(secretField).toBeDefined();
+    expect(secretField!.key).toBe('APP_SECRET');
+
+    // @ConfigurationProperties field from the plugin
+    const nameField = valueFields.find((f) => f.fieldName === 'name');
+    expect(nameField).toBeDefined();
+    expect(nameField!.key).toBe('app.name');
   });
 });

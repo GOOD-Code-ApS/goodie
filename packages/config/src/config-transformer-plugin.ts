@@ -56,15 +56,21 @@ export function createConfigPlugin(): TransformerPlugin {
       }
 
       const prefixArg = args[0].getText();
-      let prefix: string;
+      // Only string literals are supported — variable references, template literals, etc.
+      // would silently produce the identifier text as the prefix (e.g. MY_PREFIX instead of its value).
       if (
-        (prefixArg.startsWith("'") && prefixArg.endsWith("'")) ||
-        (prefixArg.startsWith('"') && prefixArg.endsWith('"'))
+        !(
+          (prefixArg.startsWith("'") && prefixArg.endsWith("'")) ||
+          (prefixArg.startsWith('"') && prefixArg.endsWith('"'))
+        )
       ) {
-        prefix = prefixArg.slice(1, -1);
-      } else {
-        prefix = prefixArg;
+        const className = ctx.classDeclaration.getName() ?? '<anonymous>';
+        console.warn(
+          `[config] @ConfigurationProperties on '${className}' has a non-literal prefix argument '${prefixArg}' — only string literals are supported. Skipping config generation for this class.`,
+        );
+        return;
       }
+      const prefix = prefixArg.slice(1, -1);
 
       // Extract class fields (both regular and accessor properties)
       const fields: Array<{
@@ -81,6 +87,8 @@ export function createConfigPlugin(): TransformerPlugin {
         if (fieldName.startsWith('_')) continue;
 
         // Get default value from initializer
+        // TODO: process.env values are always strings — add type coercion
+        // (to number, boolean, etc.) based on the field's TypeScript type annotation.
         const initializer = prop.getInitializer();
         const defaultValue = initializer ? initializer.getText() : undefined;
 
@@ -89,12 +97,20 @@ export function createConfigPlugin(): TransformerPlugin {
 
       if (fields.length === 0) return;
 
-      // Set valueFields metadata — codegen handles the rest
-      ctx.metadata.valueFields = fields.map((f) => ({
+      // Merge valueFields metadata — codegen handles the rest.
+      // The scanner may have already populated valueFields from @Value decorators,
+      // so we append rather than overwrite to preserve both sources.
+      const newFields = fields.map((f) => ({
         fieldName: f.fieldName,
         key: `${prefix}.${f.fieldName}`,
         default: f.defaultValue,
       }));
+      const existing = ctx.metadata.valueFields as
+        | Array<{ fieldName: string; key: string; default?: string }>
+        | undefined;
+      ctx.metadata.valueFields = existing
+        ? [...existing, ...newFields]
+        : newFields;
     },
   };
 }
