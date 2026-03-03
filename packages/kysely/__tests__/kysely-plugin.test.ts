@@ -33,7 +33,7 @@ describe('Kysely Transformer Plugin', () => {
     expect(result.code).toContain('buildInterceptorChain');
     expect(result.code).toContain('TransactionalInterceptor');
     expect(result.code).toContain(
-      "import { TransactionalInterceptor } from '@goodie-ts/kysely'",
+      "import { TransactionManager, TransactionalInterceptor } from '@goodie-ts/kysely'",
     );
     expect(result.code).toContain(
       "import { buildInterceptorChain } from '@goodie-ts/aop'",
