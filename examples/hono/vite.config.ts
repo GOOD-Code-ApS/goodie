@@ -32,6 +32,8 @@ export default defineConfig({
         '@goodie-ts/cache',
         '@goodie-ts/logging',
         '@goodie-ts/resilience',
+        '@goodie-ts/kysely',
+        '@goodie-ts/hono',
         'hono',
         'hono/request-id',
         '@hono/node-server',
