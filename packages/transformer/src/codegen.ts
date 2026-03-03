@@ -629,7 +629,7 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
 
       const safeMethodName = escapeStringLiteral(desc.methodName);
       bodyLines.push(
-        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance) as any${metadataArg}) as any`,
+        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance)${metadataArg})`,
       );
     }
   }
