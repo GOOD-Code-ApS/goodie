@@ -1,0 +1,513 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { IRBeanDefinition } from '../src/ir.js';
+import {
+  deserializeBeans,
+  discoverLibraryBeans,
+  type LibraryBeansManifest,
+  rewriteImportPaths,
+  serializeBeans,
+} from '../src/library-beans.js';
+
+describe('serializeBeans / deserializeBeans', () => {
+  it('should round-trip a simple class bean', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'MyService',
+          importPath: '@acme/lib',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: { filePath: '@acme/lib', line: 0, column: 0 },
+      },
+    ];
+
+    const manifest = serializeBeans(beans, '@acme/lib');
+    expect(manifest.version).toBe(1);
+    expect(manifest.package).toBe('@acme/lib');
+
+    const result = deserializeBeans(manifest);
+    expect(result).toHaveLength(1);
+    expect(result[0].tokenRef).toEqual(beans[0].tokenRef);
+    expect(result[0].scope).toBe('singleton');
+    expect(result[0].name).toBeUndefined();
+    expect(result[0].providesSource).toBeUndefined();
+    expect(result[0].baseTokenRefs).toBeUndefined();
+  });
+
+  it('should round-trip a bean with constructorDeps and baseTokenRefs', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'HealthAggregator',
+          importPath: '@goodie-ts/health',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [
+          {
+            tokenRef: {
+              kind: 'class',
+              className: 'HealthIndicator',
+              importPath: '@goodie-ts/health',
+            },
+            optional: false,
+            collection: true,
+            sourceLocation: {
+              filePath: '@goodie-ts/health',
+              line: 0,
+              column: 0,
+            },
+          },
+        ],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: {
+          filePath: '@goodie-ts/health',
+          line: 0,
+          column: 0,
+        },
+      },
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'UptimeHealthIndicator',
+          importPath: '@goodie-ts/health',
+        },
+        scope: 'singleton',
+        eager: true,
+        name: 'uptime',
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        baseTokenRefs: [
+          {
+            kind: 'class',
+            className: 'HealthIndicator',
+            importPath: '@goodie-ts/health',
+          },
+        ],
+        metadata: { custom: 'value' },
+        sourceLocation: {
+          filePath: '@goodie-ts/health',
+          line: 10,
+          column: 5,
+        },
+      },
+    ];
+
+    const manifest = serializeBeans(beans, '@goodie-ts/health');
+    const result = deserializeBeans(manifest);
+
+    expect(result).toHaveLength(2);
+
+    // Aggregator
+    expect(result[0].constructorDeps).toHaveLength(1);
+    expect(result[0].constructorDeps[0].collection).toBe(true);
+    expect(result[0].baseTokenRefs).toBeUndefined();
+
+    // UptimeHealthIndicator
+    expect(result[1].eager).toBe(true);
+    expect(result[1].name).toBe('uptime');
+    expect(result[1].baseTokenRefs).toEqual([
+      {
+        kind: 'class',
+        className: 'HealthIndicator',
+        importPath: '@goodie-ts/health',
+      },
+    ]);
+    expect(result[1].metadata).toEqual({ custom: 'value' });
+  });
+
+  it('should handle typeImports Map <-> object conversion', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'injection-token',
+          tokenName: 'myToken',
+          importPath: '@acme/lib',
+          typeAnnotation: 'Repository<User>',
+          typeImports: new Map([
+            ['Repository', '@acme/lib'],
+            ['User', '@acme/models'],
+          ]),
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: { filePath: '@acme/lib', line: 0, column: 0 },
+      },
+    ];
+
+    const manifest = serializeBeans(beans, '@acme/lib');
+
+    // Verify serialized form has plain object, not Map
+    const serializedToken = manifest.beans[0].tokenRef as Record<
+      string,
+      unknown
+    >;
+    expect(serializedToken.typeImports).toEqual({
+      Repository: '@acme/lib',
+      User: '@acme/models',
+    });
+
+    const result = deserializeBeans(manifest);
+    const tokenRef = result[0].tokenRef;
+    expect(tokenRef.kind).toBe('injection-token');
+    if (tokenRef.kind === 'injection-token') {
+      expect(tokenRef.typeImports).toBeInstanceOf(Map);
+      expect(tokenRef.typeImports!.get('Repository')).toBe('@acme/lib');
+      expect(tokenRef.typeImports!.get('User')).toBe('@acme/models');
+    }
+  });
+
+  it('should handle undefined <-> null conversion for injection token fields', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'injection-token',
+          tokenName: 'myToken',
+          importPath: undefined,
+          typeAnnotation: undefined,
+          typeImports: undefined,
+        },
+        scope: 'prototype',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: { filePath: 'test', line: 0, column: 0 },
+      },
+    ];
+
+    const manifest = serializeBeans(beans, 'test');
+
+    // Verify null in serialized form
+    const serializedToken = manifest.beans[0].tokenRef as Record<
+      string,
+      unknown
+    >;
+    expect(serializedToken.importPath).toBeNull();
+    expect(serializedToken.typeAnnotation).toBeNull();
+    expect(serializedToken.typeImports).toBeNull();
+
+    const result = deserializeBeans(manifest);
+    const tokenRef = result[0].tokenRef;
+    if (tokenRef.kind === 'injection-token') {
+      expect(tokenRef.importPath).toBeUndefined();
+      expect(tokenRef.typeAnnotation).toBeUndefined();
+      expect(tokenRef.typeImports).toBeUndefined();
+    }
+  });
+
+  it('should reject unknown version with clear error', () => {
+    const manifest: LibraryBeansManifest = {
+      version: 99,
+      package: '@acme/lib',
+      beans: [],
+    };
+
+    expect(() => deserializeBeans(manifest)).toThrow(
+      'Unsupported beans.json version 99 from package "@acme/lib"',
+    );
+  });
+});
+
+describe('discoverLibraryBeans', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'goodie-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should skip packages without goodie.beans field', async () => {
+    // Create a package with only a plugin field (no beans)
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'some-pkg');
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@goodie-ts/some-pkg',
+        goodie: { plugin: 'dist/plugin.js' },
+      }),
+    );
+
+    const beans = await discoverLibraryBeans(tmpDir);
+    expect(beans).toEqual([]);
+  });
+
+  it('should discover and deserialize beans from packages with goodie.beans field', async () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'health');
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@goodie-ts/health',
+        goodie: { beans: 'dist/beans.json' },
+      }),
+    );
+
+    const manifest: LibraryBeansManifest = {
+      version: 1,
+      package: '@goodie-ts/health',
+      beans: [
+        {
+          tokenRef: {
+            kind: 'class',
+            className: 'UptimeHealthIndicator',
+            importPath: '@goodie-ts/health',
+          },
+          scope: 'singleton',
+          eager: false,
+          name: null,
+          constructorDeps: [],
+          fieldDeps: [],
+          factoryKind: 'constructor',
+          providesSource: null,
+          baseTokenRefs: [
+            {
+              kind: 'class',
+              className: 'HealthIndicator',
+              importPath: '@goodie-ts/health',
+            },
+          ],
+          metadata: {},
+          sourceLocation: {
+            filePath: '@goodie-ts/health',
+            line: 0,
+            column: 0,
+          },
+        },
+      ],
+    };
+
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'beans.json'),
+      JSON.stringify(manifest),
+    );
+
+    const beans = await discoverLibraryBeans(tmpDir);
+    expect(beans).toHaveLength(1);
+    expect(beans[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'UptimeHealthIndicator',
+      importPath: '@goodie-ts/health',
+    });
+    expect(beans[0].baseTokenRefs).toEqual([
+      {
+        kind: 'class',
+        className: 'HealthIndicator',
+        importPath: '@goodie-ts/health',
+      },
+    ]);
+  });
+
+  it('should scan custom scopes', async () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@acme', 'my-lib');
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@acme/my-lib',
+        goodie: { beans: 'dist/beans.json' },
+      }),
+    );
+
+    const manifest: LibraryBeansManifest = {
+      version: 1,
+      package: '@acme/my-lib',
+      beans: [
+        {
+          tokenRef: {
+            kind: 'class',
+            className: 'AcmeService',
+            importPath: '@acme/my-lib',
+          },
+          scope: 'singleton',
+          eager: false,
+          name: null,
+          constructorDeps: [],
+          fieldDeps: [],
+          factoryKind: 'constructor',
+          providesSource: null,
+          metadata: {},
+          sourceLocation: {
+            filePath: '@acme/my-lib',
+            line: 0,
+            column: 0,
+          },
+        },
+      ],
+    };
+
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'beans.json'),
+      JSON.stringify(manifest),
+    );
+
+    // Only scan @acme, not @goodie-ts
+    const beans = await discoverLibraryBeans(tmpDir, ['@acme']);
+    expect(beans).toHaveLength(1);
+    expect(beans[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'AcmeService',
+      importPath: '@acme/my-lib',
+    });
+  });
+
+  it('should warn on malformed beans.json and continue', async () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'broken');
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@goodie-ts/broken',
+        goodie: { beans: 'dist/beans.json' },
+      }),
+    );
+
+    // Write invalid JSON
+    fs.writeFileSync(path.join(pkgDir, 'dist', 'beans.json'), '{ invalid }');
+
+    const beans = await discoverLibraryBeans(tmpDir);
+    expect(beans).toEqual([]);
+  });
+
+  it('should return empty array when node_modules does not exist', async () => {
+    const nonExistent = path.join(tmpDir, 'does-not-exist');
+    const beans = await discoverLibraryBeans(nonExistent);
+    expect(beans).toEqual([]);
+  });
+});
+
+describe('rewriteImportPaths', () => {
+  it('should rewrite absolute paths to bare package specifiers', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'MyService',
+          importPath: '/home/user/project/src/my-service.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [
+          {
+            tokenRef: {
+              kind: 'class',
+              className: 'Dep',
+              importPath: '/home/user/project/src/dep.ts',
+            },
+            optional: false,
+            collection: false,
+            sourceLocation: {
+              filePath: '/home/user/project/src/dep.ts',
+              line: 1,
+              column: 0,
+            },
+          },
+        ],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        baseTokenRefs: [
+          {
+            kind: 'class',
+            className: 'Base',
+            importPath: '/home/user/project/src/base.ts',
+          },
+        ],
+        metadata: {},
+        sourceLocation: {
+          filePath: '/home/user/project/src/my-service.ts',
+          line: 1,
+          column: 0,
+        },
+      },
+    ];
+
+    const result = rewriteImportPaths(
+      beans,
+      '@acme/my-lib',
+      '/home/user/project/src',
+    );
+
+    expect(result[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'MyService',
+      importPath: '@acme/my-lib',
+    });
+    expect(result[0].constructorDeps[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'Dep',
+      importPath: '@acme/my-lib',
+    });
+    expect(result[0].baseTokenRefs![0]).toEqual({
+      kind: 'class',
+      className: 'Base',
+      importPath: '@acme/my-lib',
+    });
+    expect(result[0].sourceLocation.filePath).toBe('@acme/my-lib');
+  });
+
+  it('should not rewrite paths that do not match sourceRoot', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'ExternalDep',
+          importPath: '@other/lib',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: { filePath: '@other/lib', line: 0, column: 0 },
+      },
+    ];
+
+    const result = rewriteImportPaths(
+      beans,
+      '@acme/my-lib',
+      '/home/user/project/src',
+    );
+
+    expect(result[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'ExternalDep',
+      importPath: '@other/lib',
+    });
+  });
+});

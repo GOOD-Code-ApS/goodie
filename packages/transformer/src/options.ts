@@ -16,6 +16,13 @@ export interface TransformOptions {
   plugins?: TransformerPlugin[];
   /** Skip auto-discovery of plugins from installed `@goodie-ts/*` packages. */
   disablePluginDiscovery?: boolean;
+  /** Skip auto-discovery of library beans from installed packages. */
+  disableLibraryBeanDiscovery?: boolean;
+  /**
+   * npm scopes to scan for library beans (e.g. `['@goodie-ts', '@acme']`).
+   * Defaults to `['@goodie-ts']`.
+   */
+  scanScopes?: string[];
 }
 
 /** Result returned by the transform pipeline. */

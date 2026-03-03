@@ -22,6 +22,14 @@ export type {
   SourceLocation,
   TokenRef,
 } from './ir.js';
+// Library bean discovery
+export type { LibraryBeansManifest } from './library-beans.js';
+export {
+  deserializeBeans,
+  discoverLibraryBeans,
+  rewriteImportPaths,
+  serializeBeans,
+} from './library-beans.js';
 // Options
 export type {
   ClassVisitorContext,

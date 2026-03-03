@@ -6,6 +6,7 @@ import { generateCode } from './codegen.js';
 import { discoverPlugins, mergePlugins } from './discover-plugins.js';
 import { buildGraph } from './graph-builder.js';
 import type { IRBeanDefinition } from './ir.js';
+import { discoverLibraryBeans } from './library-beans.js';
 import type {
   ClassVisitorContext,
   CodegenContribution,
@@ -65,6 +66,15 @@ export async function transform(
   let beans = resolveResult.beans;
   mergePluginMetadata(beans, pluginClassMetadata);
 
+  // 6b. Inject library beans (before afterResolve so plugins see them)
+  if (!options.disableLibraryBeanDiscovery) {
+    const libraryBeans = await discoverLibraryBeans(
+      path.dirname(options.tsConfigFilePath),
+      options.scanScopes,
+    );
+    beans = [...beans, ...libraryBeans];
+  }
+
   // 7. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
@@ -120,6 +130,7 @@ export function transformInMemory(
   project: Project,
   outputPath: string,
   plugins?: TransformerPlugin[],
+  libraryBeans?: IRBeanDefinition[],
 ): TransformResult {
   const activePlugins = plugins ?? [];
 
@@ -140,6 +151,11 @@ export function transformInMemory(
   // 5. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
   mergePluginMetadata(beans, pluginClassMetadata);
+
+  // 5b. Inject library beans (before afterResolve so plugins see them)
+  if (libraryBeans && libraryBeans.length > 0) {
+    beans = [...beans, ...libraryBeans];
+  }
 
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
