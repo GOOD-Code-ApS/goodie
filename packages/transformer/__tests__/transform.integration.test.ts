@@ -1004,6 +1004,48 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
+  describe('class inheritance subtype resolution', () => {
+    it('should wire dependency on abstract base to concrete @Singleton subclass', () => {
+      const result = createTestProject({
+        '/src/BaseRepo.ts': `
+          export abstract class BaseRepo {
+            abstract findAll(): string[]
+          }
+        `,
+        '/src/UserRepo.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class UserRepo extends BaseRepo {
+            findAll() { return ['alice'] }
+          }
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private repo: BaseRepo) {}
+          }
+        `,
+      });
+
+      // Service's dep should be rewritten from BaseRepo to UserRepo
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'UserRepo',
+      });
+      // Generated code should import and use UserRepo
+      expect(result.code).toContain('UserRepo');
+    });
+  });
+
   describe('error: interface constructor param without token', () => {
     it('should throw UnresolvableTypeError for primitive constructor param', () => {
       expect(() =>

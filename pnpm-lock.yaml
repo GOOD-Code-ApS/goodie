@@ -63,6 +63,9 @@ importers:
       '@goodie-ts/aop':
         specifier: workspace:*
         version: link:../../packages/aop
+      '@goodie-ts/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -127,6 +130,19 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
+  packages/cache:
+    dependencies:
+      '@goodie-ts/aop':
+        specifier: workspace:*
+        version: link:../aop
     devDependencies:
       '@goodie-ts/transformer':
         specifier: workspace:*

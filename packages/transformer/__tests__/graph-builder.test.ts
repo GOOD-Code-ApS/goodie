@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buildGraph } from '../src/graph-builder.js';
 import { resolve } from '../src/resolver.js';
 import {
+  AmbiguousProviderError,
   CircularDependencyError,
   MissingProviderError,
 } from '../src/transformer-errors.js';
@@ -512,6 +513,254 @@ describe('Graph Builder', () => {
       });
 
       expect(result.beans[0].eager).toBe(true);
+    });
+  });
+
+  describe('class inheritance / subtype resolution', () => {
+    it('resolves dependency on base class via decorated subclass', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/BaseRepo.ts': `
+          export abstract class BaseRepo {}
+        `,
+        '/src/UserRepo.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class UserRepo extends BaseRepo {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private repo: BaseRepo) {}
+          }
+        `,
+      });
+
+      // Service's dependency on BaseRepo should be rewritten to UserRepo
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'UserRepo',
+      });
+    });
+
+    it('throws AmbiguousProviderError when multiple subtypes exist for unregistered base', () => {
+      expect(() =>
+        pipeline({
+          '/src/decorators.ts': decoratorsFile,
+          '/src/BaseRepo.ts': `
+            export abstract class BaseRepo {}
+          `,
+          '/src/UserRepo.ts': `
+            import { Singleton } from './decorators.js'
+            import { BaseRepo } from './BaseRepo.js'
+
+            @Singleton()
+            export class UserRepo extends BaseRepo {}
+          `,
+          '/src/OrderRepo.ts': `
+            import { Singleton } from './decorators.js'
+            import { BaseRepo } from './BaseRepo.js'
+
+            @Singleton()
+            export class OrderRepo extends BaseRepo {}
+          `,
+          '/src/Service.ts': `
+            import { Singleton } from './decorators.js'
+            import { BaseRepo } from './BaseRepo.js'
+
+            @Singleton()
+            export class Service {
+              constructor(private repo: BaseRepo) {}
+            }
+          `,
+        }),
+      ).toThrow(AmbiguousProviderError);
+    });
+
+    it('resolves directly when base is registered, even with subtypes', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/BaseRepo.ts': `
+          import { Injectable } from './decorators.js'
+
+          @Injectable()
+          export class BaseRepo {}
+        `,
+        '/src/UserRepo.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class UserRepo extends BaseRepo {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private repo: BaseRepo) {}
+          }
+        `,
+      });
+
+      // BaseRepo is directly registered, so Service gets BaseRepo (not UserRepo)
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'BaseRepo',
+      });
+    });
+
+    it('resolves 3-level inheritance chain: C extends B extends A', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/A.ts': `
+          export abstract class A {}
+        `,
+        '/src/B.ts': `
+          import { A } from './A.js'
+          export abstract class B extends A {}
+        `,
+        '/src/C.ts': `
+          import { Singleton } from './decorators.js'
+          import { B } from './B.js'
+
+          @Singleton()
+          export class C extends B {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { A } from './A.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private dep: A) {}
+          }
+        `,
+      });
+
+      // Service depends on A, only C is registered (via B extends A chain)
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'C',
+      });
+    });
+
+    it('throws AmbiguousProviderError for multi-level chain with multiple leaves', () => {
+      expect(() =>
+        pipeline({
+          '/src/decorators.ts': decoratorsFile,
+          '/src/A.ts': `
+            export abstract class A {}
+          `,
+          '/src/B.ts': `
+            import { A } from './A.js'
+            export abstract class B extends A {}
+          `,
+          '/src/C.ts': `
+            import { Singleton } from './decorators.js'
+            import { B } from './B.js'
+
+            @Singleton()
+            export class C extends B {}
+          `,
+          '/src/D.ts': `
+            import { Singleton } from './decorators.js'
+            import { B } from './B.js'
+
+            @Singleton()
+            export class D extends B {}
+          `,
+          '/src/Service.ts': `
+            import { Singleton } from './decorators.js'
+            import { A } from './A.js'
+
+            @Singleton()
+            export class Service {
+              constructor(private dep: A) {}
+            }
+          `,
+        }),
+      ).toThrow(AmbiguousProviderError);
+    });
+
+    it('does not interfere when both are decorated but base is not depended on', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/BaseRepo.ts': `
+          import { Injectable } from './decorators.js'
+
+          @Injectable()
+          export class BaseRepo {}
+        `,
+        '/src/UserRepo.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class UserRepo extends BaseRepo {}
+        `,
+      });
+
+      // Both should be registered as separate beans
+      const names = result.beans.map((b) =>
+        b.tokenRef.kind === 'class'
+          ? b.tokenRef.className
+          : b.tokenRef.tokenName,
+      );
+      expect(names).toContain('BaseRepo');
+      expect(names).toContain('UserRepo');
+    });
+
+    it('resolves via subclass when base class is not decorated', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/BaseRepo.ts': `
+          export class BaseRepo {}
+        `,
+        '/src/UserRepo.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class UserRepo extends BaseRepo {}
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { BaseRepo } from './BaseRepo.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private repo: BaseRepo) {}
+          }
+        `,
+      });
+
+      const service = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
+      )!;
+      expect(service.constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'UserRepo',
+      });
     });
   });
 });

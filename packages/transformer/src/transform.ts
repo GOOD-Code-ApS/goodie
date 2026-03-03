@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
 import { generateCode } from './codegen.js';
-import { discoverPlugins, mergePlugins } from './discover-plugins.js';
 import { buildGraph } from './graph-builder.js';
 import type { IRBeanDefinition } from './ir.js';
 import type {
@@ -25,13 +24,8 @@ const PKG_VERSION: string = JSON.parse(
 /**
  * Run the full compile-time transform pipeline:
  *   Source Files -> Scanner -> Resolver -> Graph Builder -> Code Generator -> output file
- *
- * Auto-discovers plugins from installed `@goodie-ts/*` packages unless
- * `options.disablePluginDiscovery` is set to `true`.
  */
-export async function transform(
-  options: TransformOptions,
-): Promise<TransformResult> {
+export function transform(options: TransformOptions): TransformResult {
   // 1. Create ts-morph Project
   const project = new Project({
     tsConfigFilePath: options.tsConfigFilePath,
@@ -42,10 +36,7 @@ export async function transform(
     project.addSourceFilesAtPaths(options.include);
   }
 
-  const discovered = options.disablePluginDiscovery
-    ? []
-    : await discoverPlugins();
-  const activePlugins = mergePlugins(discovered, options.plugins ?? []);
+  const activePlugins = options.plugins ?? [];
 
   // 2. beforeScan hooks
   for (const plugin of activePlugins) {
