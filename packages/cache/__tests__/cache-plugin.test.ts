@@ -196,4 +196,32 @@ describe('Cache Transformer Plugin', () => {
 
     expect(result.code).toContain('"ttlMs":30000');
   });
+
+  it('should not add duplicate synthetic beans when afterResolve is invoked with existing beans', () => {
+    const project = createProject({
+      '/src/TodoService.ts': `
+        import { Singleton, Cacheable } from './decorators.js'
+        @Singleton()
+        class TodoService {
+          @Cacheable('todos')
+          findAll() {}
+        }
+      `,
+    });
+
+    const result = transformInMemory(project, '/out/gen.ts', [
+      createCachePlugin(),
+    ]);
+
+    // Match bean definitions (token + scope line), not dependency references
+    const interceptorBeanDefs = result.code.match(
+      /token: CacheInterceptor,\n\s+scope:/g,
+    );
+    expect(interceptorBeanDefs).toHaveLength(1);
+
+    const managerBeanDefs = result.code.match(
+      /token: CacheManager,\n\s+scope:/g,
+    );
+    expect(managerBeanDefs).toHaveLength(1);
+  });
 });

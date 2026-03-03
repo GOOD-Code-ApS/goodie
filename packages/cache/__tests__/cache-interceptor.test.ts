@@ -1,5 +1,5 @@
 import type { InvocationContext } from '@goodie-ts/aop';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CacheInterceptor } from '../src/cache-interceptor.js';
 import { CacheManager } from '../src/cache-manager.js';
 
@@ -117,11 +117,11 @@ describe('CacheInterceptor', () => {
     interceptor.intercept(ctx1);
     interceptor.intercept(ctx2);
 
-    expect(manager.get('todos', 'findById:id-1')).toEqual({
+    expect(manager.get('todos', 'findById:"id-1"')).toEqual({
       id: 'id-1',
       title: 'First',
     });
-    expect(manager.get('todos', 'findById:id-2')).toEqual({
+    expect(manager.get('todos', 'findById:"id-2"')).toEqual({
       id: 'id-2',
       title: 'Second',
     });
@@ -175,7 +175,7 @@ describe('CacheInterceptor', () => {
     );
   });
 
-  it('should use primitive string representation for cache keys', () => {
+  it('should use JSON.stringify for all arg types in cache keys', () => {
     const manager = new CacheManager();
     const interceptor = new CacheInterceptor(manager);
 
@@ -188,7 +188,7 @@ describe('CacheInterceptor', () => {
 
     interceptor.intercept(ctx);
 
-    // Number args should use String() not JSON.stringify
+    // Number 42 via JSON.stringify is still "42"
     expect(manager.get('items', 'findById:42')).toEqual({ id: 42 });
   });
 
@@ -209,5 +209,155 @@ describe('CacheInterceptor', () => {
     interceptor.intercept(ctx);
 
     expect(callCount).toBe(2); // Called twice because undefined is not cached
+  });
+
+  it('should produce different keys for args containing commas or colons (no collision)', () => {
+    const manager = new CacheManager();
+    const interceptor = new CacheInterceptor(manager);
+
+    // These two calls used to produce the same key "get:a,b,c"
+    const ctx1 = createContext({
+      methodName: 'get',
+      args: ['a,b', 'c'],
+      proceed: () => 'result-1',
+      metadata: { cacheName: 'test', cacheAction: 'get' },
+    });
+
+    const ctx2 = createContext({
+      methodName: 'get',
+      args: ['a', 'b,c'],
+      proceed: () => 'result-2',
+      metadata: { cacheName: 'test', cacheAction: 'get' },
+    });
+
+    interceptor.intercept(ctx1);
+    interceptor.intercept(ctx2);
+
+    // With JSON.stringify, the keys are now different:
+    // "get:\"a,b\",\"c\"" vs "get:\"a\",\"b,c\""
+    // So both results should be cached independently
+    const key1 = 'get:"a,b","c"';
+    const key2 = 'get:"a","b,c"';
+    expect(manager.get('test', key1)).toBe('result-1');
+    expect(manager.get('test', key2)).toBe('result-2');
+  });
+
+  it('should protect against async cache stampede (concurrent calls share same Promise)', async () => {
+    const manager = new CacheManager();
+    const interceptor = new CacheInterceptor(manager);
+    let callCount = 0;
+
+    let resolveDeferred!: (value: string) => void;
+    const deferred = new Promise<string>((resolve) => {
+      resolveDeferred = resolve;
+    });
+
+    const makeCtx = () =>
+      createContext({
+        methodName: 'expensiveOp',
+        args: [],
+        proceed: () => {
+          callCount++;
+          return deferred;
+        },
+        metadata: { cacheName: 'data', cacheAction: 'get' },
+      });
+
+    // Fire two concurrent requests before the first resolves
+    const promise1 = interceptor.intercept(makeCtx()) as Promise<string>;
+    const promise2 = interceptor.intercept(makeCtx()) as Promise<string>;
+
+    // Both should return the same Promise reference
+    expect(promise1).toBe(promise2);
+
+    // Only one call should have been made to proceed()
+    expect(callCount).toBe(1);
+
+    // Resolve and verify both get the value
+    resolveDeferred('shared-result');
+    const [r1, r2] = await Promise.all([promise1, promise2]);
+    expect(r1).toBe('shared-result');
+    expect(r2).toBe('shared-result');
+  });
+
+  it('should clear in-flight entry on async rejection (stampede map cleanup)', async () => {
+    const manager = new CacheManager();
+    const interceptor = new CacheInterceptor(manager);
+    let callCount = 0;
+
+    const makeCtx = (fail: boolean) =>
+      createContext({
+        methodName: 'unstable',
+        args: [],
+        proceed: () => {
+          callCount++;
+          return fail
+            ? Promise.reject(new Error('boom'))
+            : Promise.resolve('ok');
+        },
+        metadata: { cacheName: 'data', cacheAction: 'get' },
+      });
+
+    // First call fails
+    await expect(interceptor.intercept(makeCtx(true))).rejects.toThrow('boom');
+    expect(callCount).toBe(1);
+
+    // Second call should NOT reuse the failed in-flight promise — it should retry
+    const result = await interceptor.intercept(makeCtx(false));
+    expect(result).toBe('ok');
+    expect(callCount).toBe(2);
+  });
+
+  it('should swallow eviction errors and log them instead of propagating', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const manager = new CacheManager();
+    // Override evict to throw
+    vi.spyOn(manager, 'evict').mockImplementation(() => {
+      throw new Error('eviction failed');
+    });
+    const interceptor = new CacheInterceptor(manager);
+
+    const ctx = createContext({
+      methodName: 'remove',
+      args: [1],
+      proceed: () => 'business-result',
+      metadata: { cacheName: 'items', cacheAction: 'evict' },
+    });
+
+    // Should not throw — eviction error is swallowed
+    const result = interceptor.intercept(ctx);
+    expect(result).toBe('business-result');
+
+    // Error should be logged
+    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(errorSpy.mock.calls[0][0]).toContain('eviction failed');
+    errorSpy.mockRestore();
+  });
+
+  it('should swallow async eviction errors and log them', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const manager = new CacheManager();
+    vi.spyOn(manager, 'evictAll').mockImplementation(() => {
+      throw new Error('evictAll failed');
+    });
+    const interceptor = new CacheInterceptor(manager);
+
+    const ctx = createContext({
+      methodName: 'clearAll',
+      args: [],
+      proceed: () => Promise.resolve('async-result'),
+      metadata: {
+        cacheName: 'items',
+        cacheAction: 'evict',
+        allEntries: true,
+      },
+    });
+
+    const result = await interceptor.intercept(ctx);
+    expect(result).toBe('async-result');
+
+    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(errorSpy.mock.calls[0][0]).toContain('eviction failed');
+    errorSpy.mockRestore();
   });
 });

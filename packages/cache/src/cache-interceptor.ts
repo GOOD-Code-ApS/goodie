@@ -16,6 +16,9 @@ interface CacheMetadata {
  * Cache keys are derived from stringifying the method arguments.
  */
 export class CacheInterceptor implements MethodInterceptor {
+  /** In-flight promises keyed by `cacheName:cacheKey` to prevent stampedes. */
+  private readonly inflight = new Map<string, Promise<unknown>>();
+
   constructor(private readonly cacheManager: CacheManager) {}
 
   intercept(ctx: InvocationContext): unknown {
@@ -44,15 +47,29 @@ export class CacheInterceptor implements MethodInterceptor {
     const cached = this.cacheManager.get(meta.cacheName, cacheKey);
     if (cached !== undefined) return cached;
 
+    // Check for an in-flight promise (stampede protection)
+    const inflightKey = `${meta.cacheName}:${cacheKey}`;
+    const existing = this.inflight.get(inflightKey);
+    if (existing) return existing;
+
     const result = ctx.proceed();
 
     if (result instanceof Promise) {
-      return result.then((value) => {
-        if (value !== undefined && value !== null) {
-          this.cacheManager.put(meta.cacheName, cacheKey, value, meta.ttlMs);
-        }
-        return value;
-      });
+      const tracked = result.then(
+        (value) => {
+          this.inflight.delete(inflightKey);
+          if (value !== undefined && value !== null) {
+            this.cacheManager.put(meta.cacheName, cacheKey, value, meta.ttlMs);
+          }
+          return value;
+        },
+        (err) => {
+          this.inflight.delete(inflightKey);
+          throw err;
+        },
+      );
+      this.inflight.set(inflightKey, tracked);
+      return tracked;
     }
 
     if (result !== undefined && result !== null) {
@@ -87,10 +104,17 @@ export class CacheInterceptor implements MethodInterceptor {
     const result = ctx.proceed();
 
     const doEvict = () => {
-      if (meta.allEntries) {
-        this.cacheManager.evictAll(meta.cacheName);
-      } else {
-        this.cacheManager.evict(meta.cacheName, cacheKey);
+      try {
+        if (meta.allEntries) {
+          this.cacheManager.evictAll(meta.cacheName);
+        } else {
+          this.cacheManager.evict(meta.cacheName, cacheKey);
+        }
+      } catch (err) {
+        console.error(
+          `[CacheInterceptor] eviction failed for cache="${meta.cacheName}" key="${cacheKey}":`,
+          err,
+        );
       }
     };
 
@@ -111,15 +135,11 @@ export class CacheInterceptor implements MethodInterceptor {
   }
 
   private stringifyArg(arg: unknown): string {
-    if (arg === null) return 'null';
     if (arg === undefined) return 'undefined';
-    const type = typeof arg;
-    if (type === 'string' || type === 'number' || type === 'boolean') {
-      return String(arg);
-    }
     try {
       return JSON.stringify(arg);
     } catch {
+      const type = typeof arg;
       throw new Error(
         `Cache key generation failed: argument of type ${type} is not serializable. ` +
           'Use primitive arguments or provide a custom key strategy.',

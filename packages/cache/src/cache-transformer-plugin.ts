@@ -145,6 +145,15 @@ export function createCachePlugin(): TransformerPlugin {
 
       if (!needsInterceptor) return beans;
 
+      // Check if synthetic beans already exist (e.g. plugin invoked multiple times)
+      const alreadyHas = beans.some(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'CacheInterceptor' &&
+          b.tokenRef.importPath === '@goodie-ts/cache',
+      );
+      if (alreadyHas) return beans;
+
       // Add synthetic CacheInterceptor bean (depends on CacheManager)
       const cacheInterceptorBean: IRBeanDefinition = {
         tokenRef: {
