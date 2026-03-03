@@ -151,10 +151,6 @@ importers:
         version: link:../core
 
   packages/health:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:*
-        version: link:../core
     devDependencies:
       '@goodie-ts/transformer':
         specifier: workspace:*

@@ -13,22 +13,22 @@ export interface AggregatedHealth {
  * The overall status is DOWN if any indicator reports DOWN.
  */
 export class HealthAggregator {
-  constructor(private readonly indicators: HealthIndicator[]) {}
+  constructor(private readonly indicators: HealthIndicator[]) {
+    // Warn about duplicate names at construction time (once), not on every checkAll() call
+    const seen = new Set<string>();
+    for (const ind of indicators) {
+      if (seen.has(ind.name)) {
+        console.warn(
+          `[health] Duplicate indicator name '${ind.name}' — earlier result will be overwritten`,
+        );
+      }
+      seen.add(ind.name);
+    }
+  }
 
   async checkAll(): Promise<AggregatedHealth> {
     // Capture names before any async work so rejection branches can identify the indicator
     const names = this.indicators.map((i) => i.name);
-
-    // Warn about duplicate names — later entries silently overwrite earlier ones
-    const seen = new Set<string>();
-    for (const name of names) {
-      if (seen.has(name)) {
-        console.warn(
-          `[health] Duplicate indicator name '${name}' — earlier result will be overwritten`,
-        );
-      }
-      seen.add(name);
-    }
 
     const results = await Promise.allSettled(
       this.indicators.map(async (indicator) => indicator.check()),

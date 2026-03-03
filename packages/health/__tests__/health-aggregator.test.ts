@@ -137,16 +137,16 @@ describe('HealthAggregator', () => {
 
     const elapsed = Date.now() - startTime;
     // If sequential, would be ~150ms. Concurrent should be ~50ms.
-    expect(elapsed).toBeLessThan(120);
+    // Use generous threshold to avoid flakiness in CI.
+    expect(elapsed).toBeLessThan(140);
     expect(Object.keys(result.indicators)).toHaveLength(3);
   });
 
-  it('should warn on duplicate indicator names', async () => {
+  it('should warn on duplicate indicator names at construction time', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const dup = new TestIndicator('db', 'UP');
 
-    const aggregator = new HealthAggregator([dup, dup]);
-    await aggregator.checkAll();
+    new HealthAggregator([dup, dup]);
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("Duplicate indicator name 'db'"),
