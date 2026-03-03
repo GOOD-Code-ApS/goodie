@@ -9,6 +9,7 @@ import type {
 interface LogMethodInfo {
   methodName: string;
   level: 'debug' | 'info';
+  logArgs: boolean;
 }
 
 /**
@@ -30,14 +31,19 @@ export function createLoggingPlugin(): TransformerPlugin {
   return {
     name: 'logging',
 
+    beforeScan(): void {
+      classLogInfo.clear();
+    },
+
     visitMethod(ctx: MethodVisitorContext): void {
       const decorators = ctx.methodDeclaration.getDecorators();
 
       for (const decorator of decorators) {
         if (decorator.getName() !== 'Log') continue;
 
-        // Parse level from decorator arguments: @Log({ level: 'debug' })
+        // Parse options from decorator arguments: @Log({ level: 'debug', logArgs: true })
         let level: 'debug' | 'info' = 'info';
+        let logArgs = false;
         const args = decorator.getArguments();
         if (args.length > 0) {
           const text = args[0].getText();
@@ -45,11 +51,15 @@ export function createLoggingPlugin(): TransformerPlugin {
           if (levelMatch && levelMatch[1] === 'debug') {
             level = 'debug';
           }
+          const logArgsMatch = text.match(/logArgs\s*:\s*(true|false)/);
+          if (logArgsMatch && logArgsMatch[1] === 'true') {
+            logArgs = true;
+          }
         }
 
         const key = `${ctx.filePath}:${ctx.className}`;
         const existing = classLogInfo.get(key) ?? [];
-        existing.push({ methodName: ctx.methodName, level });
+        existing.push({ methodName: ctx.methodName, level, logArgs });
         classLogInfo.set(key, existing);
       }
     },
@@ -91,7 +101,7 @@ export function createLoggingPlugin(): TransformerPlugin {
             importPath: '@goodie-ts/logging',
             adviceType: 'around' as const,
             order: -100, // Logging runs outermost (before other interceptors)
-            metadata: { level: info.level },
+            metadata: { level: info.level, logArgs: info.logArgs },
           };
 
           if (methodEntry) {
