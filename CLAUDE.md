@@ -14,11 +14,13 @@ The transformer uses ts-morph to scan decorated classes at build time, producing
 
 ```
 decorators  ─┐
-              ├→  transformer  →  vite-plugin
+              ├→  transformer  →  vite-plugin / cli
 core  ───────┘         │
   ↑                    ↓
-  └──────────── generated code (imports core)
+  └──────────── generated code (imports core + aop)
 testing → core
+aop ──→ transformer (plugin)
+cache / logging / resilience / config / kysely / hono ──→ aop + transformer (plugins)
 ```
 
 ## Key Design Decisions
@@ -46,11 +48,20 @@ pnpm clean          # Clean all dist/
 | Package | Purpose |
 |---------|---------|
 | `packages/core` | Runtime container, BeanDefinition, InjectionToken, topoSort |
-| `packages/decorators` | @Injectable, @Singleton, @Module, @Provides, @Inject, etc. |
-| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen |
-| `packages/testing` | TestContext with bean overrides and @MockDefinition |
+| `packages/decorators` | @Injectable, @Singleton, @Module, @Provides, @Inject, @Value, lifecycle hooks |
+| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system |
+| `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
+| `packages/testing` | TestContext with bean overrides and @MockDefinition |
+| `packages/aop` | AOP foundation — @Before, @Around, @After, interceptor chain |
+| `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
+| `packages/config` | Configuration binding — @ConfigurationProperties |
+| `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc. |
+| `packages/kysely` | Kysely integration — @Transactional, @Migration, CrudRepository |
+| `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
+| `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |
 | `examples/basic` | End-to-end example with generics, modules, testing |
+| `examples/hono` | Full-stack example with Hono, PostgreSQL, Kysely, TestContainers |
 
 ## Testing
 
