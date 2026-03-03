@@ -31,7 +31,8 @@
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
-    "ts-morph": "^24.0.0"
+    "ts-morph": "^24.0.0",
+    "tsx": "^4.21.0"
   },
   "files": [
     "dist"
