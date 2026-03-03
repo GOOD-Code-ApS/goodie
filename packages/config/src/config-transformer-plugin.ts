@@ -66,7 +66,7 @@ export function createConfigPlugin(): TransformerPlugin {
       ) {
         const className = ctx.classDeclaration.getName() ?? '<anonymous>';
         console.warn(
-          `[config] @ConfigurationProperties on '${className}' has a non-literal prefix argument '${prefixArg}' — only string literals are supported. Skipping config generation for this class.`,
+          `[config] @ConfigurationProperties on '${className}' has a non-literal prefix argument '${prefixArg}' — only single-quoted or double-quoted string literals are supported. Skipping config generation for this class.`,
         );
         return;
       }
@@ -85,6 +85,9 @@ export function createConfigPlugin(): TransformerPlugin {
         const scope = prop.getScope();
         if (scope === 'private' || scope === 'protected') continue;
         if (fieldName.startsWith('_')) continue;
+
+        // Skip fields already decorated with @Value (handled by the scanner)
+        if (prop.getDecorators().some((d) => d.getName() === 'Value')) continue;
 
         // Get default value from initializer
         // TODO: process.env values are always strings — add type coercion

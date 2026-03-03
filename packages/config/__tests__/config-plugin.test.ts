@@ -382,6 +382,11 @@ describe('Config Transformer Plugin', () => {
       expect.stringContaining('non-literal prefix argument'),
     );
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('MY_PREFIX'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'only single-quoted or double-quoted string literals are supported',
+      ),
+    );
     // Bean exists (has @Singleton) but no valueFields (non-literal prefix)
     const bean = result.beans.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
@@ -389,6 +394,45 @@ describe('Config Transformer Plugin', () => {
     expect(bean).toBeDefined();
     expect(bean!.metadata.valueFields).toBeUndefined();
     warnSpy.mockRestore();
+  });
+
+  it('should skip @Value-decorated properties to avoid duplicate valueFields entries', () => {
+    const result = createTestProject({
+      '/src/Config.ts': `
+        import { Singleton, ConfigurationProperties, Value } from './decorators.js'
+
+        @Singleton()
+        @ConfigurationProperties('app')
+        export class Config {
+          name = 'my-app'
+
+          @Value('APP_SECRET')
+          accessor secret!: string
+        }
+      `,
+    });
+
+    const bean = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
+    );
+    expect(bean).toBeDefined();
+
+    const valueFields = bean!.metadata.valueFields as Array<{
+      fieldName: string;
+      key: string;
+      default?: string;
+    }>;
+
+    // 'secret' should appear only once (from the scanner's @Value handling),
+    // NOT duplicated by the config plugin with key 'app.secret'
+    const secretEntries = valueFields.filter((f) => f.fieldName === 'secret');
+    expect(secretEntries).toHaveLength(1);
+    expect(secretEntries[0].key).toBe('APP_SECRET');
+
+    // 'name' should still be present from the config plugin
+    const nameField = valueFields.find((f) => f.fieldName === 'name');
+    expect(nameField).toBeDefined();
+    expect(nameField!.key).toBe('app.name');
   });
 
   it('should merge @Value fields with @ConfigurationProperties fields on the same class', () => {
