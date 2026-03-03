@@ -31,6 +31,7 @@ export function CachePut(name: string, opts?: any) { return (t: any, c: any) => 
 export function Retryable(opts?: any) { return (t: any, c: any) => {} }
 export function CircuitBreaker(opts?: any) { return (t: any, c: any) => {} }
 export function Timeout(duration: number) { return (t: any, c: any) => {} }
+export function ConfigurationProperties(prefix: string) { return (t: any, c: any) => {} }
 export function Transactional(opts?: any) { return (t: any, c: any) => {} }
 export function Migration(name: string) { return (t: any, c: any) => {} }
 `;

@@ -1,4 +1,5 @@
 import { createCachePlugin } from '@goodie-ts/cache';
+import { createConfigPlugin } from '@goodie-ts/config';
 import { createLoggingPlugin } from '@goodie-ts/logging';
 import { createResiliencePlugin } from '@goodie-ts/resilience';
 import { diPlugin } from '@goodie-ts/vite-plugin';
@@ -11,6 +12,7 @@ export default defineConfig({
         createLoggingPlugin(),
         createCachePlugin(),
         createResiliencePlugin(),
+        createConfigPlugin(),
       ],
     }),
   ],
@@ -23,6 +25,7 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
+        '@goodie-ts/config',
         '@goodie-ts/core',
         '@goodie-ts/decorators',
         '@goodie-ts/aop',

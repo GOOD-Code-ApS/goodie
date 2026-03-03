@@ -40,6 +40,10 @@ export default defineConfig({
         __dirname,
         'packages/resilience/src/index.ts',
       ),
+      '@goodie-ts/config': path.resolve(
+        __dirname,
+        'packages/config/src/index.ts',
+      ),
       '@goodie-ts/kysely': path.resolve(
         __dirname,
         'packages/kysely/src/index.ts',
