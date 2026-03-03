@@ -28,12 +28,13 @@ export class LoggingInterceptor implements MethodInterceptor {
   intercept(ctx: InvocationContext): unknown | Promise<unknown> {
     const level =
       (ctx.metadata?.level as 'debug' | 'info' | undefined) ?? 'info';
+    const logArgs = (ctx.metadata?.logArgs as boolean | undefined) ?? false;
     const logger = this.getLogger(ctx.className);
     const mdcContext = MDC.getAll();
     const meta: Record<string, unknown> = {
       ...mdcContext,
       method: ctx.methodName,
-      args: ctx.args,
+      ...(logArgs ? { args: ctx.args } : {}),
     };
 
     logger[level](`→ ${ctx.methodName}()`, meta);

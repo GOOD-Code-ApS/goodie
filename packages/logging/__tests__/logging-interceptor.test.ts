@@ -163,4 +163,40 @@ describe('LoggingInterceptor', () => {
     expect(exitLog).toContain('span-456');
     logSpy.mockRestore();
   });
+
+  it('should NOT include args in log output by default (security/PII)', () => {
+    const messages: Array<{ msg: string; meta?: Record<string, unknown> }> = [];
+    const customLogger: Logger = {
+      debug: (msg, meta) => messages.push({ msg, meta }),
+      info: (msg, meta) => messages.push({ msg, meta }),
+      warn: (msg, meta) => messages.push({ msg, meta }),
+      error: (msg, meta) => messages.push({ msg, meta }),
+    };
+
+    const interceptor = new LoggingInterceptor(() => customLogger);
+    interceptor.intercept(createContext());
+
+    // Entry log meta should NOT contain args
+    expect(messages[0].meta).toBeDefined();
+    expect(messages[0].meta).not.toHaveProperty('args');
+  });
+
+  it('should include args in log output when logArgs is true', () => {
+    const messages: Array<{ msg: string; meta?: Record<string, unknown> }> = [];
+    const customLogger: Logger = {
+      debug: (msg, meta) => messages.push({ msg, meta }),
+      info: (msg, meta) => messages.push({ msg, meta }),
+      warn: (msg, meta) => messages.push({ msg, meta }),
+      error: (msg, meta) => messages.push({ msg, meta }),
+    };
+
+    const interceptor = new LoggingInterceptor(() => customLogger);
+    const ctx = createContext({ metadata: { logArgs: true } });
+    interceptor.intercept(ctx);
+
+    // Entry log meta should contain args
+    expect(messages[0].meta).toBeDefined();
+    expect(messages[0].meta).toHaveProperty('args');
+    expect(messages[0].meta?.args).toEqual(['arg1', 42]);
+  });
 });
