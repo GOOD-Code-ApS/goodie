@@ -10,6 +10,8 @@ export interface InvocationContext {
   target: unknown;
   /** Call the next interceptor in the chain, or the original method if last. */
   proceed(...args: unknown[]): unknown | Promise<unknown>;
+  /** Per-interceptor metadata from the decorator (e.g. log level, cache name). */
+  metadata?: Record<string, unknown>;
 }
 
 /** Full-control interceptor — wraps the entire method execution. */
@@ -40,6 +42,8 @@ export interface InterceptorRef {
   adviceType: 'around' | 'before' | 'after';
   /** Execution order (lower = runs first). */
   order: number;
+  /** Per-interceptor metadata passed to InvocationContext (e.g. cache name, log level). */
+  metadata?: Record<string, unknown>;
 }
 
 /** Descriptor for an intercepted method (stored in bean metadata). */

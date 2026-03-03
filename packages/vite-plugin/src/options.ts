@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { TransformerPlugin } from '@goodie-ts/transformer';
 
 /** User-facing options for the Vite DI plugin. */
 export interface DiPluginOptions {
@@ -10,6 +11,8 @@ export interface DiPluginOptions {
   include?: string[];
   /** Debounce interval in ms for watch-mode rebuilds. Defaults to `100`. */
   debounceMs?: number;
+  /** Transformer plugins to extend the pipeline (e.g. AOP, logging, cache). */
+  plugins?: TransformerPlugin[];
 }
 
 /** Resolved (absolute) options used internally by the plugin. */
@@ -18,6 +21,7 @@ export interface ResolvedOptions {
   outputPath: string;
   include: string[] | undefined;
   debounceMs: number;
+  plugins: TransformerPlugin[];
 }
 
 const DEFAULT_TSCONFIG = 'tsconfig.json';
@@ -40,5 +44,6 @@ export function resolveOptions(
       : path.resolve(viteRoot, DEFAULT_OUTPUT),
     include: opts.include,
     debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+    plugins: opts.plugins ?? [],
   };
 }

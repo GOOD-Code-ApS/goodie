@@ -22,16 +22,16 @@ const defaultOptions = {
 };
 
 describe('runTransform', () => {
-  it('returns success with result and timing', () => {
+  it('returns success with result and timing', async () => {
     const fakeResult = {
       code: '// generated',
       outputPath: defaultOptions.outputPath,
       beans: [{ id: 'A' }, { id: 'B' }],
       warnings: [],
     };
-    mockTransform.mockReturnValue(fakeResult as any);
+    mockTransform.mockResolvedValue(fakeResult as any);
 
-    const outcome = runTransform(defaultOptions);
+    const outcome = await runTransform(defaultOptions);
 
     expect(outcome.success).toBe(true);
     if (outcome.success) {
@@ -40,15 +40,15 @@ describe('runTransform', () => {
     }
   });
 
-  it('passes tsConfigPath and outputPath to transform', () => {
-    mockTransform.mockReturnValue({
+  it('passes tsConfigPath and outputPath to transform', async () => {
+    mockTransform.mockResolvedValue({
       code: '',
       outputPath: '',
       beans: [],
       warnings: [],
     } as any);
 
-    runTransform(defaultOptions);
+    await runTransform(defaultOptions);
 
     expect(mockTransform).toHaveBeenCalledWith({
       tsConfigFilePath: '/project/tsconfig.json',
@@ -56,17 +56,15 @@ describe('runTransform', () => {
     });
   });
 
-  it('returns failure on TransformerError', () => {
+  it('returns failure on TransformerError', async () => {
     const error = new TransformerError(
       'Missing provider',
       { filePath: 'foo.ts', line: 1, column: 0 },
       'Add @Injectable()',
     );
-    mockTransform.mockImplementation(() => {
-      throw error;
-    });
+    mockTransform.mockRejectedValue(error);
 
-    const outcome = runTransform(defaultOptions);
+    const outcome = await runTransform(defaultOptions);
 
     expect(outcome.success).toBe(false);
     if (!outcome.success) {
@@ -74,12 +72,10 @@ describe('runTransform', () => {
     }
   });
 
-  it('wraps non-Error throws into an Error', () => {
-    mockTransform.mockImplementation(() => {
-      throw 'string error';
-    });
+  it('wraps non-Error throws into an Error', async () => {
+    mockTransform.mockRejectedValue('string error');
 
-    const outcome = runTransform(defaultOptions);
+    const outcome = await runTransform(defaultOptions);
 
     expect(outcome.success).toBe(false);
     if (!outcome.success) {

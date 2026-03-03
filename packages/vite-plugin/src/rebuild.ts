@@ -12,12 +12,15 @@ export type RebuildOutcome = RebuildSuccess | RebuildFailure;
 /**
  * Run the DI transform pipeline with full rebuild every time.
  */
-export function runRebuild(options: ResolvedOptions): RebuildOutcome {
+export async function runRebuild(
+  options: ResolvedOptions,
+): Promise<RebuildOutcome> {
   try {
-    const result = transform({
+    const result = await transform({
       tsConfigFilePath: options.tsConfigPath,
       outputPath: options.outputPath,
       include: options.include,
+      plugins: options.plugins,
     });
     return { success: true, result };
   } catch (error) {

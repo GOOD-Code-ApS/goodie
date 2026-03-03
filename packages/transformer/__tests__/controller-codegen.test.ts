@@ -8,7 +8,7 @@ import { generateCode } from '../src/codegen.js';
 const loc = { filePath: '/src/test.ts', line: 1, column: 1 };
 
 describe('Controller Codegen', () => {
-  it('should generate createRouter() when controllers with routes exist', () => {
+  it('should generate EmbeddedServer bean when controllers with routes exist', () => {
     const beans: IRBeanDefinition[] = [
       {
         tokenRef: {
@@ -51,15 +51,15 @@ describe('Controller Codegen', () => {
     );
 
     expect(code).toContain("import { Hono } from 'hono'");
-    expect(code).toContain(
-      'export function createRouter(ctx: ApplicationContext): Hono',
-    );
-    expect(code).toContain('const userController = ctx.get(UserController)');
-    expect(code).toContain("app.get('/users'");
+    expect(code).toContain("import { EmbeddedServer } from '@goodie-ts/hono'");
+    expect(code).toContain('token: EmbeddedServer,');
+    expect(code).toContain('new Hono()');
+    expect(code).toContain("__honoApp.get('/users'");
     expect(code).toContain('userController.getAll(c)');
-    expect(code).toContain("app.post('/users'");
+    expect(code).toContain("__honoApp.post('/users'");
     expect(code).toContain('userController.create(c)');
-    expect(code).toContain('return app');
+    expect(code).toContain('new EmbeddedServer(__honoApp)');
+    expect(code).toContain('export async function startServer');
   });
 
   it('should correctly prefix routes with basePath', () => {
@@ -104,11 +104,11 @@ describe('Controller Codegen', () => {
       controllers,
     );
 
-    expect(code).toContain("app.get('/api/todos'");
-    expect(code).toContain("app.get('/api/todos/:id'");
+    expect(code).toContain("__honoApp.get('/api/todos'");
+    expect(code).toContain("__honoApp.get('/api/todos/:id'");
   });
 
-  it('should generate multiple controller variable assignments', () => {
+  it('should list all controllers as EmbeddedServer dependencies', () => {
     const beans: IRBeanDefinition[] = [
       {
         tokenRef: {
@@ -172,13 +172,13 @@ describe('Controller Codegen', () => {
       controllers,
     );
 
-    expect(code).toContain('const userController = ctx.get(UserController)');
-    expect(code).toContain('const todoController = ctx.get(TodoController)');
-    expect(code).toContain("app.get('/users'");
-    expect(code).toContain("app.get('/todos'");
+    expect(code).toContain('token: UserController, optional: false');
+    expect(code).toContain('token: TodoController, optional: false');
+    expect(code).toContain("__honoApp.get('/users'");
+    expect(code).toContain("__honoApp.get('/todos'");
   });
 
-  it('should not generate createRouter() when no controllers', () => {
+  it('should not generate EmbeddedServer when no controllers', () => {
     const beans: IRBeanDefinition[] = [
       {
         tokenRef: {
@@ -202,11 +202,12 @@ describe('Controller Codegen', () => {
       outputPath: '/out/AppContext.generated.ts',
     });
 
-    expect(code).not.toContain('createRouter');
+    expect(code).not.toContain('EmbeddedServer');
     expect(code).not.toContain("import { Hono } from 'hono'");
+    expect(code).not.toContain('startServer');
   });
 
-  it('should not generate createRouter() when controllers have no routes', () => {
+  it('should generate EmbeddedServer even when controllers have no routes', () => {
     const beans: IRBeanDefinition[] = [
       {
         tokenRef: {
@@ -245,8 +246,9 @@ describe('Controller Codegen', () => {
       controllers,
     );
 
-    expect(code).not.toContain('createRouter');
-    expect(code).not.toContain("import { Hono } from 'hono'");
+    expect(code).toContain('token: EmbeddedServer,');
+    expect(code).toContain('new EmbeddedServer(__honoApp)');
+    expect(code).toContain('startServer');
   });
 
   it('should generate Response passthrough in route handlers', () => {
@@ -400,11 +402,9 @@ describe('Controller Codegen', () => {
       controllers,
     );
 
-    // Different class names produce different variable names
-    expect(code).toContain('const userController = ctx.get(UserController)');
-    expect(code).toContain(
-      'const userControllerV2 = ctx.get(UserControllerV2)',
-    );
+    // Different class names produce different factory param names
+    expect(code).toContain('userController: any');
+    expect(code).toContain('userControllerV2: any');
   });
 
   it('should handle all HTTP methods in routes', () => {
@@ -452,10 +452,55 @@ describe('Controller Codegen', () => {
       controllers,
     );
 
-    expect(code).toContain("app.get('/r'");
-    expect(code).toContain("app.post('/r'");
-    expect(code).toContain("app.put('/r'");
-    expect(code).toContain("app.delete('/r'");
-    expect(code).toContain("app.patch('/r'");
+    expect(code).toContain("__honoApp.get('/r'");
+    expect(code).toContain("__honoApp.post('/r'");
+    expect(code).toContain("__honoApp.put('/r'");
+    expect(code).toContain("__honoApp.delete('/r'");
+    expect(code).toContain("__honoApp.patch('/r'");
+  });
+
+  it('should generate startServer that uses EmbeddedServer.listen()', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Ctrl',
+          importPath: '/src/Ctrl.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const controllers: IRControllerDefinition[] = [
+      {
+        classTokenRef: {
+          kind: 'class',
+          className: 'Ctrl',
+          importPath: '/src/Ctrl.ts',
+        },
+        basePath: '/',
+        routes: [{ methodName: 'index', httpMethod: 'get', path: '/' }],
+      },
+    ];
+
+    const code = generateCode(
+      beans,
+      { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
+      controllers,
+    );
+
+    expect(code).toContain('export async function startServer');
+    expect(code).toContain('await app.start()');
+    expect(code).toContain('ctx.get(EmbeddedServer).listen(options)');
+    expect(code).toContain('return ctx');
   });
 });

@@ -20,10 +20,12 @@ export interface TransformFailure {
 
 export type TransformOutcome = TransformSuccess | TransformFailure;
 
-export function runTransform(options: RunTransformOptions): TransformOutcome {
+export async function runTransform(
+  options: RunTransformOptions,
+): Promise<TransformOutcome> {
   const start = performance.now();
   try {
-    const result = transform({
+    const result = await transform({
       tsConfigFilePath: options.tsConfigPath,
       outputPath: options.outputPath,
     });
