@@ -257,6 +257,12 @@ export function rewriteImportPaths(
     constructorDeps: bean.constructorDeps.map((dep) => ({
       ...dep,
       tokenRef: rewriteTokenRefPath(dep.tokenRef, packageName, sourceRoot),
+      sourceLocation: {
+        ...dep.sourceLocation,
+        filePath: dep.sourceLocation.filePath.startsWith(sourceRoot)
+          ? packageName
+          : dep.sourceLocation.filePath,
+      },
     })),
     fieldDeps: bean.fieldDeps.map((dep) => ({
       ...dep,

@@ -25,6 +25,37 @@ export interface TransformOptions {
   scanScopes?: string[];
 }
 
+/** Options for building a library's beans.json manifest. */
+export interface TransformLibraryOptions {
+  /** Path to the tsconfig.json used to create the ts-morph Project. */
+  tsConfigFilePath: string;
+  /** npm package name (e.g. `'@goodie-ts/health'`). Used in the manifest and to rewrite import paths. */
+  packageName: string;
+  /** Absolute path for the generated beans.json file. */
+  beansOutputPath: string;
+  /**
+   * Source file globs to scan (relative to tsconfig root).
+   * Defaults to all .ts files in the project.
+   */
+  include?: string[];
+  /** Plugins to extend the transformer pipeline. */
+  plugins?: TransformerPlugin[];
+  /** Skip auto-discovery of plugins from installed `@goodie-ts/*` packages. */
+  disablePluginDiscovery?: boolean;
+}
+
+/** Result returned by the library transform pipeline. */
+export interface TransformLibraryResult {
+  /** The serialized beans.json manifest. */
+  manifest: import('./library-beans.js').LibraryBeansManifest;
+  /** Absolute path where the manifest was written. */
+  outputPath: string;
+  /** All discovered bean definitions (with rewritten import paths). */
+  beans: import('./ir.js').IRBeanDefinition[];
+  /** Non-fatal warnings encountered during transformation. */
+  warnings: string[];
+}
+
 /** Result returned by the transform pipeline. */
 export interface TransformResult {
   /** The generated source code. */

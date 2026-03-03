@@ -197,6 +197,10 @@ importers:
         version: link:../core
 
   packages/health:
+    dependencies:
+      '@goodie-ts/decorators':
+        specifier: workspace:^
+        version: link:../decorators
     devDependencies:
       '@goodie-ts/transformer':
         specifier: workspace:*

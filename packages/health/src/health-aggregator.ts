@@ -1,3 +1,4 @@
+import { Singleton } from '@goodie-ts/decorators';
 import type { HealthIndicator, HealthResult } from './health-indicator.js';
 
 /** Aggregated result from all health indicators. */
@@ -9,9 +10,10 @@ export interface AggregatedHealth {
 /**
  * Aggregates multiple HealthIndicator instances and provides a combined health status.
  *
- * Usage: register as a singleton with all HealthIndicator[] injected via constructor.
  * The overall status is DOWN if any indicator reports DOWN.
+ * All HealthIndicator subtypes are injected via collection injection.
  */
+@Singleton()
 export class HealthAggregator {
   constructor(private readonly indicators: HealthIndicator[]) {
     // Warn about duplicate names at construction time (once), not on every checkAll() call

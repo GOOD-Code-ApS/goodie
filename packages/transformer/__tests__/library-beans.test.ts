@@ -10,6 +10,7 @@ import {
   rewriteImportPaths,
   serializeBeans,
 } from '../src/library-beans.js';
+import { transformLibrary } from '../src/transform.js';
 
 describe('serializeBeans / deserializeBeans', () => {
   it('should round-trip a simple class bean', () => {
@@ -470,6 +471,9 @@ describe('rewriteImportPaths', () => {
       className: 'Dep',
       importPath: '@acme/my-lib',
     });
+    expect(result[0].constructorDeps[0].sourceLocation.filePath).toBe(
+      '@acme/my-lib',
+    );
     expect(result[0].baseTokenRefs![0]).toEqual({
       kind: 'class',
       className: 'Base',
@@ -509,5 +513,239 @@ describe('rewriteImportPaths', () => {
       className: 'ExternalDep',
       importPath: '@other/lib',
     });
+  });
+});
+
+describe('transformLibrary', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'goodie-lib-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeFiles(files: Record<string, string>) {
+    for (const [filePath, content] of Object.entries(files)) {
+      const fullPath = path.join(tmpDir, filePath);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, content);
+    }
+  }
+
+  it('should scan decorated source and produce a beans.json manifest', async () => {
+    writeFiles({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ES2022',
+          moduleResolution: 'bundler',
+          strict: true,
+          outDir: 'dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+      }),
+      'src/decorators.ts': `
+export function Singleton() { return (t: any, c: any) => {} }
+      `,
+      'src/my-service.ts': `
+import { Singleton } from './decorators.js'
+
+@Singleton()
+export class MyService {
+  hello() { return 'world' }
+}
+      `,
+    });
+
+    const beansOutputPath = path.join(tmpDir, 'dist', 'beans.json');
+    const result = await transformLibrary({
+      tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
+      packageName: '@acme/my-lib',
+      beansOutputPath,
+      disablePluginDiscovery: true,
+    });
+
+    // Should have discovered MyService
+    expect(result.beans).toHaveLength(1);
+    expect(result.beans[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'MyService',
+      importPath: '@acme/my-lib',
+    });
+    expect(result.beans[0].sourceLocation.filePath).toBe('@acme/my-lib');
+
+    // Manifest should be written to disk
+    expect(fs.existsSync(beansOutputPath)).toBe(true);
+    const written = JSON.parse(fs.readFileSync(beansOutputPath, 'utf-8'));
+    expect(written.version).toBe(1);
+    expect(written.package).toBe('@acme/my-lib');
+    expect(written.beans).toHaveLength(1);
+  });
+
+  it('should rewrite import paths including constructor dep sourceLocations', async () => {
+    writeFiles({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ES2022',
+          moduleResolution: 'bundler',
+          strict: true,
+          outDir: 'dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+      }),
+      'src/decorators.ts': `
+export function Singleton() { return (t: any, c: any) => {} }
+      `,
+      'src/dep.ts': `
+import { Singleton } from './decorators.js'
+
+@Singleton()
+export class Dep {}
+      `,
+      'src/consumer.ts': `
+import { Singleton } from './decorators.js'
+import { Dep } from './dep.js'
+
+@Singleton()
+export class Consumer {
+  constructor(private dep: Dep) {}
+}
+      `,
+    });
+
+    const result = await transformLibrary({
+      tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
+      packageName: '@acme/my-lib',
+      beansOutputPath: path.join(tmpDir, 'dist', 'beans.json'),
+      disablePluginDiscovery: true,
+    });
+
+    const consumer = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Consumer',
+    );
+    expect(consumer).toBeDefined();
+
+    // Token ref should be rewritten
+    expect(consumer!.tokenRef).toEqual({
+      kind: 'class',
+      className: 'Consumer',
+      importPath: '@acme/my-lib',
+    });
+
+    // Constructor dep token ref and sourceLocation should be rewritten
+    expect(consumer!.constructorDeps).toHaveLength(1);
+    expect(consumer!.constructorDeps[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'Dep',
+      importPath: '@acme/my-lib',
+    });
+    expect(consumer!.constructorDeps[0].sourceLocation.filePath).toBe(
+      '@acme/my-lib',
+    );
+  });
+
+  it('should produce a manifest that round-trips through deserialize', async () => {
+    writeFiles({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ES2022',
+          moduleResolution: 'bundler',
+          strict: true,
+          outDir: 'dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+      }),
+      'src/decorators.ts': `
+export function Singleton() { return (t: any, c: any) => {} }
+      `,
+      'src/service.ts': `
+import { Singleton } from './decorators.js'
+
+@Singleton()
+export class Service {}
+      `,
+    });
+
+    const beansOutputPath = path.join(tmpDir, 'dist', 'beans.json');
+    await transformLibrary({
+      tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
+      packageName: '@acme/lib',
+      beansOutputPath,
+      disablePluginDiscovery: true,
+    });
+
+    // Read manifest from disk and deserialize
+    const manifest: LibraryBeansManifest = JSON.parse(
+      fs.readFileSync(beansOutputPath, 'utf-8'),
+    );
+    const beans = deserializeBeans(manifest);
+
+    expect(beans).toHaveLength(1);
+    expect(beans[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'Service',
+      importPath: '@acme/lib',
+    });
+  });
+
+  it('should detect base classes and set baseTokenRefs', async () => {
+    writeFiles({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ES2022',
+          moduleResolution: 'bundler',
+          strict: true,
+          outDir: 'dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+      }),
+      'src/decorators.ts': `
+export function Singleton() { return (t: any, c: any) => {} }
+      `,
+      'src/base.ts': `
+export abstract class BaseService {
+  abstract doWork(): void
+}
+      `,
+      'src/impl.ts': `
+import { Singleton } from './decorators.js'
+import { BaseService } from './base.js'
+
+@Singleton()
+export class ImplService extends BaseService {
+  doWork() {}
+}
+      `,
+    });
+
+    const result = await transformLibrary({
+      tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
+      packageName: '@acme/lib',
+      beansOutputPath: path.join(tmpDir, 'dist', 'beans.json'),
+      disablePluginDiscovery: true,
+    });
+
+    const impl = result.beans.find(
+      (b) =>
+        b.tokenRef.kind === 'class' && b.tokenRef.className === 'ImplService',
+    );
+    expect(impl).toBeDefined();
+    expect(impl!.baseTokenRefs).toEqual([
+      {
+        kind: 'class',
+        className: 'BaseService',
+        importPath: '@acme/lib',
+      },
+    ]);
   });
 });
