@@ -1,10 +1,10 @@
 import type { InjectionToken } from './injection-token.js';
-import type { Constructor, Scope } from './types.js';
+import type { AbstractConstructor, Constructor, Scope } from './types.js';
 
 /** A single dependency of a bean. */
 export interface Dependency {
   /** The token to resolve. */
-  token: InjectionToken<unknown> | Constructor;
+  token: InjectionToken<unknown> | Constructor | AbstractConstructor;
   /** If true, resolves to `undefined` when no provider is registered. */
   optional: boolean;
   /** If true, inject all beans under this token as an array via `getAll()`. */
@@ -24,7 +24,7 @@ export interface BeanDefinition<T = unknown> {
   /** Whether to instantiate eagerly during context creation. */
   eager: boolean;
   /** Additional tokens this bean should be registered under (e.g. base classes). */
-  baseTokens?: (InjectionToken<unknown> | Constructor)[];
+  baseTokens?: (InjectionToken<unknown> | Constructor | AbstractConstructor)[];
   /** Arbitrary metadata stashed by decorators — extension libraries use this. */
   metadata: Record<string, unknown>;
 }

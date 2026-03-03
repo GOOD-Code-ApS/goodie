@@ -7,9 +7,9 @@ import {
 } from './errors.js';
 import type { InjectionToken } from './injection-token.js';
 import { topoSort } from './topo-sort.js';
-import type { Constructor } from './types.js';
+import type { AbstractConstructor, Constructor } from './types.js';
 
-type Token = InjectionToken<unknown> | Constructor;
+type Token = InjectionToken<unknown> | Constructor | AbstractConstructor;
 
 const UNRESOLVED = Symbol('UNRESOLVED');
 
@@ -79,7 +79,9 @@ export class ApplicationContext {
    * - The token has no provider
    * - The context is closed
    */
-  get<T>(token: Constructor<T> | InjectionToken<T>): T {
+  get<T>(
+    token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+  ): T {
     this.assertOpen();
     const def = this.primaryDef.get(token as Token);
     if (!def) {
@@ -106,7 +108,9 @@ export class ApplicationContext {
   /**
    * Asynchronously get a bean. Always works, even for async factories.
    */
-  async getAsync<T>(token: Constructor<T> | InjectionToken<T>): Promise<T> {
+  async getAsync<T>(
+    token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+  ): Promise<T> {
     this.assertOpen();
     const def = this.primaryDef.get(token as Token);
     if (!def) {
@@ -143,7 +147,9 @@ export class ApplicationContext {
    * Get all beans registered under the given token.
    * Throws if any bean has an async factory — use `getAllAsync()` instead.
    */
-  getAll<T>(token: Constructor<T> | InjectionToken<T>): T[] {
+  getAll<T>(
+    token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+  ): T[] {
     this.assertOpen();
     const defs = this.defsByToken.get(token as Token);
     if (!defs || defs.length === 0) {
@@ -165,7 +171,7 @@ export class ApplicationContext {
    * Safe to use when beans may have async factories.
    */
   async getAllAsync<T>(
-    token: Constructor<T> | InjectionToken<T>,
+    token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
   ): Promise<T[]> {
     this.assertOpen();
     const defs = this.defsByToken.get(token as Token);

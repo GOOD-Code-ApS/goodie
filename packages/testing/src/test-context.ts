@@ -1,4 +1,5 @@
 import {
+  type AbstractConstructor,
   ApplicationContext,
   type BeanDefinition,
   type Constructor,
@@ -8,7 +9,7 @@ import {
 } from '@goodie-ts/core';
 import { getMockTarget, MockDefinitionError } from './mock-definition.js';
 
-type Token = InjectionToken<unknown> | Constructor;
+type Token = InjectionToken<unknown> | Constructor | AbstractConstructor;
 
 function tokenName(token: Token): string {
   if (typeof token === 'function') {
@@ -33,7 +34,7 @@ export class OverrideBuilder<T> {
    */
   withValue(value: T): TestContextBuilder {
     const def: BeanDefinition = {
-      token: this.token,
+      token: this.token as BeanDefinition['token'],
       scope: 'singleton',
       dependencies: [],
       factory: () => value,
@@ -49,7 +50,7 @@ export class OverrideBuilder<T> {
    */
   with(cls: Constructor<T>): TestContextBuilder {
     const def: BeanDefinition = {
-      token: this.token,
+      token: this.token as BeanDefinition['token'],
       scope: 'singleton',
       dependencies: [],
       factory: () => new cls(),
@@ -65,7 +66,7 @@ export class OverrideBuilder<T> {
    */
   withFactory(factory: () => T | Promise<T>): TestContextBuilder {
     const def: BeanDefinition = {
-      token: this.token,
+      token: this.token as BeanDefinition['token'],
       scope: 'singleton',
       dependencies: [],
       factory,
@@ -96,7 +97,7 @@ export class OverrideBuilder<T> {
       );
     }
     const def: BeanDefinition = {
-      token: this.token,
+      token: this.token as BeanDefinition['token'],
       scope: original.scope,
       dependencies: [...original.dependencies],
       factory,
@@ -124,7 +125,9 @@ export class TestContextBuilder {
    * Start overriding a bean identified by its class constructor.
    * Throws OverrideError if the token doesn't exist in the base definitions.
    */
-  override<T>(token: Constructor<T> | InjectionToken<T>): OverrideBuilder<T> {
+  override<T>(
+    token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+  ): OverrideBuilder<T> {
     if (!this.tokenSet.has(token as Token)) {
       throw new OverrideError(tokenName(token as Token));
     }
@@ -161,7 +164,7 @@ export class TestContextBuilder {
       }
 
       const def: BeanDefinition = {
-        token,
+        token: token as BeanDefinition['token'],
         scope: 'singleton',
         dependencies: [],
         factory: () => new cls(),
