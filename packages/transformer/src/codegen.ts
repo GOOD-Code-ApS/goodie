@@ -70,10 +70,20 @@ export function generateCode(
     return tokenVarNameMap.get(ref.tokenName) ?? tokenVarName(ref.tokenName);
   };
 
-  // Class imports
+  // Class imports — group by import path to produce single import lines
+  const importsByPath = new Map<string, string[]>();
   for (const [className, importPath] of classImports) {
     const relativePath = computeRelativeImport(outputDir, importPath);
-    lines.push(`import { ${className} } from '${relativePath}'`);
+    const existing = importsByPath.get(relativePath) ?? [];
+    if (!existing.includes(className)) {
+      existing.push(className);
+    }
+    importsByPath.set(relativePath, existing);
+  }
+  for (const [relativePath, classNames] of importsByPath) {
+    lines.push(
+      `import { ${classNames.sort().join(', ')} } from '${relativePath}'`,
+    );
   }
 
   // EmbeddedServer imports (when controllers exist)
@@ -94,18 +104,39 @@ export function generateCode(
 
   // Plugin contribution imports (deduplicated against class imports and each other)
   if (contributions && contributions.length > 0) {
-    const seen = new Set<string>();
-    // Pre-populate with already-generated class import lines to avoid duplicates
+    // Track already-imported symbols per path to avoid duplicates
+    const importedSymbols = new Set<string>();
     for (const [className, importPath] of classImports) {
       const relativePath = computeRelativeImport(outputDir, importPath);
-      seen.add(`import { ${className} } from '${relativePath}'`);
+      importedSymbols.add(`${className}:${relativePath}`);
     }
+
     for (const contrib of contributions) {
       if (contrib.imports) {
         for (const imp of contrib.imports) {
-          if (!seen.has(imp)) {
-            seen.add(imp);
+          // Parse "import { A, B } from 'path'" to extract symbols and path
+          const match = imp.match(
+            /^import\s+(?:type\s+)?{\s*(.+?)\s*}\s+from\s+['"](.+?)['"]/,
+          );
+          if (!match) {
+            // Non-standard import line — add if not already present
             lines.push(imp);
+            continue;
+          }
+          const symbols = match[1].split(',').map((s) => s.trim());
+          const importPath = match[2];
+          const newSymbols = symbols.filter(
+            (s) => !importedSymbols.has(`${s}:${importPath}`),
+          );
+          for (const s of newSymbols) {
+            importedSymbols.add(`${s}:${importPath}`);
+          }
+          if (newSymbols.length > 0) {
+            const isTypeImport = imp.startsWith('import type');
+            const keyword = isTypeImport ? 'import type' : 'import';
+            lines.push(
+              `${keyword} { ${newSymbols.join(', ')} } from '${importPath}'`,
+            );
           }
         }
       }
@@ -598,7 +629,7 @@ function constructorFactoryToCode(bean: IRBeanDefinition): string {
 
       const safeMethodName = escapeStringLiteral(desc.methodName);
       bodyLines.push(
-        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance)${metadataArg})`,
+        `    instance.${desc.methodName} = buildInterceptorChain([${interceptorArgs.join(', ')}], instance, '${escapeStringLiteral(className)}', '${safeMethodName}', instance.${desc.methodName}.bind(instance) as any${metadataArg}) as any`,
       );
     }
   }

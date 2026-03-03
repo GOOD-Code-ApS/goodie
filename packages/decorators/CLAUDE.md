@@ -15,6 +15,10 @@ User-facing decorators that attach metadata via `Symbol.metadata`. These are rea
 | `src/provides.ts` | `@Provides()` — marks method in a @Module as a bean factory |
 | `src/inject.ts` | `@Inject(qualifier?)` — accessor field injection |
 | `src/optional.ts` | `@Optional()` — marks accessor field as optional |
+| `src/value.ts` | `@Value(key, { default? })` — config value injection |
+| `src/post-construct.ts` | `@PostConstruct()` — lifecycle hook after construction |
+| `src/pre-destroy.ts` | `@PreDestroy()` — lifecycle hook on context close |
+| `src/post-processor.ts` | `@PostProcessor()` — marks bean as BeanPostProcessor |
 
 ## META Keys (metadata.ts)
 
@@ -26,6 +30,10 @@ All are Symbols under the `META` object:
 - `PROVIDES` — array of `{ methodName }`
 - `INJECT` — array of `{ fieldName, qualifier }`
 - `OPTIONAL` — array of `{ fieldName }`
+- `VALUE` — array of `{ fieldName, key, default? }`
+- `POST_CONSTRUCT` — array of `{ methodName }`
+- `PRE_DESTROY` — array of `{ methodName }`
+- `POST_PROCESSOR` — boolean
 
 ## Stage 3 Decorator Pattern
 

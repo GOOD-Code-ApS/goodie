@@ -254,7 +254,15 @@ function mergePluginMetadata(
     const metadataKey = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
     const meta = pluginMetadata.get(metadataKey);
     if (meta && Object.keys(meta).length > 0) {
-      Object.assign(bean.metadata, meta);
+      for (const [key, value] of Object.entries(meta)) {
+        const existing = bean.metadata[key];
+        // Merge arrays (e.g. valueFields from scanner + plugin) instead of overwriting
+        if (Array.isArray(existing) && Array.isArray(value)) {
+          bean.metadata[key] = [...existing, ...value];
+        } else {
+          bean.metadata[key] = value;
+        }
+      }
     }
   }
 }
