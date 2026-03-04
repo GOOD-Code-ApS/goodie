@@ -25,23 +25,31 @@ type MetadataObject = DecoratorMetadataObject | Record<PropertyKey, unknown>;
 
 /**
  * Set a single metadata value on the decorator context metadata object.
+ *
+ * No-ops when `metadata` is undefined (e.g. Node < 22 where Symbol.metadata
+ * is not available). Decorator metadata is read at compile time by the
+ * transformer, not at runtime.
  */
 export function setMeta(
-  metadata: MetadataObject,
+  metadata: MetadataObject | undefined,
   key: symbol,
   value: unknown,
 ): void {
+  if (!metadata) return;
   metadata[key] = value;
 }
 
 /**
  * Push a value onto an array stored under `key`. Creates the array if needed.
+ *
+ * No-ops when `metadata` is undefined (same rationale as `setMeta`).
  */
 export function pushMeta(
-  metadata: MetadataObject,
+  metadata: MetadataObject | undefined,
   key: symbol,
   value: unknown,
 ): void {
+  if (!metadata) return;
   const arr = (metadata[key] as unknown[]) ?? [];
   arr.push(value);
   metadata[key] = arr;

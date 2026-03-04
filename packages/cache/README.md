@@ -40,16 +40,9 @@ class UserService {
 }
 ```
 
-## Vite Plugin Setup
+## Setup
 
-```typescript
-import { diPlugin } from '@goodie-ts/vite-plugin';
-import { createCachePlugin } from '@goodie-ts/cache';
-
-export default defineConfig({
-  plugins: [diPlugin({ plugins: [createCachePlugin()] })],
-});
-```
+No plugin configuration needed — `@goodie-ts/cache` ships pre-scanned beans and AOP config in `beans.json`. The transformer auto-discovers them at build time.
 
 ## License
 

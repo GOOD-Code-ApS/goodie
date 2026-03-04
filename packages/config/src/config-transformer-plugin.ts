@@ -117,3 +117,5 @@ export function createConfigPlugin(): TransformerPlugin {
     },
   };
 }
+
+export default createConfigPlugin;

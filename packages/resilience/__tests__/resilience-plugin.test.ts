@@ -1,8 +1,78 @@
-import { transformInMemory } from '@goodie-ts/transformer';
+import type {
+  IRBeanDefinition,
+  ResolvedAopMapping,
+} from '@goodie-ts/transformer';
+import {
+  createDeclarativeAopPlugin,
+  transformInMemory,
+} from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
-import { createResiliencePlugin } from '../src/resilience-transformer-plugin.js';
+
+const RESILIENCE_MAPPINGS: ResolvedAopMapping[] = [
+  {
+    decoratorName: 'Retryable',
+    declaration: {
+      interceptor: 'RetryInterceptor',
+      order: -10,
+      defaults: { maxAttempts: 3, delay: 1000, multiplier: 1 },
+    },
+    packageName: '@goodie-ts/resilience',
+  },
+  {
+    decoratorName: 'CircuitBreaker',
+    declaration: {
+      interceptor: 'CircuitBreakerInterceptor',
+      order: -20,
+      defaults: {
+        failureThreshold: 5,
+        resetTimeout: 30000,
+        halfOpenAttempts: 1,
+      },
+    },
+    packageName: '@goodie-ts/resilience',
+  },
+  {
+    decoratorName: 'Timeout',
+    declaration: {
+      interceptor: 'TimeoutInterceptor',
+      order: -30,
+      argMapping: ['duration'],
+      defaults: { duration: 5000 },
+    },
+    packageName: '@goodie-ts/resilience',
+  },
+];
+
+function makeInterceptorBean(className: string): IRBeanDefinition {
+  return {
+    tokenRef: {
+      kind: 'class',
+      className,
+      importPath: '@goodie-ts/resilience',
+    },
+    scope: 'singleton',
+    eager: false,
+    name: undefined,
+    constructorDeps: [],
+    fieldDeps: [],
+    factoryKind: 'constructor',
+    providesSource: undefined,
+    metadata: {},
+    sourceLocation: {
+      filePath: '@goodie-ts/resilience',
+      line: 0,
+      column: 0,
+    },
+  };
+}
+
+const RESILIENCE_LIBRARY_BEANS: IRBeanDefinition[] = [
+  makeInterceptorBean('RetryInterceptor'),
+  makeInterceptorBean('CircuitBreakerInterceptor'),
+  makeInterceptorBean('TimeoutInterceptor'),
+];
 
 function createProject(files: Record<string, string>) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -26,15 +96,17 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
     expect(result.code).toContain('buildInterceptorChain');
     expect(result.code).toContain('RetryInterceptor');
-    expect(result.code).toContain(
-      "import { RetryInterceptor } from '@goodie-ts/resilience'",
-    );
+    expect(result.code).toContain("from '@goodie-ts/resilience'");
     expect(result.code).toContain(
       "import { buildInterceptorChain } from '@goodie-ts/aop'",
     );
@@ -52,9 +124,13 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"maxAttempts":3');
     expect(result.code).toContain('"delay":1000');
@@ -73,9 +149,13 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"maxAttempts":5');
     expect(result.code).toContain('"delay":500');
@@ -94,9 +174,13 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
     expect(result.code).toContain('CircuitBreakerInterceptor');
     expect(result.code).toContain('"failureThreshold":3');
@@ -115,9 +199,13 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
     expect(result.code).toContain('TimeoutInterceptor');
     expect(result.code).toContain('"duration":3000');
@@ -137,9 +225,13 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
     expect(result.code).toContain('RetryInterceptor');
     expect(result.code).toContain('CircuitBreakerInterceptor');
@@ -159,17 +251,18 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
-    expect(result.code).not.toContain('RetryInterceptor');
-    expect(result.code).not.toContain('CircuitBreakerInterceptor');
-    expect(result.code).not.toContain('TimeoutInterceptor');
     expect(result.code).not.toContain('buildInterceptorChain');
   });
 
-  it('should only add synthetic beans for interceptors actually used', () => {
+  it('should only wire interceptors actually used into AOP chain', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton, Retryable } from './decorators.js'
@@ -181,18 +274,23 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
-    expect(result.code).toContain('RetryInterceptor');
-    expect(result.code).not.toContain('CircuitBreakerInterceptor');
-    expect(result.code).not.toContain('TimeoutInterceptor');
+    // Only RetryInterceptor should appear in the interceptor chain
+    expect(result.code).toContain('buildInterceptorChain([__interceptor0]');
+    // The other interceptors exist as library beans but aren't in the AOP chain
+    expect(result.code).not.toContain(
+      'instance.fetchData = buildInterceptorChain([__interceptor0, __interceptor1',
+    );
   });
 
-  it('should warn when @Timeout receives an object-form argument', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+  it('should handle @Timeout with object literal argument', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton, Timeout } from './decorators.js'
@@ -204,18 +302,16 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
-
-    // Should fall back to default 5000ms
-    expect(result.code).toContain('"duration":5000');
-    // Should have emitted a warning
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('@Timeout received an object literal argument'),
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
     );
 
-    warnSpy.mockRestore();
+    // Generic parser handles { duration: 3000 } correctly
+    expect(result.code).toContain('"duration":3000');
   });
 
   it('should handle TypeScript numeric separators in options', () => {
@@ -230,16 +326,20 @@ describe('Resilience Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createResiliencePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      RESILIENCE_LIBRARY_BEANS,
+      RESILIENCE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"maxAttempts":5');
     expect(result.code).toContain('"delay":1000');
   });
 
   it('should produce identical output when the same plugin instance is reused across transforms (rebuild)', () => {
-    const plugin = createResiliencePlugin();
+    const plugin = createDeclarativeAopPlugin(RESILIENCE_MAPPINGS);
 
     const makeProject = () =>
       createProject({
@@ -257,11 +357,13 @@ describe('Resilience Transformer Plugin', () => {
       makeProject(),
       '/out/AppContext.generated.ts',
       [plugin],
+      RESILIENCE_LIBRARY_BEANS,
     );
     const result2 = transformInMemory(
       makeProject(),
       '/out/AppContext.generated.ts',
       [plugin],
+      RESILIENCE_LIBRARY_BEANS,
     );
 
     // Strip timestamp comment (first line) since it varies between runs

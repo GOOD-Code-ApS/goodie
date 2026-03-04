@@ -1,6 +1,12 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { defineCommand } from 'citty';
-import { logOutcome, runTransform } from '../run-transform.js';
+import {
+  logLibraryOutcome,
+  logOutcome,
+  runTransform,
+  runTransformLibrary,
+} from '../run-transform.js';
 import { watchAndRebuild } from '../watch.js';
 
 export const generate = defineCommand({
@@ -18,6 +24,31 @@ export const generate = defineCommand({
       description: 'Output file path',
       default: 'src/AppContext.generated.ts',
     },
+    mode: {
+      type: 'string',
+      description: 'Transform mode: "app" (default) or "library"',
+      default: 'app',
+    },
+    'package-name': {
+      type: 'string',
+      description:
+        'Package name for library mode (auto-detected from package.json if omitted)',
+    },
+    'beans-output': {
+      type: 'string',
+      description: 'Output path for beans.json in library mode',
+      default: 'dist/beans.json',
+    },
+    'code-output': {
+      type: 'string',
+      description:
+        'Also emit generated code (e.g. for integration tests). Only used in library mode.',
+    },
+    scan: {
+      type: 'string',
+      description:
+        'Comma-separated npm scopes to scan for library beans (e.g. "@goodie-ts,@acme")',
+    },
     watch: {
       type: 'boolean',
       description: 'Watch for changes and rebuild',
@@ -33,28 +64,76 @@ export const generate = defineCommand({
     const cwd = process.cwd();
     const tsConfigPath = path.resolve(cwd, args.tsconfig);
     const outputPath = path.resolve(cwd, args.output);
+    const scanScopes = args.scan
+      ? args.scan.split(',').map((s: string) => s.trim())
+      : undefined;
 
-    // Always run an initial transform
-    const outcome = await runTransform({ tsConfigPath, outputPath });
-    logOutcome(outcome);
+    if (args.mode === 'library') {
+      const packageName = args['package-name'] ?? detectPackageName(cwd);
+      const beansOutputPath = path.resolve(cwd, args['beans-output']);
+      const codeOutputPath = args['code-output']
+        ? path.resolve(cwd, args['code-output'])
+        : undefined;
 
-    if (!outcome.success) {
-      process.exitCode = 1;
-      return;
-    }
+      const outcome = await runTransformLibrary({
+        tsConfigPath,
+        packageName,
+        beansOutputPath,
+        codeOutputPath,
+      });
+      logLibraryOutcome(outcome);
 
-    if (args.watch) {
-      const watchDir = args['watch-dir']
-        ? path.resolve(cwd, args['watch-dir'])
-        : cwd;
-      console.log(
-        `[goodie] Watching ${path.relative(cwd, watchDir) || '.'} for changes...`,
-      );
-      watchAndRebuild({
+      if (!outcome.success) {
+        process.exitCode = 1;
+        return;
+      }
+
+      if (args.watch) {
+        console.warn(
+          '[goodie] --watch is not supported in library mode. Run without --watch.',
+        );
+        process.exitCode = 1;
+      }
+    } else {
+      const outcome = await runTransform({
         tsConfigPath,
         outputPath,
-        watchDir,
+        scanScopes,
       });
+      logOutcome(outcome);
+
+      if (!outcome.success) {
+        process.exitCode = 1;
+        return;
+      }
+
+      if (args.watch) {
+        const watchDir = args['watch-dir']
+          ? path.resolve(cwd, args['watch-dir'])
+          : cwd;
+        console.log(
+          `[goodie] Watching ${path.relative(cwd, watchDir) || '.'} for changes...`,
+        );
+        watchAndRebuild({
+          tsConfigPath,
+          outputPath,
+          watchDir,
+        });
+      }
     }
   },
 });
+
+function detectPackageName(cwd: string): string {
+  const pkgJsonPath = path.join(cwd, 'package.json');
+  try {
+    const raw = fs.readFileSync(pkgJsonPath, 'utf-8');
+    const pkg = JSON.parse(raw) as { name?: string };
+    if (pkg.name) return pkg.name;
+  } catch {
+    // Fall through to error
+  }
+  throw new Error(
+    'Could not detect package name. Provide --package-name or ensure package.json exists with a "name" field.',
+  );
+}

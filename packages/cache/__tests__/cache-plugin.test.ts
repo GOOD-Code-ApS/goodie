@@ -1,8 +1,97 @@
-import { transformInMemory } from '@goodie-ts/transformer';
+import type {
+  IRBeanDefinition,
+  ResolvedAopMapping,
+} from '@goodie-ts/transformer';
+import {
+  createDeclarativeAopPlugin,
+  transformInMemory,
+} from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
-import { createCachePlugin } from '../src/cache-transformer-plugin.js';
+
+const CACHE_MAPPINGS: ResolvedAopMapping[] = [
+  {
+    decoratorName: 'Cacheable',
+    declaration: {
+      interceptor: 'CacheInterceptor',
+      order: -50,
+      metadata: { cacheAction: 'get' },
+      argMapping: ['cacheName'],
+    },
+    packageName: '@goodie-ts/cache',
+  },
+  {
+    decoratorName: 'CacheEvict',
+    declaration: {
+      interceptor: 'CacheInterceptor',
+      order: -50,
+      metadata: { cacheAction: 'evict' },
+      argMapping: ['cacheName'],
+    },
+    packageName: '@goodie-ts/cache',
+  },
+  {
+    decoratorName: 'CachePut',
+    declaration: {
+      interceptor: 'CacheInterceptor',
+      order: -50,
+      metadata: { cacheAction: 'put' },
+      argMapping: ['cacheName'],
+    },
+    packageName: '@goodie-ts/cache',
+  },
+];
+
+const CACHE_LIBRARY_BEANS: IRBeanDefinition[] = [
+  {
+    tokenRef: {
+      kind: 'class',
+      className: 'CacheManager',
+      importPath: '@goodie-ts/cache',
+    },
+    scope: 'singleton',
+    eager: false,
+    name: undefined,
+    constructorDeps: [],
+    fieldDeps: [],
+    factoryKind: 'constructor',
+    providesSource: undefined,
+    metadata: {},
+    sourceLocation: { filePath: '@goodie-ts/cache', line: 0, column: 0 },
+  },
+  {
+    tokenRef: {
+      kind: 'class',
+      className: 'CacheInterceptor',
+      importPath: '@goodie-ts/cache',
+    },
+    scope: 'singleton',
+    eager: false,
+    name: undefined,
+    constructorDeps: [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'CacheManager',
+          importPath: '@goodie-ts/cache',
+        },
+        optional: false,
+        collection: false,
+        sourceLocation: {
+          filePath: '@goodie-ts/cache',
+          line: 0,
+          column: 0,
+        },
+      },
+    ],
+    fieldDeps: [],
+    factoryKind: 'constructor',
+    providesSource: undefined,
+    metadata: {},
+    sourceLocation: { filePath: '@goodie-ts/cache', line: 0, column: 0 },
+  },
+];
 
 function createProject(files: Record<string, string>) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -26,16 +115,18 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     expect(result.code).toContain('buildInterceptorChain');
     expect(result.code).toContain('CacheInterceptor');
     expect(result.code).toContain('CacheManager');
-    expect(result.code).toContain(
-      "import { CacheInterceptor, CacheManager } from '@goodie-ts/cache'",
-    );
+    expect(result.code).toContain("from '@goodie-ts/cache'");
   });
 
   it('should generate metadata with cacheName and cacheAction', () => {
@@ -50,9 +141,13 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"cacheName":"todos"');
     expect(result.code).toContain('"cacheAction":"get"');
@@ -70,9 +165,13 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"cacheAction":"evict"');
   });
@@ -89,9 +188,13 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"cacheAction":"put"');
   });
@@ -107,15 +210,18 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
-    expect(result.code).not.toContain('CacheInterceptor');
-    expect(result.code).not.toContain('CacheManager');
+    expect(result.code).not.toContain('buildInterceptorChain');
   });
 
-  it('should generate synthetic CacheManager and CacheInterceptor beans', () => {
+  it('should have CacheManager and CacheInterceptor beans from library beans', () => {
     const project = createProject({
       '/src/TodoService.ts': `
         import { Singleton, Cacheable } from './decorators.js'
@@ -127,9 +233,13 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     // CacheManager and CacheInterceptor should both be bean tokens
     expect(result.code).toContain('token: CacheManager');
@@ -150,9 +260,13 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     expect(result.code).toContain('instance.findAll = buildInterceptorChain');
     expect(result.code).toContain('instance.create = buildInterceptorChain');
@@ -170,9 +284,13 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"cacheAction":"evict"');
     expect(result.code).toContain('"allEntries":true');
@@ -190,14 +308,18 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     expect(result.code).toContain('"ttlMs":30000');
   });
 
-  it('should not add duplicate synthetic beans when afterResolve is invoked with existing beans', () => {
+  it('should not add duplicate bean definitions', () => {
     const project = createProject({
       '/src/TodoService.ts': `
         import { Singleton, Cacheable } from './decorators.js'
@@ -209,9 +331,13 @@ describe('Cache Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/gen.ts', [
-      createCachePlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/gen.ts',
+      [],
+      CACHE_LIBRARY_BEANS,
+      CACHE_MAPPINGS,
+    );
 
     // Match bean definitions (token + scope line), not dependency references
     const interceptorBeanDefs = result.code.match(
@@ -226,7 +352,7 @@ describe('Cache Transformer Plugin', () => {
   });
 
   it('should produce identical output when the same plugin instance is reused across transforms (rebuild)', () => {
-    const plugin = createCachePlugin();
+    const plugin = createDeclarativeAopPlugin(CACHE_MAPPINGS);
 
     const makeProject = () =>
       createProject({
@@ -240,8 +366,18 @@ describe('Cache Transformer Plugin', () => {
         `,
       });
 
-    const result1 = transformInMemory(makeProject(), '/out/gen.ts', [plugin]);
-    const result2 = transformInMemory(makeProject(), '/out/gen.ts', [plugin]);
+    const result1 = transformInMemory(
+      makeProject(),
+      '/out/gen.ts',
+      [plugin],
+      CACHE_LIBRARY_BEANS,
+    );
+    const result2 = transformInMemory(
+      makeProject(),
+      '/out/gen.ts',
+      [plugin],
+      CACHE_LIBRARY_BEANS,
+    );
 
     // Strip timestamp comment (first line) since it varies between runs
     const stripTimestamp = (code: string) =>

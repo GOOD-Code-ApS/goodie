@@ -44,6 +44,10 @@ The generated file exports:
 - `createContext()` — async factory returning an `ApplicationContext`
 - `app` — a `Goodie.build(definitions)` instance ready to `.start()`
 
+## Library Mode
+
+For packages that ship pre-scanned beans, use `transformLibrary()` (via `goodie generate --mode library`). It serializes bean definitions to `beans.json` and also scans for `createAopDecorator<{...}>()` calls, including AOP config in the manifest. Consumers auto-discover beans and AOP mappings at build time.
+
 ## License
 
 [MIT](https://github.com/GOOD-Code-ApS/goodie/blob/main/LICENSE)

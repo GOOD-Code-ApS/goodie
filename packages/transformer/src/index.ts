@@ -1,5 +1,14 @@
 // @goodie-ts/transformer — Phase 2: Compile-time DI transformer
 
+// Declarative AOP plugin
+export type {
+  AopDecoratorDeclaration,
+  ResolvedAopMapping,
+} from './aop-plugin.js';
+export { createDeclarativeAopPlugin } from './aop-plugin.js';
+// AOP decorator scanner
+export type { ScannedAopDecorator } from './aop-scanner.js';
+export { scanAopDecoratorDefinitions } from './aop-scanner.js';
 export type { CodegenOptions } from './codegen.js';
 // Code Generator
 export { generateCode } from './codegen.js';
@@ -23,10 +32,12 @@ export type {
   TokenRef,
 } from './ir.js';
 // Library bean discovery
-export type { LibraryBeansManifest } from './library-beans.js';
+export type { DiscoveryResult, LibraryBeansManifest } from './library-beans.js';
 export {
   deserializeBeans,
+  discoverAopMappings,
   discoverLibraryBeans,
+  discoverLibraryManifests,
   rewriteImportPaths,
   serializeBeans,
 } from './library-beans.js';

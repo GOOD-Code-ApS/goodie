@@ -42,16 +42,9 @@ class PaymentService {
 - `TimeoutError` — thrown when `@Timeout` duration is exceeded
 - `CircuitOpenError` — thrown when the circuit breaker is OPEN and rejecting calls
 
-## Vite Plugin Setup
+## Setup
 
-```typescript
-import { diPlugin } from '@goodie-ts/vite-plugin';
-import { createResiliencePlugin } from '@goodie-ts/resilience';
-
-export default defineConfig({
-  plugins: [diPlugin({ plugins: [createResiliencePlugin()] })],
-});
-```
+No plugin configuration needed — `@goodie-ts/resilience` ships pre-scanned beans and AOP config in `beans.json`. The transformer auto-discovers them at build time.
 
 ## License
 

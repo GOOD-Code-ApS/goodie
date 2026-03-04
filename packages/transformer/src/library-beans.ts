@@ -1,5 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type {
+  AopDecoratorDeclaration,
+  ResolvedAopMapping,
+} from './aop-plugin.js';
 import type { IRBeanDefinition } from './ir.js';
 
 /** Manifest format for library-shipped bean definitions. */
@@ -10,6 +14,8 @@ export interface LibraryBeansManifest {
   package: string;
   /** Serialized IRBeanDefinition[]. */
   beans: Record<string, unknown>[];
+  /** AOP decorator declarations, keyed by decorator name. */
+  aop?: Record<string, AopDecoratorDeclaration>;
 }
 
 /**
@@ -21,12 +27,17 @@ export interface LibraryBeansManifest {
 export function serializeBeans(
   beans: IRBeanDefinition[],
   packageName: string,
+  aop?: Record<string, AopDecoratorDeclaration>,
 ): LibraryBeansManifest {
-  return {
+  const manifest: LibraryBeansManifest = {
     version: 1,
     package: packageName,
     beans: beans.map((bean) => serializeBean(bean)),
   };
+  if (aop && Object.keys(aop).length > 0) {
+    manifest.aop = aop;
+  }
+  return manifest;
 }
 
 function serializeBean(bean: IRBeanDefinition): Record<string, unknown> {
@@ -170,23 +181,24 @@ function deserializeTokenRef(
   };
 }
 
+/** Result of scanning a single package's beans.json manifest. */
+interface ScannedManifest {
+  packageName: string;
+  manifest: LibraryBeansManifest;
+}
+
 /**
- * Discover library beans from installed packages.
- *
- * Scans `node_modules` for packages in the given scopes (default: `['@goodie-ts']`)
- * that declare a `"goodie": { "beans": "..." }` field in their `package.json`.
- * Reads and deserializes each beans.json manifest.
- *
- * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
- * @param scanScopes - npm scopes to scan. Defaults to `['@goodie-ts']`.
+ * Scan `node_modules` for packages with `"goodie": { "beans": "..." }` and
+ * read their beans.json manifests. Shared by `discoverLibraryBeans` and
+ * `discoverAopMappings` to avoid duplicate filesystem scanning.
  */
-export async function discoverLibraryBeans(
+function scanLibraryManifests(
   baseDir?: string,
   scanScopes?: string[],
-): Promise<IRBeanDefinition[]> {
+): ScannedManifest[] {
   const root = baseDir ?? process.cwd();
   const scopes = scanScopes ?? ['@goodie-ts'];
-  const allBeans: IRBeanDefinition[] = [];
+  const results: ScannedManifest[] = [];
 
   for (const scope of scopes) {
     const scopeDir = path.join(root, 'node_modules', scope);
@@ -215,6 +227,9 @@ export async function discoverLibraryBeans(
         continue;
       }
 
+      const packageName = pkgJson.name as string | undefined;
+      if (!packageName) continue;
+
       const goodieField = pkgJson.goodie as { beans?: string } | undefined;
       if (!goodieField?.beans) continue;
 
@@ -223,13 +238,41 @@ export async function discoverLibraryBeans(
       try {
         const beansRaw = fs.readFileSync(beansJsonPath, 'utf-8');
         const manifest: LibraryBeansManifest = JSON.parse(beansRaw);
-        const beans = deserializeBeans(manifest);
-        allBeans.push(...beans);
+        results.push({ packageName, manifest });
       } catch (err) {
         console.warn(
           `[@goodie-ts] Failed to load beans.json from ${scope}/${entry}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Discover library beans from installed packages.
+ *
+ * Scans `node_modules` for packages in the given scopes (default: `['@goodie-ts']`)
+ * that declare a `"goodie": { "beans": "..." }` field in their `package.json`.
+ * Reads and deserializes each beans.json manifest.
+ *
+ * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
+ * @param scanScopes - npm scopes to scan. Defaults to `['@goodie-ts']`.
+ */
+export async function discoverLibraryBeans(
+  baseDir?: string,
+  scanScopes?: string[],
+): Promise<IRBeanDefinition[]> {
+  const allBeans: IRBeanDefinition[] = [];
+
+  for (const { manifest } of scanLibraryManifests(baseDir, scanScopes)) {
+    try {
+      allBeans.push(...deserializeBeans(manifest));
+    } catch (err) {
+      console.warn(
+        `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -295,4 +338,74 @@ function rewriteTokenRefPath(
     return { ...tokenRef, importPath: packageName };
   }
   return tokenRef;
+}
+
+/**
+ * Discover AOP decorator mappings from installed packages.
+ *
+ * Scans `node_modules` for packages with beans.json manifests and extracts
+ * the `aop` section from each.
+ *
+ * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
+ * @param scanScopes - npm scopes to scan. Defaults to `['@goodie-ts']`.
+ */
+export function discoverAopMappings(
+  baseDir?: string,
+  scanScopes?: string[],
+): ResolvedAopMapping[] {
+  const allMappings: ResolvedAopMapping[] = [];
+
+  for (const { packageName, manifest } of scanLibraryManifests(
+    baseDir,
+    scanScopes,
+  )) {
+    if (!manifest.aop) continue;
+
+    for (const [decoratorName, declaration] of Object.entries(manifest.aop)) {
+      allMappings.push({ decoratorName, declaration, packageName });
+    }
+  }
+
+  return allMappings;
+}
+
+/** Combined result from a single discovery pass. */
+export interface DiscoveryResult {
+  beans: IRBeanDefinition[];
+  aopMappings: ResolvedAopMapping[];
+}
+
+/**
+ * Discover both library beans and AOP mappings in a single filesystem pass.
+ *
+ * Equivalent to calling `discoverLibraryBeans()` + `discoverAopMappings()`
+ * but reads each beans.json only once.
+ */
+export function discoverLibraryManifests(
+  baseDir?: string,
+  scanScopes?: string[],
+): DiscoveryResult {
+  const beans: IRBeanDefinition[] = [];
+  const aopMappings: ResolvedAopMapping[] = [];
+
+  for (const { packageName, manifest } of scanLibraryManifests(
+    baseDir,
+    scanScopes,
+  )) {
+    try {
+      beans.push(...deserializeBeans(manifest));
+    } catch (err) {
+      console.warn(
+        `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    if (manifest.aop) {
+      for (const [decoratorName, declaration] of Object.entries(manifest.aop)) {
+        aopMappings.push({ decoratorName, declaration, packageName });
+      }
+    }
+  }
+
+  return { beans, aopMappings };
 }

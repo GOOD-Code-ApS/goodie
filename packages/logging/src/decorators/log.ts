@@ -1,3 +1,6 @@
+import { createAopDecorator } from '@goodie-ts/aop';
+import type { LoggingInterceptor } from '../logging-interceptor.js';
+
 export interface LogOptions {
   /** Log level for the method. Default: 'info'. */
   level?: 'debug' | 'info';
@@ -10,15 +13,10 @@ export interface LogOptions {
   logArgs?: boolean;
 }
 
-type MethodDecorator_Stage3 = (
-  target: (...args: never) => unknown,
-  context: ClassMethodDecoratorContext,
-) => void;
-
 /**
  * Mark a method for automatic logging of entry/exit.
  *
- * At compile time, the logging transformer plugin reads this decorator
+ * At compile time, the transformer's AOP scanner reads the type parameter
  * and wires the `LoggingInterceptor` via AOP. No runtime metadata is stored.
  *
  * **Limitation:** `@Log` on a `@Provides` method inside a `@Module` class is
@@ -29,8 +27,8 @@ type MethodDecorator_Stage3 = (
  *
  * @param opts - Optional configuration (e.g. log level, argument logging).
  */
-export function Log(_opts?: LogOptions): MethodDecorator_Stage3 {
-  return (_target, _context) => {
-    // No-op: decorator arguments are read at compile time by the logging transformer plugin
-  };
-}
+export const Log = createAopDecorator<{
+  interceptor: LoggingInterceptor;
+  order: -100;
+  args: [opts?: LogOptions];
+}>();

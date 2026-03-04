@@ -1,4 +1,5 @@
 import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
+import { Singleton } from '@goodie-ts/decorators';
 
 /** Metadata shape expected from the resilience transformer plugin. */
 interface TimeoutMetadata {
@@ -20,6 +21,7 @@ export class TimeoutError extends Error {
  * For sync methods, the timeout cannot be enforced (sync code blocks the
  * event loop), so the result is returned as-is.
  */
+@Singleton()
 export class TimeoutInterceptor implements MethodInterceptor {
   intercept(ctx: InvocationContext): unknown {
     const meta = ctx.metadata as TimeoutMetadata | undefined;

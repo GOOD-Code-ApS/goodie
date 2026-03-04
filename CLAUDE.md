@@ -53,7 +53,7 @@ pnpm clean          # Clean all dist/
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
 | `packages/testing` | TestContext with bean overrides and @MockDefinition |
-| `packages/aop` | AOP foundation — @Before, @Around, @After, interceptor chain |
+| `packages/aop` | AOP foundation — @Before, @Around, @After, interceptor chain, `createAopDecorator()` |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
 | `packages/config` | Configuration binding — @ConfigurationProperties |
 | `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc. |

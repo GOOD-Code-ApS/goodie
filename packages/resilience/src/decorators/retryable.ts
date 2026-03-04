@@ -1,3 +1,6 @@
+import { createAopDecorator } from '@goodie-ts/aop';
+import type { RetryInterceptor } from '../retry-interceptor.js';
+
 export interface RetryOptions {
   /** Maximum number of retry attempts (default: 3). */
   maxAttempts?: number;
@@ -7,19 +10,15 @@ export interface RetryOptions {
   multiplier?: number;
 }
 
-type MethodDecorator_Stage3 = (
-  target: (...args: never) => unknown,
-  context: ClassMethodDecoratorContext,
-) => void;
-
 /**
  * Mark a method for automatic retry on failure.
  *
- * At compile time, the resilience transformer plugin reads this decorator
+ * At compile time, the AOP scanner reads the type parameter
  * and wires the `RetryInterceptor` via AOP. No runtime metadata is stored.
  */
-export function Retryable(_opts?: RetryOptions): MethodDecorator_Stage3 {
-  return (_target, _context) => {
-    // No-op: read at compile time by the resilience transformer plugin
-  };
-}
+export const Retryable = createAopDecorator<{
+  interceptor: RetryInterceptor;
+  order: -10;
+  defaults: { maxAttempts: 3; delay: 1000; multiplier: 1 };
+  args: [opts?: RetryOptions];
+}>();

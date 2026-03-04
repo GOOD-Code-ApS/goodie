@@ -1,4 +1,5 @@
 import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
+import { Singleton } from '@goodie-ts/decorators';
 
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
@@ -35,6 +36,7 @@ export class CircuitOpenError extends Error {
  *
  * Each decorated method gets its own circuit, keyed by `className:methodName`.
  */
+@Singleton()
 export class CircuitBreakerInterceptor implements MethodInterceptor {
   private readonly circuits = new Map<string, CircuitEntry>();
 

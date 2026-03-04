@@ -1,4 +1,5 @@
 import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
+import { Singleton } from '@goodie-ts/decorators';
 import type { CacheManager } from './cache-manager.js';
 
 /** Metadata shape expected from the cache transformer plugin. */
@@ -15,6 +16,7 @@ interface CacheMetadata {
  * Reads cache configuration from `ctx.metadata` (set by the cache transformer plugin).
  * Cache keys are derived from stringifying the method arguments.
  */
+@Singleton()
 export class CacheInterceptor implements MethodInterceptor {
   /** In-flight promises keyed by `cacheName:cacheKey` to prevent stampedes. */
   private readonly inflight = new Map<string, Promise<unknown>>();

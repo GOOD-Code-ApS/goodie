@@ -1,6 +1,7 @@
 import type { InvocationContext } from '@goodie-ts/aop';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Logger } from '../src/logger.js';
+import { LoggerFactory } from '../src/logger-factory.js';
 import { LoggingInterceptor } from '../src/logging-interceptor.js';
 import { MDC } from '../src/mdc.js';
 
@@ -18,6 +19,10 @@ function createContext(
 }
 
 describe('LoggingInterceptor', () => {
+  afterEach(() => {
+    LoggerFactory.reset();
+  });
+
   it('should log method entry and exit for sync methods', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const interceptor = new LoggingInterceptor();
@@ -127,7 +132,7 @@ describe('LoggingInterceptor', () => {
     logSpy.mockRestore();
   });
 
-  it('should use custom logger factory when provided', () => {
+  it('should use custom logger factory when set via LoggerFactory.setFactory()', () => {
     const messages: string[] = [];
     const customLogger: Logger = {
       debug: (msg) => messages.push(`DEBUG: ${msg}`),
@@ -136,7 +141,8 @@ describe('LoggingInterceptor', () => {
       error: (msg) => messages.push(`ERROR: ${msg}`),
     };
 
-    const interceptor = new LoggingInterceptor(() => customLogger);
+    LoggerFactory.setFactory(() => customLogger);
+    const interceptor = new LoggingInterceptor();
     interceptor.intercept(createContext());
 
     expect(messages).toHaveLength(2);
@@ -173,7 +179,8 @@ describe('LoggingInterceptor', () => {
       error: (msg, meta) => messages.push({ msg, meta }),
     };
 
-    const interceptor = new LoggingInterceptor(() => customLogger);
+    LoggerFactory.setFactory(() => customLogger);
+    const interceptor = new LoggingInterceptor();
     interceptor.intercept(createContext());
 
     // Entry log meta should NOT contain args
@@ -190,7 +197,8 @@ describe('LoggingInterceptor', () => {
       error: (msg, meta) => messages.push({ msg, meta }),
     };
 
-    const interceptor = new LoggingInterceptor(() => customLogger);
+    LoggerFactory.setFactory(() => customLogger);
+    const interceptor = new LoggingInterceptor();
     const ctx = createContext({ metadata: { logArgs: true } });
     interceptor.intercept(ctx);
 

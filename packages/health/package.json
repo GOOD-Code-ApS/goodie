@@ -13,7 +13,6 @@
     "access": "public"
   },
   "goodie": {
-    "plugin": "dist/health-transformer-plugin.js",
     "beans": "dist/beans.json"
   },
   "main": "dist/index.js",
@@ -25,17 +24,17 @@
     }
   },
   "scripts": {
-    "build": "tsc && tsx scripts/generate-beans.ts",
+    "build": "tsc && goodie generate --mode library",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
     "@goodie-ts/decorators": "workspace:^"
   },
   "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
-    "ts-morph": "^24.0.0",
-    "tsx": "^4.21.0"
+    "ts-morph": "^24.0.0"
   },
   "files": [
     "dist"

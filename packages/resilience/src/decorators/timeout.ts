@@ -1,18 +1,18 @@
-type MethodDecorator_Stage3 = (
-  target: (...args: never) => unknown,
-  context: ClassMethodDecoratorContext,
-) => void;
+import { createAopDecorator } from '@goodie-ts/aop';
+import type { TimeoutInterceptor } from '../timeout-interceptor.js';
 
 /**
  * Mark a method for automatic timeout.
  *
- * At compile time, the resilience transformer plugin reads this decorator
+ * At compile time, the AOP scanner reads the type parameter
  * and wires the `TimeoutInterceptor` via AOP.
  *
  * @param duration - Timeout duration in milliseconds.
  */
-export function Timeout(_duration: number): MethodDecorator_Stage3 {
-  return (_target, _context) => {
-    // No-op: read at compile time by the resilience transformer plugin
-  };
-}
+export const Timeout = createAopDecorator<{
+  interceptor: TimeoutInterceptor;
+  order: -30;
+  argMapping: ['duration'];
+  defaults: { duration: 5000 };
+  args: [duration: number];
+}>();
