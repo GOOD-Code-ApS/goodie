@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/resilience",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Resilience patterns for goodie-ts — @Retryable, @CircuitBreaker, @Timeout decorators",
   "license": "MIT",
   "type": "module",
