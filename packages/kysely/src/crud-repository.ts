@@ -4,9 +4,9 @@ import type { TransactionManager } from './transaction-manager.js';
 /**
  * Abstract base class for CRUD repositories backed by Kysely.
  *
- * **PostgreSQL-only:** Uses `RETURNING` clauses in `save()` and `deleteById()`.
- * MySQL and SQLite do not support `RETURNING`. For other dialects, override
- * these methods in your subclass.
+ * Supports PostgreSQL, MySQL, and SQLite. Dialects that support `RETURNING`
+ * (PostgreSQL) use it for efficient single-query inserts and deletes.
+ * Other dialects fall back to INSERT + SELECT or SELECT + DELETE.
  *
  * Provides standard `findAll`, `findById`, `save`, and `deleteById` operations.
  * All queries use `TransactionManager.getConnection()` to be transaction-aware.
@@ -38,6 +38,11 @@ export abstract class CrudRepository<T extends Record<string, unknown>> {
     return this.transactionManager.getConnection() as Kysely<any>;
   }
 
+  /** Whether the current dialect supports RETURNING clauses. */
+  protected get returningSupported(): boolean {
+    return this.db.getExecutor().adapter.supportsReturning;
+  }
+
   async findAll(): Promise<T[]> {
     return this.db.selectFrom(this.tableName).selectAll().execute() as Promise<
       T[]
@@ -53,18 +58,39 @@ export abstract class CrudRepository<T extends Record<string, unknown>> {
   }
 
   async save(entity: Record<string, unknown>): Promise<T> {
-    return this.db
+    if (this.returningSupported) {
+      return this.db
+        .insertInto(this.tableName)
+        .values(entity)
+        .returningAll()
+        .executeTakeFirstOrThrow() as Promise<T>;
+    }
+    const result = await this.db
       .insertInto(this.tableName)
       .values(entity)
-      .returningAll()
+      .executeTakeFirstOrThrow();
+    const id = entity[this.idColumn] ?? result.insertId;
+    return this.db
+      .selectFrom(this.tableName)
+      .selectAll()
+      .where(this.idColumn, '=', id)
       .executeTakeFirstOrThrow() as Promise<T>;
   }
 
   async deleteById(id: unknown): Promise<T | undefined> {
-    return this.db
+    if (this.returningSupported) {
+      return this.db
+        .deleteFrom(this.tableName)
+        .where(this.idColumn, '=', id)
+        .returningAll()
+        .executeTakeFirst() as Promise<T | undefined>;
+    }
+    const existing = await this.findById(id);
+    if (!existing) return undefined;
+    await this.db
       .deleteFrom(this.tableName)
       .where(this.idColumn, '=', id)
-      .returningAll()
-      .executeTakeFirst() as Promise<T | undefined>;
+      .execute();
+    return existing;
   }
 }

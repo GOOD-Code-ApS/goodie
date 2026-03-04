@@ -14,7 +14,7 @@ class TestRepository extends CrudRepository<TestEntity> {
   }
 }
 
-function createMockConnection() {
+function createMockConnection(supportsReturning = true) {
   const rows = [
     { id: '1', name: 'Alice' },
     { id: '2', name: 'Bob' },
@@ -34,6 +34,9 @@ function createMockConnection() {
     selectFrom: vi.fn().mockReturnValue(chainable),
     insertInto: vi.fn().mockReturnValue(chainable),
     deleteFrom: vi.fn().mockReturnValue(chainable),
+    getExecutor: vi.fn().mockReturnValue({
+      adapter: { supportsReturning },
+    }),
     _chainable: chainable,
   };
 
@@ -112,5 +115,93 @@ describe('CrudRepository', () => {
     await repo.findById('abc');
 
     expect(chainable.where).toHaveBeenCalledWith('custom_id', '=', 'abc');
+  });
+
+  describe('returning dialect (PostgreSQL)', () => {
+    it('save should use returningAll()', async () => {
+      const { tm, chainable } = createMockConnection(true);
+      const repo = new TestRepository(tm);
+
+      await repo.save({ name: 'Charlie' });
+
+      expect(chainable.returningAll).toHaveBeenCalled();
+      expect(chainable.executeTakeFirstOrThrow).toHaveBeenCalled();
+    });
+
+    it('deleteById should use returningAll()', async () => {
+      const { tm, chainable } = createMockConnection(true);
+      const repo = new TestRepository(tm);
+
+      await repo.deleteById('1');
+
+      expect(chainable.returningAll).toHaveBeenCalled();
+      expect(chainable.executeTakeFirst).toHaveBeenCalled();
+    });
+  });
+
+  describe('non-returning dialect (MySQL/SQLite)', () => {
+    it('save should INSERT then re-fetch by entity id', async () => {
+      const { tm, connection, chainable } = createMockConnection(false);
+      const repo = new TestRepository(tm);
+
+      const result = await repo.save({ id: 'new-id', name: 'Charlie' });
+
+      // Should NOT use returningAll
+      expect(chainable.returningAll).not.toHaveBeenCalled();
+      // First call: insertInto
+      expect(connection.insertInto).toHaveBeenCalledWith('test_table');
+      // Second call: selectFrom to re-fetch
+      expect(connection.selectFrom).toHaveBeenCalledWith('test_table');
+      expect(chainable.where).toHaveBeenCalledWith('id', '=', 'new-id');
+      expect(result).toEqual({ id: '1', name: 'Alice' }); // mock returns first row
+    });
+
+    it('save should fall back to insertId when entity has no id', async () => {
+      const insertResult = { insertId: 42n, numInsertedOrUpdatedRows: 1n };
+      const { tm, connection, chainable } = createMockConnection(false);
+      // Override executeTakeFirstOrThrow to return insert result first, then entity
+      let callCount = 0;
+      chainable.executeTakeFirstOrThrow.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve(insertResult);
+        return Promise.resolve({ id: '42', name: 'Charlie' });
+      });
+
+      const repo = new TestRepository(tm);
+
+      const result = await repo.save({ name: 'Charlie' });
+
+      expect(connection.insertInto).toHaveBeenCalledWith('test_table');
+      expect(connection.selectFrom).toHaveBeenCalledWith('test_table');
+      expect(chainable.where).toHaveBeenCalledWith('id', '=', 42n);
+      expect(result).toEqual({ id: '42', name: 'Charlie' });
+    });
+
+    it('deleteById should SELECT first then DELETE', async () => {
+      const { tm, connection, chainable } = createMockConnection(false);
+      const repo = new TestRepository(tm);
+
+      const result = await repo.deleteById('1');
+
+      // Should NOT use returningAll
+      expect(chainable.returningAll).not.toHaveBeenCalled();
+      // Should SELECT first (findById) then DELETE
+      expect(connection.selectFrom).toHaveBeenCalledWith('test_table');
+      expect(connection.deleteFrom).toHaveBeenCalledWith('test_table');
+      expect(result).toEqual({ id: '1', name: 'Alice' });
+    });
+
+    it('deleteById should return undefined when entity not found', async () => {
+      const { tm, chainable } = createMockConnection(false);
+      // findById returns undefined
+      chainable.executeTakeFirst.mockResolvedValue(undefined);
+      const repo = new TestRepository(tm);
+
+      const result = await repo.deleteById('nonexistent');
+
+      expect(chainable.returningAll).not.toHaveBeenCalled();
+      // Should not call deleteFrom if entity not found
+      expect(result).toBeUndefined();
+    });
   });
 });

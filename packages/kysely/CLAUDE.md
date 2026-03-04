@@ -10,7 +10,7 @@ Kysely database integration for goodie-ts: `@Transactional` decorator, `Transact
 | `src/transactional-interceptor.ts` | `TransactionalInterceptor` — AOP interceptor wrapping methods in transactions (order `-40`) |
 | `src/migration-runner.ts` | `MigrationRunner` — runs `@Migration` classes in sorted order via `@PostConstruct` |
 | `src/abstract-migration.ts` | `AbstractMigration` — base class with `up(db)` / `down?(db)` |
-| `src/crud-repository.ts` | `CrudRepository<T>` — generic CRUD base class (PostgreSQL `RETURNING` by default) |
+| `src/crud-repository.ts` | `CrudRepository<T>` — generic CRUD base class, multi-dialect (auto-detects `RETURNING` support) |
 | `src/kysely-transformer-plugin.ts` | `createKyselyPlugin()` — scans decorators, auto-detects Kysely provider, synthesizes beans |
 | `src/decorators/transactional.ts` | `@Transactional({ propagation? })` — `REQUIRED` (default) or `REQUIRES_NEW` |
 | `src/decorators/migration.ts` | `@Migration('name')` — marks a class as a migration with a sortable name |
@@ -38,7 +38,7 @@ Migrations are wired as individual constructor deps (rest params), not via `base
 
 ## CrudRepository
 
-Generic base class providing `findAll()`, `findById(id)`, `save(entity)`, `deleteById(id)`. Uses `TransactionManager.getConnection()` for transaction awareness. PostgreSQL-only (uses `RETURNING`) — override methods for other dialects.
+Generic base class providing `findAll()`, `findById(id)`, `save(entity)`, `deleteById(id)`. Uses `TransactionManager.getConnection()` for transaction awareness. Auto-detects dialect support for `RETURNING` via `adapter.supportsReturning`. PostgreSQL uses `RETURNING`; MySQL/SQLite fall back to INSERT + SELECT or SELECT + DELETE.
 
 ## Gotchas
 
