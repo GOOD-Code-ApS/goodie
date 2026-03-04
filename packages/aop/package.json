@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/aop",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Aspect-oriented programming support for goodie-ts",
   "license": "MIT",
   "type": "module",

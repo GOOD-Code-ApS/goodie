@@ -1,5 +1,12 @@
 # @goodie-ts/kysely
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [9f7daed]
+  - @goodie-ts/aop@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes
