@@ -229,9 +229,15 @@ importers:
       '@hono/node-server':
         specifier: '>=1.0.0'
         version: 1.19.9(hono@4.12.2)
+      '@hono/zod-validator':
+        specifier: '>=0.4.0'
+        version: 0.7.6(hono@4.12.2)(zod@4.3.6)
       hono:
         specifier: '>=4.0.0'
         version: 4.12.2
+      zod:
+        specifier: '>=3.0.0'
+        version: 4.3.6
     devDependencies:
       '@goodie-ts/transformer':
         specifier: workspace:*
@@ -796,6 +802,12 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/zod-validator@0.7.6':
+    resolution: {integrity: sha512-Io1B6d011Gj1KknV4rXYz4le5+5EubcWEU/speUjuw9XMMIaP3n78yXLhjd2A3PXaXaUwEAluOiAyLqhBEJgsw==}
+    peerDependencies:
+      hono: '>=3.9.0'
+      zod: ^3.25.0 || ^4.0.0
 
   '@inquirer/external-editor@1.0.3':
     resolution: {integrity: sha512-RWbSrDiYmO4LbejWY7ttpxczuwQyZLBUyygsA9Nsv95hpzUWwnNTVQmAq3xuh7vNwCp07UTmE5i11XAEExx4RA==}
@@ -2253,6 +2265,9 @@ packages:
     resolution: {integrity: sha512-zK7YHHz4ZXpW89AHXUPbQVGKI7uvkd3hzusTdotCg1UxyaVtg0zFJSTfW/Dq5f7OBBVnq6cZIaC8Ti4hb6dtCA==}
     engines: {node: '>= 14'}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@babel/runtime@7.28.6': {}
@@ -2618,6 +2633,11 @@ snapshots:
   '@hono/node-server@1.19.9(hono@4.12.2)':
     dependencies:
       hono: 4.12.2
+
+  '@hono/zod-validator@0.7.6(hono@4.12.2)(zod@4.3.6)':
+    dependencies:
+      hono: 4.12.2
+      zod: 4.3.6
 
   '@inquirer/external-editor@1.0.3(@types/node@22.19.11)':
     dependencies:
@@ -4100,3 +4120,5 @@ snapshots:
       archiver-utils: 5.0.2
       compress-commons: 6.0.2
       readable-stream: 4.7.0
+
+  zod@4.3.6: {}
