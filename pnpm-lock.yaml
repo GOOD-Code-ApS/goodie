@@ -14,9 +14,6 @@ importers:
       '@changesets/cli':
         specifier: ^2.29.8
         version: 2.29.8(@types/node@22.19.11)
-      '@goodie-ts/cli':
-        specifier: workspace:*
-        version: link:packages/cli
       husky:
         specifier: ^9.1.7
         version: 9.1.7
