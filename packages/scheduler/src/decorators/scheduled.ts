@@ -1,5 +1,3 @@
-import { SCHEDULER_META, type ScheduleMetadata } from '../metadata.js';
-
 type MethodDecorator_Stage3 = (
   target: (...args: never) => unknown,
   context: ClassMethodDecoratorContext,
@@ -20,6 +18,8 @@ export interface ScheduledOptions {
  * Marks a method as a scheduled task.
  *
  * Exactly one of `cron`, `fixedRate`, or `fixedDelay` must be specified.
+ * The transformer plugin validates this at compile time and generates
+ * static schedule registration code. At runtime, this decorator is a no-op marker.
  *
  * ```ts
  * @Scheduled({ cron: '0 * * * * *' })
@@ -29,18 +29,6 @@ export interface ScheduledOptions {
  * async everyFiveSeconds() { ... }
  * ```
  */
-export function Scheduled(opts: ScheduledOptions): MethodDecorator_Stage3 {
-  return (_target, context) => {
-    const entry: ScheduleMetadata = {
-      methodName: String(context.name),
-      cron: opts.cron,
-      fixedRate: opts.fixedRate,
-      fixedDelay: opts.fixedDelay,
-      concurrent: opts.concurrent ?? false,
-    };
-    const existing: ScheduleMetadata[] =
-      (context.metadata[SCHEDULER_META.SCHEDULES] as ScheduleMetadata[]) ?? [];
-    existing.push(entry);
-    context.metadata[SCHEDULER_META.SCHEDULES] = existing;
-  };
+export function Scheduled(_opts: ScheduledOptions): MethodDecorator_Stage3 {
+  return () => {};
 }

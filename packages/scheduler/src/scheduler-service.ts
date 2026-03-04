@@ -1,5 +1,14 @@
 import { Cron } from 'croner';
-import { SCHEDULER_META, type ScheduleMetadata } from './metadata.js';
+
+/** A scheduled method registration, populated at compile time by the plugin. */
+export interface ScheduleRoute {
+  bean: object;
+  methodName: string;
+  cron?: string;
+  fixedRate?: number;
+  fixedDelay?: number;
+  concurrent: boolean;
+}
 
 interface ScheduledJob {
   /** Human-readable label for logging. */
@@ -13,55 +22,55 @@ interface ScheduledJob {
  *
  * Synthesized by the scheduler transformer plugin as an eager singleton
  * with `postConstructMethods: ['start']` and `preDestroyMethods: ['stop']`.
- * Constructor receives all scheduled beans as rest params.
+ * The plugin generates a custom factory that calls `addSchedule()` for each
+ * scheduled method discovered at compile time — no runtime metadata scanning needed.
  */
 export class SchedulerService {
   private readonly jobs: ScheduledJob[] = [];
-  private readonly beans: object[];
+  private readonly routes: ScheduleRoute[] = [];
+  private started = false;
 
-  constructor(...beans: object[]) {
-    this.beans = beans;
+  /**
+   * Register a scheduled method. Called by the generated factory at compile time.
+   */
+  addSchedule(
+    bean: object,
+    methodName: string,
+    opts: {
+      cron?: string;
+      fixedRate?: number;
+      fixedDelay?: number;
+      concurrent: boolean;
+    },
+  ): void {
+    this.routes.push({ bean, methodName, ...opts });
   }
 
   /** Start all scheduled jobs. Called automatically via @PostConstruct. */
   start(): void {
-    for (const bean of this.beans) {
-      const metadata = (
-        bean.constructor as { [Symbol.metadata]?: Record<PropertyKey, unknown> }
-      )[Symbol.metadata];
-      if (!metadata) continue;
+    if (this.started) return;
+    this.started = true;
 
-      const schedules = metadata[SCHEDULER_META.SCHEDULES] as
-        | ScheduleMetadata[]
-        | undefined;
-      if (!schedules) continue;
+    for (const route of this.routes) {
+      const label = `${route.bean.constructor.name}.${route.methodName}`;
+      const method = (
+        route.bean as Record<string, (...args: unknown[]) => unknown>
+      )[route.methodName];
+      if (!method) continue;
 
-      for (const schedule of schedules) {
-        const label = `${bean.constructor.name}.${schedule.methodName}`;
-        const method = (
-          bean as Record<string, (...args: unknown[]) => unknown>
-        )[schedule.methodName];
-        if (!method) continue;
+      const boundMethod = method.bind(route.bean);
 
-        const boundMethod = method.bind(bean);
-
-        if (schedule.cron) {
-          this.startCronJob(
-            label,
-            schedule.cron,
-            boundMethod,
-            schedule.concurrent,
-          );
-        } else if (schedule.fixedRate !== undefined) {
-          this.startFixedRateJob(
-            label,
-            schedule.fixedRate,
-            boundMethod,
-            schedule.concurrent,
-          );
-        } else if (schedule.fixedDelay !== undefined) {
-          this.startFixedDelayJob(label, schedule.fixedDelay, boundMethod);
-        }
+      if (route.cron) {
+        this.startCronJob(label, route.cron, boundMethod, route.concurrent);
+      } else if (route.fixedRate !== undefined) {
+        this.startFixedRateJob(
+          label,
+          route.fixedRate,
+          boundMethod,
+          route.concurrent,
+        );
+      } else if (route.fixedDelay !== undefined) {
+        this.startFixedDelayJob(label, route.fixedDelay, boundMethod);
       }
     }
   }
@@ -72,6 +81,7 @@ export class SchedulerService {
       job.stop();
     }
     this.jobs.length = 0;
+    this.started = false;
   }
 
   private startCronJob(

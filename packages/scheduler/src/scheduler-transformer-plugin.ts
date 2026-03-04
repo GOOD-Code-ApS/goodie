@@ -3,17 +3,28 @@ import type {
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
+import { SyntaxKind } from 'ts-morph';
+
+interface ScheduleMethodInfo {
+  methodName: string;
+  cron?: string;
+  fixedRate?: number;
+  fixedDelay?: number;
+  concurrent: boolean;
+}
 
 interface ScheduledClassInfo {
   className: string;
   filePath: string;
+  methods: ScheduleMethodInfo[];
 }
 
 /**
  * Create the scheduler transformer plugin.
  *
- * Scans `@Scheduled` decorators on methods and synthesizes a `SchedulerService`
- * bean with individual constructor deps on all scheduled beans.
+ * Scans `@Scheduled` decorators on methods at compile time, validates options,
+ * and synthesizes a `SchedulerService` bean with a custom factory that
+ * statically registers all schedules. No runtime Symbol.metadata scanning needed.
  */
 export function createSchedulerPlugin(): TransformerPlugin {
   /** Classes that contain at least one @Scheduled method. Keyed by filePath:className. */
@@ -28,28 +39,86 @@ export function createSchedulerPlugin(): TransformerPlugin {
       for (const decorator of decorators) {
         if (decorator.getName() !== 'Scheduled') continue;
 
-        const key = `${ctx.filePath}:${ctx.className}`;
-        if (!scheduledClasses.has(key)) {
-          scheduledClasses.set(key, {
-            className: ctx.className,
-            filePath: ctx.filePath,
-          });
+        const args = decorator.getArguments();
+        if (args.length === 0) continue;
+
+        const opts = args[0];
+        if (!opts.isKind(SyntaxKind.ObjectLiteralExpression)) continue;
+
+        // Extract schedule options
+        let cron: string | undefined;
+        let fixedRate: number | undefined;
+        let fixedDelay: number | undefined;
+        let concurrent = false;
+
+        for (const prop of opts.getProperties()) {
+          if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
+          const name = prop.getName();
+          const init = prop.getInitializer();
+          if (!init) continue;
+          const text = init.getText();
+
+          if (name === 'cron') {
+            cron = text.replace(/^['"]|['"]$/g, '');
+          } else if (name === 'fixedRate') {
+            fixedRate = Number(text);
+          } else if (name === 'fixedDelay') {
+            fixedDelay = Number(text);
+          } else if (name === 'concurrent') {
+            concurrent = text === 'true';
+          }
         }
-        break;
+
+        // Compile-time validation: exactly one mode must be specified
+        const modeCount =
+          (cron ? 1 : 0) +
+          (fixedRate !== undefined ? 1 : 0) +
+          (fixedDelay !== undefined ? 1 : 0);
+
+        if (modeCount === 0) {
+          const loc = decorator.getSourceFile().getFilePath();
+          throw new Error(
+            `@Scheduled on ${ctx.className}.${ctx.methodName} must specify exactly one of 'cron', 'fixedRate', or 'fixedDelay' (${loc})`,
+          );
+        }
+        if (modeCount > 1) {
+          const loc = decorator.getSourceFile().getFilePath();
+          throw new Error(
+            `@Scheduled on ${ctx.className}.${ctx.methodName} specifies multiple modes — use exactly one of 'cron', 'fixedRate', or 'fixedDelay' (${loc})`,
+          );
+        }
+
+        const key = `${ctx.filePath}:${ctx.className}`;
+        const existing = scheduledClasses.get(key) ?? {
+          className: ctx.className,
+          filePath: ctx.filePath,
+          methods: [],
+        };
+        existing.methods.push({
+          methodName: ctx.methodName,
+          cron,
+          fixedRate,
+          fixedDelay,
+          concurrent,
+        });
+        scheduledClasses.set(key, existing);
+        break; // Only process first @Scheduled per method
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    beforeCodegen(beans: IRBeanDefinition[]): IRBeanDefinition[] {
       // Only create SchedulerService when @Scheduled methods are found
       if (scheduledClasses.size === 0) return beans;
 
       const scheduledDeps: IRBeanDefinition['constructorDeps'] = [];
+      const matchedClasses: ScheduledClassInfo[] = [];
 
       for (const bean of beans) {
         if (bean.tokenRef.kind !== 'class') continue;
 
         const key = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
-        if (scheduledClasses.has(key)) {
+        const info = scheduledClasses.get(key);
+        if (info) {
           scheduledDeps.push({
             tokenRef: {
               kind: 'class',
@@ -64,8 +133,33 @@ export function createSchedulerPlugin(): TransformerPlugin {
               column: 0,
             },
           });
+          matchedClasses.push(info);
         }
       }
+
+      // Build custom factory that statically registers all schedules
+      const params = scheduledDeps.map((_, i) => `dep${i}: any`).join(', ');
+      const addCalls: string[] = [];
+
+      for (let i = 0; i < matchedClasses.length; i++) {
+        for (const method of matchedClasses[i].methods) {
+          const optsStr = JSON.stringify({
+            cron: method.cron,
+            fixedRate: method.fixedRate,
+            fixedDelay: method.fixedDelay,
+            concurrent: method.concurrent,
+          });
+          addCalls.push(
+            `    __svc.addSchedule(dep${i}, '${method.methodName}', ${optsStr})`,
+          );
+        }
+      }
+
+      const customFactory = `(${params}) => {
+    const __svc = new SchedulerService()
+${addCalls.join('\n')}
+    return __svc
+  }`;
 
       const schedulerServiceBean: IRBeanDefinition = {
         tokenRef: {
@@ -80,6 +174,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
         fieldDeps: [],
         factoryKind: 'constructor',
         providesSource: undefined,
+        customFactory,
         metadata: {
           postConstructMethods: ['start'],
           preDestroyMethods: ['stop'],

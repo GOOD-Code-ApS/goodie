@@ -128,6 +128,12 @@ export interface IRBeanDefinition {
     | undefined;
   /** Base class tokens this bean should also be registered under. */
   baseTokenRefs?: ClassTokenRef[];
+  /**
+   * Custom factory code string. When set, the codegen uses this verbatim
+   * instead of auto-generating from `factoryKind`. Used by plugins that need
+   * custom wiring logic (e.g. compile-time event routing, schedule registration).
+   */
+  customFactory?: string;
   metadata: Record<string, unknown>;
   sourceLocation: SourceLocation;
 }

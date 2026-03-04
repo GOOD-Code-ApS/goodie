@@ -1,5 +1,3 @@
-import { EVENTS_META, type ListenerMetadata } from '../metadata.js';
-
 type MethodDecorator_Stage3 = (
   target: (...args: never) => unknown,
   context: ClassMethodDecoratorContext,
@@ -13,24 +11,24 @@ export interface EventListenerOptions {
 /**
  * Marks a method as an event listener for the given event type.
  *
+ * The transformer plugin reads this decorator at compile time to generate
+ * static event routing code. At runtime, this decorator is a no-op marker.
+ *
+ * **Event matching is by exact constructor identity.** If you register for
+ * `BaseEvent` and publish `ChildEvent extends BaseEvent`, this listener
+ * will NOT fire. Each event type must be registered explicitly.
+ *
  * ```ts
  * @EventListener(UserCreatedEvent)
  * async onUserCreated(event: UserCreatedEvent) { ... }
+ *
+ * @EventListener(OrderEvent, { order: 10 })
+ * async onOrder(event: OrderEvent) { ... }
  * ```
  */
 export function EventListener(
-  eventType: new (...args: any[]) => object,
-  opts?: EventListenerOptions,
+  _eventType: new (...args: any[]) => object,
+  _opts?: EventListenerOptions,
 ): MethodDecorator_Stage3 {
-  return (_target, context) => {
-    const entry: ListenerMetadata = {
-      methodName: String(context.name),
-      eventType,
-      order: opts?.order ?? 0,
-    };
-    const existing: ListenerMetadata[] =
-      (context.metadata[EVENTS_META.LISTENERS] as ListenerMetadata[]) ?? [];
-    existing.push(entry);
-    context.metadata[EVENTS_META.LISTENERS] = existing;
-  };
+  return () => {};
 }
