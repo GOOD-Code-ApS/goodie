@@ -6,11 +6,18 @@ import { generateCode } from './codegen.js';
 import { discoverPlugins, mergePlugins } from './discover-plugins.js';
 import { buildGraph } from './graph-builder.js';
 import type { IRBeanDefinition } from './ir.js';
+import {
+  discoverLibraryBeans,
+  rewriteImportPaths,
+  serializeBeans,
+} from './library-beans.js';
 import type {
   ClassVisitorContext,
   CodegenContribution,
   MethodVisitorContext,
   TransformerPlugin,
+  TransformLibraryOptions,
+  TransformLibraryResult,
   TransformOptions,
   TransformResult,
 } from './options.js';
@@ -64,6 +71,15 @@ export async function transform(
   // 6. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
   mergePluginMetadata(beans, pluginClassMetadata);
+
+  // 6b. Inject library beans (before afterResolve so plugins see them)
+  if (!options.disableLibraryBeanDiscovery) {
+    const libraryBeans = await discoverLibraryBeans(
+      path.dirname(options.tsConfigFilePath),
+      options.scanScopes,
+    );
+    beans = [...beans, ...libraryBeans];
+  }
 
   // 7. afterResolve hook
   for (const plugin of activePlugins) {
@@ -120,6 +136,7 @@ export function transformInMemory(
   project: Project,
   outputPath: string,
   plugins?: TransformerPlugin[],
+  libraryBeans?: IRBeanDefinition[],
 ): TransformResult {
   const activePlugins = plugins ?? [];
 
@@ -140,6 +157,11 @@ export function transformInMemory(
   // 5. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
   mergePluginMetadata(beans, pluginClassMetadata);
+
+  // 5b. Inject library beans (before afterResolve so plugins see them)
+  if (libraryBeans && libraryBeans.length > 0) {
+    beans = [...beans, ...libraryBeans];
+  }
 
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
@@ -179,6 +201,100 @@ export function transformInMemory(
     code,
     outputPath,
     beans: finalBeans,
+    warnings: graphResult.warnings,
+  };
+}
+
+/**
+ * Run the transform pipeline in library mode.
+ *
+ * Scans decorated source, runs the full pipeline (including plugins),
+ * then serializes the discovered beans to a `beans.json` manifest instead
+ * of emitting generated code. Import paths are rewritten to use the
+ * bare package specifier.
+ *
+ * Auto-discovers plugins from installed `@goodie-ts/*` packages unless
+ * `options.disablePluginDiscovery` is set to `true`.
+ */
+export async function transformLibrary(
+  options: TransformLibraryOptions,
+): Promise<TransformLibraryResult> {
+  // 1. Create ts-morph Project
+  const project = new Project({
+    tsConfigFilePath: options.tsConfigFilePath,
+  });
+
+  if (options.include && options.include.length > 0) {
+    project.addSourceFilesAtPaths(options.include);
+  }
+
+  const discovered = options.disablePluginDiscovery
+    ? []
+    : await discoverPlugins();
+  const activePlugins = mergePlugins(discovered, options.plugins ?? []);
+
+  // 2. beforeScan hooks
+  for (const plugin of activePlugins) {
+    plugin.beforeScan?.();
+  }
+
+  // 3. Scan
+  const scanResult = scan(project);
+
+  // 4. Run visitClass and visitMethod hooks
+  const pluginClassMetadata = runPluginVisitors(project, activePlugins);
+
+  // 5. Resolve
+  const resolveResult = resolve(scanResult);
+
+  // 6. Merge visitor metadata
+  let beans = resolveResult.beans;
+  mergePluginMetadata(beans, pluginClassMetadata);
+
+  // 7. afterResolve hook
+  for (const plugin of activePlugins) {
+    if (plugin.afterResolve) {
+      beans = plugin.afterResolve(beans);
+    }
+  }
+
+  // 8. Build graph (validate + topo sort)
+  const graphResult = buildGraph({ ...resolveResult, beans });
+
+  // 9. beforeCodegen hook (plugins may add synthetic beans)
+  let finalBeans = graphResult.beans;
+  for (const plugin of activePlugins) {
+    if (plugin.beforeCodegen) {
+      finalBeans = plugin.beforeCodegen(finalBeans);
+    }
+  }
+
+  // 10. Determine source root from tsconfig for import path rewriting
+  const sourceRoot = path.dirname(options.tsConfigFilePath);
+
+  // 11. Rewrite import paths from absolute to bare package specifier
+  const rewrittenBeans = rewriteImportPaths(
+    finalBeans,
+    options.packageName,
+    sourceRoot,
+  );
+
+  // 12. Serialize to manifest
+  const manifest = serializeBeans(rewrittenBeans, options.packageName);
+
+  // 13. Write beans.json
+  const outputDir = path.dirname(options.beansOutputPath);
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(
+    options.beansOutputPath,
+    JSON.stringify(manifest, null, 2),
+    'utf-8',
+  );
+
+  return {
+    manifest,
+    outputPath: options.beansOutputPath,
+    beans: rewrittenBeans,
     warnings: graphResult.warnings,
   };
 }

@@ -22,12 +22,22 @@ export type {
   SourceLocation,
   TokenRef,
 } from './ir.js';
+// Library bean discovery
+export type { LibraryBeansManifest } from './library-beans.js';
+export {
+  deserializeBeans,
+  discoverLibraryBeans,
+  rewriteImportPaths,
+  serializeBeans,
+} from './library-beans.js';
 // Options
 export type {
   ClassVisitorContext,
   CodegenContribution,
   MethodVisitorContext,
   TransformerPlugin,
+  TransformLibraryOptions,
+  TransformLibraryResult,
   TransformOptions,
   TransformResult,
 } from './options.js';
@@ -50,7 +60,7 @@ export type {
 // Scanner
 export { scan } from './scanner.js';
 // Pipeline
-export { transform, transformInMemory } from './transform.js';
+export { transform, transformInMemory, transformLibrary } from './transform.js';
 // Errors
 export {
   AmbiguousProviderError,

@@ -1,4 +1,5 @@
 import type {
+  AbstractConstructor,
   ApplicationContext,
   BeanDefinition,
   Constructor,
@@ -30,7 +31,9 @@ export interface GoodieFixtures {
   /** The built ApplicationContext. Built fresh per test, closed after. */
   ctx: ApplicationContext;
   /** Convenience function to resolve beans from the context. */
-  resolve: <T>(token: Constructor<T> | InjectionToken<T>) => T;
+  resolve: <T>(
+    token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+  ) => T;
 }
 
 /**
@@ -88,8 +91,10 @@ export function createGoodieTest(
     },
 
     resolve: async ({ ctx }, use) => {
-      await use(<T>(token: Constructor<T> | InjectionToken<T>) =>
-        ctx.get(token),
+      await use(
+        <T>(
+          token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+        ) => ctx.get(token),
       );
     },
   });

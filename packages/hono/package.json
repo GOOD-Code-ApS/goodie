@@ -25,7 +25,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:*"
+    "@goodie-ts/core": "workspace:^"
   },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
@@ -33,7 +33,7 @@
     "ts-morph": "^24.0.0"
   },
   "peerDependencies": {
-    "@goodie-ts/transformer": "workspace:*",
+    "@goodie-ts/transformer": "workspace:^",
     "@hono/node-server": ">=1.0.0",
     "hono": ">=4.0.0"
   },

@@ -29,11 +29,11 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:*"
+    "@goodie-ts/core": "workspace:^"
   },
   "peerDependencies": {
     "vitest": ">=3.0.0",
-    "@goodie-ts/kysely": "workspace:*"
+    "@goodie-ts/kysely": "workspace:^"
   },
   "peerDependenciesMeta": {
     "vitest": {

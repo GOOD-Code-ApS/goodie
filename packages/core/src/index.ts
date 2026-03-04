@@ -14,4 +14,4 @@ export {
 export { Goodie, GoodieBuilder } from './goodie.js';
 export { InjectionToken } from './injection-token.js';
 export { topoSort } from './topo-sort.js';
-export type { Constructor, Scope } from './types.js';
+export type { AbstractConstructor, Constructor, Scope } from './types.js';

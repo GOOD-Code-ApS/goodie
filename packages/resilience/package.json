@@ -25,10 +25,10 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/aop": "workspace:*"
+    "@goodie-ts/aop": "workspace:^"
   },
   "peerDependencies": {
-    "@goodie-ts/transformer": "workspace:*"
+    "@goodie-ts/transformer": "workspace:^"
   },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",

@@ -1,9 +1,9 @@
 import type { BeanDefinition } from './bean-definition.js';
 import { CircularDependencyError } from './errors.js';
 import type { InjectionToken } from './injection-token.js';
-import type { Constructor } from './types.js';
+import type { AbstractConstructor, Constructor } from './types.js';
 
-type Token = InjectionToken<unknown> | Constructor;
+type Token = InjectionToken<unknown> | Constructor | AbstractConstructor;
 
 /**
  * Topologically sorts bean definitions so that dependencies come before

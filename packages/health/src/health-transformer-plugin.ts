@@ -29,6 +29,22 @@ export function createHealthPlugin(): TransformerPlugin {
 
       if (!hasHealthIndicators) return beans;
 
+      // Skip synthesis if library beans already provided these beans (from beans.json)
+      const hasUptimeIndicator = beans.some(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'UptimeHealthIndicator' &&
+          b.tokenRef.importPath === HEALTH_IMPORT_PATH,
+      );
+      const hasAggregator = beans.some(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'HealthAggregator' &&
+          b.tokenRef.importPath === HEALTH_IMPORT_PATH,
+      );
+
+      if (hasUptimeIndicator && hasAggregator) return beans;
+
       const syntheticBeans: IRBeanDefinition[] = [];
 
       // Inject synthetic UptimeHealthIndicator (built-in, always included)
