@@ -24,7 +24,7 @@
     "beans": "dist/beans.json"
   },
   "scripts": {
-    "build": "tsc && pnpm exec goodie generate --mode library",
+    "build": "tsc && goodie generate --mode library",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "files": [
