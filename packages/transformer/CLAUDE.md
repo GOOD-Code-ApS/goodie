@@ -22,7 +22,10 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 | File | Role |
 |------|------|
 | `src/ir.ts` | IR types: `IRBeanDefinition`, `TokenRef`, `IRDependency`, `IRModule`, etc. |
-| `src/transform.ts` | `transform()` and `transformInMemory()` orchestrators |
+| `src/transform.ts` | `transform()`, `transformInMemory()`, and `transformLibrary()` orchestrators |
+| `src/aop-scanner.ts` | `scanAopDecoratorDefinitions()` — scans `createAopDecorator<{...}>()` calls, extracts config from type parameters via type checker |
+| `src/aop-plugin.ts` | `createDeclarativeAopPlugin()` — generic AOP plugin driven by `AopDecoratorDeclaration` mappings |
+| `src/library-beans.ts` | `serializeBeans()`, `deserializeBeans()`, `discoverLibraryBeans()`, `discoverAopMappings()` |
 | `src/transformer-errors.ts` | `TransformerError` subclasses with source locations |
 
 ## IR Types (ir.ts)
@@ -50,6 +53,15 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 - `@Provides` methods get the module instance as their first dependency
 - Resolves `@Named()` qualifiers to match `@Inject('name')`
 - Validates required providers exist, detects cycles
+
+## Library Mode (`transformLibrary`)
+
+`transformLibrary()` scans library source, runs the full pipeline, then serializes beans to `beans.json`. It also:
+1. Runs `scanAopDecoratorDefinitions()` to find `createAopDecorator<{...}>()` calls
+2. Extracts AOP config from type parameters (interceptor class, order, metadata, argMapping, defaults)
+3. Includes the config in the manifest's `aop` section
+
+Consumers discover AOP mappings via `discoverAopMappings()`, which reads beans.json manifests (not package.json).
 
 ## Testing
 

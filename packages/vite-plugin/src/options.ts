@@ -13,6 +13,11 @@ export interface DiPluginOptions {
   debounceMs?: number;
   /** Transformer plugins to extend the pipeline (e.g. AOP, logging, cache). */
   plugins?: TransformerPlugin[];
+  /**
+   * npm scopes to scan for library beans (e.g. `['@goodie-ts', '@acme']`).
+   * Defaults to `['@goodie-ts']`.
+   */
+  scan?: string[];
 }
 
 /** Resolved (absolute) options used internally by the plugin. */
@@ -22,6 +27,7 @@ export interface ResolvedOptions {
   include: string[] | undefined;
   debounceMs: number;
   plugins: TransformerPlugin[];
+  scanScopes: string[] | undefined;
 }
 
 const DEFAULT_TSCONFIG = 'tsconfig.json';
@@ -45,5 +51,6 @@ export function resolveOptions(
     include: opts.include,
     debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
     plugins: opts.plugins ?? [],
+    scanScopes: opts.scan,
   };
 }

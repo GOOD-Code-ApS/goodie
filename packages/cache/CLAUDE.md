@@ -8,14 +8,13 @@ In-memory caching for goodie-ts via `@Cacheable`, `@CacheEvict`, and `@CachePut`
 |------|------|
 | `src/cache-interceptor.ts` | `CacheInterceptor` — AOP interceptor handling get/put/evict with stampede protection |
 | `src/cache-manager.ts` | `CacheManager` — in-memory cache store with named caches and TTL |
-| `src/cache-transformer-plugin.ts` | `createCachePlugin()` — scans decorators, synthesizes `CacheInterceptor` + `CacheManager` beans |
-| `src/decorators/cacheable.ts` | `@Cacheable(cacheName, { ttlMs? })` — cache-aside (get or compute) |
-| `src/decorators/cache-evict.ts` | `@CacheEvict(cacheName, { allEntries? })` — evict after method execution |
-| `src/decorators/cache-put.ts` | `@CachePut(cacheName, { ttlMs? })` — always execute, then cache result |
+| `src/decorators/cacheable.ts` | `@Cacheable(cacheName)` — defined via `createAopDecorator<{ interceptor: CacheInterceptor; metadata: { cacheAction: 'get' }; ... }>()` |
+| `src/decorators/cache-evict.ts` | `@CacheEvict(cacheName)` — defined via `createAopDecorator<{ metadata: { cacheAction: 'evict' }; ... }>()` |
+| `src/decorators/cache-put.ts` | `@CachePut(cacheName)` — defined via `createAopDecorator<{ metadata: { cacheAction: 'put' }; ... }>()` |
 
 ## How It Works
 
-1. **Compile time:** `createCachePlugin()` scans `@Cacheable`/`@CacheEvict`/`@CachePut` decorators via `visitMethod`. Populates AOP metadata with `cacheName`, `cacheAction`, `ttlMs`, `allEntries`. Synthesizes `CacheInterceptor` and `CacheManager` singleton beans in `afterResolve`.
+1. **Compile time:** Cache decorators are defined via `createAopDecorator()` with AOP config in the type parameter. The transformer's AOP scanner extracts config and includes it in `beans.json`. The declarative AOP plugin parses decorator args at consumer build time using `argMapping` and `metadata`.
 2. **Runtime:** `CacheInterceptor` reads `ctx.metadata` to determine the action. Cache keys are `className#methodName:arg1,arg2,...`.
 
 ## Cache Key Strategy
@@ -26,13 +25,13 @@ Keys include the class name to avoid collisions across classes: `ClassName#metho
 
 `CacheInterceptor` uses an in-flight promise map. Concurrent calls for the same cache key share a single promise instead of hitting the backend multiple times.
 
-## Plugin Bean Synthesis
+## Library Beans
 
-The plugin adds two synthetic beans when any cache decorator is found:
+The package ships two beans in `beans.json`:
 - `CacheManager` (singleton) — the cache store
 - `CacheInterceptor` (singleton, depends on `CacheManager`) — the AOP interceptor
 
-A `beforeScan` hook clears accumulated state for watch-mode compatibility.
+Consumers auto-discover them at build time via `discoverLibraryBeans()`.
 
 ## Gotchas
 

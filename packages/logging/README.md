@@ -72,16 +72,9 @@ MDC.run(new Map([['traceId', crypto.randomUUID()]]), async () => {
 });
 ```
 
-## Vite Plugin Setup
+## Setup
 
-```typescript
-import { diPlugin } from '@goodie-ts/vite-plugin';
-import { createLoggingPlugin } from '@goodie-ts/logging';
-
-export default defineConfig({
-  plugins: [diPlugin({ plugins: [createLoggingPlugin()] })],
-});
-```
+No plugin configuration needed — `@goodie-ts/logging` ships pre-scanned beans and AOP config in `beans.json`. The transformer auto-discovers them at build time.
 
 ## License
 

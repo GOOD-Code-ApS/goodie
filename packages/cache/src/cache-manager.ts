@@ -1,3 +1,5 @@
+import { Singleton } from '@goodie-ts/decorators';
+
 /** Entry stored in a cache with optional TTL. */
 interface CacheEntry<T = unknown> {
   value: T;
@@ -10,6 +12,7 @@ interface CacheEntry<T = unknown> {
  * Each cache is a separate namespace identified by a string name.
  * Entries expire after their TTL (time-to-live) in milliseconds.
  */
+@Singleton()
 export class CacheManager {
   private readonly caches = new Map<string, Map<string, CacheEntry>>();
 

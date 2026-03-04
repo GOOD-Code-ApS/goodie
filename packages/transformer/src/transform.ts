@@ -2,12 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
+import type {
+  AopDecoratorDeclaration,
+  ResolvedAopMapping,
+} from './aop-plugin.js';
+import { createDeclarativeAopPlugin } from './aop-plugin.js';
+import { scanAopDecoratorDefinitions } from './aop-scanner.js';
 import { generateCode } from './codegen.js';
 import { discoverPlugins, mergePlugins } from './discover-plugins.js';
 import { buildGraph } from './graph-builder.js';
 import type { IRBeanDefinition } from './ir.js';
 import {
+  discoverAopMappings,
   discoverLibraryBeans,
+  discoverLibraryManifests,
   rewriteImportPaths,
   serializeBeans,
 } from './library-beans.js';
@@ -49,10 +57,27 @@ export async function transform(
     project.addSourceFilesAtPaths(options.include);
   }
 
+  const baseDir = path.dirname(options.tsConfigFilePath);
+
   const discovered = options.disablePluginDiscovery
     ? []
-    : await discoverPlugins();
-  const activePlugins = mergePlugins(discovered, options.plugins ?? []);
+    : await discoverPlugins(baseDir, options.scanScopes);
+  const discovery =
+    options.disablePluginDiscovery && options.disableLibraryBeanDiscovery
+      ? { beans: [], aopMappings: [] }
+      : discoverLibraryManifests(baseDir, options.scanScopes);
+
+  const aopMappings = options.disablePluginDiscovery
+    ? []
+    : discovery.aopMappings;
+  const aopPlugins =
+    aopMappings.length > 0 ? [createDeclarativeAopPlugin(aopMappings)] : [];
+
+  // Declarative AOP plugin comes first so explicit plugins can override
+  const activePlugins = mergePlugins(
+    [...aopPlugins, ...discovered],
+    options.plugins ?? [],
+  );
 
   // 2. beforeScan hooks
   for (const plugin of activePlugins) {
@@ -73,12 +98,8 @@ export async function transform(
   mergePluginMetadata(beans, pluginClassMetadata);
 
   // 6b. Inject library beans (before afterResolve so plugins see them)
-  if (!options.disableLibraryBeanDiscovery) {
-    const libraryBeans = await discoverLibraryBeans(
-      path.dirname(options.tsConfigFilePath),
-      options.scanScopes,
-    );
-    beans = [...beans, ...libraryBeans];
+  if (!options.disableLibraryBeanDiscovery && discovery.beans.length > 0) {
+    beans = [...beans, ...discovery.beans];
   }
 
   // 7. afterResolve hook
@@ -137,8 +158,13 @@ export function transformInMemory(
   outputPath: string,
   plugins?: TransformerPlugin[],
   libraryBeans?: IRBeanDefinition[],
+  aopMappings?: ResolvedAopMapping[],
 ): TransformResult {
-  const activePlugins = plugins ?? [];
+  const aopPlugins =
+    aopMappings && aopMappings.length > 0
+      ? [createDeclarativeAopPlugin(aopMappings)]
+      : [];
+  const activePlugins = [...aopPlugins, ...(plugins ?? [])];
 
   // 1. beforeScan hooks
   for (const plugin of activePlugins) {
@@ -228,10 +254,24 @@ export async function transformLibrary(
     project.addSourceFilesAtPaths(options.include);
   }
 
+  const libBaseDir = path.dirname(options.tsConfigFilePath);
+
   const discovered = options.disablePluginDiscovery
     ? []
-    : await discoverPlugins();
-  const activePlugins = mergePlugins(discovered, options.plugins ?? []);
+    : await discoverPlugins(libBaseDir);
+
+  // Discover declarative AOP mappings (library mode doesn't need them for its own beans,
+  // but may need them if codeOutputPath is set for integration tests)
+  const aopMappings = options.disablePluginDiscovery
+    ? []
+    : discoverAopMappings(libBaseDir, ['@goodie-ts']);
+  const aopPlugins =
+    aopMappings.length > 0 ? [createDeclarativeAopPlugin(aopMappings)] : [];
+
+  const activePlugins = mergePlugins(
+    [...aopPlugins, ...discovered],
+    options.plugins ?? [],
+  );
 
   // 2. beforeScan hooks
   for (const plugin of activePlugins) {
@@ -269,20 +309,62 @@ export async function transformLibrary(
     }
   }
 
-  // 10. Determine source root from tsconfig for import path rewriting
+  // 10. Generate code (before rewriting import paths — code uses relative imports)
+  let code: string | undefined;
+  if (options.codeOutputPath) {
+    const contributions: CodegenContribution[] = [];
+    for (const plugin of activePlugins) {
+      if (plugin.codegen) {
+        contributions.push(plugin.codegen(finalBeans));
+      }
+    }
+
+    code = generateCode(
+      finalBeans,
+      { outputPath: options.codeOutputPath, version: PKG_VERSION },
+      contributions,
+      graphResult.controllers,
+    );
+
+    const codeDir = path.dirname(options.codeOutputPath);
+    fs.mkdirSync(codeDir, { recursive: true });
+    fs.writeFileSync(options.codeOutputPath, code, 'utf-8');
+  }
+
+  // 11. Determine source root from tsconfig for import path rewriting
   const sourceRoot = path.dirname(options.tsConfigFilePath);
 
-  // 11. Rewrite import paths from absolute to bare package specifier
+  // 11b. Scan for createAopDecorator<{...}>() calls and build AOP declarations
+  const scannedAopDecorators = scanAopDecoratorDefinitions(project);
+  let aopDeclarations: Record<string, AopDecoratorDeclaration> | undefined;
+  if (scannedAopDecorators.length > 0) {
+    aopDeclarations = {};
+    for (const dec of scannedAopDecorators) {
+      aopDeclarations[dec.decoratorName] = {
+        interceptor: dec.interceptorClassName,
+        order: dec.order,
+        ...(dec.metadata ? { metadata: dec.metadata } : {}),
+        ...(dec.argMapping ? { argMapping: dec.argMapping } : {}),
+        ...(dec.defaults ? { defaults: dec.defaults } : {}),
+      };
+    }
+  }
+
+  // 12. Rewrite import paths from absolute to bare package specifier
   const rewrittenBeans = rewriteImportPaths(
     finalBeans,
     options.packageName,
     sourceRoot,
   );
 
-  // 12. Serialize to manifest
-  const manifest = serializeBeans(rewrittenBeans, options.packageName);
+  // 13. Serialize to manifest
+  const manifest = serializeBeans(
+    rewrittenBeans,
+    options.packageName,
+    aopDeclarations,
+  );
 
-  // 13. Write beans.json
+  // 14. Write beans.json
   const outputDir = path.dirname(options.beansOutputPath);
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(
@@ -296,6 +378,8 @@ export async function transformLibrary(
     outputPath: options.beansOutputPath,
     beans: rewrittenBeans,
     warnings: graphResult.warnings,
+    code,
+    codeOutputPath: options.codeOutputPath,
   };
 }
 

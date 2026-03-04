@@ -10,8 +10,7 @@ Method-level logging for goodie-ts via `@Log` decorator and `LoggerFactory` stat
 | `src/logger.ts` | `Logger` interface + `ConsoleLogger` default implementation |
 | `src/logger-factory.ts` | `LoggerFactory` — static factory for obtaining `Logger` instances (delegate pattern) |
 | `src/mdc.ts` | `MDC` — Mapped Diagnostic Context via `AsyncLocalStorage` |
-| `src/logging-transformer-plugin.ts` | `createLoggingPlugin()` — scans `@Log`, synthesizes `LoggingInterceptor` bean |
-| `src/decorators/log.ts` | `@Log({ level?, logArgs? })` decorator definition |
+| `src/decorators/log.ts` | `@Log()` — defined via `createAopDecorator<{ interceptor: LoggingInterceptor; order: -100 }>()` |
 
 ## Two Logging Approaches
 
@@ -28,9 +27,9 @@ Both share the same `LoggerFactory` backend, so AOP and imperative loggers use t
 
 `MDC` is backed by `AsyncLocalStorage`. Use `MDC.run(context, fn)` in middleware to set request-scoped values (e.g. `traceId`). The `LoggingInterceptor` automatically includes MDC context in log output.
 
-## Plugin Bean Synthesis
+## AOP Wiring
 
-The plugin synthesizes a `LoggingInterceptor` singleton bean (order `-100`, outermost in the chain). A `beforeScan` hook clears state for watch-mode compatibility.
+The `@Log` decorator is defined via `createAopDecorator()` with AOP config in the type parameter. At library build time, the transformer's AOP scanner extracts the config and includes it in `beans.json`. The `LoggingInterceptor` singleton bean is also shipped in `beans.json`. Consumers auto-discover both at build time — no plugin setup needed.
 
 ## Gotchas
 

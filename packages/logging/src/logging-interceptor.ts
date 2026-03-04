@@ -1,4 +1,5 @@
 import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
+import { Singleton } from '@goodie-ts/decorators';
 import type { Logger } from './logger.js';
 import { LoggerFactory } from './logger-factory.js';
 import { MDC } from './mdc.js';
@@ -8,17 +9,13 @@ import { MDC } from './mdc.js';
  * Reads the log level from invocation metadata (set by the @Log decorator via the transformer plugin).
  * Automatically includes MDC context (e.g. traceId) in log output.
  *
- * Accepts an optional LoggerFactory to allow custom logger implementations (pino, winston, etc.).
- * Falls back to ConsoleLogger when no factory is provided.
+ * Uses `LoggerFactory.getLogger()` for logger resolution. To customize the
+ * logger backend (pino, winston, etc.), call `LoggerFactory.setFactory()` at
+ * application startup.
  */
+@Singleton()
 export class LoggingInterceptor implements MethodInterceptor {
   private readonly loggers = new Map<string, Logger>();
-  private readonly loggerFactory: (className: string) => Logger;
-
-  constructor(loggerFactory?: (className: string) => Logger) {
-    this.loggerFactory =
-      loggerFactory ?? ((className) => LoggerFactory.getLogger(className));
-  }
 
   intercept(ctx: InvocationContext): unknown | Promise<unknown> {
     const level =
@@ -73,7 +70,7 @@ export class LoggingInterceptor implements MethodInterceptor {
   private getLogger(className: string): Logger {
     let logger = this.loggers.get(className);
     if (!logger) {
-      logger = this.loggerFactory(className);
+      logger = LoggerFactory.getLogger(className);
       this.loggers.set(className, logger);
     }
     return logger;

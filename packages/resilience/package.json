@@ -12,6 +12,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "goodie": {
+    "beans": "dist/beans.json"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -21,16 +24,15 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && goodie generate --mode library",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/aop": "workspace:^"
-  },
-  "peerDependencies": {
-    "@goodie-ts/transformer": "workspace:^"
+    "@goodie-ts/aop": "workspace:^",
+    "@goodie-ts/decorators": "workspace:^"
   },
   "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
     "ts-morph": "^24.0.0"

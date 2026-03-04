@@ -21,6 +21,7 @@ export async function runRebuild(
       outputPath: options.outputPath,
       include: options.include,
       plugins: options.plugins,
+      scanScopes: options.scanScopes,
     });
     return { success: true, result };
   } catch (error) {

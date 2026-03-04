@@ -6,12 +6,78 @@ import {
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
-import { createHealthPlugin } from '../src/health-transformer-plugin.js';
 
 const DECORATOR_STUBS = `
 export function Injectable() { return (t: any, c: any) => {} }
 export function Singleton() { return (t: any, c: any) => {} }
 `;
+
+const HEALTH_IMPORT_PATH = '@goodie-ts/health';
+
+const libraryBeans: IRBeanDefinition[] = [
+  {
+    tokenRef: {
+      kind: 'class',
+      className: 'UptimeHealthIndicator',
+      importPath: HEALTH_IMPORT_PATH,
+    },
+    scope: 'singleton',
+    eager: false,
+    name: undefined,
+    constructorDeps: [],
+    fieldDeps: [],
+    factoryKind: 'constructor',
+    providesSource: undefined,
+    baseTokenRefs: [
+      {
+        kind: 'class',
+        className: 'HealthIndicator',
+        importPath: HEALTH_IMPORT_PATH,
+      },
+    ],
+    metadata: {},
+    sourceLocation: {
+      filePath: HEALTH_IMPORT_PATH,
+      line: 0,
+      column: 0,
+    },
+  },
+  {
+    tokenRef: {
+      kind: 'class',
+      className: 'HealthAggregator',
+      importPath: HEALTH_IMPORT_PATH,
+    },
+    scope: 'singleton',
+    eager: false,
+    name: undefined,
+    constructorDeps: [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'HealthIndicator',
+          importPath: HEALTH_IMPORT_PATH,
+        },
+        optional: false,
+        collection: true,
+        sourceLocation: {
+          filePath: HEALTH_IMPORT_PATH,
+          line: 0,
+          column: 0,
+        },
+      },
+    ],
+    fieldDeps: [],
+    factoryKind: 'constructor',
+    providesSource: undefined,
+    metadata: {},
+    sourceLocation: {
+      filePath: HEALTH_IMPORT_PATH,
+      line: 0,
+      column: 0,
+    },
+  },
+];
 
 function createProject(files: Record<string, string>) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -31,8 +97,8 @@ function findBean(
   );
 }
 
-describe('Health Transformer Plugin', () => {
-  it('should inject HealthAggregator and UptimeHealthIndicator when indicator subtypes exist', () => {
+describe('Health Library Beans', () => {
+  it('should include library beans in transform output', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -52,16 +118,19 @@ describe('Health Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createHealthPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      libraryBeans,
+    );
 
     const aggregator = findBean(result.beans, 'HealthAggregator');
     expect(aggregator).toBeDefined();
     expect(aggregator!.tokenRef).toEqual({
       kind: 'class',
       className: 'HealthAggregator',
-      importPath: '@goodie-ts/health',
+      importPath: HEALTH_IMPORT_PATH,
     });
     expect(aggregator!.scope).toBe('singleton');
 
@@ -72,11 +141,11 @@ describe('Health Transformer Plugin', () => {
     expect(collectionDep.tokenRef).toEqual({
       kind: 'class',
       className: 'HealthIndicator',
-      importPath: '@goodie-ts/health',
+      importPath: HEALTH_IMPORT_PATH,
     });
   });
 
-  it('should inject synthetic UptimeHealthIndicator with HealthIndicator base token', () => {
+  it('should include UptimeHealthIndicator with HealthIndicator base token from library beans', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -96,27 +165,30 @@ describe('Health Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createHealthPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      libraryBeans,
+    );
 
     const uptime = findBean(result.beans, 'UptimeHealthIndicator');
     expect(uptime).toBeDefined();
     expect(uptime!.tokenRef).toEqual({
       kind: 'class',
       className: 'UptimeHealthIndicator',
-      importPath: '@goodie-ts/health',
+      importPath: HEALTH_IMPORT_PATH,
     });
     expect(uptime!.baseTokenRefs).toEqual([
       {
         kind: 'class',
         className: 'HealthIndicator',
-        importPath: '@goodie-ts/health',
+        importPath: HEALTH_IMPORT_PATH,
       },
     ]);
   });
 
-  it('should not inject any beans when no HealthIndicator subtypes exist', () => {
+  it('should not include library beans when none are provided', () => {
     const project = createProject({
       '/src/Service.ts': `
         import { Singleton } from './decorators.js'
@@ -126,16 +198,14 @@ describe('Health Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createHealthPlugin(),
-    ]);
+    const result = transformInMemory(project, '/out/AppContext.generated.ts');
 
     expect(findBean(result.beans, 'HealthAggregator')).toBeUndefined();
     expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeUndefined();
     expect(result.beans).toHaveLength(1);
   });
 
-  it('should contribute imports for health classes in generated code', () => {
+  it('should generate imports for health classes from library beans', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -155,13 +225,18 @@ describe('Health Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createHealthPlugin(),
-    ]);
-
-    expect(result.code).toContain(
-      "import { HealthAggregator, HealthIndicator, UptimeHealthIndicator } from '@goodie-ts/health'",
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      libraryBeans,
     );
+
+    // Codegen auto-generates imports from bean tokenRefs and baseTokenRefs
+    expect(result.code).toContain('HealthAggregator');
+    expect(result.code).toContain('HealthIndicator');
+    expect(result.code).toContain('UptimeHealthIndicator');
+    expect(result.code).toContain("from '@goodie-ts/health'");
   });
 
   it('should work with multiple indicator subtypes', () => {
@@ -194,86 +269,20 @@ describe('Health Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createHealthPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      libraryBeans,
+    );
 
     // DbIndicator + CacheIndicator + UptimeHealthIndicator + HealthAggregator
     expect(result.beans).toHaveLength(4);
     expect(findBean(result.beans, 'HealthAggregator')).toBeDefined();
     expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeDefined();
   });
-});
 
-describe('Health Plugin with Library Beans', () => {
-  const HEALTH_IMPORT_PATH = '@goodie-ts/health';
-
-  const libraryBeans: IRBeanDefinition[] = [
-    {
-      tokenRef: {
-        kind: 'class',
-        className: 'UptimeHealthIndicator',
-        importPath: HEALTH_IMPORT_PATH,
-      },
-      scope: 'singleton',
-      eager: false,
-      name: undefined,
-      constructorDeps: [],
-      fieldDeps: [],
-      factoryKind: 'constructor',
-      providesSource: undefined,
-      baseTokenRefs: [
-        {
-          kind: 'class',
-          className: 'HealthIndicator',
-          importPath: HEALTH_IMPORT_PATH,
-        },
-      ],
-      metadata: {},
-      sourceLocation: {
-        filePath: HEALTH_IMPORT_PATH,
-        line: 0,
-        column: 0,
-      },
-    },
-    {
-      tokenRef: {
-        kind: 'class',
-        className: 'HealthAggregator',
-        importPath: HEALTH_IMPORT_PATH,
-      },
-      scope: 'singleton',
-      eager: false,
-      name: undefined,
-      constructorDeps: [
-        {
-          tokenRef: {
-            kind: 'class',
-            className: 'HealthIndicator',
-            importPath: HEALTH_IMPORT_PATH,
-          },
-          optional: false,
-          collection: true,
-          sourceLocation: {
-            filePath: HEALTH_IMPORT_PATH,
-            line: 0,
-            column: 0,
-          },
-        },
-      ],
-      fieldDeps: [],
-      factoryKind: 'constructor',
-      providesSource: undefined,
-      metadata: {},
-      sourceLocation: {
-        filePath: HEALTH_IMPORT_PATH,
-        line: 0,
-        column: 0,
-      },
-    },
-  ];
-
-  it('should skip synthesis when library beans already provide health beans', () => {
+  it('should not create duplicate beans when library beans are present', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -293,16 +302,13 @@ describe('Health Plugin with Library Beans', () => {
       `,
     });
 
-    // Pass library beans via transformInMemory
     const result = transformInMemory(
       project,
       '/out/AppContext.generated.ts',
-      [createHealthPlugin()],
+      [],
       libraryBeans,
     );
 
-    // Should have: DbIndicator + UptimeHealthIndicator + HealthAggregator (from library)
-    // Plugin should NOT add duplicates
     const uptimeBeans = result.beans.filter(
       (b) =>
         b.tokenRef.kind === 'class' &&
@@ -316,69 +322,6 @@ describe('Health Plugin with Library Beans', () => {
 
     expect(uptimeBeans).toHaveLength(1);
     expect(aggregatorBeans).toHaveLength(1);
-  });
-
-  it('should include library beans in transformInMemory output', () => {
-    const project = createProject({
-      '/src/HealthIndicator.ts': `
-        export abstract class HealthIndicator {
-          abstract readonly name: string
-          abstract check(): Promise<{ status: string }>
-        }
-      `,
-      '/src/DbIndicator.ts': `
-        import { Singleton } from './decorators.js'
-        import { HealthIndicator } from './HealthIndicator.js'
-
-        @Singleton()
-        export class DbIndicator extends HealthIndicator {
-          readonly name = 'db'
-          async check() { return { status: 'UP' } }
-        }
-      `,
-    });
-
-    const result = transformInMemory(
-      project,
-      '/out/AppContext.generated.ts',
-      [createHealthPlugin()],
-      libraryBeans,
-    );
-
-    // Library beans should be in the output
-    expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeDefined();
-    expect(findBean(result.beans, 'HealthAggregator')).toBeDefined();
-    expect(findBean(result.beans, 'DbIndicator')).toBeDefined();
-  });
-
-  it('should still synthesize beans without library beans (backward compat)', () => {
-    const project = createProject({
-      '/src/HealthIndicator.ts': `
-        export abstract class HealthIndicator {
-          abstract readonly name: string
-          abstract check(): Promise<{ status: string }>
-        }
-      `,
-      '/src/DbIndicator.ts': `
-        import { Singleton } from './decorators.js'
-        import { HealthIndicator } from './HealthIndicator.js'
-
-        @Singleton()
-        export class DbIndicator extends HealthIndicator {
-          readonly name = 'db'
-          async check() { return { status: 'UP' } }
-        }
-      `,
-    });
-
-    // No library beans — plugin should synthesize as before
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createHealthPlugin(),
-    ]);
-
-    expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeDefined();
-    expect(findBean(result.beans, 'HealthAggregator')).toBeDefined();
-    expect(result.beans).toHaveLength(3);
   });
 
   it('should round-trip library beans through serialize/deserialize', () => {

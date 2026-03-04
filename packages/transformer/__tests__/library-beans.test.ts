@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { IRBeanDefinition } from '../src/ir.js';
 import {
   deserializeBeans,
+  discoverAopMappings,
   discoverLibraryBeans,
   type LibraryBeansManifest,
   rewriteImportPaths,
@@ -235,6 +236,41 @@ describe('serializeBeans / deserializeBeans', () => {
       'Unsupported beans.json version 99 from package "@acme/lib"',
     );
   });
+
+  it('should include aop section in manifest when provided', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'LoggingInterceptor',
+          importPath: '@goodie-ts/logging',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: { filePath: '@goodie-ts/logging', line: 0, column: 0 },
+      },
+    ];
+
+    const aop = {
+      Log: { interceptor: 'LoggingInterceptor', order: -100 },
+    };
+
+    const manifest = serializeBeans(beans, '@goodie-ts/logging', aop);
+    expect(manifest.aop).toEqual(aop);
+    expect(manifest.beans).toHaveLength(1);
+  });
+
+  it('should omit aop section when no aop mappings exist', () => {
+    const beans: IRBeanDefinition[] = [];
+    const manifest = serializeBeans(beans, '@acme/lib');
+    expect(manifest.aop).toBeUndefined();
+  });
 });
 
 describe('discoverLibraryBeans', () => {
@@ -405,6 +441,148 @@ describe('discoverLibraryBeans', () => {
     const nonExistent = path.join(tmpDir, 'does-not-exist');
     const beans = await discoverLibraryBeans(nonExistent);
     expect(beans).toEqual([]);
+  });
+});
+
+describe('discoverAopMappings', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'goodie-aop-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should discover aop mappings from beans.json manifest', () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'logging');
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@goodie-ts/logging',
+        goodie: { beans: 'dist/beans.json' },
+      }),
+    );
+
+    const manifest: LibraryBeansManifest = {
+      version: 1,
+      package: '@goodie-ts/logging',
+      beans: [],
+      aop: {
+        Log: { interceptor: 'LoggingInterceptor', order: -100 },
+      },
+    };
+
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'beans.json'),
+      JSON.stringify(manifest),
+    );
+
+    const mappings = discoverAopMappings(tmpDir);
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0]).toEqual({
+      decoratorName: 'Log',
+      declaration: { interceptor: 'LoggingInterceptor', order: -100 },
+      packageName: '@goodie-ts/logging',
+    });
+  });
+
+  it('should skip packages without beans field', () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'core');
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({ name: '@goodie-ts/core' }),
+    );
+
+    const mappings = discoverAopMappings(tmpDir);
+    expect(mappings).toEqual([]);
+  });
+
+  it('should skip manifests without aop section', () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'health');
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@goodie-ts/health',
+        goodie: { beans: 'dist/beans.json' },
+      }),
+    );
+
+    const manifest: LibraryBeansManifest = {
+      version: 1,
+      package: '@goodie-ts/health',
+      beans: [],
+    };
+
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'beans.json'),
+      JSON.stringify(manifest),
+    );
+
+    const mappings = discoverAopMappings(tmpDir);
+    expect(mappings).toEqual([]);
+  });
+
+  it('should discover multiple decorators from one package', () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'cache');
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@goodie-ts/cache',
+        goodie: { beans: 'dist/beans.json' },
+      }),
+    );
+
+    const manifest: LibraryBeansManifest = {
+      version: 1,
+      package: '@goodie-ts/cache',
+      beans: [],
+      aop: {
+        Cacheable: {
+          interceptor: 'CacheInterceptor',
+          order: -50,
+          metadata: { cacheAction: 'get' },
+          argMapping: ['cacheName'],
+        },
+        CacheEvict: {
+          interceptor: 'CacheInterceptor',
+          order: -50,
+          metadata: { cacheAction: 'evict' },
+          argMapping: ['cacheName'],
+        },
+      },
+    };
+
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'beans.json'),
+      JSON.stringify(manifest),
+    );
+
+    const mappings = discoverAopMappings(tmpDir);
+    expect(mappings).toHaveLength(2);
+    const names = mappings.map((m) => m.decoratorName).sort();
+    expect(names).toEqual(['CacheEvict', 'Cacheable']);
+  });
+
+  it('should return empty array when beans.json is malformed', () => {
+    const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'broken');
+    fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        name: '@goodie-ts/broken',
+        goodie: { beans: 'dist/beans.json' },
+      }),
+    );
+    fs.writeFileSync(path.join(pkgDir, 'dist', 'beans.json'), '{ invalid }');
+
+    const mappings = discoverAopMappings(tmpDir);
+    expect(mappings).toEqual([]);
   });
 });
 
@@ -694,6 +872,91 @@ export class Service {}
       className: 'Service',
       importPath: '@acme/lib',
     });
+  });
+
+  it('should emit generated code when codeOutputPath is set', async () => {
+    writeFiles({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ES2022',
+          moduleResolution: 'bundler',
+          strict: true,
+          outDir: 'dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+      }),
+      'src/decorators.ts': `
+export function Singleton() { return (t: any, c: any) => {} }
+      `,
+      'src/my-service.ts': `
+import { Singleton } from './decorators.js'
+
+@Singleton()
+export class MyService {
+  hello() { return 'world' }
+}
+      `,
+    });
+
+    const beansOutputPath = path.join(tmpDir, 'dist', 'beans.json');
+    const codeOutputPath = path.join(tmpDir, 'src', 'AppContext.generated.ts');
+    const result = await transformLibrary({
+      tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
+      packageName: '@acme/my-lib',
+      beansOutputPath,
+      codeOutputPath,
+      disablePluginDiscovery: true,
+    });
+
+    // beans.json should be written
+    expect(fs.existsSync(beansOutputPath)).toBe(true);
+
+    // Generated code should be written
+    expect(fs.existsSync(codeOutputPath)).toBe(true);
+    expect(result.code).toBeDefined();
+    expect(result.codeOutputPath).toBe(codeOutputPath);
+
+    // Generated code should contain bean definitions
+    const code = fs.readFileSync(codeOutputPath, 'utf-8');
+    expect(code).toContain('MyService');
+    expect(code).toContain('BeanDefinition');
+  });
+
+  it('should not emit code when codeOutputPath is omitted', async () => {
+    writeFiles({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ES2022',
+          moduleResolution: 'bundler',
+          strict: true,
+          outDir: 'dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+      }),
+      'src/decorators.ts': `
+export function Singleton() { return (t: any, c: any) => {} }
+      `,
+      'src/service.ts': `
+import { Singleton } from './decorators.js'
+
+@Singleton()
+export class Service {}
+      `,
+    });
+
+    const result = await transformLibrary({
+      tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
+      packageName: '@acme/lib',
+      beansOutputPath: path.join(tmpDir, 'dist', 'beans.json'),
+      disablePluginDiscovery: true,
+    });
+
+    expect(result.code).toBeUndefined();
+    expect(result.codeOutputPath).toBeUndefined();
   });
 
   it('should detect base classes and set baseTokenRefs', async () => {

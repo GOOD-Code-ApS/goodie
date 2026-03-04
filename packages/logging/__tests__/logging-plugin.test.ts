@@ -1,8 +1,41 @@
-import { transformInMemory } from '@goodie-ts/transformer';
+import type {
+  IRBeanDefinition,
+  ResolvedAopMapping,
+} from '@goodie-ts/transformer';
+import {
+  createDeclarativeAopPlugin,
+  transformInMemory,
+} from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
-import { createLoggingPlugin } from '../src/logging-transformer-plugin.js';
 import { DECORATOR_STUBS } from './helpers.js';
+
+const LOGGING_MAPPINGS: ResolvedAopMapping[] = [
+  {
+    decoratorName: 'Log',
+    declaration: { interceptor: 'LoggingInterceptor', order: -100 },
+    packageName: '@goodie-ts/logging',
+  },
+];
+
+const LOGGING_LIBRARY_BEANS: IRBeanDefinition[] = [
+  {
+    tokenRef: {
+      kind: 'class',
+      className: 'LoggingInterceptor',
+      importPath: '@goodie-ts/logging',
+    },
+    scope: 'singleton',
+    eager: false,
+    name: undefined,
+    constructorDeps: [],
+    fieldDeps: [],
+    factoryKind: 'constructor',
+    providesSource: undefined,
+    metadata: {},
+    sourceLocation: { filePath: '@goodie-ts/logging', line: 0, column: 0 },
+  },
+];
 
 function createProject(files: Record<string, string>) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -26,9 +59,13 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
     expect(result.code).toContain('buildInterceptorChain');
     expect(result.code).toContain('LoggingInterceptor');
@@ -52,11 +89,17 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
-    expect(result.code).toContain('"level":"info"');
+    // No defaults or metadata on Log, so no level/logArgs metadata is emitted
+    // The declarative plugin only emits what's parsed from args
+    expect(result.code).toContain('buildInterceptorChain');
   });
 
   it('should generate metadata with debug level when specified', () => {
@@ -71,9 +114,13 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
     expect(result.code).toContain('"level":"debug"');
   });
@@ -90,15 +137,19 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
     // LoggingInterceptor should appear in dependencies array
     expect(result.code).toContain('token: LoggingInterceptor');
   });
 
-  it('should generate a synthetic LoggingInterceptor bean', () => {
+  it('should have LoggingInterceptor bean from library beans', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton, Log } from './decorators.js'
@@ -110,9 +161,13 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
     // Should have a bean definition with token: LoggingInterceptor
     const lines = result.code.split('\n');
@@ -134,11 +189,14 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
-    expect(result.code).not.toContain('LoggingInterceptor');
     expect(result.code).not.toContain('buildInterceptorChain');
   });
 
@@ -156,33 +214,18 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
     expect(result.code).toContain('instance.doWork = buildInterceptorChain');
     expect(result.code).toContain(
       'instance.doOtherWork = buildInterceptorChain',
     );
-  });
-
-  it('should generate metadata with logArgs false by default', () => {
-    const project = createProject({
-      '/src/MyService.ts': `
-        import { Singleton, Log } from './decorators.js'
-        @Singleton()
-        class MyService {
-          @Log()
-          doWork() {}
-        }
-      `,
-    });
-
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
-
-    expect(result.code).toContain('"logArgs":false');
   });
 
   it('should generate metadata with logArgs true when specified', () => {
@@ -197,15 +240,19 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createLoggingPlugin(),
-    ]);
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [],
+      LOGGING_LIBRARY_BEANS,
+      LOGGING_MAPPINGS,
+    );
 
     expect(result.code).toContain('"logArgs":true');
   });
 
   it('should clear state between rebuilds (no duplicate entries on plugin reuse)', () => {
-    const plugin = createLoggingPlugin();
+    const plugin = createDeclarativeAopPlugin(LOGGING_MAPPINGS);
 
     // First transform
     const project1 = createProject({
@@ -222,6 +269,7 @@ describe('Logging Transformer Plugin', () => {
       project1,
       '/out/AppContext.generated.ts',
       [plugin],
+      LOGGING_LIBRARY_BEANS,
     );
 
     // Second transform with the same plugin instance (simulates watch-mode rebuild)
@@ -239,6 +287,7 @@ describe('Logging Transformer Plugin', () => {
       project2,
       '/out/AppContext.generated.ts',
       [plugin],
+      LOGGING_LIBRARY_BEANS,
     );
 
     // Strip timestamp comment (first line) since it varies between runs
@@ -280,10 +329,14 @@ describe('Logging Transformer Plugin', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts', [
-      createAopPlugin(),
-      createLoggingPlugin(),
-    ]);
+    const plugin = createDeclarativeAopPlugin(LOGGING_MAPPINGS);
+
+    const result = transformInMemory(
+      project,
+      '/out/AppContext.generated.ts',
+      [plugin, createAopPlugin()],
+      LOGGING_LIBRARY_BEANS,
+    );
 
     // Both interceptors should be in the chain
     expect(result.code).toContain('LoggingInterceptor');

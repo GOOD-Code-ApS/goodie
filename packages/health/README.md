@@ -63,14 +63,15 @@ class HealthController {
 - Overall status is `DOWN` if any indicator reports `DOWN` or throws
 - Thrown errors are caught and reported as `DOWN` with error details
 
-## Vite Plugin Setup
+## Setup
+
+Health beans are auto-discovered from `beans.json` — no manual plugin registration needed:
 
 ```typescript
 import { diPlugin } from '@goodie-ts/vite-plugin';
-import { createHealthPlugin } from '@goodie-ts/health';
 
 export default defineConfig({
-  plugins: [diPlugin({ plugins: [createHealthPlugin()] })],
+  plugins: [diPlugin()],
 });
 ```
 

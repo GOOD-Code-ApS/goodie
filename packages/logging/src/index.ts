@@ -4,5 +4,4 @@ export type { Logger } from './logger.js';
 export { ConsoleLogger } from './logger.js';
 export { LoggerFactory } from './logger-factory.js';
 export { LoggingInterceptor } from './logging-interceptor.js';
-export { createLoggingPlugin } from './logging-transformer-plugin.js';
 export { MDC } from './mdc.js';

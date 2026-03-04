@@ -7,12 +7,11 @@ Resilience patterns for goodie-ts: `@Retryable`, `@CircuitBreaker`, and `@Timeou
 | File | Role |
 |------|------|
 | `src/retry-interceptor.ts` | `RetryInterceptor` — exponential backoff with jitter (order `-10`) |
-| `src/circuit-breaker-interceptor.ts` | `CircuitBreakerInterceptor` — state machine: CLOSED → OPEN → HALF_OPEN (order `-30`) |
-| `src/timeout-interceptor.ts` | `TimeoutInterceptor` — `Promise.race` timeout enforcement (order `-50`) |
-| `src/resilience-transformer-plugin.ts` | `createResiliencePlugin()` — scans decorators, synthesizes interceptor beans |
-| `src/decorators/retryable.ts` | `@Retryable({ maxAttempts?, delay?, multiplier? })` |
-| `src/decorators/circuit-breaker.ts` | `@CircuitBreaker({ failureThreshold?, resetTimeout?, halfOpenAttempts? })` |
-| `src/decorators/timeout.ts` | `@Timeout(durationMs)` |
+| `src/circuit-breaker-interceptor.ts` | `CircuitBreakerInterceptor` — state machine: CLOSED → OPEN → HALF_OPEN (order `-20`) |
+| `src/timeout-interceptor.ts` | `TimeoutInterceptor` — `Promise.race` timeout enforcement (order `-30`) |
+| `src/decorators/retryable.ts` | `@Retryable()` — defined via `createAopDecorator<{ interceptor: RetryInterceptor; order: -10; defaults: {...} }>()` |
+| `src/decorators/circuit-breaker.ts` | `@CircuitBreaker()` — defined via `createAopDecorator<{ interceptor: CircuitBreakerInterceptor; order: -20; ... }>()` |
+| `src/decorators/timeout.ts` | `@Timeout(duration)` — defined via `createAopDecorator<{ interceptor: TimeoutInterceptor; order: -30; ... }>()` |
 
 ## Interceptor Execution Order
 
@@ -36,9 +35,9 @@ Each method gets its own circuit keyed by `className:methodName`. Only one probe
 
 Exponential backoff with random jitter (50–100% of computed delay) to prevent thundering herd. On first failure of a sync method, the return becomes a `Promise` due to `setTimeout` — callers should always `await` `@Retryable` methods.
 
-## Plugin Bean Synthesis
+## Library Beans
 
-The plugin synthesizes singleton beans for each interceptor type that has at least one usage. A `beforeScan` hook clears state for watch-mode compatibility.
+The package ships three singleton interceptor beans in `beans.json` (`RetryInterceptor`, `CircuitBreakerInterceptor`, `TimeoutInterceptor`). AOP decorator config is also included in the manifest's `aop` section. Consumers auto-discover both at build time.
 
 ## Gotchas
 

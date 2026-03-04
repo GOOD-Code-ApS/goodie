@@ -12,14 +12,14 @@ export interface TransformOptions {
    * Defaults to all .ts files in the project.
    */
   include?: string[];
-  /** Plugins to extend the transformer pipeline. */
+  /** Plugins to extend the transformer pipeline. Merged with auto-discovered plugins. */
   plugins?: TransformerPlugin[];
-  /** Skip auto-discovery of plugins from installed `@goodie-ts/*` packages. */
+  /** Skip auto-discovery of plugins from installed packages. */
   disablePluginDiscovery?: boolean;
   /** Skip auto-discovery of library beans from installed packages. */
   disableLibraryBeanDiscovery?: boolean;
   /**
-   * npm scopes to scan for library beans (e.g. `['@goodie-ts', '@acme']`).
+   * npm scopes to scan for library beans and plugins (e.g. `['@goodie-ts', '@acme']`).
    * Defaults to `['@goodie-ts']`.
    */
   scanScopes?: string[];
@@ -34,13 +34,19 @@ export interface TransformLibraryOptions {
   /** Absolute path for the generated beans.json file. */
   beansOutputPath: string;
   /**
+   * Absolute path for the generated TypeScript code file.
+   * When set, library mode emits both beans.json AND generated code
+   * (useful for the library's own integration tests).
+   */
+  codeOutputPath?: string;
+  /**
    * Source file globs to scan (relative to tsconfig root).
    * Defaults to all .ts files in the project.
    */
   include?: string[];
-  /** Plugins to extend the transformer pipeline. */
+  /** Plugins to extend the transformer pipeline. Merged with auto-discovered plugins. */
   plugins?: TransformerPlugin[];
-  /** Skip auto-discovery of plugins from installed `@goodie-ts/*` packages. */
+  /** Skip auto-discovery of plugins from installed packages. */
   disablePluginDiscovery?: boolean;
 }
 
@@ -54,6 +60,10 @@ export interface TransformLibraryResult {
   beans: import('./ir.js').IRBeanDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
+  /** Generated TypeScript code (only when `codeOutputPath` is set). */
+  code?: string;
+  /** Absolute path where the generated code was written (only when `codeOutputPath` is set). */
+  codeOutputPath?: string;
 }
 
 /** Result returned by the transform pipeline. */

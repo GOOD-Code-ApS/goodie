@@ -1,4 +1,5 @@
 import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
+import { Singleton } from '@goodie-ts/decorators';
 
 /** Metadata shape expected from the resilience transformer plugin. */
 interface RetryMetadata {
@@ -27,6 +28,7 @@ interface RetryMetadata {
  * failure. Callers should always `await` the return value of `@Retryable`
  * methods.
  */
+@Singleton()
 export class RetryInterceptor implements MethodInterceptor {
   intercept(ctx: InvocationContext): unknown {
     const meta = ctx.metadata as RetryMetadata | undefined;

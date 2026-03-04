@@ -77,6 +77,41 @@ describe('discoverPlugins', () => {
     expect(plugins).toEqual([]);
   });
 
+  it('scans custom scopes when scanScopes is provided', async () => {
+    mockReaddirSync.mockReturnValue(['my-plugin'] as any);
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({
+        name: '@acme/my-plugin',
+        goodie: { plugin: './dist/plugin.js' },
+      }),
+    );
+
+    const { discoverPlugins } = await import('../src/discover-plugins.js');
+    const plugins = await discoverPlugins('/fake/project', ['@acme']);
+
+    // Import will fail for the fake path, but readdirSync should scan @acme scope
+    expect(plugins).toEqual([]);
+    expect(mockReaddirSync).toHaveBeenCalledWith(
+      expect.stringContaining('@acme'),
+    );
+  });
+
+  it('scans multiple scopes', async () => {
+    mockReaddirSync.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+
+    const { discoverPlugins } = await import('../src/discover-plugins.js');
+    const plugins = await discoverPlugins('/fake/project', [
+      '@goodie-ts',
+      '@acme',
+    ]);
+
+    expect(plugins).toEqual([]);
+    // Should have attempted both scopes
+    expect(mockReaddirSync).toHaveBeenCalledTimes(2);
+  });
+
   it('skips packages without "goodie" field', async () => {
     mockReaddirSync.mockReturnValue(['core', 'decorators'] as any);
     mockReadFileSync.mockReturnValue(

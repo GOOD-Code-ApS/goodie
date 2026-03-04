@@ -9,13 +9,12 @@ Health check indicators and aggregation for goodie-ts. Provides `HealthIndicator
 | `src/health-indicator.ts` | `HealthIndicator` — abstract base class with `name` and `check()` |
 | `src/health-aggregator.ts` | `HealthAggregator` — collects all indicators via constructor injection, reports combined status |
 | `src/uptime-health-indicator.ts` | `UptimeHealthIndicator` — built-in indicator reporting app uptime |
-| `src/health-transformer-plugin.ts` | `createHealthPlugin()` — detects `HealthIndicator` subclasses, synthesizes beans |
 
 ## How It Works
 
 1. **User defines indicators** by extending `HealthIndicator` and decorating with `@Singleton()`
-2. **Resolver** populates `baseTokenRefs` on beans that extend `HealthIndicator`
-3. **Plugin (`beforeCodegen`)** detects indicators via `baseTokenRefs`, synthesizes `UptimeHealthIndicator` (with `baseTokenRefs: [HealthIndicator]`) and `HealthAggregator` (with `collection: true` dep on `HealthIndicator`)
+2. **Library beans** (`beans.json`) ship `UptimeHealthIndicator` (with `baseTokenRefs: [HealthIndicator]`) and `HealthAggregator` (with `collection: true` dep on `HealthIndicator`)
+3. **Codegen** auto-generates imports for all library beans — no transformer plugin needed
 4. **Runtime** `ApplicationContext.getAll(HealthIndicator)` resolves all subtypes, injected into `HealthAggregator`'s constructor
 
 ## Collection Injection
@@ -31,6 +30,6 @@ Health check indicators and aggregation for goodie-ts. Provides `HealthIndicator
 
 ## Gotchas
 
-- The plugin only activates when at least one user-defined `HealthIndicator` subclass exists — if no user indicators are present, no health beans are synthesized
-- `UptimeHealthIndicator` is always included when the health subsystem activates
+- Library beans are always injected when `@goodie-ts/health` is installed — `UptimeHealthIndicator` and `HealthAggregator` are always present
 - Indicators must extend `HealthIndicator` (not just implement the interface) for `baseTokenRefs` detection to work
+- No transformer plugin needed — beans are shipped via `beans.json` and codegen handles imports automatically

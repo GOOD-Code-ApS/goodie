@@ -1,12 +1,16 @@
+import { createAopDecorator } from '@goodie-ts/aop';
+import type { CacheInterceptor } from '../cache-interceptor.js';
+
 /**
  * @Cacheable(cacheName) — cache the method's return value.
  *
- * No-op at runtime. The cache transformer plugin reads this decorator
+ * No-op at runtime. The AOP scanner reads the type parameter
  * at compile time and wires the CacheInterceptor with cache-get metadata.
  */
-export function Cacheable(
-  _cacheName: string,
-  _opts?: { ttlMs?: number },
-): (_target: unknown, _context: ClassMethodDecoratorContext) => void {
-  return () => {};
-}
+export const Cacheable = createAopDecorator<{
+  interceptor: CacheInterceptor;
+  order: -50;
+  metadata: { cacheAction: 'get' };
+  argMapping: ['cacheName'];
+  args: [cacheName: string, opts?: { ttlMs?: number }];
+}>();
