@@ -401,6 +401,30 @@ describe('Controller Scanner', () => {
       ]);
     });
 
+    it('should throw when @Validate value is an expression instead of identifier', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Post(path?: string) { return (t: any, c: any) => {} }
+          export function Validate(targets: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/TodoController.ts': `
+          import { Controller, Post, Validate } from './decorators.js'
+
+          const makeSchema = () => ({})
+
+          @Controller('/todos')
+          export class TodoController {
+            @Post('/')
+            @Validate({ json: makeSchema() })
+            create() {}
+          }
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+    });
+
     it('should not include validation when @Validate is absent', () => {
       const project = createProject({
         '/src/decorators.ts': `

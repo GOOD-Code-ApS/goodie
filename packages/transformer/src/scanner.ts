@@ -471,6 +471,20 @@ function scanValidateDecorator(
     const initializer = propAssign.getInitializer();
     if (!initializer) continue;
 
+    // Validate that the schema reference is a simple identifier or property access
+    // to prevent arbitrary expressions from being embedded in generated code.
+    const kind = initializer.getKind();
+    if (
+      kind !== SyntaxKind.Identifier &&
+      kind !== SyntaxKind.PropertyAccessExpression
+    ) {
+      throw new InvalidDecoratorUsageError(
+        'Validate',
+        `@Validate({ ${target}: ... }) value must be a variable reference or property access (e.g. mySchema or schemas.user), not an expression. Found: ${initializer.getText()}`,
+        getSourceLocation(initializer, cls.getSourceFile()),
+      );
+    }
+
     const schemaRef = initializer.getText();
 
     // Resolve import path of the schema variable

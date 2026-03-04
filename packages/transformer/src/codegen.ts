@@ -780,7 +780,9 @@ function generateEmbeddedServerBeanDef(
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     for (const route of ctrl.routes) {
-      const fullPath = joinPaths(ctrl.basePath, route.path);
+      const fullPath = escapeStringLiteral(
+        joinPaths(ctrl.basePath, route.path),
+      );
       const validationMiddleware = generateValidationMiddleware(
         route.validation,
       );
@@ -870,7 +872,7 @@ function generateValidationMiddleware(
   if (!validation || validation.length === 0) return [];
   return validation.map(
     (v) =>
-      `zValidator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.issues }, 400) })`,
+      `zValidator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.issues.map((i: any) => ({ path: i.path, message: i.message })) }, 400) })`,
   );
 }
 
