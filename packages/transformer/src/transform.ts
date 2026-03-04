@@ -190,6 +190,7 @@ export async function transform(
     { ...codegenOptions, hash: currentHash },
     contributions,
     graphResult.controllers,
+    graphResult.securityProvider,
   );
 
   // 12. Write output
@@ -277,6 +278,7 @@ export function transformInMemory(
     { outputPath, version: PKG_VERSION },
     contributions,
     graphResult.controllers,
+    graphResult.securityProvider,
   );
 
   return {
@@ -379,6 +381,7 @@ export async function transformLibrary(
       { outputPath: options.codeOutputPath, version: PKG_VERSION },
       contributions,
       graphResult.controllers,
+      graphResult.securityProvider,
     );
 
     const codeDir = path.dirname(options.codeOutputPath);

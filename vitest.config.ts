@@ -52,6 +52,10 @@ export default defineConfig({
         __dirname,
         'packages/kysely/src/index.ts',
       ),
+      '@goodie-ts/security': path.resolve(
+        __dirname,
+        'packages/security/src/index.ts',
+      ),
     },
   },
   test: {

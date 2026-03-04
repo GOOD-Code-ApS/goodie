@@ -24,6 +24,8 @@ export interface ResolveResult {
   beans: IRBeanDefinition[];
   modules: IRModule[];
   controllers: IRControllerDefinition[];
+  /** The first bean class that extends SecurityProvider (if any). */
+  securityProvider?: ClassTokenRef;
   warnings: string[];
 }
 
@@ -68,15 +70,29 @@ export function resolve(scanResult: ScanResult): ResolveResult {
   ).map((c) => ({
     classTokenRef: c.classTokenRef,
     basePath: c.basePath,
+    secured: c.secured,
     routes: c.routes.map((r) => ({
       methodName: r.methodName,
       httpMethod: r.httpMethod,
       path: r.path,
+      security: r.security
+        ? {
+            secured: r.security.secured,
+            roles: r.security.roles,
+            anonymous: r.security.anonymous,
+          }
+        : undefined,
       ...(r.validation ? { validation: r.validation } : {}),
     })),
   }));
 
-  return { beans, modules, controllers, warnings };
+  return {
+    beans,
+    modules,
+    controllers,
+    securityProvider: scanResult.securityProvider,
+    warnings,
+  };
 }
 
 function resolveBean(

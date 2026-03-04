@@ -49,6 +49,9 @@ const DECORATOR_NAMES = {
   Put: 'Put',
   Delete: 'Delete',
   Patch: 'Patch',
+  Secured: 'Secured',
+  Roles: 'Roles',
+  Anonymous: 'Anonymous',
   Validate: 'Validate',
 } as const;
 
@@ -158,6 +161,16 @@ export interface ScannedProvides {
 /** HTTP method for a route. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
 
+/** Security metadata for a route method. */
+export interface ScannedRouteSecurity {
+  /** Whether this route requires authentication (method-level @Secured). */
+  secured: boolean;
+  /** Required roles from @Roles('admin', ...). */
+  roles?: string[];
+  /** Whether @Anonymous exempts this route from class-level @Secured. */
+  anonymous: boolean;
+}
+
 /** A validation target extracted from @Validate on a route method. */
 export interface ScannedValidation {
   target: 'json' | 'query' | 'param';
@@ -170,6 +183,8 @@ export interface ScannedRoute {
   methodName: string;
   httpMethod: HttpMethod;
   path: string;
+  /** Security metadata from @Secured, @Roles, @Anonymous decorators. */
+  security?: ScannedRouteSecurity;
   validation?: ScannedValidation[];
 }
 
@@ -178,6 +193,8 @@ export interface ScannedController {
   classDeclaration: ClassDeclaration;
   classTokenRef: ClassTokenRef;
   basePath: string;
+  /** Whether @Secured() is present on the controller class. */
+  secured: boolean;
   routes: ScannedRoute[];
   /** The ScannedBean for this controller (controllers are singletons). */
   beanRef: ScannedBean;
@@ -189,6 +206,8 @@ export interface ScanResult {
   beans: ScannedBean[];
   modules: ScannedModule[];
   controllers: ScannedController[];
+  /** The first bean class that extends SecurityProvider (if any). */
+  securityProvider?: ClassTokenRef;
   warnings: string[];
   /** Plugin-accumulated class metadata, keyed by "filePath:className". Only populated when plugins with visitor hooks are provided. */
   pluginMetadata?: Map<string, Record<string, unknown>>;
@@ -210,6 +229,7 @@ export function scan(
     symbols: new Map(),
     typeArgs: new Map(),
   };
+  let securityProvider: ClassTokenRef | undefined;
 
   for (const sourceFile of project.getSourceFiles()) {
     const filePath = sourceFile.getFilePath();
@@ -334,6 +354,7 @@ export function scan(
             decorators,
             sourceFile,
             scannedBean,
+            warnings,
           );
           if (scannedController) controllers.push(scannedController);
         }
@@ -353,7 +374,13 @@ export function scan(
           isSingleton || isPostProcessor,
           typeCache,
         );
-        if (scannedBean) beans.push(scannedBean);
+        if (scannedBean) {
+          beans.push(scannedBean);
+          // Detect SecurityProvider subclass
+          if (!securityProvider && extendsSecurityProvider(cls)) {
+            securityProvider = scannedBean.classTokenRef;
+          }
+        }
       }
     }
   }
@@ -362,6 +389,7 @@ export function scan(
     beans,
     modules,
     controllers,
+    securityProvider,
     warnings,
     ...(hasVisitors ? { pluginMetadata } : {}),
   };
@@ -442,6 +470,7 @@ function scanController(
   decorators: Decorator[],
   sourceFile: SourceFile,
   beanRef: ScannedBean,
+  warnings: string[],
 ): ScannedController | undefined {
   const className = cls.getName();
   if (!className) return undefined;
@@ -459,7 +488,8 @@ function scanController(
     }
   }
 
-  const routes = scanControllerRoutes(cls);
+  const secured = hasDecorator(decorators, DECORATOR_NAMES.Secured);
+  const routes = scanControllerRoutes(cls, secured, warnings);
 
   return {
     classDeclaration: cls,
@@ -469,6 +499,7 @@ function scanController(
       importPath: sourceFile.getFilePath(),
     },
     basePath,
+    secured,
     routes,
     beanRef,
     sourceLocation: getSourceLocation(cls, sourceFile),
@@ -489,7 +520,11 @@ const ROUTE_DECORATOR_MAP: Record<string, HttpMethod> = {
   [DECORATOR_NAMES.Patch]: 'patch',
 };
 
-function scanControllerRoutes(cls: ClassDeclaration): ScannedRoute[] {
+function scanControllerRoutes(
+  cls: ClassDeclaration,
+  classSecured: boolean,
+  warnings: string[],
+): ScannedRoute[] {
   const routes: ScannedRoute[] = [];
 
   for (const method of cls.getMethods()) {
@@ -518,6 +553,29 @@ function scanControllerRoutes(cls: ClassDeclaration): ScannedRoute[] {
 
     if (!httpMethod) continue;
 
+    // Detect security decorators on the method
+    const methodSecured = hasDecorator(decorators, DECORATOR_NAMES.Secured);
+    const anonymous = hasDecorator(decorators, DECORATOR_NAMES.Anonymous);
+    const rolesDec = findDecorator(decorators, DECORATOR_NAMES.Roles);
+    const roles = rolesDec ? extractStringArrayArgs(rolesDec) : undefined;
+
+    // Warnings for suspicious decorator combos
+    if (roles && !methodSecured && !classSecured) {
+      warnings.push(
+        `@Roles on ${cls.getName()}.${method.getName()} has no effect without @Secured on the method or class`,
+      );
+    }
+    if (anonymous && !classSecured) {
+      warnings.push(
+        `@Anonymous on ${cls.getName()}.${method.getName()} has no effect without class-level @Secured`,
+      );
+    }
+
+    const hasSecurity = methodSecured || anonymous || roles !== undefined;
+    const security: ScannedRouteSecurity | undefined = hasSecurity
+      ? { secured: methodSecured, roles, anonymous }
+      : undefined;
+
     // Scan @Validate on this method
     const validation = scanValidateDecorator(method.getDecorators(), cls);
 
@@ -525,6 +583,7 @@ function scanControllerRoutes(cls: ClassDeclaration): ScannedRoute[] {
       methodName: method.getName(),
       httpMethod,
       path,
+      security,
       ...(validation.length > 0 ? { validation } : {}),
     });
   }
@@ -1068,6 +1127,35 @@ function getModuleImports(decorator: Decorator): ScannedModuleImport[] {
       }
     }
     return { className: text, sourceFile };
+  });
+}
+
+// ── SecurityProvider detection ──
+
+/**
+ * Check if a class extends SecurityProvider by name.
+ * Consistent with all other decorator detection — name-based, no import verification.
+ */
+function extendsSecurityProvider(cls: ClassDeclaration): boolean {
+  const extendsExpr = cls.getExtends();
+  if (!extendsExpr) return false;
+  return extendsExpr.getExpression().getText() === 'SecurityProvider';
+}
+
+/**
+ * Extract string literal arguments from a decorator call.
+ * E.g. @Roles('admin', 'analyst') → ['admin', 'analyst']
+ */
+function extractStringArrayArgs(dec: Decorator): string[] {
+  return dec.getArguments().map((arg) => {
+    const text = arg.getText();
+    if (
+      (text.startsWith("'") && text.endsWith("'")) ||
+      (text.startsWith('"') && text.endsWith('"'))
+    ) {
+      return text.slice(1, -1);
+    }
+    return text;
   });
 }
 

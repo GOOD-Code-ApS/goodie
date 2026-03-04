@@ -83,6 +83,13 @@ export interface IRModule {
   sourceLocation: SourceLocation;
 }
 
+/** Security metadata for a route in the IR. */
+export interface IRRouteSecurity {
+  secured: boolean;
+  roles?: string[];
+  anonymous: boolean;
+}
+
 /** A validation target for a route method. */
 export interface IRRouteValidation {
   target: 'json' | 'query' | 'param';
@@ -95,6 +102,8 @@ export interface IRRouteDefinition {
   methodName: string;
   httpMethod: 'get' | 'post' | 'put' | 'delete' | 'patch';
   path: string;
+  /** Security metadata from @Secured, @Roles, @Anonymous decorators. */
+  security?: IRRouteSecurity;
   validation?: IRRouteValidation[];
 }
 
@@ -102,6 +111,8 @@ export interface IRRouteDefinition {
 export interface IRControllerDefinition {
   classTokenRef: ClassTokenRef;
   basePath: string;
+  /** Whether @Secured() is present on the controller class. */
+  secured: boolean;
   routes: IRRouteDefinition[];
 }
 

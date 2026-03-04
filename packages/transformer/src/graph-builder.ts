@@ -1,4 +1,5 @@
 import type {
+  ClassTokenRef,
   IRBeanDefinition,
   IRControllerDefinition,
   IRDependency,
@@ -22,6 +23,8 @@ export interface GraphResult {
   beans: IRBeanDefinition[];
   /** Controller definitions discovered during scanning. */
   controllers: IRControllerDefinition[];
+  /** The concrete SecurityProvider bean class (if any). */
+  securityProvider?: ClassTokenRef;
   warnings: string[];
 }
 
@@ -57,10 +60,47 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
   // Validate: no missing providers (except optional)
   validateProviders(allBeans);
 
+  // Validate: if any controller has secured routes but no SecurityProvider → error
+  validateSecurityProvider(
+    resolveResult.controllers,
+    resolveResult.securityProvider,
+  );
+
   // Topological sort with cycle detection
   const sorted = topoSort(allBeans);
 
-  return { beans: sorted, controllers: resolveResult.controllers, warnings };
+  return {
+    beans: sorted,
+    controllers: resolveResult.controllers,
+    securityProvider: resolveResult.securityProvider,
+    warnings,
+  };
+}
+
+/**
+ * Validate that when @Secured is used on controllers, a SecurityProvider bean exists.
+ */
+function validateSecurityProvider(
+  controllers: IRControllerDefinition[],
+  securityProvider: ClassTokenRef | undefined,
+): void {
+  const hasSecuredRoutes = controllers.some(
+    (ctrl) => ctrl.secured || ctrl.routes.some((r) => r.security?.secured),
+  );
+
+  if (hasSecuredRoutes && !securityProvider) {
+    throw new MissingProviderError(
+      'SecurityProvider',
+      '@Secured controllers',
+      controllers[0]
+        ? {
+            filePath: controllers[0].classTokenRef.importPath,
+            line: 1,
+            column: 1,
+          }
+        : { filePath: 'unknown', line: 1, column: 1 },
+    );
+  }
 }
 
 /**

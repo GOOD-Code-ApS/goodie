@@ -1,0 +1,34 @@
+{
+  "name": "@goodie-ts/security",
+  "version": "0.1.0",
+  "description": "Authentication and authorization decorators for goodie-ts",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/security"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

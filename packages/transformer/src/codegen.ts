@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import type {
+  ClassTokenRef,
   IRBeanDefinition,
   IRControllerDefinition,
   IRRouteValidation,
@@ -68,6 +69,7 @@ export function generateCode(
   options: CodegenOptions,
   contributions?: CodegenContribution[],
   controllers?: IRControllerDefinition[],
+  securityProvider?: ClassTokenRef,
 ): string {
   const outputDir = path.dirname(options.outputPath);
   const importCache = new Map<string, string>();
@@ -154,6 +156,28 @@ export function generateCode(
       for (const [schemaRef, importSpec] of schemaImports) {
         lines.push(`import { ${schemaRef} } from '${importSpec}'`);
       }
+    }
+  }
+
+  // SecurityProvider import (when @Secured is used and routes need it)
+  const hasSecuredRoutes =
+    securityProvider !== undefined &&
+    (controllers ?? []).some(
+      (ctrl) => ctrl.secured || ctrl.routes.some((r) => r.security?.secured),
+    );
+  if (hasSecuredRoutes && securityProvider) {
+    const relImport = computeRelativeImport(
+      outputDir,
+      securityProvider.importPath,
+    );
+    // Add to existing import group or create new import
+    const existingGroup = importsByPath.get(relImport);
+    if (existingGroup && !existingGroup.includes(securityProvider.className)) {
+      existingGroup.push(securityProvider.className);
+    } else if (!existingGroup) {
+      lines.push(
+        `import { ${securityProvider.className} } from '${relImport}'`,
+      );
     }
   }
 
@@ -269,7 +293,9 @@ export function generateCode(
 
   // EmbeddedServer bean definition (when controllers with routes exist)
   if (needsEmbeddedServer) {
-    lines.push(...generateEmbeddedServerBeanDef(controllers!));
+    lines.push(
+      ...generateEmbeddedServerBeanDef(controllers!, securityProvider),
+    );
   }
 
   if (hasValueFields) {
@@ -833,21 +859,37 @@ function escapeStringLiteral(value: string): string {
  */
 function generateEmbeddedServerBeanDef(
   controllers: IRControllerDefinition[],
+  securityProvider?: ClassTokenRef,
 ): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
-  // Dependencies: one per controller
+  // Check if any route actually needs security middleware
+  const needsSecurity =
+    securityProvider !== undefined &&
+    controllers.some(
+      (ctrl) => ctrl.secured || ctrl.routes.some((r) => r.security?.secured),
+    );
+
+  // Dependencies: one per controller + optional security provider
   const deps = controllers.map(
     (ctrl) =>
       `{ token: ${ctrl.classTokenRef.className}, optional: false, collection: false }`,
   );
+  if (needsSecurity) {
+    deps.push(
+      `{ token: ${securityProvider!.className}, optional: false, collection: false }`,
+    );
+  }
 
-  // Factory params: collision-safe controller variable names
+  // Factory params: collision-safe controller variable names + optional security provider
   const params = controllers.map((ctrl) => {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     return `${varName}: any`;
   });
+  if (needsSecurity) {
+    params.push('__securityProvider: any');
+  }
 
   lines.push('  {');
   lines.push('    token: EmbeddedServer,');
@@ -862,14 +904,19 @@ function generateEmbeddedServerBeanDef(
       const fullPath = escapeStringLiteral(
         joinPaths(ctrl.basePath, route.path),
       );
+      const securityMiddleware = generateSecurityMiddleware(
+        ctrl,
+        route,
+        securityProvider,
+      );
       const validationMiddleware = generateValidationMiddleware(
         route.validation,
       );
+      const allMiddleware = [...securityMiddleware, ...validationMiddleware];
 
-      if (validationMiddleware.length > 0) {
-        // Route with validation middleware
+      if (allMiddleware.length > 0) {
         lines.push(`      __honoApp.${route.httpMethod}('${fullPath}',`);
-        for (const mw of validationMiddleware) {
+        for (const mw of allMiddleware) {
           lines.push(`        ${mw},`);
         }
         lines.push('        async (c) => {');
@@ -897,6 +944,46 @@ function generateEmbeddedServerBeanDef(
   lines.push('  },');
 
   return lines;
+}
+
+/**
+ * Generate security middleware for a route based on controller-level and method-level security.
+ * Returns an array of inline middleware function strings in order: auth → roles.
+ */
+function generateSecurityMiddleware(
+  ctrl: IRControllerDefinition,
+  route: {
+    security?: { secured: boolean; roles?: string[]; anonymous: boolean };
+  },
+  securityProvider?: ClassTokenRef,
+): string[] {
+  if (!securityProvider) return [];
+
+  const security = route.security;
+  const isAnonymous = security?.anonymous === true;
+
+  // Determine if this route needs auth
+  const needsAuth =
+    !isAnonymous && (ctrl.secured || security?.secured === true);
+
+  if (!needsAuth) return [];
+
+  const middlewares: string[] = [];
+
+  // Auth middleware
+  middlewares.push(
+    `async (c: any, next: any) => { const principal = await __securityProvider.authenticate(c.req.raw); if (!principal) return c.json({ error: 'Unauthorized' }, 401); c.set('principal', principal); await next() }`,
+  );
+
+  // Roles middleware (only when @Roles is specified)
+  if (security?.roles && security.roles.length > 0) {
+    const rolesArray = JSON.stringify(security.roles);
+    middlewares.push(
+      `async (c: any, next: any) => { const principal = c.get('principal'); if (!${rolesArray}.some((r: string) => principal.roles?.includes(r))) return c.json({ error: 'Forbidden' }, 403); await next() }`,
+    );
+  }
+
+  return middlewares;
 }
 
 /**
