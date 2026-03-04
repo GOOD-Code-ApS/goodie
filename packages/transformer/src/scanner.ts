@@ -30,6 +30,7 @@ const DECORATOR_NAMES = {
   Put: 'Put',
   Delete: 'Delete',
   Patch: 'Patch',
+  Validate: 'Validate',
 } as const;
 
 /** A class decorated with @Injectable or @Singleton (but not @Module). */
@@ -138,11 +139,19 @@ export interface ScannedProvides {
 /** HTTP method for a route. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
 
+/** A validation target extracted from @Validate on a route method. */
+export interface ScannedValidation {
+  target: 'json' | 'query' | 'param';
+  schemaRef: string;
+  importPath: string;
+}
+
 /** A route method discovered on a @Controller class. */
 export interface ScannedRoute {
   methodName: string;
   httpMethod: HttpMethod;
   path: string;
+  validation?: ScannedValidation[];
 }
 
 /** A class decorated with @Controller(basePath). */
@@ -398,12 +407,16 @@ function scanControllerRoutes(cls: ClassDeclaration): ScannedRoute[] {
 
   for (const method of cls.getMethods()) {
     const decorators = method.getDecorators();
+    let httpMethod: HttpMethod | undefined;
+    let path = '/';
+
+    // Find the route decorator
     for (const dec of decorators) {
-      const httpMethod = ROUTE_DECORATOR_MAP[dec.getName()];
-      if (!httpMethod) continue;
+      const matched = ROUTE_DECORATOR_MAP[dec.getName()];
+      if (!matched) continue;
+      httpMethod = matched;
 
       const args = dec.getArguments();
-      let path = '/';
       if (args.length > 0) {
         const argText = args[0].getText();
         if (
@@ -413,16 +426,94 @@ function scanControllerRoutes(cls: ClassDeclaration): ScannedRoute[] {
           path = argText.slice(1, -1);
         }
       }
-
-      routes.push({
-        methodName: method.getName(),
-        httpMethod,
-        path,
-      });
+      break;
     }
+
+    if (!httpMethod) continue;
+
+    // Scan @Validate on this method
+    const validation = scanValidateDecorator(method.getDecorators(), cls);
+
+    routes.push({
+      methodName: method.getName(),
+      httpMethod,
+      path,
+      ...(validation.length > 0 ? { validation } : {}),
+    });
   }
 
   return routes;
+}
+
+/** Extract validation targets from @Validate({ json: schema, query: schema, param: schema }). */
+function scanValidateDecorator(
+  decorators: Decorator[],
+  cls: ClassDeclaration,
+): ScannedValidation[] {
+  const validateDec = findDecorator(decorators, DECORATOR_NAMES.Validate);
+  if (!validateDec) return [];
+
+  const args = validateDec.getArguments();
+  if (args.length === 0) return [];
+
+  const arg = args[0];
+  if (arg.getKind() !== SyntaxKind.ObjectLiteralExpression) return [];
+
+  const validations: ScannedValidation[] = [];
+  const objLiteral = arg.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+
+  for (const prop of objLiteral.getProperties()) {
+    if (prop.getKind() !== SyntaxKind.PropertyAssignment) continue;
+    const propAssign = prop.asKindOrThrow(SyntaxKind.PropertyAssignment);
+    const target = propAssign.getName() as 'json' | 'query' | 'param';
+    if (target !== 'json' && target !== 'query' && target !== 'param') continue;
+
+    const initializer = propAssign.getInitializer();
+    if (!initializer) continue;
+
+    const schemaRef = initializer.getText();
+
+    // Resolve import path of the schema variable
+    const importPath = resolveSchemaImportPath(initializer, cls);
+
+    validations.push({ target, schemaRef, importPath });
+  }
+
+  return validations;
+}
+
+/** Resolve the import path of a schema variable reference. */
+function resolveSchemaImportPath(
+  node: import('ts-morph').Node,
+  cls: ClassDeclaration,
+): string {
+  const sourceFile = cls.getSourceFile();
+  const varName = node.getText();
+
+  // Try to find the import declaration that brings this symbol into scope
+  for (const importDecl of sourceFile.getImportDeclarations()) {
+    for (const namedImport of importDecl.getNamedImports()) {
+      if (namedImport.getName() === varName) {
+        const moduleSpecifier = importDecl.getModuleSpecifierSourceFile();
+        if (moduleSpecifier) {
+          return moduleSpecifier.getFilePath();
+        }
+      }
+    }
+  }
+
+  // Fallback: symbol resolution via ts-morph type checker
+  const symbol = node.getSymbol();
+  if (symbol) {
+    const declarations = symbol.getDeclarations();
+    if (declarations.length > 0) {
+      const declSourceFile = declarations[0].getSourceFile();
+      return declSourceFile.getFilePath();
+    }
+  }
+
+  // Fallback: schema is defined in the same file as the controller
+  return sourceFile.getFilePath();
 }
 
 function scanConstructorParams(

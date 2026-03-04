@@ -1,6 +1,7 @@
 import type {
   IRBeanDefinition,
   IRControllerDefinition,
+  IRRouteValidation,
 } from '@goodie-ts/transformer';
 import { describe, expect, it } from 'vitest';
 import { generateCode } from '../src/codegen.js';
@@ -502,5 +503,175 @@ describe('Controller Codegen', () => {
     expect(code).toContain('await app.start()');
     expect(code).toContain('ctx.get(EmbeddedServer).listen(options)');
     expect(code).toContain('return ctx');
+  });
+
+  it('should emit zValidator middleware for validated routes', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'TodoController',
+          importPath: '/src/TodoController.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const validation: IRRouteValidation[] = [
+      {
+        target: 'json',
+        schemaRef: 'createTodoSchema',
+        importPath: '/src/schema.ts',
+      },
+    ];
+
+    const controllers: IRControllerDefinition[] = [
+      {
+        classTokenRef: {
+          kind: 'class',
+          className: 'TodoController',
+          importPath: '/src/TodoController.ts',
+        },
+        basePath: '/api/todos',
+        routes: [
+          {
+            methodName: 'create',
+            httpMethod: 'post',
+            path: '/',
+            validation,
+          },
+        ],
+      },
+    ];
+
+    const code = generateCode(
+      beans,
+      { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
+      controllers,
+    );
+
+    expect(code).toContain("import { zValidator } from '@hono/zod-validator'");
+    expect(code).toContain(
+      "import { createTodoSchema } from '../src/schema.js'",
+    );
+    expect(code).toContain("zValidator('json', createTodoSchema");
+    expect(code).toContain('Validation failed');
+    expect(code).toContain('todoController.create(c)');
+  });
+
+  it('should emit multiple validation middleware for multiple targets', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'ItemController',
+          importPath: '/src/ItemController.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const controllers: IRControllerDefinition[] = [
+      {
+        classTokenRef: {
+          kind: 'class',
+          className: 'ItemController',
+          importPath: '/src/ItemController.ts',
+        },
+        basePath: '/items',
+        routes: [
+          {
+            methodName: 'getById',
+            httpMethod: 'get',
+            path: '/:id',
+            validation: [
+              {
+                target: 'param',
+                schemaRef: 'paramSchema',
+                importPath: '/src/schemas.ts',
+              },
+              {
+                target: 'query',
+                schemaRef: 'querySchema',
+                importPath: '/src/schemas.ts',
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const code = generateCode(
+      beans,
+      { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
+      controllers,
+    );
+
+    expect(code).toContain("zValidator('param', paramSchema");
+    expect(code).toContain("zValidator('query', querySchema");
+    // Both schemas from same file should produce a single import
+    expect(code).toContain("import { paramSchema } from '../src/schemas.js'");
+    expect(code).toContain("import { querySchema } from '../src/schemas.js'");
+  });
+
+  it('should not emit zValidator import when no routes have validation', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'PlainController',
+          importPath: '/src/PlainController.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const controllers: IRControllerDefinition[] = [
+      {
+        classTokenRef: {
+          kind: 'class',
+          className: 'PlainController',
+          importPath: '/src/PlainController.ts',
+        },
+        basePath: '/',
+        routes: [{ methodName: 'index', httpMethod: 'get', path: '/' }],
+      },
+    ];
+
+    const code = generateCode(
+      beans,
+      { outputPath: '/out/AppContext.generated.ts' },
+      undefined,
+      controllers,
+    );
+
+    expect(code).not.toContain('zValidator');
+    expect(code).not.toContain('@hono/zod-validator');
   });
 });

@@ -2,6 +2,7 @@ import path from 'node:path';
 import type {
   IRBeanDefinition,
   IRControllerDefinition,
+  IRRouteValidation,
   TokenRef,
 } from './ir.js';
 import type { CodegenContribution } from './options.js';
@@ -88,6 +89,20 @@ export function generateCode(
   if (needsEmbeddedServer) {
     lines.push("import { Hono } from 'hono'");
     lines.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+
+    // Validation imports (when any route has @Validate)
+    const allRoutes = (controllers ?? []).flatMap((c) => c.routes);
+    const hasValidation = allRoutes.some(
+      (r) => r.validation && r.validation.length > 0,
+    );
+    if (hasValidation) {
+      lines.push("import { zValidator } from '@hono/zod-validator'");
+      // Collect unique schema imports
+      const schemaImports = collectSchemaImports(controllers ?? [], outputDir);
+      for (const [schemaRef, importSpec] of schemaImports) {
+        lines.push(`import { ${schemaRef} } from '${importSpec}'`);
+      }
+    }
   }
 
   // Type-only imports for types referenced in token generics
@@ -766,9 +781,22 @@ function generateEmbeddedServerBeanDef(
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     for (const route of ctrl.routes) {
       const fullPath = joinPaths(ctrl.basePath, route.path);
-      lines.push(
-        `      __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
+      const validationMiddleware = generateValidationMiddleware(
+        route.validation,
       );
+
+      if (validationMiddleware.length > 0) {
+        // Route with validation middleware
+        lines.push(`      __honoApp.${route.httpMethod}('${fullPath}',`);
+        for (const mw of validationMiddleware) {
+          lines.push(`        ${mw},`);
+        }
+        lines.push('        async (c) => {');
+      } else {
+        lines.push(
+          `      __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
+        );
+      }
       lines.push(
         `        const result = await ${varName}.${route.methodName}(c)`,
       );
@@ -833,4 +861,40 @@ function joinPaths(basePath: string, routePath: string): string {
   if (route === '/') return base || '/';
 
   return `${base}${route}`;
+}
+
+/** Generate zValidator() middleware calls for a route's validation targets. */
+function generateValidationMiddleware(
+  validation: IRRouteValidation[] | undefined,
+): string[] {
+  if (!validation || validation.length === 0) return [];
+  return validation.map(
+    (v) =>
+      `zValidator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.issues }, 400) })`,
+  );
+}
+
+/**
+ * Collect unique schema imports from validated routes.
+ * Returns a Map from schema variable name to relative import path.
+ */
+function collectSchemaImports(
+  controllers: IRControllerDefinition[],
+  outputDir: string,
+): Map<string, string> {
+  const imports = new Map<string, string>();
+  for (const ctrl of controllers) {
+    for (const route of ctrl.routes) {
+      if (!route.validation) continue;
+      for (const v of route.validation) {
+        if (!imports.has(v.schemaRef)) {
+          imports.set(
+            v.schemaRef,
+            computeRelativeImport(outputDir, v.importPath),
+          );
+        }
+      }
+    }
+  }
+  return imports;
 }
