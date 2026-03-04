@@ -1,0 +1,38 @@
+{
+  "name": "@goodie-ts/events",
+  "version": "0.5.1",
+  "description": "Event publishing and listener support for goodie-ts — @EventListener decorator",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/events"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "goodie": {
+    "plugin": "./dist/events-transformer-plugin.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

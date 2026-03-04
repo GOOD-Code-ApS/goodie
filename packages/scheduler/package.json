@@ -1,0 +1,41 @@
+{
+  "name": "@goodie-ts/scheduler",
+  "version": "0.5.1",
+  "description": "Task scheduling support for goodie-ts — @Scheduled decorator with cron, fixedRate, and fixedDelay",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/scheduler"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "goodie": {
+    "plugin": "./dist/scheduler-transformer-plugin.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "croner": "^9.0.0"
+  },
+  "devDependencies": {
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
