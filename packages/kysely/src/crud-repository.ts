@@ -40,7 +40,7 @@ export abstract class CrudRepository<T extends Record<string, unknown>> {
 
   /** Whether the current dialect supports RETURNING clauses. */
   protected get returningSupported(): boolean {
-    return this.db.getExecutor().adapter.supportsReturning;
+    return this.transactionManager.supportsReturning;
   }
 
   async findAll(): Promise<T[]> {
@@ -70,6 +70,11 @@ export abstract class CrudRepository<T extends Record<string, unknown>> {
       .values(entity)
       .executeTakeFirstOrThrow();
     const id = entity[this.idColumn] ?? result.insertId;
+    if (id === undefined) {
+      throw new Error(
+        `Cannot re-fetch inserted row: no value for '${this.idColumn}' in entity and no auto-generated insertId`,
+      );
+    }
     return this.db
       .selectFrom(this.tableName)
       .selectAll()
@@ -85,12 +90,19 @@ export abstract class CrudRepository<T extends Record<string, unknown>> {
         .returningAll()
         .executeTakeFirst() as Promise<T | undefined>;
     }
-    const existing = await this.findById(id);
-    if (!existing) return undefined;
-    await this.db
-      .deleteFrom(this.tableName)
-      .where(this.idColumn, '=', id)
-      .execute();
-    return existing;
+    // Wrap SELECT + DELETE in a transaction to prevent race conditions
+    return this.db.transaction().execute(async (trx) => {
+      const existing = (await trx
+        .selectFrom(this.tableName)
+        .selectAll()
+        .where(this.idColumn, '=', id)
+        .executeTakeFirst()) as T | undefined;
+      if (!existing) return undefined;
+      await trx
+        .deleteFrom(this.tableName)
+        .where(this.idColumn, '=', id)
+        .execute();
+      return existing;
+    });
   }
 }

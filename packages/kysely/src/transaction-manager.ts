@@ -23,6 +23,7 @@ export class TransactionManager {
   private readonly storage = new AsyncLocalStorage<Transaction<any>>();
   private kyselyRef?: Kysely<any>;
   private testTransactionActive = false;
+  private _supportsReturning?: boolean;
 
   constructor(kyselyOrProvider?: Kysely<any> | KyselyProvider) {
     if (kyselyOrProvider) {
@@ -98,6 +99,18 @@ export class TransactionManager {
    */
   getConnection(): Kysely<any> {
     return this.currentTransaction() ?? this.kysely;
+  }
+
+  /**
+   * Whether the underlying dialect supports RETURNING clauses.
+   * Detected once from the Kysely adapter and cached.
+   */
+  get supportsReturning(): boolean {
+    if (this._supportsReturning === undefined) {
+      this._supportsReturning =
+        this.kysely.getExecutor().adapter.supportsReturning;
+    }
+    return this._supportsReturning;
   }
 
   /**
