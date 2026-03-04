@@ -51,6 +51,7 @@ export class TransactionManager {
    */
   configure(kysely: Kysely<any>): void {
     this.kyselyRef = kysely;
+    this._supportsReturning = undefined;
   }
 
   private get kysely(): Kysely<any> {

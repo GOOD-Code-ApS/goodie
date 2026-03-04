@@ -90,15 +90,17 @@ export abstract class CrudRepository<T extends Record<string, unknown>> {
         .returningAll()
         .executeTakeFirst() as Promise<T | undefined>;
     }
-    // Wrap SELECT + DELETE in a transaction to prevent race conditions
-    return this.db.transaction().execute(async (trx) => {
-      const existing = (await trx
+    // Wrap SELECT + DELETE in a transaction to prevent race conditions.
+    // Uses runInTransaction (REQUIRED propagation) so it reuses an existing
+    // @Transactional context instead of nesting (Kysely throws on nested tx).
+    return this.transactionManager.runInTransaction(async () => {
+      const existing = (await this.db
         .selectFrom(this.tableName)
         .selectAll()
         .where(this.idColumn, '=', id)
         .executeTakeFirst()) as T | undefined;
       if (!existing) return undefined;
-      await trx
+      await this.db
         .deleteFrom(this.tableName)
         .where(this.idColumn, '=', id)
         .execute();

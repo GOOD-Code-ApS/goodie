@@ -93,6 +93,7 @@ function createMockConnection(opts: {
   const tm = {
     getConnection: vi.fn().mockReturnValue(connection),
     supportsReturning: opts.supportsReturning,
+    runInTransaction: vi.fn((fn: () => Promise<unknown>) => fn()),
   } as unknown as TransactionManager;
 
   return { tm, connection, selectChain, insertChain, deleteChain };
@@ -283,7 +284,7 @@ describe('CrudRepository', () => {
       );
     });
 
-    it('deleteById should SELECT then DELETE in a transaction', async () => {
+    it('deleteById should SELECT then DELETE via runInTransaction', async () => {
       const existing = { id: '1', name: 'Alice' };
       const { tm, connection } = createMockConnection({
         supportsReturning: false,
@@ -294,8 +295,11 @@ describe('CrudRepository', () => {
 
       const result = await repo.deleteById('1');
 
-      // Should use transaction
-      expect(connection.transaction).toHaveBeenCalled();
+      // Should use runInTransaction (REQUIRED propagation), not db.transaction()
+      expect(tm.runInTransaction).toHaveBeenCalled();
+      expect(connection.transaction).not.toHaveBeenCalled();
+      expect(connection.selectFrom).toHaveBeenCalledWith('test_table');
+      expect(connection.deleteFrom).toHaveBeenCalledWith('test_table');
       expect(result).toEqual(existing);
     });
 
@@ -308,7 +312,8 @@ describe('CrudRepository', () => {
 
       const result = await repo.deleteById('nonexistent');
 
-      expect(connection.transaction).toHaveBeenCalled();
+      expect(tm.runInTransaction).toHaveBeenCalled();
+      expect(connection.transaction).not.toHaveBeenCalled();
       expect(result).toBeUndefined();
     });
   });

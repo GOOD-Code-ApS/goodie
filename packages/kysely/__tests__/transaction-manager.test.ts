@@ -178,4 +178,28 @@ describe('TransactionManager', () => {
     const result = await tm.runInTransaction(async () => 'via configure');
     expect(result).toBe('via configure');
   });
+
+  it('should reset supportsReturning cache when configure() is called', () => {
+    function createKyselyWithReturning(supports: boolean) {
+      return {
+        ...createMockKysely().kysely,
+        getExecutor: () => ({
+          adapter: { supportsReturning: supports },
+        }),
+      };
+    }
+
+    const tm = new TransactionManager();
+    const kysely1 = createKyselyWithReturning(true);
+    tm.configure(kysely1 as never);
+
+    expect(tm.supportsReturning).toBe(true);
+
+    // Reconfigure with a dialect that does NOT support returning
+    const kysely2 = createKyselyWithReturning(false);
+    tm.configure(kysely2 as never);
+
+    // Should reflect the new dialect, not the cached value
+    expect(tm.supportsReturning).toBe(false);
+  });
 });
