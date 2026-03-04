@@ -1,5 +1,11 @@
 # @goodie-ts/core
 
+## 0.5.2
+
+### Patch Changes
+
+- 124bb16: Add library bean discovery via `beans.json` manifests and `transformLibrary()` pipeline. Support abstract class tokens in DI container. Replace `workspace:*` with `workspace:^` for proper semver ranges on publish.
+
 ## 0.5.1
 
 ### Patch Changes
