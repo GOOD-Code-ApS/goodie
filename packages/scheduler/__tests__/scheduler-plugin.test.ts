@@ -194,4 +194,51 @@ describe('Scheduler Transformer Plugin', () => {
     expect(result.code).toContain('SchedulerService');
     expect(result.code).toContain('@goodie-ts/scheduler');
   });
+
+  it('should clear state between watch-mode rebuilds', () => {
+    const plugin = createSchedulerPlugin();
+
+    const makeProject = () => {
+      const project = new Project({ useInMemoryFileSystem: true });
+      project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
+      project.createSourceFile(
+        '/src/Task.ts',
+        `
+        import { Singleton, Scheduled } from './decorators.js'
+
+        @Singleton()
+        export class Task {
+          @Scheduled({ fixedRate: 1000 })
+          run() {}
+        }
+      `,
+      );
+      return project;
+    };
+
+    // First transform
+    const result1 = transformInMemory(
+      makeProject(),
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    // Second transform with the same plugin instance (simulates watch-mode rebuild)
+    const result2 = transformInMemory(
+      makeProject(),
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    const getScheduler = (r: typeof result1) =>
+      r.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'SchedulerService',
+      );
+
+    // Should have exactly 1 dep each time — no stale accumulation
+    expect(getScheduler(result1)!.constructorDeps).toHaveLength(1);
+    expect(getScheduler(result2)!.constructorDeps).toHaveLength(1);
+  });
 });

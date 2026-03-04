@@ -33,6 +33,10 @@ export function createEventsPlugin(): TransformerPlugin {
   return {
     name: 'events',
 
+    beforeScan(): void {
+      listenerClasses.clear();
+    },
+
     visitMethod(ctx: MethodVisitorContext): void {
       const decorators = ctx.methodDeclaration.getDecorators();
 

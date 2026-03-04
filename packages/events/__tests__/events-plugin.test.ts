@@ -214,4 +214,76 @@ describe('Events Transformer Plugin', () => {
     expect(result.code).toContain('EventBus');
     expect(result.code).toContain('@goodie-ts/events');
   });
+
+  it('should generate relative import paths for event types (not absolute)', () => {
+    const result = createTestProject({
+      '/src/UserCreatedEvent.ts': `
+        export class UserCreatedEvent {
+          constructor(public userId: string) {}
+        }
+      `,
+      '/src/UserListener.ts': `
+        import { Singleton, EventListener } from './decorators.js'
+        import { UserCreatedEvent } from './UserCreatedEvent.js'
+
+        @Singleton()
+        export class UserListener {
+          @EventListener(UserCreatedEvent)
+          onUserCreated(event: UserCreatedEvent) {}
+        }
+      `,
+    });
+
+    // Event type import should be relative, not an absolute path like /src/UserCreatedEvent.ts
+    expect(result.code).toContain('UserCreatedEvent');
+    expect(result.code).not.toMatch(/from\s+['"]\//);
+  });
+
+  it('should clear state between watch-mode rebuilds', () => {
+    const plugin = createEventsPlugin();
+
+    const makeProject = () => {
+      const project = new Project({ useInMemoryFileSystem: true });
+      project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
+      project.createSourceFile('/src/MyEvent.ts', 'export class MyEvent {}');
+      project.createSourceFile(
+        '/src/Listener.ts',
+        `
+        import { Singleton, EventListener } from './decorators.js'
+        import { MyEvent } from './MyEvent.js'
+
+        @Singleton()
+        export class Listener {
+          @EventListener(MyEvent)
+          handle(event: MyEvent) {}
+        }
+      `,
+      );
+      return project;
+    };
+
+    // First transform
+    const result1 = transformInMemory(
+      makeProject(),
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    // Second transform with the same plugin instance (simulates watch-mode rebuild)
+    const result2 = transformInMemory(
+      makeProject(),
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    const getBus = (r: typeof result1) =>
+      r.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
+      );
+
+    // Should have exactly 1 dep each time — no stale accumulation
+    expect(getBus(result1)!.constructorDeps).toHaveLength(1);
+    expect(getBus(result2)!.constructorDeps).toHaveLength(1);
+  });
 });

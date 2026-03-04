@@ -33,6 +33,10 @@ export function createSchedulerPlugin(): TransformerPlugin {
   return {
     name: 'scheduler',
 
+    beforeScan(): void {
+      scheduledClasses.clear();
+    },
+
     visitMethod(ctx: MethodVisitorContext): void {
       const decorators = ctx.methodDeclaration.getDecorators();
 
@@ -71,7 +75,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
 
         // Compile-time validation: exactly one mode must be specified
         const modeCount =
-          (cron ? 1 : 0) +
+          (cron !== undefined ? 1 : 0) +
           (fixedRate !== undefined ? 1 : 0) +
           (fixedDelay !== undefined ? 1 : 0);
 

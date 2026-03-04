@@ -184,18 +184,18 @@ export function generateCode(
             continue;
           }
           const symbols = match[1].split(',').map((s) => s.trim());
-          const importPath = match[2];
+          const resolvedPath = computeRelativeImport(outputDir, match[2]);
           const newSymbols = symbols.filter(
-            (s) => !importedSymbols.has(`${s}:${importPath}`),
+            (s) => !importedSymbols.has(`${s}:${resolvedPath}`),
           );
           for (const s of newSymbols) {
-            importedSymbols.add(`${s}:${importPath}`);
+            importedSymbols.add(`${s}:${resolvedPath}`);
           }
           if (newSymbols.length > 0) {
             const isTypeImport = imp.startsWith('import type');
             const keyword = isTypeImport ? 'import type' : 'import';
             lines.push(
-              `${keyword} { ${newSymbols.join(', ')} } from '${importPath}'`,
+              `${keyword} { ${newSymbols.join(', ')} } from '${resolvedPath}'`,
             );
           }
         }
