@@ -94,9 +94,10 @@ describe('Security Codegen', () => {
 
       // Public route should NOT have auth middleware
       expect(code).toContain("__honoApp.get('/api/public', async (c)");
-      // Private route SHOULD have auth middleware
+      // Private route SHOULD have auth middleware (multi-line format)
+      expect(code).toContain("__honoApp.get('/api/private',");
       expect(code).toContain(
-        "__honoApp.get('/api/private', async (c: any, next: any)",
+        'async (c: any, next: any) => { const principal = await __securityProvider.authenticate(c.req.raw)',
       );
     });
 
@@ -162,9 +163,10 @@ describe('Security Codegen', () => {
 
       // Health route has @Anonymous — no auth middleware
       expect(code).toContain("__honoApp.get('/api/health', async (c)");
-      // Data route is secured via class — has auth middleware
+      // Data route is secured via class — has auth middleware (multi-line format)
+      expect(code).toContain("__honoApp.get('/api/data',");
       expect(code).toContain(
-        "__honoApp.get('/api/data', async (c: any, next: any)",
+        'async (c: any, next: any) => { const principal = await __securityProvider.authenticate(c.req.raw)',
       );
     });
   });
