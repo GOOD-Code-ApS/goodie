@@ -8,7 +8,26 @@ import {
   type Type,
 } from 'ts-morph';
 import type { ClassTokenRef, SourceLocation } from './ir.js';
+import type {
+  ClassVisitorContext,
+  MethodVisitorContext,
+  TransformerPlugin,
+} from './options.js';
 import { InvalidDecoratorUsageError } from './transformer-errors.js';
+
+/** Cached result of resolving a type's symbol and source file. */
+interface ResolvedTypeInfo {
+  symbolName: string | undefined;
+  sourceFile: SourceFile | undefined;
+}
+
+/** Cache for type resolution results, scoped to a single scan() call. */
+interface TypeResolutionCache {
+  /** Cache for getType() → getSymbol() → getDeclarations() chain, keyed by filePath:startPos. */
+  symbols: Map<string, ResolvedTypeInfo>;
+  /** Cache for extractTypeArguments() results, keyed by type text. */
+  typeArgs: Map<string, ScannedTypeArgument[]>;
+}
 
 /** Names of decorators we recognize from @goodie-ts/decorators. */
 const DECORATOR_NAMES = {
@@ -171,19 +190,68 @@ export interface ScanResult {
   modules: ScannedModule[];
   controllers: ScannedController[];
   warnings: string[];
+  /** Plugin-accumulated class metadata, keyed by "filePath:className". Only populated when plugins with visitor hooks are provided. */
+  pluginMetadata?: Map<string, Record<string, unknown>>;
 }
 
 /** Scan a ts-morph Project for decorated classes. */
-export function scan(project: Project): ScanResult {
+export function scan(
+  project: Project,
+  plugins?: TransformerPlugin[],
+): ScanResult {
   const beans: ScannedBean[] = [];
   const modules: ScannedModule[] = [];
   const controllers: ScannedController[] = [];
   const warnings: string[] = [];
+  const pluginMetadata = new Map<string, Record<string, unknown>>();
+  const hasVisitors =
+    plugins?.some((p) => p.visitClass || p.visitMethod) ?? false;
+  const typeCache: TypeResolutionCache = {
+    symbols: new Map(),
+    typeArgs: new Map(),
+  };
 
   for (const sourceFile of project.getSourceFiles()) {
+    const filePath = sourceFile.getFilePath();
+    if (filePath.endsWith('.d.ts') || filePath.includes('/node_modules/'))
+      continue;
+
     for (const cls of sourceFile.getClasses()) {
       const decorators = cls.getDecorators();
       if (decorators.length === 0) continue;
+
+      // Run plugin visitor hooks for any decorated class with a name
+      if (hasVisitors) {
+        const className = cls.getName();
+        if (className) {
+          const metadata: Record<string, unknown> = {};
+          const metadataKey = `${filePath}:${className}`;
+          pluginMetadata.set(metadataKey, metadata);
+
+          const classCtx: ClassVisitorContext = {
+            classDeclaration: cls,
+            className,
+            filePath,
+            metadata,
+          };
+          for (const plugin of plugins!) {
+            plugin.visitClass?.(classCtx);
+          }
+
+          for (const method of cls.getMethods()) {
+            const methodCtx: MethodVisitorContext = {
+              methodDeclaration: method,
+              methodName: method.getName(),
+              className,
+              filePath,
+              classMetadata: metadata,
+            };
+            for (const plugin of plugins!) {
+              plugin.visitMethod?.(methodCtx);
+            }
+          }
+        }
+      }
 
       const isModule = hasDecorator(decorators, DECORATOR_NAMES.Module);
       const isInjectable = hasDecorator(decorators, DECORATOR_NAMES.Injectable);
@@ -252,7 +320,13 @@ export function scan(project: Project): ScanResult {
 
       if (isController) {
         // Controllers are implicitly singletons — scan as bean too
-        const scannedBean = scanBean(cls, decorators, sourceFile, true);
+        const scannedBean = scanBean(
+          cls,
+          decorators,
+          sourceFile,
+          true,
+          typeCache,
+        );
         if (scannedBean) {
           beans.push(scannedBean);
           const scannedController = scanController(
@@ -264,7 +338,12 @@ export function scan(project: Project): ScanResult {
           if (scannedController) controllers.push(scannedController);
         }
       } else if (isModule) {
-        const scannedModule = scanModule(cls, decorators, sourceFile);
+        const scannedModule = scanModule(
+          cls,
+          decorators,
+          sourceFile,
+          typeCache,
+        );
         if (scannedModule) modules.push(scannedModule);
       } else if (isInjectable || isSingleton || isPostProcessor) {
         const scannedBean = scanBean(
@@ -272,13 +351,20 @@ export function scan(project: Project): ScanResult {
           decorators,
           sourceFile,
           isSingleton || isPostProcessor,
+          typeCache,
         );
         if (scannedBean) beans.push(scannedBean);
       }
     }
   }
 
-  return { beans, modules, controllers, warnings };
+  return {
+    beans,
+    modules,
+    controllers,
+    warnings,
+    ...(hasVisitors ? { pluginMetadata } : {}),
+  };
 }
 
 function scanBean(
@@ -286,6 +372,7 @@ function scanBean(
   decorators: Decorator[],
   sourceFile: SourceFile,
   isSingleton: boolean,
+  cache: TypeResolutionCache,
 ): ScannedBean | undefined {
   const className = cls.getName();
   if (!className) return undefined;
@@ -293,10 +380,9 @@ function scanBean(
   const scope: Scope = isSingleton ? 'singleton' : 'prototype';
   const eager = hasDecorator(decorators, DECORATOR_NAMES.Eager);
   const name = getNamedValue(decorators);
-  const constructorParams = scanConstructorParams(cls);
-  const fieldInjections = scanFieldInjections(cls);
-  const preDestroyMethods = scanPreDestroyMethods(cls);
-  const postConstructMethods = scanPostConstructMethods(cls);
+  const constructorParams = scanConstructorParams(cls, cache);
+  const fieldInjections = scanFieldInjections(cls, cache);
+  const lifecycle = scanLifecycleMethods(cls);
   const isBeanPostProcessor = hasDecorator(
     decorators,
     DECORATOR_NAMES.PostProcessor,
@@ -316,8 +402,8 @@ function scanBean(
     name,
     constructorParams,
     fieldInjections,
-    preDestroyMethods,
-    postConstructMethods,
+    preDestroyMethods: lifecycle.preDestroy,
+    postConstructMethods: lifecycle.postConstruct,
     isBeanPostProcessor,
     valueFields,
     baseClasses,
@@ -329,13 +415,14 @@ function scanModule(
   cls: ClassDeclaration,
   decorators: Decorator[],
   sourceFile: SourceFile,
+  cache: TypeResolutionCache,
 ): ScannedModule | undefined {
   const className = cls.getName();
   if (!className) return undefined;
 
   const moduleDecorator = findDecorator(decorators, DECORATOR_NAMES.Module)!;
   const imports = getModuleImports(moduleDecorator);
-  const provides = scanProvidesMethods(cls, sourceFile);
+  const provides = scanProvidesMethods(cls, sourceFile, cache);
 
   return {
     classDeclaration: cls,
@@ -532,6 +619,7 @@ function resolveSchemaImportPath(
 
 function scanConstructorParams(
   cls: ClassDeclaration,
+  cache: TypeResolutionCache,
 ): ScannedConstructorParam[] {
   const ctor = cls.getConstructors()[0];
   if (!ctor) return [];
@@ -556,28 +644,20 @@ function scanConstructorParams(
       if (paramType.isArray()) {
         isCollection = true;
         const elementType = paramType.getArrayElementTypeOrThrow();
-        const elemSymbol = elementType.getSymbol();
-        if (elemSymbol) {
-          elementTypeName = elemSymbol.getName();
-          const decls = elemSymbol.getDeclarations();
-          if (decls.length > 0) {
-            elementTypeSourceFile = decls[0].getSourceFile();
-          }
-          elementResolvedBaseTypeName = elemSymbol.getName();
+        const elemResolved = resolveTypeSymbol(elementType, cache);
+        if (elemResolved.symbolName) {
+          elementTypeName = elemResolved.symbolName;
+          elementTypeSourceFile = elemResolved.sourceFile;
+          elementResolvedBaseTypeName = elemResolved.symbolName;
         } else {
           elementTypeName = elementType.getText();
         }
-        elementTypeArguments = extractTypeArguments(elementType);
+        elementTypeArguments = extractTypeArguments(elementType, cache);
       } else {
-        const typeSymbol = paramType.getSymbol();
-        if (typeSymbol) {
-          const decls = typeSymbol.getDeclarations();
-          if (decls.length > 0) {
-            typeSourceFile = decls[0].getSourceFile();
-          }
-          resolvedBaseTypeName = typeSymbol.getName();
-        }
-        typeArguments = extractTypeArguments(paramType);
+        const resolved = resolveTypeSymbol(paramType, cache);
+        typeSourceFile = resolved.sourceFile;
+        resolvedBaseTypeName = resolved.symbolName;
+        typeArguments = extractTypeArguments(paramType, cache);
       }
     }
 
@@ -597,7 +677,10 @@ function scanConstructorParams(
   });
 }
 
-function scanFieldInjections(cls: ClassDeclaration): ScannedFieldInjection[] {
+function scanFieldInjections(
+  cls: ClassDeclaration,
+  cache: TypeResolutionCache,
+): ScannedFieldInjection[] {
   const results: ScannedFieldInjection[] = [];
 
   for (const prop of cls.getProperties()) {
@@ -637,15 +720,10 @@ function scanFieldInjections(cls: ClassDeclaration): ScannedFieldInjection[] {
     if (typeNode) {
       typeName = typeNode.getText();
       const propType = prop.getType();
-      const typeSymbol = propType.getSymbol();
-      if (typeSymbol) {
-        const decls = typeSymbol.getDeclarations();
-        if (decls.length > 0) {
-          typeSourceFile = decls[0].getSourceFile();
-        }
-        resolvedBaseTypeName = typeSymbol.getName();
-      }
-      typeArguments = extractTypeArguments(propType);
+      const resolved = resolveTypeSymbol(propType, cache);
+      typeSourceFile = resolved.sourceFile;
+      resolvedBaseTypeName = resolved.symbolName;
+      typeArguments = extractTypeArguments(propType, cache);
     }
 
     results.push({
@@ -666,6 +744,7 @@ function scanFieldInjections(cls: ClassDeclaration): ScannedFieldInjection[] {
 function scanProvidesMethods(
   cls: ClassDeclaration,
   sourceFile: SourceFile,
+  cache: TypeResolutionCache,
 ): ScannedProvides[] {
   const results: ScannedProvides[] = [];
 
@@ -682,15 +761,10 @@ function scanProvidesMethods(
     if (returnTypeNode) {
       returnTypeName = returnTypeNode.getText();
       const returnType = method.getReturnType();
-      const typeSymbol = returnType.getSymbol();
-      if (typeSymbol) {
-        const decls = typeSymbol.getDeclarations();
-        if (decls.length > 0) {
-          returnTypeSourceFile = decls[0].getSourceFile();
-        }
-        returnResolvedBaseTypeName = typeSymbol.getName();
-      }
-      returnTypeArguments = extractTypeArguments(returnType);
+      const resolved = resolveTypeSymbol(returnType, cache);
+      returnTypeSourceFile = resolved.sourceFile;
+      returnResolvedBaseTypeName = resolved.symbolName;
+      returnTypeArguments = extractTypeArguments(returnType, cache);
     }
 
     const params = method.getParameters().map((param) => {
@@ -703,15 +777,10 @@ function scanProvidesMethods(
       if (typeNode) {
         typeName = typeNode.getText();
         const paramType = param.getType();
-        const typeSymbol = paramType.getSymbol();
-        if (typeSymbol) {
-          const decls = typeSymbol.getDeclarations();
-          if (decls.length > 0) {
-            typeSourceFile = decls[0].getSourceFile();
-          }
-          resolvedBaseTypeName = typeSymbol.getName();
-        }
-        typeArguments = extractTypeArguments(paramType);
+        const resolved = resolveTypeSymbol(paramType, cache);
+        typeSourceFile = resolved.sourceFile;
+        resolvedBaseTypeName = resolved.symbolName;
+        typeArguments = extractTypeArguments(paramType, cache);
       }
 
       return {
@@ -744,30 +813,24 @@ function scanProvidesMethods(
   return results;
 }
 
-// ── @PreDestroy scanning ──
+// ── Lifecycle method scanning (@PreDestroy + @PostConstruct in one pass) ──
 
-function scanPreDestroyMethods(cls: ClassDeclaration): string[] {
-  const methods: string[] = [];
+function scanLifecycleMethods(cls: ClassDeclaration): {
+  preDestroy: string[];
+  postConstruct: string[];
+} {
+  const preDestroy: string[] = [];
+  const postConstruct: string[] = [];
   for (const method of cls.getMethods()) {
     const decorators = method.getDecorators();
     if (hasDecorator(decorators, DECORATOR_NAMES.PreDestroy)) {
-      methods.push(method.getName());
+      preDestroy.push(method.getName());
     }
-  }
-  return methods;
-}
-
-// ── @PostConstruct scanning ──
-
-function scanPostConstructMethods(cls: ClassDeclaration): string[] {
-  const methods: string[] = [];
-  for (const method of cls.getMethods()) {
-    const decorators = method.getDecorators();
     if (hasDecorator(decorators, DECORATOR_NAMES.PostConstruct)) {
-      methods.push(method.getName());
+      postConstruct.push(method.getName());
     }
   }
-  return methods;
+  return { preDestroy, postConstruct };
 }
 
 // ── @Value scanning ──
@@ -882,29 +945,60 @@ function extractBaseClasses(cls: ClassDeclaration): ClassTokenRef[] {
   return result;
 }
 
-// ── Generic type helpers ──
+// ── Type resolution helpers (with memoization) ──
+
+/** Resolve a type's symbol name and source file, with caching. */
+function resolveTypeSymbol(
+  type: Type,
+  cache: TypeResolutionCache,
+): ResolvedTypeInfo {
+  const symbol = type.getSymbol();
+  if (!symbol) return { symbolName: undefined, sourceFile: undefined };
+
+  const decls = symbol.getDeclarations();
+  if (decls.length === 0) {
+    return { symbolName: symbol.getName(), sourceFile: undefined };
+  }
+
+  const decl = decls[0];
+  const key = `${decl.getSourceFile().getFilePath()}:${decl.getStart()}`;
+  const cached = cache.symbols.get(key);
+  if (cached) return cached;
+
+  const result: ResolvedTypeInfo = {
+    symbolName: symbol.getName(),
+    sourceFile: decl.getSourceFile(),
+  };
+  cache.symbols.set(key, result);
+  return result;
+}
 
 /** Extract type arguments from a ts-morph Type, recursively for nested generics. */
-function extractTypeArguments(type: Type): ScannedTypeArgument[] {
+function extractTypeArguments(
+  type: Type,
+  cache: TypeResolutionCache,
+): ScannedTypeArgument[] {
   const typeArgs = type.getTypeArguments();
   if (typeArgs.length === 0) return [];
 
-  return typeArgs.map((arg) => {
-    const symbol = arg.getSymbol();
-    let typeSourceFile: SourceFile | undefined;
-    if (symbol) {
-      const decls = symbol.getDeclarations();
-      if (decls.length > 0) {
-        typeSourceFile = decls[0].getSourceFile();
-      }
-    }
+  const symbolPath =
+    type.getSymbol()?.getDeclarations()?.[0]?.getSourceFile().getFilePath() ??
+    '';
+  const cacheKey = `${type.getText()}@${symbolPath}`;
+  const cached = cache.typeArgs.get(cacheKey);
+  if (cached) return cached;
+
+  const result = typeArgs.map((arg) => {
+    const resolved = resolveTypeSymbol(arg, cache);
 
     return {
-      typeName: symbol?.getName() ?? arg.getText(),
-      typeSourceFile,
-      typeArguments: extractTypeArguments(arg),
+      typeName: resolved.symbolName ?? arg.getText(),
+      typeSourceFile: resolved.sourceFile,
+      typeArguments: extractTypeArguments(arg, cache),
     };
   });
+  cache.typeArgs.set(cacheKey, result);
+  return result;
 }
 
 // ── Decorator helpers ──

@@ -99,11 +99,38 @@ const userService = app.context.get(UserService);
 | [`@goodie-ts/health`](./packages/health) | Health checks — `HealthIndicator`, `HealthAggregator`, `UptimeHealthIndicator` |
 | [`@goodie-ts/resilience`](./packages/resilience) | Resilience patterns — `@Retryable`, `@CircuitBreaker`, `@Timeout` |
 
+## Performance
+
+Benchmarks measured on an Apple M-series MacBook. Run `pnpm bench` to reproduce on your machine. Cloud/CI environments will show lower absolute numbers, but relative comparisons hold.
+
+### Build-time (transformer)
+
+| Benchmark | 50 beans | 100 beans | 500 beans |
+|---|---|---|---|
+| Full pipeline (scan + resolve + graph + codegen) | ~75ms | ~75ms | ~97ms |
+| Scanner only | ~71ms | ~76ms | ~94ms |
+| Code generation only | ~0.17ms | ~0.35ms | ~1.7ms |
+
+The scanner (ts-morph AST traversal + type resolution) dominates build time. Code generation is negligible. Watch-mode rebuilds skip codegen entirely when the DI graph hasn't changed (IR hash comparison).
+
+### Runtime (ApplicationContext)
+
+| Benchmark | ops/sec |
+|---|---|
+| `ApplicationContext.create()` — 50 beans | ~222k |
+| `ApplicationContext.create()` — 500 beans | ~20k |
+| Singleton `get()` (cached) | ~10.5M |
+| Prototype `get()` (new instance) | ~143k |
+| `getAll()` — 100 beans | ~1M |
+
+Singleton resolution is a single Map lookup — effectively free. The `preSorted` optimization (used by generated code) makes `create()` ~2x faster by skipping redundant topological sorting.
+
 ## Development
 
 ```bash
 pnpm build          # Build all packages
 pnpm test           # Run all tests (vitest)
+pnpm bench          # Run performance benchmarks
 pnpm test:watch     # Watch mode
 pnpm lint           # Check with Biome
 pnpm lint:fix       # Auto-fix lint issues
