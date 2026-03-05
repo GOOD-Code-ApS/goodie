@@ -95,17 +95,17 @@ export class SchedulerService {
     const job = new Cron(cron, () => {
       if (!concurrent && running) return;
       running = true;
-      const run: Promise<void> = (async () => {
+      const run = (async () => {
         try {
           await fn();
         } catch (error) {
           console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
         } finally {
           running = false;
-          inFlight.delete(run);
         }
       })();
       inFlight.add(run);
+      run.finally(() => inFlight.delete(run));
     });
 
     this.jobs.push({
@@ -131,17 +131,17 @@ export class SchedulerService {
     const timer = setInterval(() => {
       if (!concurrent && running) return;
       running = true;
-      const run: Promise<void> = (async () => {
+      const run = (async () => {
         try {
           await fn();
         } catch (error) {
           console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
         } finally {
           running = false;
-          inFlight.delete(run);
         }
       })();
       inFlight.add(run);
+      run.finally(() => inFlight.delete(run));
     }, intervalMs);
 
     this.jobs.push({
