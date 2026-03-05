@@ -142,31 +142,6 @@ export function createEventsPlugin(): TransformerPlugin {
         const key = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
         const info = listenerClasses.get(key);
         if (info) {
-          // Validate that listener beans don't use features incompatible with customFactory
-          const valueFields = bean.metadata.valueFields as
-            | unknown[]
-            | undefined;
-          if (valueFields && valueFields.length > 0) {
-            throw new InvalidDecoratorUsageError(
-              'EventListener',
-              `Class '${bean.tokenRef.className}' uses both @EventListener and @Value/@ConfigurationProperties. ` +
-                `These are incompatible because the EventBus customFactory cannot wire config dependencies. ` +
-                `Move @Value fields to a separate config bean and inject it.`,
-              bean.sourceLocation,
-            );
-          }
-          const interceptedMethods = bean.metadata.interceptedMethods as
-            | unknown[]
-            | undefined;
-          if (interceptedMethods && interceptedMethods.length > 0) {
-            throw new InvalidDecoratorUsageError(
-              'EventListener',
-              `Class '${bean.tokenRef.className}' uses both @EventListener and AOP interceptors. ` +
-                `These are incompatible because the EventBus customFactory cannot wire interceptor dependencies. ` +
-                `Move the listener method to a separate class without AOP decorators.`,
-              bean.sourceLocation,
-            );
-          }
           listenerDeps.push({
             tokenRef: {
               kind: 'class',
