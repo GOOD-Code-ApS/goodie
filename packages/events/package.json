@@ -1,7 +1,7 @@
 {
   "name": "@goodie-ts/events",
   "version": "0.5.1",
-  "description": "Event publishing and listener support for goodie-ts — @EventListener decorator",
+  "description": "Event publishing and listener support for goodie-ts — ApplicationEventListener pattern",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -27,8 +27,8 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "dependencies": {
-    "@goodie-ts/core": "workspace:*"
+  "peerDependencies": {
+    "@goodie-ts/core": "workspace:^"
   },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",

@@ -214,7 +214,7 @@ importers:
   packages/events:
     dependencies:
       '@goodie-ts/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@goodie-ts/transformer':
@@ -340,7 +340,7 @@ importers:
   packages/scheduler:
     dependencies:
       '@goodie-ts/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       croner:
         specifier: ^9.0.0

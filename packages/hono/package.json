@@ -24,15 +24,13 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "dependencies": {
-    "@goodie-ts/core": "workspace:^"
-  },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
     "ts-morph": "^24.0.0"
   },
   "peerDependencies": {
+    "@goodie-ts/core": "workspace:^",
     "@hono/node-server": ">=1.0.0",
     "@hono/zod-validator": ">=0.4.0",
     "hono": ">=4.0.0",
