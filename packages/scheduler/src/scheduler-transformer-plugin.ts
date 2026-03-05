@@ -1,7 +1,8 @@
-import type {
-  IRBeanDefinition,
-  MethodVisitorContext,
-  TransformerPlugin,
+import {
+  InvalidDecoratorUsageError,
+  type IRBeanDefinition,
+  type MethodVisitorContext,
+  type TransformerPlugin,
 } from '@goodie-ts/transformer';
 import { SyntaxKind } from 'ts-morph';
 
@@ -79,24 +80,33 @@ export function createSchedulerPlugin(): TransformerPlugin {
           (fixedRate !== undefined ? 1 : 0) +
           (fixedDelay !== undefined ? 1 : 0);
 
+        const sourceLocation = {
+          filePath: decorator.getSourceFile().getFilePath(),
+          line: decorator.getStartLineNumber(),
+          column: 1,
+        };
+
         if (modeCount === 0) {
-          const loc = decorator.getSourceFile().getFilePath();
-          throw new Error(
-            `@Scheduled on ${ctx.className}.${ctx.methodName} must specify exactly one of 'cron', 'fixedRate', or 'fixedDelay' (${loc})`,
+          throw new InvalidDecoratorUsageError(
+            'Scheduled',
+            `${ctx.className}.${ctx.methodName} must specify exactly one of 'cron', 'fixedRate', or 'fixedDelay'`,
+            sourceLocation,
           );
         }
         if (modeCount > 1) {
-          const loc = decorator.getSourceFile().getFilePath();
-          throw new Error(
-            `@Scheduled on ${ctx.className}.${ctx.methodName} specifies multiple modes — use exactly one of 'cron', 'fixedRate', or 'fixedDelay' (${loc})`,
+          throw new InvalidDecoratorUsageError(
+            'Scheduled',
+            `${ctx.className}.${ctx.methodName} specifies multiple modes — use exactly one of 'cron', 'fixedRate', or 'fixedDelay'`,
+            sourceLocation,
           );
         }
 
         // Validate cron expression is not empty
         if (cron !== undefined && cron.trim() === '') {
-          const loc = decorator.getSourceFile().getFilePath();
-          throw new Error(
-            `@Scheduled on ${ctx.className}.${ctx.methodName} has an empty 'cron' expression — provide a valid cron pattern (${loc})`,
+          throw new InvalidDecoratorUsageError(
+            'Scheduled',
+            `${ctx.className}.${ctx.methodName} has an empty 'cron' expression — provide a valid cron pattern`,
+            sourceLocation,
           );
         }
 
@@ -131,6 +141,31 @@ export function createSchedulerPlugin(): TransformerPlugin {
         const key = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
         const info = scheduledClasses.get(key);
         if (info) {
+          // Validate that scheduled beans don't use features incompatible with customFactory
+          const valueFields = bean.metadata.valueFields as
+            | unknown[]
+            | undefined;
+          if (valueFields && valueFields.length > 0) {
+            throw new InvalidDecoratorUsageError(
+              'Scheduled',
+              `Class '${bean.tokenRef.className}' uses both @Scheduled and @Value/@ConfigurationProperties. ` +
+                `These are incompatible because the SchedulerService customFactory cannot wire config dependencies. ` +
+                `Move @Value fields to a separate config bean and inject it.`,
+              bean.sourceLocation,
+            );
+          }
+          const interceptedMethods = bean.metadata.interceptedMethods as
+            | unknown[]
+            | undefined;
+          if (interceptedMethods && interceptedMethods.length > 0) {
+            throw new InvalidDecoratorUsageError(
+              'Scheduled',
+              `Class '${bean.tokenRef.className}' uses both @Scheduled and AOP interceptors. ` +
+                `These are incompatible because the SchedulerService customFactory cannot wire interceptor dependencies. ` +
+                `Move the scheduled method to a separate class without AOP decorators.`,
+              bean.sourceLocation,
+            );
+          }
           scheduledDeps.push({
             tokenRef: {
               kind: 'class',
@@ -150,7 +185,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
       }
 
       // Build custom factory that statically registers all schedules
-      const params = scheduledDeps.map((_, i) => `dep${i}: any`).join(', ');
+      const params = scheduledDeps.map((_, i) => `dep${i}: unknown`).join(', ');
       const addCalls: string[] = [];
 
       for (let i = 0; i < matchedClasses.length; i++) {

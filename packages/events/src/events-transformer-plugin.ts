@@ -1,8 +1,9 @@
-import type {
-  CodegenContribution,
-  IRBeanDefinition,
-  MethodVisitorContext,
-  TransformerPlugin,
+import {
+  type CodegenContribution,
+  InvalidDecoratorUsageError,
+  type IRBeanDefinition,
+  type MethodVisitorContext,
+  type TransformerPlugin,
 } from '@goodie-ts/transformer';
 import { SyntaxKind } from 'ts-morph';
 
@@ -54,6 +55,7 @@ export function createEventsPlugin(): TransformerPlugin {
         const sourceFile = ctx.methodDeclaration.getSourceFile();
         let eventTypeImportPath = '';
 
+        // Check named imports
         for (const imp of sourceFile.getImportDeclarations()) {
           const namedImport = imp
             .getNamedImports()
@@ -63,6 +65,36 @@ export function createEventsPlugin(): TransformerPlugin {
             eventTypeImportPath = moduleFile?.getFilePath() ?? '';
             break;
           }
+          // Check default import
+          const defaultImport = imp.getDefaultImport();
+          if (defaultImport?.getText() === eventTypeName) {
+            const moduleFile = imp.getModuleSpecifierSourceFile();
+            eventTypeImportPath = moduleFile?.getFilePath() ?? '';
+            break;
+          }
+        }
+
+        // Check if event class is defined in the same file
+        if (!eventTypeImportPath) {
+          const localClass = sourceFile
+            .getClasses()
+            .find((c) => c.getName() === eventTypeName);
+          if (localClass) {
+            eventTypeImportPath = sourceFile.getFilePath();
+          }
+        }
+
+        if (!eventTypeImportPath) {
+          throw new InvalidDecoratorUsageError(
+            'EventListener',
+            `Cannot resolve import path for event type '${eventTypeName}' on ${ctx.className}.${ctx.methodName}. ` +
+              `The event class must be imported or defined in the same file.`,
+            {
+              filePath: sourceFile.getFilePath(),
+              line: decorator.getStartLineNumber(),
+              column: 1,
+            },
+          );
         }
 
         // Extract order from options (second argument)
@@ -110,6 +142,31 @@ export function createEventsPlugin(): TransformerPlugin {
         const key = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
         const info = listenerClasses.get(key);
         if (info) {
+          // Validate that listener beans don't use features incompatible with customFactory
+          const valueFields = bean.metadata.valueFields as
+            | unknown[]
+            | undefined;
+          if (valueFields && valueFields.length > 0) {
+            throw new InvalidDecoratorUsageError(
+              'EventListener',
+              `Class '${bean.tokenRef.className}' uses both @EventListener and @Value/@ConfigurationProperties. ` +
+                `These are incompatible because the EventBus customFactory cannot wire config dependencies. ` +
+                `Move @Value fields to a separate config bean and inject it.`,
+              bean.sourceLocation,
+            );
+          }
+          const interceptedMethods = bean.metadata.interceptedMethods as
+            | unknown[]
+            | undefined;
+          if (interceptedMethods && interceptedMethods.length > 0) {
+            throw new InvalidDecoratorUsageError(
+              'EventListener',
+              `Class '${bean.tokenRef.className}' uses both @EventListener and AOP interceptors. ` +
+                `These are incompatible because the EventBus customFactory cannot wire interceptor dependencies. ` +
+                `Move the listener method to a separate class without AOP decorators.`,
+              bean.sourceLocation,
+            );
+          }
           listenerDeps.push({
             tokenRef: {
               kind: 'class',
@@ -129,7 +186,7 @@ export function createEventsPlugin(): TransformerPlugin {
       }
 
       // Build custom factory that statically registers all listeners
-      const params = listenerDeps.map((_, i) => `dep${i}: any`).join(', ');
+      const params = listenerDeps.map((_, i) => `dep${i}: unknown`).join(', ');
       const registerCalls: string[] = [];
 
       for (let i = 0; i < matchedClasses.length; i++) {

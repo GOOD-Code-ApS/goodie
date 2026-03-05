@@ -287,6 +287,48 @@ describe('Events Transformer Plugin', () => {
     expect(getBus(result2)!.constructorDeps).toHaveLength(1);
   });
 
+  it('should resolve event class defined in the same file as the listener', () => {
+    const result = createTestProject({
+      '/src/Listener.ts': `
+        import { Singleton, EventListener } from './decorators.js'
+
+        export class InlineEvent {
+          constructor(public data: string) {}
+        }
+
+        @Singleton()
+        export class Listener {
+          @EventListener(InlineEvent)
+          handle(event: InlineEvent) {}
+        }
+      `,
+    });
+
+    const eventBus = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
+    );
+    expect(eventBus!.constructorDeps).toHaveLength(1);
+    // Should generate valid code without absolute paths
+    expect(result.code).toContain('InlineEvent');
+    expect(result.code).not.toMatch(/from\s+['"]\//);
+  });
+
+  it('should throw when event class cannot be resolved', () => {
+    expect(() =>
+      createTestProject({
+        '/src/Listener.ts': `
+          import { Singleton, EventListener } from './decorators.js'
+
+          @Singleton()
+          export class Listener {
+            @EventListener(NonExistentEvent)
+            handle(event: any) {}
+          }
+        `,
+      }),
+    ).toThrow(/Cannot resolve import path for event type 'NonExistentEvent'/);
+  });
+
   it('should not retain stale entries when an @EventListener class is removed between runs', () => {
     const plugin = createEventsPlugin();
 

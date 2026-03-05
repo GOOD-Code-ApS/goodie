@@ -142,6 +142,7 @@ export class SchedulerService {
     fn: () => unknown,
   ): void {
     let stopped = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const loop = async (): Promise<void> => {
       while (!stopped) {
@@ -151,7 +152,9 @@ export class SchedulerService {
           console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
         }
         if (!stopped) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          await new Promise<void>((resolve) => {
+            timeoutId = setTimeout(resolve, delayMs);
+          });
         }
       }
     };
@@ -163,6 +166,7 @@ export class SchedulerService {
       label,
       stop: () => {
         stopped = true;
+        if (timeoutId) clearTimeout(timeoutId);
       },
     });
   }

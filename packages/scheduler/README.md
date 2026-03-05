@@ -23,6 +23,8 @@ Declarative task scheduling using the `@Scheduled` decorator. The transformer pl
 
 Exactly one of `cron`, `fixedRate`, or `fixedDelay` must be specified.
 
+**Note:** `fixedDelay` runs immediately on startup then waits the specified delay between executions. `fixedRate` waits one interval before the first execution. `cron` follows the cron schedule.
+
 ## Usage
 
 ```typescript
