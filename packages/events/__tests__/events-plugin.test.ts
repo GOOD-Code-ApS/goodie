@@ -286,4 +286,84 @@ describe('Events Transformer Plugin', () => {
     expect(getBus(result1)!.constructorDeps).toHaveLength(1);
     expect(getBus(result2)!.constructorDeps).toHaveLength(1);
   });
+
+  it('should not retain stale entries when an @EventListener class is removed between runs', () => {
+    const plugin = createEventsPlugin();
+
+    // First run: two listener classes
+    const project1 = new Project({ useInMemoryFileSystem: true });
+    project1.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
+    project1.createSourceFile('/src/MyEvent.ts', 'export class MyEvent {}');
+    project1.createSourceFile(
+      '/src/ListenerA.ts',
+      `
+        import { Singleton, EventListener } from './decorators.js'
+        import { MyEvent } from './MyEvent.js'
+
+        @Singleton()
+        export class ListenerA {
+          @EventListener(MyEvent)
+          handle(event: MyEvent) {}
+        }
+      `,
+    );
+    project1.createSourceFile(
+      '/src/ListenerB.ts',
+      `
+        import { Singleton, EventListener } from './decorators.js'
+        import { MyEvent } from './MyEvent.js'
+
+        @Singleton()
+        export class ListenerB {
+          @EventListener(MyEvent)
+          handle(event: MyEvent) {}
+        }
+      `,
+    );
+
+    const result1 = transformInMemory(
+      project1,
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    // Second run: ListenerB removed
+    const project2 = new Project({ useInMemoryFileSystem: true });
+    project2.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
+    project2.createSourceFile('/src/MyEvent.ts', 'export class MyEvent {}');
+    project2.createSourceFile(
+      '/src/ListenerA.ts',
+      `
+        import { Singleton, EventListener } from './decorators.js'
+        import { MyEvent } from './MyEvent.js'
+
+        @Singleton()
+        export class ListenerA {
+          @EventListener(MyEvent)
+          handle(event: MyEvent) {}
+        }
+      `,
+    );
+
+    const result2 = transformInMemory(
+      project2,
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    const getBus = (r: typeof result1) =>
+      r.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
+      );
+
+    expect(getBus(result1)!.constructorDeps).toHaveLength(2);
+    // After removing ListenerB, only ListenerA should remain — no stale ListenerB
+    expect(getBus(result2)!.constructorDeps).toHaveLength(1);
+    expect(getBus(result2)!.constructorDeps[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'ListenerA',
+      importPath: '/src/ListenerA.ts',
+    });
+  });
 });

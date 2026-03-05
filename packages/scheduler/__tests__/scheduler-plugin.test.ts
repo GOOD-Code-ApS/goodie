@@ -241,4 +241,128 @@ describe('Scheduler Transformer Plugin', () => {
     expect(getScheduler(result1)!.constructorDeps).toHaveLength(1);
     expect(getScheduler(result2)!.constructorDeps).toHaveLength(1);
   });
+
+  it('should not retain stale entries when a @Scheduled class is removed between runs', () => {
+    const plugin = createSchedulerPlugin();
+
+    // First run: two scheduled classes
+    const project1 = new Project({ useInMemoryFileSystem: true });
+    project1.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
+    project1.createSourceFile(
+      '/src/TaskA.ts',
+      `
+        import { Singleton, Scheduled } from './decorators.js'
+
+        @Singleton()
+        export class TaskA {
+          @Scheduled({ fixedRate: 1000 })
+          run() {}
+        }
+      `,
+    );
+    project1.createSourceFile(
+      '/src/TaskB.ts',
+      `
+        import { Singleton, Scheduled } from './decorators.js'
+
+        @Singleton()
+        export class TaskB {
+          @Scheduled({ cron: '0 * * * * *' })
+          run() {}
+        }
+      `,
+    );
+
+    const result1 = transformInMemory(
+      project1,
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    // Second run: TaskB removed
+    const project2 = new Project({ useInMemoryFileSystem: true });
+    project2.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
+    project2.createSourceFile(
+      '/src/TaskA.ts',
+      `
+        import { Singleton, Scheduled } from './decorators.js'
+
+        @Singleton()
+        export class TaskA {
+          @Scheduled({ fixedRate: 1000 })
+          run() {}
+        }
+      `,
+    );
+
+    const result2 = transformInMemory(
+      project2,
+      '/out/AppContext.generated.ts',
+      [plugin],
+    );
+
+    const getScheduler = (r: typeof result1) =>
+      r.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'SchedulerService',
+      );
+
+    expect(getScheduler(result1)!.constructorDeps).toHaveLength(2);
+    // After removing TaskB, only TaskA should remain — no stale TaskB
+    expect(getScheduler(result2)!.constructorDeps).toHaveLength(1);
+    expect(getScheduler(result2)!.constructorDeps[0].tokenRef).toEqual({
+      kind: 'class',
+      className: 'TaskA',
+      importPath: '/src/TaskA.ts',
+    });
+  });
+
+  it('should reject @Scheduled with an empty cron expression', () => {
+    expect(() =>
+      createTestProject({
+        '/src/Task.ts': `
+          import { Singleton, Scheduled } from './decorators.js'
+
+          @Singleton()
+          export class Task {
+            @Scheduled({ cron: '' })
+            run() {}
+          }
+        `,
+      }),
+    ).toThrow(/empty 'cron' expression/);
+  });
+
+  it('should reject @Scheduled with no scheduling mode specified', () => {
+    expect(() =>
+      createTestProject({
+        '/src/Task.ts': `
+          import { Singleton, Scheduled } from './decorators.js'
+
+          @Singleton()
+          export class Task {
+            @Scheduled({ concurrent: true })
+            run() {}
+          }
+        `,
+      }),
+    ).toThrow(/must specify exactly one/);
+  });
+
+  it('should reject @Scheduled with multiple scheduling modes', () => {
+    expect(() =>
+      createTestProject({
+        '/src/Task.ts': `
+          import { Singleton, Scheduled } from './decorators.js'
+
+          @Singleton()
+          export class Task {
+            @Scheduled({ cron: '0 * * * * *', fixedRate: 1000 })
+            run() {}
+          }
+        `,
+      }),
+    ).toThrow(/multiple modes/);
+  });
 });

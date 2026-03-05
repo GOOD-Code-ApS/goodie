@@ -92,6 +92,14 @@ export function createSchedulerPlugin(): TransformerPlugin {
           );
         }
 
+        // Validate cron expression is not empty
+        if (cron !== undefined && cron.trim() === '') {
+          const loc = decorator.getSourceFile().getFilePath();
+          throw new Error(
+            `@Scheduled on ${ctx.className}.${ctx.methodName} has an empty 'cron' expression — provide a valid cron pattern (${loc})`,
+          );
+        }
+
         const key = `${ctx.filePath}:${ctx.className}`;
         const existing = scheduledClasses.get(key) ?? {
           className: ctx.className,
