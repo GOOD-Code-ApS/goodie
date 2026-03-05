@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/events",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Event publishing and listener support for goodie-ts — ApplicationEventListener pattern",
   "license": "MIT",
   "type": "module",

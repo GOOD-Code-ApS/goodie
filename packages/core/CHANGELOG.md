@@ -1,5 +1,41 @@
 # @goodie-ts/core
 
+## 0.6.0
+
+### Minor Changes
+
+- cc600d7: feat: add @goodie-ts/events and @goodie-ts/scheduler packages
+
+  Events: ApplicationEventListener abstract class pattern with compile-time discovery, EventBus with sequential async dispatch and O(1) routing, EventPublisher injection token.
+
+  Scheduler: @Scheduled decorator for cron/fixedRate/fixedDelay with compile-time discovery, overlap prevention, graceful shutdown, lifecycle integration.
+
+  Core: ApplicationContext self-registration as a bean for constructor injection by framework services.
+
+  Transformer: plugin system hooks (visitClass, visitMethod, beforeCodegen) for events and scheduler plugins.
+
+### Patch Changes
+
+- c77e195: perf: build-time and runtime performance optimizations
+
+  Transformer:
+
+  - Merge scan + plugin visitors into a single AST pass (eliminates double traversal)
+  - Skip .d.ts and node_modules files in scanner
+  - IR hash to skip codegen when DI graph is unchanged (watch mode optimization)
+  - Memoize type resolution (getType/getSymbol/getDeclarations cache)
+  - Single lifecycle method pass (merge @PreDestroy + @PostConstruct scanning)
+  - Merge codegen collection passes into one iteration
+  - Merge filesystem discovery (plugins + library manifests in single scan)
+  - Cache filesystem discovery for watch mode (discoveryCache option)
+  - Generator-based getAllDependencies (avoids intermediate array allocations)
+  - Memoize computeRelativeImport in codegen
+  - Pass pre-computed IR hash to avoid double SHA-256 computation
+
+  Core:
+
+  - Add preSorted option to ApplicationContext.create() to skip redundant topoSort (generated code is already topologically sorted)
+
 ## 0.5.2
 
 ### Patch Changes
