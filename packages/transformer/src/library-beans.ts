@@ -182,7 +182,7 @@ function deserializeTokenRef(
 }
 
 /** Result of scanning a single package's beans.json manifest. */
-interface ScannedManifest {
+export interface ScannedManifest {
   packageName: string;
   manifest: LibraryBeansManifest;
 }

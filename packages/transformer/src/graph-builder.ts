@@ -309,14 +309,12 @@ function topoSort(beans: IRBeanDefinition[]): IRBeanDefinition[] {
 }
 
 /** Get all dependencies of a bean (constructor + field + interceptor). */
-function getAllDependencies(
+function* getAllDependencies(
   bean: IRBeanDefinition,
-): Array<{ tokenRef: TokenRef }> {
-  return [
-    ...bean.constructorDeps,
-    ...bean.fieldDeps.map((f) => ({ tokenRef: f.tokenRef })),
-    ...getInterceptorDependencies(bean),
-  ];
+): Generator<{ tokenRef: TokenRef }> {
+  yield* bean.constructorDeps;
+  for (const f of bean.fieldDeps) yield { tokenRef: f.tokenRef };
+  yield* getInterceptorDependencies(bean);
 }
 
 /**

@@ -61,4 +61,7 @@ export default defineConfig({
       'examples/**/__tests__/**/*.test.ts',
     ],
   },
+  bench: {
+    include: ['benchmarks/**/*.bench.ts'],
+  },
 });
