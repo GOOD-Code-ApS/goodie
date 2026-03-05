@@ -10,9 +10,13 @@ import type { Principal } from './principal.js';
  *
  * @example
  * ```ts
+ * interface JwtPrincipal extends Principal {
+ *   attributes: { sub: string; scopes: string[] };
+ * }
+ *
  * @Singleton()
- * export class JwtAuth extends SecurityProvider {
- *   async authenticate(request: Request): Promise<Principal | null> {
+ * export class JwtAuth extends SecurityProvider<JwtPrincipal> {
+ *   async authenticate(request: Request): Promise<JwtPrincipal | null> {
  *     const token = request.headers.get('Authorization')?.replace('Bearer ', '');
  *     if (!token) return null;
  *     return verifyJwt(token);
