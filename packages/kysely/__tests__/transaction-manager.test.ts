@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TransactionManager } from '../src/transaction-manager.js';
 
 /** Create a mock Kysely instance with configurable transaction behavior. */
-function createMockKysely() {
+function createMockKysely(opts?: { supportsReturning?: boolean }) {
   const mockTransaction = { isTransaction: true };
 
   const kysely = {
@@ -10,6 +10,9 @@ function createMockKysely() {
       execute: vi.fn(async (fn: (trx: unknown) => Promise<unknown>) => {
         return fn(mockTransaction);
       }),
+    }),
+    getExecutor: () => ({
+      adapter: { supportsReturning: opts?.supportsReturning ?? false },
     }),
   };
 
@@ -177,6 +180,40 @@ describe('TransactionManager', () => {
 
     const result = await tm.runInTransaction(async () => 'via configure');
     expect(result).toBe('via configure');
+  });
+
+  it('should eagerly derive supportsReturning at configure time', () => {
+    const { kysely } = createMockKysely({ supportsReturning: true });
+    const tm = new TransactionManager();
+    tm.configure(kysely as never);
+
+    // Should be available immediately without lazy evaluation
+    expect(tm.supportsReturning).toBe(true);
+  });
+
+  it('should accept explicit supportsReturning via options to avoid Kysely internals', () => {
+    // Kysely mock returns false from getExecutor, but explicit option overrides it
+    const { kysely } = createMockKysely({ supportsReturning: false });
+    const tm = new TransactionManager(kysely as never, {
+      supportsReturning: true,
+    });
+
+    expect(tm.supportsReturning).toBe(true);
+  });
+
+  it('should accept explicit supportsReturning in configure() options', () => {
+    const { kysely } = createMockKysely({ supportsReturning: false });
+    const tm = new TransactionManager();
+    tm.configure(kysely as never, { supportsReturning: true });
+
+    expect(tm.supportsReturning).toBe(true);
+  });
+
+  it('should throw when supportsReturning is accessed before configuration', () => {
+    const tm = new TransactionManager();
+    expect(() => tm.supportsReturning).toThrow(
+      'TransactionManager not configured',
+    );
   });
 
   it('should reset supportsReturning cache when configure() is called', () => {

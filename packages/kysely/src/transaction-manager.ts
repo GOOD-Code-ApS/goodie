@@ -9,6 +9,15 @@ export interface KyselyProvider {
   kysely: Kysely<any>;
 }
 
+export interface TransactionManagerOptions {
+  /**
+   * Explicitly set whether the dialect supports RETURNING clauses.
+   * When provided, avoids probing Kysely internals at runtime.
+   * When omitted, auto-detected once from the Kysely adapter.
+   */
+  supportsReturning?: boolean;
+}
+
 /**
  * Manages database transactions using AsyncLocalStorage.
  *
@@ -25,7 +34,10 @@ export class TransactionManager {
   private testTransactionActive = false;
   private _supportsReturning?: boolean;
 
-  constructor(kyselyOrProvider?: Kysely<any> | KyselyProvider) {
+  constructor(
+    kyselyOrProvider?: Kysely<any> | KyselyProvider,
+    options?: TransactionManagerOptions,
+  ) {
     if (kyselyOrProvider) {
       if ('kysely' in kyselyOrProvider) {
         this.kyselyRef = kyselyOrProvider.kysely;
@@ -42,6 +54,7 @@ export class TransactionManager {
       } else {
         this.kyselyRef = kyselyOrProvider;
       }
+      this.deriveSupportsReturning(options?.supportsReturning);
     }
   }
 
@@ -49,9 +62,9 @@ export class TransactionManager {
    * Configure the Kysely instance used for transactions.
    * Unnecessary when auto-wired via `createKyselyPlugin({ database: '...' })`.
    */
-  configure(kysely: Kysely<any>): void {
+  configure(kysely: Kysely<any>, options?: TransactionManagerOptions): void {
     this.kyselyRef = kysely;
-    this._supportsReturning = undefined;
+    this.deriveSupportsReturning(options?.supportsReturning);
   }
 
   private get kysely(): Kysely<any> {
@@ -104,14 +117,29 @@ export class TransactionManager {
 
   /**
    * Whether the underlying dialect supports RETURNING clauses.
-   * Detected once from the Kysely adapter and cached.
+   * Eagerly derived at construction / configure time.
    */
   get supportsReturning(): boolean {
     if (this._supportsReturning === undefined) {
+      throw new Error(
+        'TransactionManager not configured. Call configure(kysely) or pass a Kysely instance to the constructor.',
+      );
+    }
+    return this._supportsReturning;
+  }
+
+  /**
+   * Eagerly derive the `supportsReturning` capability.
+   * When `explicit` is provided, uses it directly (avoids Kysely internals).
+   * Otherwise, probes the Kysely adapter once.
+   */
+  private deriveSupportsReturning(explicit?: boolean): void {
+    if (explicit !== undefined) {
+      this._supportsReturning = explicit;
+    } else {
       this._supportsReturning =
         this.kysely.getExecutor().adapter.supportsReturning;
     }
-    return this._supportsReturning;
   }
 
   /**

@@ -5,6 +5,9 @@ export { Transactional } from './decorators/transactional.js';
 export type { KyselyPluginOptions } from './kysely-transformer-plugin.js';
 export { createKyselyPlugin } from './kysely-transformer-plugin.js';
 export { MigrationRunner } from './migration-runner.js';
-export type { KyselyProvider } from './transaction-manager.js';
+export type {
+  KyselyProvider,
+  TransactionManagerOptions,
+} from './transaction-manager.js';
 export { TransactionManager } from './transaction-manager.js';
 export { TransactionalInterceptor } from './transactional-interceptor.js';

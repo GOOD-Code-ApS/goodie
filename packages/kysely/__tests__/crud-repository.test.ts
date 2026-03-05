@@ -316,5 +316,43 @@ describe('CrudRepository', () => {
       expect(connection.transaction).not.toHaveBeenCalled();
       expect(result).toBeUndefined();
     });
+
+    it('deleteById should work when already inside a @Transactional context', async () => {
+      const existing = { id: '1', name: 'Alice' };
+      const selectChain = createSelectChain({ first: existing });
+      const deleteChain = createDeleteChain({ returningFirst: undefined });
+
+      const connection = {
+        selectFrom: vi.fn().mockReturnValue(selectChain),
+        insertInto: vi.fn(),
+        deleteFrom: vi.fn().mockReturnValue(deleteChain),
+        // Simulate Kysely's Transaction — calling transaction() on a Transaction throws
+        transaction: vi.fn().mockImplementation(() => {
+          throw new Error(
+            'calling the transaction method for a Transaction is not supported',
+          );
+        }),
+      };
+
+      // runInTransaction with REQUIRED propagation reuses the existing transaction
+      // (i.e. just calls fn directly), which is the real behavior inside @Transactional
+      const tm = {
+        getConnection: vi.fn().mockReturnValue(connection),
+        supportsReturning: false,
+        runInTransaction: vi.fn((fn: () => Promise<unknown>) => fn()),
+      } as unknown as TransactionManager;
+
+      const repo = new TestRepository(tm);
+
+      // This should succeed because deleteById uses runInTransaction (not db.transaction())
+      const result = await repo.deleteById('1');
+
+      expect(tm.runInTransaction).toHaveBeenCalled();
+      // db.transaction() must NOT be called — it would throw on a Transaction object
+      expect(connection.transaction).not.toHaveBeenCalled();
+      expect(connection.selectFrom).toHaveBeenCalledWith('test_table');
+      expect(connection.deleteFrom).toHaveBeenCalledWith('test_table');
+      expect(result).toEqual(existing);
+    });
   });
 });
