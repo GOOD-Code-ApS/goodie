@@ -127,4 +127,55 @@ describe('Hono + PostgreSQL Todo API', () => {
     const body = await res.json();
     expect(body.error).toBe('Todo not found');
   });
+
+  test('POST /api/todos returns 400 for missing title', async ({ resolve }) => {
+    const honoApp = app(resolve);
+
+    const res = await honoApp.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Validation failed');
+    expect(body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: expect.any(String) }),
+      ]),
+    );
+  });
+
+  test('POST /api/todos returns 400 for empty title', async ({ resolve }) => {
+    const honoApp = app(resolve);
+
+    const res = await honoApp.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '' }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Validation failed');
+    expect(body.issues[0].message).toBe('Title must not be empty');
+  });
+
+  test('PATCH /api/todos/:id returns 400 for invalid completed field', async ({
+    resolve,
+  }) => {
+    const honoApp = app(resolve);
+    const created = await createTodo(honoApp, 'Valid todo');
+
+    const res = await honoApp.request(`/api/todos/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: 'not-a-boolean' }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Validation failed');
+  });
 });
