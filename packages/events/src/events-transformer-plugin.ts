@@ -57,6 +57,9 @@ export function createEventsPlugin(): TransformerPlugin {
         } else {
           bean.baseTokenRefs = [baseRef];
         }
+
+        // Clean up internal marker — not needed at runtime
+        delete bean.metadata.__isEventListener;
       }
 
       // Always create EventBus when the plugin is installed — allows

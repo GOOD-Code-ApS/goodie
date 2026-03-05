@@ -10,31 +10,51 @@ pnpm add @goodie-ts/events
 
 ## Overview
 
-Declarative event handling using `@EventListener` decorators. The transformer plugin discovers listeners at compile time and generates static wiring code. At runtime, `EventBus` dispatches events sequentially to registered listeners with error isolation.
+Declarative event handling using the `ApplicationEventListener` abstract class pattern. The transformer plugin discovers listener subclasses at compile time and generates static wiring code. At runtime, `EventBus` dispatches events sequentially to registered listeners with error isolation.
 
 ## Usage
 
 ```typescript
-import { EventListener } from '@goodie-ts/events';
-import { EventPublisher } from '@goodie-ts/events';
+import {
+  ApplicationEvent,
+  ApplicationEventListener,
+  EventPublisher,
+} from '@goodie-ts/events';
 import { Singleton, Inject } from '@goodie-ts/decorators';
 
 // Define an event class
-class UserCreatedEvent {
-  constructor(public readonly userId: string) {}
+class UserCreatedEvent extends ApplicationEvent {
+  constructor(public readonly userId: string) {
+    super();
+  }
 }
 
 // Listen for events
 @Singleton()
-class NotificationService {
-  @EventListener(UserCreatedEvent)
-  async onUserCreated(event: UserCreatedEvent) {
+class UserCreatedListener extends ApplicationEventListener<UserCreatedEvent> {
+  readonly eventType = UserCreatedEvent;
+
+  async onApplicationEvent(event: UserCreatedEvent) {
     console.log(`User created: ${event.userId}`);
   }
+}
 
-  @EventListener(UserCreatedEvent, { order: 10 })
-  async sendWelcomeEmail(event: UserCreatedEvent) {
-    // Runs after onUserCreated (higher order = later)
+// Optional: override supports() for conditional filtering
+@Singleton()
+class HighValueOrderListener extends ApplicationEventListener<OrderEvent> {
+  readonly eventType = OrderEvent;
+
+  supports(event: OrderEvent) {
+    return event.total > 10_000;
+  }
+
+  async onApplicationEvent(event: OrderEvent) {
+    console.log('High value order!');
+  }
+
+  // Optional: control execution order (lower = earlier, default 0)
+  get order() {
+    return 10;
   }
 }
 

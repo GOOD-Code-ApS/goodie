@@ -7,15 +7,14 @@ Task scheduling for goodie-ts. `@Scheduled` decorator with compile-time discover
 | File | Role |
 |------|------|
 | `src/decorators/scheduled.ts` | `@Scheduled({ cron?, fixedRate?, fixedDelay?, concurrent? })` -- runtime no-op marker, read at compile time |
-| `src/scheduler-service.ts` | `SchedulerService` -- manages scheduled jobs; `addSchedule()`, `start()`, `stop()` |
+| `src/scheduler-service.ts` | `SchedulerService` -- manages scheduled jobs; discovers them via `ApplicationContext.getDefinitions()`, `start()`, `stop()` |
 | `src/scheduler-transformer-plugin.ts` | `createSchedulerPlugin()` -- transformer plugin that scans `@Scheduled` and synthesizes the `SchedulerService` bean |
-| `src/metadata.ts` | `SCHEDULER_META` symbols and `ScheduleMetadata` interface (vestigial -- not used at runtime) |
 | `src/index.ts` | Public API re-exports |
 
 ## How It Works
 
-1. **Compile time:** The `createSchedulerPlugin()` transformer plugin scans methods for `@Scheduled` decorators via `visitMethod`. It extracts `cron`, `fixedRate`, `fixedDelay`, and `concurrent` from the decorator's object literal argument. The plugin validates at compile time that exactly one scheduling mode is specified and that cron expressions are non-empty. In `beforeCodegen`, it synthesizes a `SchedulerService` bean with a `customFactory` that calls `addSchedule()` for each discovered method.
-2. **Runtime:** `SchedulerService` stores registered routes and starts them when `start()` is called (via `postConstruct`). On shutdown, `stop()` (via `preDestroy`) cleans up all timers and cron jobs.
+1. **Compile time:** The `createSchedulerPlugin()` transformer plugin scans methods for `@Scheduled` decorators via `visitMethod`. It extracts `cron`, `fixedRate`, `fixedDelay`, and `concurrent` from the decorator's object literal argument. The plugin validates at compile time that exactly one scheduling mode is specified and that cron expressions are non-empty. Metadata is stored on the bean's `classMetadata.scheduledMethods` array. In `beforeCodegen`, it synthesizes a `SchedulerService` bean that depends on `ApplicationContext`.
+2. **Runtime:** `SchedulerService` takes `ApplicationContext` as a constructor dep. In `start()` (via `@PostConstruct`), it iterates `ctx.getDefinitions()` looking for beans with `metadata.scheduledMethods`, resolves each bean, and starts the corresponding cron/interval/delay jobs. On shutdown, `stop()` (via `@PreDestroy`) cleans up all timers and awaits in-flight executions.
 
 ## Scheduling Modes
 
@@ -35,21 +34,27 @@ Set `concurrent: true` to allow overlapping executions for cron and fixedRate jo
 
 The synthesized `SchedulerService` bean has:
 - `metadata.postConstructMethods: ['start']` -- starts all jobs after the container is fully initialized
-- `metadata.preDestroyMethods: ['stop']` -- stops all jobs and clears timers on shutdown
+- `metadata.preDestroyMethods: ['stop']` -- stops all jobs, clears timers, and awaits in-flight executions on shutdown
 - `eager: true` -- ensures the service is created during context startup
 
 ## Compile-Time Validation
 
-The plugin throws errors at build time for:
+The plugin throws `InvalidDecoratorUsageError` at build time for:
 - Missing scheduling mode (none of `cron`, `fixedRate`, `fixedDelay` specified)
 - Multiple scheduling modes on the same method
 - Empty cron expression string
+
+## Graceful Shutdown
+
+`stop()` is async and supports graceful drain:
+- Cron and fixedRate jobs track `currentRun` promise via a `drained` getter
+- fixedDelay jobs use a `resolveDelay` pattern to break out of the sleep without leaving a dangling promise
+- `stop()` awaits all `drained` promises before returning
 
 ## Gotchas
 
 - The plugin only synthesizes `SchedulerService` when at least one `@Scheduled` method is found (unlike events, which always creates `EventBus`)
 - `fixedDelay` jobs start executing immediately on `start()` with no initial delay
 - Error handling logs via `console.error` but does not stop the schedule -- jobs continue on the next tick
-- The `metadata.ts` symbols are vestigial from an earlier runtime-scanning design
 - The plugin is auto-discovered via `package.json` `goodie.plugin` field
 - Cron parsing uses the `croner` library (6-field format with seconds)
