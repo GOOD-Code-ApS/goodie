@@ -28,8 +28,10 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
+  "dependencies": {
+    "@goodie-ts/core": "workspace:^"
+  },
   "peerDependencies": {
-    "@goodie-ts/core": "workspace:^",
     "vitest": ">=3.0.0",
     "@goodie-ts/kysely": "workspace:^"
   },

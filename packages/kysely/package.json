@@ -27,8 +27,10 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
+  "dependencies": {
+    "@goodie-ts/aop": "workspace:^"
+  },
   "peerDependencies": {
-    "@goodie-ts/aop": "workspace:^",
     "kysely": ">=0.27.0"
   },
   "devDependencies": {

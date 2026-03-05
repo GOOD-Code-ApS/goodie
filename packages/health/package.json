@@ -27,7 +27,7 @@
     "build": "tsc && goodie generate --mode library",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@goodie-ts/decorators": "workspace:^"
   },
   "devDependencies": {
