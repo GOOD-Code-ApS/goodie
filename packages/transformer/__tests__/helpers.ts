@@ -34,6 +34,7 @@ export function Timeout(duration: number) { return (t: any, c: any) => {} }
 export function ConfigurationProperties(prefix: string) { return (t: any, c: any) => {} }
 export function Transactional(opts?: any) { return (t: any, c: any) => {} }
 export function Migration(name: string) { return (t: any, c: any) => {} }
+export function Validate(targets: any) { return (t: any, c: any) => {} }
 `;
 
 /**

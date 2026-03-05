@@ -33,6 +33,7 @@ export type {
   IRModule,
   IRProvides,
   IRRouteDefinition,
+  IRRouteValidation,
   SourceLocation,
   TokenRef,
 } from './ir.js';
@@ -71,6 +72,7 @@ export type {
   ScannedProvides,
   ScannedRoute,
   ScannedTypeArgument,
+  ScannedValidation,
   ScanResult,
 } from './scanner.js';
 // Scanner
