@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/hono",
-  "version": "0.5.1",
+  "version": "1.0.0",
   "description": "Hono HTTP controller integration for goodie-ts",
   "license": "MIT",
   "type": "module",

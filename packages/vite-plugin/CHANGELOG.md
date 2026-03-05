@@ -1,5 +1,14 @@
 # @goodie-ts/vite-plugin
 
+## 0.5.3
+
+### Patch Changes
+
+- Updated dependencies [cc600d7]
+- Updated dependencies [3b40073]
+- Updated dependencies [c77e195]
+  - @goodie-ts/transformer@0.7.0
+
 ## 0.5.2
 
 ### Patch Changes

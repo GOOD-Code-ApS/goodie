@@ -1,5 +1,33 @@
 # @goodie-ts/hono
 
+## 1.0.0
+
+### Minor Changes
+
+- 3b40073: feat(hono,transformer): request validation via @Validate
+
+  - Add `@Validate({ json?, query?, param? })` decorator for controller methods
+  - Scanner detects `@Validate`, extracts Zod schema references and import paths via ts-morph
+  - Codegen emits `zValidator()` middleware from `@hono/zod-validator` before route handlers
+  - Standard 400 error response with sanitized Zod issues on validation failure
+  - `@hono/zod-validator` and `zod` added as optional peer dependencies
+  - Hono example updated with Zod schemas for create/update todo validation
+
+### Patch Changes
+
+- cc600d7: fix: move @goodie-ts/\* runtime dependencies to peerDependencies
+
+  Library packages now declare @goodie-ts/\* runtime dependencies as peerDependencies
+  instead of dependencies. This ensures consumers share a single copy of core packages
+  like @goodie-ts/core, preventing class identity mismatches at runtime.
+
+  Build-time tools (cli, vite-plugin, transformer) are unchanged since they don't share
+  a runtime with the consumer's application.
+
+- Updated dependencies [cc600d7]
+- Updated dependencies [c77e195]
+  - @goodie-ts/core@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes
