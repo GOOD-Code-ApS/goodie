@@ -19,7 +19,6 @@ import type { IRBeanDefinition } from './ir.js';
 import {
   deserializeBeans,
   discoverAopMappings,
-  discoverLibraryManifests,
   rewriteImportPaths,
   serializeBeans,
 } from './library-beans.js';

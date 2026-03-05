@@ -255,7 +255,9 @@ export function generateCode(
     lines.push(
       `    dependencies: ${depsToCode(bean, resolveTokenRef, hasValueFields, interceptorDepsPerBean)},`,
     );
-    lines.push(`    factory: ${bean.customFactory ?? factoryToCode(bean, interceptorDepsPerBean)},`);
+    lines.push(
+      `    factory: ${bean.customFactory ?? factoryToCode(bean, interceptorDepsPerBean)},`,
+    );
     lines.push(`    eager: ${bean.eager},`);
     lines.push(`    metadata: ${metadataToCode(bean.metadata)},`);
     if (bean.baseTokenRefs && bean.baseTokenRefs.length > 0) {

@@ -6,9 +6,9 @@ type MethodDecorator_Stage3 = (
 export interface ScheduledOptions {
   /** Cron expression (6 fields: sec min hour dom mon dow). */
   cron?: string;
-  /** Fixed-rate interval in milliseconds. */
+  /** Fixed-rate interval in milliseconds. Waits one interval before first execution. */
   fixedRate?: number;
-  /** Fixed-delay interval in milliseconds (waits for previous completion). */
+  /** Fixed-delay interval in milliseconds. Runs immediately, then waits for previous completion + delay. */
   fixedDelay?: number;
   /** Allow concurrent executions. Defaults to false. */
   concurrent?: boolean;

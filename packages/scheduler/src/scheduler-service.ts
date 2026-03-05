@@ -13,8 +13,10 @@ export interface ScheduleRoute {
 interface ScheduledJob {
   /** Human-readable label for logging. */
   label: string;
-  /** Stop function — clears interval/cron. */
+  /** Stop function — clears interval/cron/loop. */
   stop: () => void;
+  /** Promise that resolves when any in-flight execution completes. */
+  drained?: Promise<void>;
 }
 
 /**
@@ -75,11 +77,13 @@ export class SchedulerService {
     }
   }
 
-  /** Stop all scheduled jobs. Called automatically via @PreDestroy. */
-  stop(): void {
+  /** Stop all scheduled jobs and await in-flight executions. Called automatically via @PreDestroy. */
+  async stop(): Promise<void> {
     for (const job of this.jobs) {
       job.stop();
     }
+    // Await any in-flight task executions before returning
+    await Promise.all(this.jobs.map((j) => j.drained).filter(Boolean));
     this.jobs.length = 0;
     this.started = false;
   }
@@ -91,22 +95,28 @@ export class SchedulerService {
     concurrent: boolean,
   ): void {
     let running = false;
+    let currentRun: Promise<void> | undefined;
 
-    const job = new Cron(cron, async () => {
+    const job = new Cron(cron, () => {
       if (!concurrent && running) return;
       running = true;
-      try {
-        await fn();
-      } catch (error) {
-        console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
-      } finally {
-        running = false;
-      }
+      currentRun = (async () => {
+        try {
+          await fn();
+        } catch (error) {
+          console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
+        } finally {
+          running = false;
+        }
+      })();
     });
 
     this.jobs.push({
       label,
       stop: () => job.stop(),
+      get drained() {
+        return currentRun;
+      },
     });
   }
 
@@ -117,22 +127,28 @@ export class SchedulerService {
     concurrent: boolean,
   ): void {
     let running = false;
+    let currentRun: Promise<void> | undefined;
 
-    const timer = setInterval(async () => {
+    const timer = setInterval(() => {
       if (!concurrent && running) return;
       running = true;
-      try {
-        await fn();
-      } catch (error) {
-        console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
-      } finally {
-        running = false;
-      }
+      currentRun = (async () => {
+        try {
+          await fn();
+        } catch (error) {
+          console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
+        } finally {
+          running = false;
+        }
+      })();
     }, intervalMs);
 
     this.jobs.push({
       label,
       stop: () => clearInterval(timer),
+      get drained() {
+        return currentRun;
+      },
     });
   }
 
@@ -159,8 +175,8 @@ export class SchedulerService {
       }
     };
 
-    // Start the loop — fire-and-forget
-    loop();
+    // Start the loop — tracked for graceful drain on stop()
+    const loopPromise = loop();
 
     this.jobs.push({
       label,
@@ -168,6 +184,7 @@ export class SchedulerService {
         stopped = true;
         if (timeoutId) clearTimeout(timeoutId);
       },
+      drained: loopPromise,
     });
   }
 }
