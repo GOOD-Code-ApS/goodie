@@ -17,6 +17,8 @@ Scanner → Resolver → GraphBuilder → Codegen
 
 Entry points: `transform(options)` for file-based, `transformInMemory(project, outputPath)` for tests.
 
+`scan()` accepts an optional `plugins` parameter — plugin `visitClass`/`visitMethod` hooks run inline during the scan loop (single AST pass). Returns `pluginMetadata` in `ScanResult`.
+
 ## Key Files
 
 | File | Role |
@@ -26,6 +28,7 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 | `src/aop-scanner.ts` | `scanAopDecoratorDefinitions()` — scans `createAopDecorator<{...}>()` calls, extracts config from type parameters via type checker |
 | `src/aop-plugin.ts` | `createDeclarativeAopPlugin()` — generic AOP plugin driven by `AopDecoratorDeclaration` mappings |
 | `src/library-beans.ts` | `serializeBeans()`, `deserializeBeans()`, `discoverLibraryBeans()`, `discoverAopMappings()` |
+| `src/discover-plugins.ts` | `discoverAll()` — single-pass plugin + library manifest discovery from `node_modules` |
 | `src/transformer-errors.ts` | `TransformerError` subclasses with source locations |
 
 ## IR Types (ir.ts)
@@ -62,6 +65,14 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 3. Includes the config in the manifest's `aop` section
 
 Consumers discover AOP mappings via `discoverAopMappings()`, which reads beans.json manifests (not package.json).
+
+## Performance Optimizations
+
+- **IR hash**: Codegen output includes a SHA-256 hash of all inputs. `transform()` skips file write when the hash matches the existing file (`TransformResult.skipped`). Prevents unnecessary Vite HMR reloads.
+- **Discovery cache**: `TransformOptions.discoveryCache` lets watch-mode callers skip `node_modules` filesystem scanning between rebuilds. Returned in `TransformResult.discoveryCache`.
+- **Type resolution memoization**: Scanner caches `getType()→getSymbol()→getDeclarations()` results and `extractTypeArguments()` results per `scan()` call via `TypeResolutionCache`.
+- **Single-pass collection**: `collectAllImports()` in codegen iterates beans once for class imports, injection tokens, type-only imports, and interceptor deps.
+- **`.d.ts`/`node_modules` skip**: Scanner filters out declaration files and node_modules source files early.
 
 ## Testing
 

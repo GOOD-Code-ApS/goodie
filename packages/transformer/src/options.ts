@@ -23,6 +23,12 @@ export interface TransformOptions {
    * Defaults to `['@goodie-ts']`.
    */
   scanScopes?: string[];
+  /**
+   * Cached discovery result from a previous run.
+   * When set, the filesystem scan for plugins + library manifests is skipped.
+   * Useful in watch mode where `node_modules` doesn't change between rebuilds.
+   */
+  discoveryCache?: import('./discover-plugins.js').DiscoverAllResult;
 }
 
 /** Options for building a library's beans.json manifest. */
@@ -76,6 +82,10 @@ export interface TransformResult {
   beans: IRBeanDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
+  /** True when codegen was skipped because the IR hash matched the existing file. */
+  skipped?: boolean;
+  /** Discovery result that can be passed as `discoveryCache` on subsequent runs. */
+  discoveryCache?: import('./discover-plugins.js').DiscoverAllResult;
 }
 
 /** Context passed to visitClass hook. */

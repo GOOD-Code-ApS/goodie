@@ -64,8 +64,9 @@ export class ApplicationContext {
    */
   static async create(
     definitions: BeanDefinition[],
+    options?: { preSorted?: boolean },
   ): Promise<ApplicationContext> {
-    const sorted = topoSort(definitions);
+    const sorted = options?.preSorted ? definitions : topoSort(definitions);
     const ctx = new ApplicationContext(sorted);
     ctx.validateDependencies();
     await ctx.initPostProcessors();
