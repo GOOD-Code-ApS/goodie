@@ -46,7 +46,12 @@ export function createSchedulerPlugin(): TransformerPlugin {
           const text = init.getText();
 
           if (name === 'cron') {
-            cron = text.replace(/^['"]|['"]$/g, '');
+            const strLit =
+              init.asKind(SyntaxKind.StringLiteral) ??
+              init.asKind(SyntaxKind.NoSubstitutionTemplateLiteral);
+            cron = strLit
+              ? strLit.getLiteralValue()
+              : text.replace(/^['"]|['"]$/g, '');
           } else if (name === 'fixedRate') {
             fixedRate = Number(text);
           } else if (name === 'fixedDelay') {

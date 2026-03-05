@@ -208,10 +208,12 @@ export class ApplicationContext {
   }
 
   /**
-   * Returns a shallow defensive copy of the bean definitions used to build this context.
+   * Returns a shallow defensive copy of the bean definitions used to build this context,
+   * including the self-registered ApplicationContext definition.
    */
   getDefinitions(): readonly BeanDefinition[] {
-    return [...this.sortedDefs];
+    const selfDef = this.primaryDef.get(ApplicationContext);
+    return selfDef ? [selfDef, ...this.sortedDefs] : [...this.sortedDefs];
   }
 
   /**

@@ -1029,9 +1029,11 @@ describe('ApplicationContext — getDefinitions', () => {
     ];
     const ctx = await ApplicationContext.create(defs);
     const returned = ctx.getDefinitions();
-    expect(returned).toHaveLength(2);
+    // +1 for self-registered ApplicationContext definition
+    expect(returned).toHaveLength(3);
     expect(returned.map((d) => d.token)).toContain(Foo);
     expect(returned.map((d) => d.token)).toContain(Bar);
+    expect(returned.map((d) => d.token)).toContain(ApplicationContext);
   });
 
   it('returns a defensive copy (different array instances, same contents)', async () => {

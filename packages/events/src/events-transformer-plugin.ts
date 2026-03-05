@@ -22,8 +22,11 @@ export function createEventsPlugin(): TransformerPlugin {
       const extendsClause = ctx.classDeclaration.getExtends();
       if (!extendsClause) return;
 
-      const baseName = extendsClause.getExpression().getText();
-      if (baseName !== 'ApplicationEventListener') return;
+      // Resolve via ts-morph type symbol to handle aliased imports
+      // (e.g. `import { ApplicationEventListener as AEL }`)
+      const baseType = extendsClause.getExpression().getType();
+      const symbol = baseType.getSymbol();
+      if (symbol?.getName() !== 'ApplicationEventListener') return;
 
       // Mark this bean as an event listener so beforeCodegen can add baseTokenRefs.
       // The scanner stops at node_modules, so external base classes aren't captured

@@ -56,7 +56,7 @@ export class SchedulerService {
 
         const boundMethod = method.bind(bean);
 
-        if (meta.cron) {
+        if (meta.cron !== undefined) {
           this.startCronJob(label, meta.cron, boundMethod, meta.concurrent);
         } else if (meta.fixedRate !== undefined) {
           this.startFixedRateJob(
@@ -90,27 +90,31 @@ export class SchedulerService {
     concurrent: boolean,
   ): void {
     let running = false;
-    let currentRun: Promise<void> | undefined;
+    const inFlight = new Set<Promise<void>>();
 
     const job = new Cron(cron, () => {
       if (!concurrent && running) return;
       running = true;
-      currentRun = (async () => {
+      const run: Promise<void> = (async () => {
         try {
           await fn();
         } catch (error) {
           console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
         } finally {
           running = false;
+          inFlight.delete(run);
         }
       })();
+      inFlight.add(run);
     });
 
     this.jobs.push({
       label,
       stop: () => job.stop(),
       get drained() {
-        return currentRun;
+        return inFlight.size > 0
+          ? Promise.all(inFlight).then(() => {})
+          : undefined;
       },
     });
   }
@@ -122,27 +126,31 @@ export class SchedulerService {
     concurrent: boolean,
   ): void {
     let running = false;
-    let currentRun: Promise<void> | undefined;
+    const inFlight = new Set<Promise<void>>();
 
     const timer = setInterval(() => {
       if (!concurrent && running) return;
       running = true;
-      currentRun = (async () => {
+      const run: Promise<void> = (async () => {
         try {
           await fn();
         } catch (error) {
           console.error(`[@goodie-ts/scheduler] Error in ${label}:`, error);
         } finally {
           running = false;
+          inFlight.delete(run);
         }
       })();
+      inFlight.add(run);
     }, intervalMs);
 
     this.jobs.push({
       label,
       stop: () => clearInterval(timer),
       get drained() {
-        return currentRun;
+        return inFlight.size > 0
+          ? Promise.all(inFlight).then(() => {})
+          : undefined;
       },
     });
   }
