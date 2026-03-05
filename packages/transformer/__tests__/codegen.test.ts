@@ -450,7 +450,9 @@ describe('Code Generator', () => {
     expect(code).toContain(
       'export async function createContext(): Promise<ApplicationContext>',
     );
-    expect(code).toContain('return ApplicationContext.create(definitions)');
+    expect(code).toContain(
+      'return ApplicationContext.create(definitions, { preSorted: true })',
+    );
     expect(code).toContain('export { definitions }');
   });
 

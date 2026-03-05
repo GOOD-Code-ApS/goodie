@@ -8,21 +8,22 @@ import type {
 } from './aop-plugin.js';
 import { createDeclarativeAopPlugin } from './aop-plugin.js';
 import { scanAopDecoratorDefinitions } from './aop-scanner.js';
-import { generateCode } from './codegen.js';
-import { discoverPlugins, mergePlugins } from './discover-plugins.js';
+import { computeIRHash, extractIRHash, generateCode } from './codegen.js';
+import {
+  discoverAll,
+  discoverPlugins,
+  mergePlugins,
+} from './discover-plugins.js';
 import { buildGraph } from './graph-builder.js';
 import type { IRBeanDefinition } from './ir.js';
 import {
+  deserializeBeans,
   discoverAopMappings,
-  discoverLibraryBeans,
-  discoverLibraryManifests,
   rewriteImportPaths,
   serializeBeans,
 } from './library-beans.js';
 import type {
-  ClassVisitorContext,
   CodegenContribution,
-  MethodVisitorContext,
   TransformerPlugin,
   TransformLibraryOptions,
   TransformLibraryResult,
@@ -59,23 +60,46 @@ export async function transform(
 
   const baseDir = path.dirname(options.tsConfigFilePath);
 
-  const discovered = options.disablePluginDiscovery
-    ? []
-    : await discoverPlugins(baseDir, options.scanScopes);
-  const discovery =
-    options.disablePluginDiscovery && options.disableLibraryBeanDiscovery
-      ? { beans: [], aopMappings: [] }
-      : discoverLibraryManifests(baseDir, options.scanScopes);
+  // Single filesystem discovery pass for plugins + library manifests
+  const skipDiscovery =
+    options.disablePluginDiscovery && options.disableLibraryBeanDiscovery;
+  const discovery = skipDiscovery
+    ? { plugins: [], manifests: [] }
+    : (options.discoveryCache ??
+      (await discoverAll(baseDir, options.scanScopes)));
 
-  const aopMappings = options.disablePluginDiscovery
+  const discoveredPlugins = options.disablePluginDiscovery
     ? []
-    : discovery.aopMappings;
+    : discovery.plugins;
+
+  // Extract library beans and AOP mappings from manifests
+  const libraryBeans: IRBeanDefinition[] = [];
+  const aopMappings: import('./aop-plugin.js').ResolvedAopMapping[] = [];
+  if (!options.disableLibraryBeanDiscovery) {
+    for (const { packageName, manifest } of discovery.manifests) {
+      try {
+        libraryBeans.push(...deserializeBeans(manifest));
+      } catch (err) {
+        console.warn(
+          `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      if (!options.disablePluginDiscovery && manifest.aop) {
+        for (const [decoratorName, declaration] of Object.entries(
+          manifest.aop,
+        )) {
+          aopMappings.push({ decoratorName, declaration, packageName });
+        }
+      }
+    }
+  }
+
   const aopPlugins =
     aopMappings.length > 0 ? [createDeclarativeAopPlugin(aopMappings)] : [];
 
   // Declarative AOP plugin comes first so explicit plugins can override
   const activePlugins = mergePlugins(
-    [...aopPlugins, ...discovered],
+    [...aopPlugins, ...discoveredPlugins],
     options.plugins ?? [],
   );
 
@@ -84,108 +108,20 @@ export async function transform(
     plugin.beforeScan?.();
   }
 
-  // 3. Scan
-  const scanResult = scan(project);
-
-  // 4. Run visitClass and visitMethod hooks
-  const pluginClassMetadata = runPluginVisitors(project, activePlugins);
-
-  // 5. Resolve
-  const resolveResult = resolve(scanResult);
-
-  // 6. Merge visitor metadata into beans (before afterResolve so plugins can read it)
-  let beans = resolveResult.beans;
-  mergePluginMetadata(beans, pluginClassMetadata);
-
-  // 6b. Inject library beans (before afterResolve so plugins see them)
-  if (!options.disableLibraryBeanDiscovery && discovery.beans.length > 0) {
-    beans = [...beans, ...discovery.beans];
-  }
-
-  // 7. afterResolve hook
-  for (const plugin of activePlugins) {
-    if (plugin.afterResolve) {
-      beans = plugin.afterResolve(beans);
-    }
-  }
-
-  // 8. Build graph (validate + topo sort)
-  const graphResult = buildGraph({ ...resolveResult, beans });
-
-  // 9. beforeCodegen hook
-  let finalBeans = graphResult.beans;
-  for (const plugin of activePlugins) {
-    if (plugin.beforeCodegen) {
-      finalBeans = plugin.beforeCodegen(finalBeans);
-    }
-  }
-
-  // 10. Collect codegen contributions
-  const contributions: CodegenContribution[] = [];
-  for (const plugin of activePlugins) {
-    if (plugin.codegen) {
-      contributions.push(plugin.codegen(finalBeans));
-    }
-  }
-
-  // 11. Generate code
-  const code = generateCode(
-    finalBeans,
-    { outputPath: options.outputPath, version: PKG_VERSION },
-    contributions,
-    graphResult.controllers,
-  );
-
-  // 12. Write output
-  const outputDir = path.dirname(options.outputPath);
-  fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(options.outputPath, code, 'utf-8');
-
-  return {
-    code,
-    outputPath: options.outputPath,
-    beans: finalBeans,
-    warnings: graphResult.warnings,
-  };
-}
-
-/**
- * Run the pipeline in-memory without writing to disk.
- * Useful for testing and tooling integration.
- */
-export function transformInMemory(
-  project: Project,
-  outputPath: string,
-  plugins?: TransformerPlugin[],
-  libraryBeans?: IRBeanDefinition[],
-  aopMappings?: ResolvedAopMapping[],
-): TransformResult {
-  const aopPlugins =
-    aopMappings && aopMappings.length > 0
-      ? [createDeclarativeAopPlugin(aopMappings)]
-      : [];
-  const activePlugins = [...aopPlugins, ...(plugins ?? [])];
-
-  // 1. beforeScan hooks
-  for (const plugin of activePlugins) {
-    plugin.beforeScan?.();
-  }
-
-  // 2. Scan
-  const scanResult = scan(project);
-
-  // 3. Run visitClass and visitMethod hooks
-  const pluginClassMetadata = runPluginVisitors(project, activePlugins);
+  // 3. Scan (with plugin visitor hooks inlined)
+  const scanResult = scan(project, activePlugins);
 
   // 4. Resolve
   const resolveResult = resolve(scanResult);
 
   // 5. Merge visitor metadata into beans (before afterResolve so plugins can read it)
   let beans = resolveResult.beans;
-  mergePluginMetadata(beans, pluginClassMetadata);
+  if (scanResult.pluginMetadata) {
+    mergePluginMetadata(beans, scanResult.pluginMetadata);
+  }
 
   // 5b. Inject library beans (before afterResolve so plugins see them)
-  if (libraryBeans && libraryBeans.length > 0) {
+  if (!options.disableLibraryBeanDiscovery && libraryBeans.length > 0) {
     beans = [...beans, ...libraryBeans];
   }
 
@@ -215,7 +151,127 @@ export function transformInMemory(
     }
   }
 
-  // 10. Generate code
+  // 10. Check IR hash — skip codegen + write if DI graph unchanged
+  const codegenOptions = {
+    outputPath: options.outputPath,
+    version: PKG_VERSION,
+  };
+  const currentHash = computeIRHash(
+    finalBeans,
+    codegenOptions,
+    contributions,
+    graphResult.controllers,
+  );
+
+  let existingHash: string | undefined;
+  try {
+    const existingContent = fs.readFileSync(options.outputPath, 'utf-8');
+    existingHash = extractIRHash(existingContent);
+  } catch {
+    // File doesn't exist yet — proceed with generation
+  }
+
+  if (existingHash === currentHash) {
+    // Read the existing file for the return value
+    const code = fs.readFileSync(options.outputPath, 'utf-8');
+    return {
+      code,
+      outputPath: options.outputPath,
+      beans: finalBeans,
+      warnings: graphResult.warnings,
+      skipped: true,
+      discoveryCache: discovery,
+    };
+  }
+
+  // 11. Generate code (pass pre-computed hash to avoid recomputation)
+  const code = generateCode(
+    finalBeans,
+    { ...codegenOptions, hash: currentHash },
+    contributions,
+    graphResult.controllers,
+  );
+
+  // 12. Write output
+  const outputDir = path.dirname(options.outputPath);
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(options.outputPath, code, 'utf-8');
+
+  return {
+    code,
+    outputPath: options.outputPath,
+    beans: finalBeans,
+    warnings: graphResult.warnings,
+    discoveryCache: discovery,
+  };
+}
+
+/**
+ * Run the pipeline in-memory without writing to disk.
+ * Useful for testing and tooling integration.
+ */
+export function transformInMemory(
+  project: Project,
+  outputPath: string,
+  plugins?: TransformerPlugin[],
+  libraryBeans?: IRBeanDefinition[],
+  aopMappings?: ResolvedAopMapping[],
+): TransformResult {
+  const aopPlugins =
+    aopMappings && aopMappings.length > 0
+      ? [createDeclarativeAopPlugin(aopMappings)]
+      : [];
+  const activePlugins = [...aopPlugins, ...(plugins ?? [])];
+
+  // 1. beforeScan hooks
+  for (const plugin of activePlugins) {
+    plugin.beforeScan?.();
+  }
+
+  // 2. Scan (with plugin visitor hooks inlined)
+  const scanResult = scan(project, activePlugins);
+
+  // 3. Resolve
+  const resolveResult = resolve(scanResult);
+
+  // 4. Merge visitor metadata into beans (before afterResolve so plugins can read it)
+  let beans = resolveResult.beans;
+  if (scanResult.pluginMetadata) {
+    mergePluginMetadata(beans, scanResult.pluginMetadata);
+  }
+
+  // 4b. Inject library beans (before afterResolve so plugins see them)
+  if (libraryBeans && libraryBeans.length > 0) {
+    beans = [...beans, ...libraryBeans];
+  }
+
+  // 5. afterResolve hook
+  for (const plugin of activePlugins) {
+    if (plugin.afterResolve) {
+      beans = plugin.afterResolve(beans);
+    }
+  }
+
+  // 6. Build graph (validate + topo sort)
+  const graphResult = buildGraph({ ...resolveResult, beans });
+
+  // 7. beforeCodegen hook
+  let finalBeans = graphResult.beans;
+  for (const plugin of activePlugins) {
+    if (plugin.beforeCodegen) {
+      finalBeans = plugin.beforeCodegen(finalBeans);
+    }
+  }
+
+  // 8. Collect codegen contributions
+  const contributions: CodegenContribution[] = [];
+  for (const plugin of activePlugins) {
+    if (plugin.codegen) {
+      contributions.push(plugin.codegen(finalBeans));
+    }
+  }
+
+  // 9. Generate code
   const code = generateCode(
     finalBeans,
     { outputPath, version: PKG_VERSION },
@@ -278,20 +334,19 @@ export async function transformLibrary(
     plugin.beforeScan?.();
   }
 
-  // 3. Scan
-  const scanResult = scan(project);
+  // 3. Scan (with plugin visitor hooks inlined)
+  const scanResult = scan(project, activePlugins);
 
-  // 4. Run visitClass and visitMethod hooks
-  const pluginClassMetadata = runPluginVisitors(project, activePlugins);
-
-  // 5. Resolve
+  // 4. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 6. Merge visitor metadata
+  // 5. Merge visitor metadata
   let beans = resolveResult.beans;
-  mergePluginMetadata(beans, pluginClassMetadata);
+  if (scanResult.pluginMetadata) {
+    mergePluginMetadata(beans, scanResult.pluginMetadata);
+  }
 
-  // 7. afterResolve hook
+  // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
@@ -381,63 +436,6 @@ export async function transformLibrary(
     code,
     codeOutputPath: options.codeOutputPath,
   };
-}
-
-/**
- * Run visitClass and visitMethod hooks across all plugins.
- * Returns a map of "filePath:className" -> accumulated metadata.
- */
-function runPluginVisitors(
-  project: Project,
-  plugins: TransformerPlugin[],
-): Map<string, Record<string, unknown>> {
-  const classMetadataMap = new Map<string, Record<string, unknown>>();
-
-  if (plugins.every((p) => !p.visitClass && !p.visitMethod)) {
-    return classMetadataMap; // No visitor hooks, skip iteration
-  }
-
-  for (const sourceFile of project.getSourceFiles()) {
-    for (const cls of sourceFile.getClasses()) {
-      const className = cls.getName();
-      if (!className) continue;
-
-      const decorators = cls.getDecorators();
-      if (decorators.length === 0) continue;
-
-      const metadata: Record<string, unknown> = {};
-      const metadataKey = `${sourceFile.getFilePath()}:${className}`;
-      classMetadataMap.set(metadataKey, metadata);
-
-      const classCtx: ClassVisitorContext = {
-        classDeclaration: cls,
-        className,
-        filePath: sourceFile.getFilePath(),
-        metadata,
-      };
-
-      for (const plugin of plugins) {
-        plugin.visitClass?.(classCtx);
-      }
-
-      // Visit methods
-      for (const method of cls.getMethods()) {
-        const methodCtx: MethodVisitorContext = {
-          methodDeclaration: method,
-          methodName: method.getName(),
-          className,
-          filePath: sourceFile.getFilePath(),
-          classMetadata: metadata,
-        };
-
-        for (const plugin of plugins) {
-          plugin.visitMethod?.(methodCtx);
-        }
-      }
-    }
-  }
-
-  return classMetadataMap;
 }
 
 /**
