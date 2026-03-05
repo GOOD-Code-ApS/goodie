@@ -1,17 +1,29 @@
+import type { BeanDefinition } from '@goodie-ts/core';
+import { ApplicationContext } from '@goodie-ts/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ScheduledMethodMeta } from '../src/scheduler-service.js';
 import { SchedulerService } from '../src/scheduler-service.js';
 
-function createBeanWithMethods(
-  name: string,
-  methods: Record<string, (...args: unknown[]) => unknown>,
-): object {
-  class FakeBean {}
-  Object.defineProperty(FakeBean, 'name', { value: name });
-  const instance = new FakeBean();
-  for (const [methodName, fn] of Object.entries(methods)) {
-    (instance as any)[methodName] = fn;
-  }
-  return instance;
+/** Build an ApplicationContext with the given beans and their scheduled metadata. */
+async function createSchedulerContext(
+  beans: Array<{
+    instance: object;
+    token: new (...args: any[]) => unknown;
+    scheduledMethods: ScheduledMethodMeta[];
+  }>,
+): Promise<{ ctx: ApplicationContext; service: SchedulerService }> {
+  const definitions: BeanDefinition[] = beans.map((b) => ({
+    token: b.token,
+    scope: 'singleton' as const,
+    dependencies: [],
+    factory: () => b.instance,
+    eager: false,
+    metadata: { scheduledMethods: b.scheduledMethods },
+  }));
+
+  const ctx = await ApplicationContext.create(definitions);
+  const service = new SchedulerService(ctx);
+  return { ctx, service };
 }
 
 describe('SchedulerService', () => {
@@ -23,14 +35,22 @@ describe('SchedulerService', () => {
   it('should execute fixedRate jobs at the specified interval', async () => {
     vi.useFakeTimers();
     const handler = vi.fn();
-    const bean = createBeanWithMethods('MyTask', { run: handler });
 
-    const service = new SchedulerService();
-    service.addSchedule(bean, 'run', {
-      fixedRate: 100,
-      concurrent: false,
-    });
-    service.start();
+    class MyTask {
+      run = handler;
+    }
+    const instance = new MyTask();
+
+    const { service } = await createSchedulerContext([
+      {
+        instance,
+        token: MyTask,
+        scheduledMethods: [
+          { methodName: 'run', fixedRate: 100, concurrent: false },
+        ],
+      },
+    ]);
+    await service.start();
 
     expect(handler).not.toHaveBeenCalled();
 
@@ -40,7 +60,7 @@ describe('SchedulerService', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(handler).toHaveBeenCalledTimes(2);
 
-    service.stop();
+    await service.stop();
   });
 
   it('should prevent concurrent execution when concurrent is false', async () => {
@@ -50,14 +70,22 @@ describe('SchedulerService', () => {
       resolveTask = r;
     });
     const handler = vi.fn().mockReturnValue(taskPromise);
-    const bean = createBeanWithMethods('SlowTask', { run: handler });
 
-    const service = new SchedulerService();
-    service.addSchedule(bean, 'run', {
-      fixedRate: 50,
-      concurrent: false,
-    });
-    service.start();
+    class SlowTask {
+      run = handler;
+    }
+    const instance = new SlowTask();
+
+    const { service } = await createSchedulerContext([
+      {
+        instance,
+        token: SlowTask,
+        scheduledMethods: [
+          { methodName: 'run', fixedRate: 50, concurrent: false },
+        ],
+      },
+    ]);
+    await service.start();
 
     // First tick — starts the task
     await vi.advanceTimersByTimeAsync(50);
@@ -75,7 +103,7 @@ describe('SchedulerService', () => {
     await vi.advanceTimersByTimeAsync(50);
     expect(handler).toHaveBeenCalledTimes(2);
 
-    service.stop();
+    await service.stop();
   });
 
   it('should isolate errors between scheduled tasks', async () => {
@@ -84,23 +112,30 @@ describe('SchedulerService', () => {
     const failingHandler = vi.fn().mockRejectedValue(new Error('task failed'));
     const successHandler = vi.fn();
 
-    const bean1 = createBeanWithMethods('FailingTask', {
-      run: failingHandler,
-    });
-    const bean2 = createBeanWithMethods('SuccessTask', {
-      run: successHandler,
-    });
+    class FailingTask {
+      run = failingHandler;
+    }
+    class SuccessTask {
+      run = successHandler;
+    }
 
-    const service = new SchedulerService();
-    service.addSchedule(bean1, 'run', {
-      fixedRate: 100,
-      concurrent: false,
-    });
-    service.addSchedule(bean2, 'run', {
-      fixedRate: 100,
-      concurrent: false,
-    });
-    service.start();
+    const { service } = await createSchedulerContext([
+      {
+        instance: new FailingTask(),
+        token: FailingTask,
+        scheduledMethods: [
+          { methodName: 'run', fixedRate: 100, concurrent: false },
+        ],
+      },
+      {
+        instance: new SuccessTask(),
+        token: SuccessTask,
+        scheduledMethods: [
+          { methodName: 'run', fixedRate: 100, concurrent: false },
+        ],
+      },
+    ]);
+    await service.start();
 
     await vi.advanceTimersByTimeAsync(100);
 
@@ -111,49 +146,64 @@ describe('SchedulerService', () => {
       expect.any(Error),
     );
 
-    service.stop();
+    await service.stop();
     errorSpy.mockRestore();
   });
 
   it('should stop all jobs on stop()', async () => {
     vi.useFakeTimers();
     const handler = vi.fn();
-    const bean = createBeanWithMethods('MyTask', { run: handler });
 
-    const service = new SchedulerService();
-    service.addSchedule(bean, 'run', {
-      fixedRate: 100,
-      concurrent: false,
-    });
-    service.start();
+    class MyTask {
+      run = handler;
+    }
+
+    const { service } = await createSchedulerContext([
+      {
+        instance: new MyTask(),
+        token: MyTask,
+        scheduledMethods: [
+          { methodName: 'run', fixedRate: 100, concurrent: false },
+        ],
+      },
+    ]);
+    await service.start();
 
     await vi.advanceTimersByTimeAsync(100);
     expect(handler).toHaveBeenCalledTimes(1);
 
-    service.stop();
+    await service.stop();
 
     await vi.advanceTimersByTimeAsync(300);
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it('should handle zero schedules', () => {
-    const service = new SchedulerService();
-    service.start();
-    service.stop();
+  it('should handle zero schedules', async () => {
+    const ctx = await ApplicationContext.create([]);
+    const service = new SchedulerService(ctx);
+    await service.start();
+    await service.stop();
     // No error
   });
 
   it('should handle fixedDelay jobs', async () => {
     vi.useFakeTimers();
     const handler = vi.fn().mockImplementation(async () => {});
-    const bean = createBeanWithMethods('DelayTask', { run: handler });
 
-    const service = new SchedulerService();
-    service.addSchedule(bean, 'run', {
-      fixedDelay: 100,
-      concurrent: false,
-    });
-    service.start();
+    class DelayTask {
+      run = handler;
+    }
+
+    const { service } = await createSchedulerContext([
+      {
+        instance: new DelayTask(),
+        token: DelayTask,
+        scheduledMethods: [
+          { methodName: 'run', fixedDelay: 100, concurrent: false },
+        ],
+      },
+    ]);
+    await service.start();
 
     // fixedDelay runs immediately, then waits
     await vi.advanceTimersByTimeAsync(0);
@@ -162,27 +212,76 @@ describe('SchedulerService', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(handler).toHaveBeenCalledTimes(2);
 
-    service.stop();
+    await service.stop();
   });
 
   it('should prevent double-init when start() is called twice', async () => {
     vi.useFakeTimers();
     const handler = vi.fn();
-    const bean = createBeanWithMethods('MyTask', { run: handler });
 
-    const service = new SchedulerService();
-    service.addSchedule(bean, 'run', {
-      fixedRate: 100,
-      concurrent: false,
-    });
+    class MyTask {
+      run = handler;
+    }
 
-    service.start();
-    service.start(); // second call should be a no-op
+    const { service } = await createSchedulerContext([
+      {
+        instance: new MyTask(),
+        token: MyTask,
+        scheduledMethods: [
+          { methodName: 'run', fixedRate: 100, concurrent: false },
+        ],
+      },
+    ]);
+
+    await service.start();
+    await service.start(); // second call should be a no-op
 
     await vi.advanceTimersByTimeAsync(100);
     // Should only have 1 call (not 2 from double scheduling)
     expect(handler).toHaveBeenCalledTimes(1);
 
-    service.stop();
+    await service.stop();
+  });
+
+  it('should skip beans without scheduledMethods metadata', async () => {
+    vi.useFakeTimers();
+    const handler = vi.fn();
+
+    class ScheduledTask {
+      run = handler;
+    }
+    class PlainService {}
+
+    const definitions: BeanDefinition[] = [
+      {
+        token: PlainService,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new PlainService(),
+        eager: false,
+        metadata: {},
+      },
+      {
+        token: ScheduledTask,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new ScheduledTask(),
+        eager: false,
+        metadata: {
+          scheduledMethods: [
+            { methodName: 'run', fixedRate: 100, concurrent: false },
+          ],
+        },
+      },
+    ];
+
+    const ctx = await ApplicationContext.create(definitions);
+    const service = new SchedulerService(ctx);
+    await service.start();
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    await service.stop();
   });
 });

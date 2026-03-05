@@ -1,3 +1,5 @@
+import type { ApplicationEvent } from './application-event.js';
+
 /**
  * Abstract event publisher — used as an injection token via `baseTokenRefs`.
  *
@@ -7,5 +9,5 @@
  * ```
  */
 export abstract class EventPublisher {
-  abstract publish(event: object): Promise<void>;
+  abstract publish(event: ApplicationEvent): Promise<void>;
 }

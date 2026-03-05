@@ -1,78 +1,117 @@
+import type { BeanDefinition } from '@goodie-ts/core';
+import { ApplicationContext } from '@goodie-ts/core';
 import { describe, expect, it, vi } from 'vitest';
+import { ApplicationEvent } from '../src/application-event.js';
+import { ApplicationEventListener } from '../src/application-event-listener.js';
 import { EventBus } from '../src/event-bus.js';
 
-class UserCreatedEvent {
-  constructor(public readonly userId: string) {}
-}
-
-class OrderPlacedEvent {
-  constructor(public readonly orderId: string) {}
-}
-
-function createBeanWithMethods(
-  name: string,
-  methods: Record<string, (...args: unknown[]) => unknown>,
-): object {
-  class FakeBean {}
-  Object.defineProperty(FakeBean, 'name', { value: name });
-  const instance = new FakeBean();
-  for (const [methodName, fn] of Object.entries(methods)) {
-    (instance as any)[methodName] = fn;
+class UserCreatedEvent extends ApplicationEvent {
+  constructor(public readonly userId: string) {
+    super();
   }
-  return instance;
+}
+
+class OrderPlacedEvent extends ApplicationEvent {
+  constructor(public readonly orderId: string) {
+    super();
+  }
+}
+
+/** Build an ApplicationContext with listener beans and an EventBus. */
+async function createEventBusContext(
+  listeners: ApplicationEventListener[],
+): Promise<EventBus> {
+  const definitions: BeanDefinition[] = listeners.map((listener) => ({
+    token: listener.constructor as new (...args: any[]) => unknown,
+    scope: 'singleton' as const,
+    dependencies: [],
+    factory: () => listener,
+    eager: false,
+    baseTokens: [ApplicationEventListener],
+    metadata: {},
+  }));
+
+  const ctx = await ApplicationContext.create(definitions);
+  const bus = new EventBus(ctx);
+  await bus.init();
+  return bus;
+}
+
+class UserCreatedListener extends ApplicationEventListener<UserCreatedEvent> {
+  readonly eventType = UserCreatedEvent;
+  handler = vi.fn();
+
+  onApplicationEvent(event: UserCreatedEvent) {
+    this.handler(event);
+  }
+}
+
+class OrderPlacedListener extends ApplicationEventListener<OrderPlacedEvent> {
+  readonly eventType = OrderPlacedEvent;
+  handler = vi.fn();
+
+  onApplicationEvent(event: OrderPlacedEvent) {
+    this.handler(event);
+  }
 }
 
 describe('EventBus', () => {
   it('should route events to matching listeners', async () => {
-    const handler = vi.fn();
-    const bean = createBeanWithMethods('UserHandler', {
-      onUserCreated: handler,
-    });
-
-    const bus = new EventBus();
-    bus.register(bean, 'onUserCreated', UserCreatedEvent, 0);
-    bus.sortListeners();
+    const listener = new UserCreatedListener();
+    const bus = await createEventBusContext([listener]);
 
     const event = new UserCreatedEvent('user-1');
     await bus.publish(event);
 
-    expect(handler).toHaveBeenCalledWith(event);
-    expect(handler).toHaveBeenCalledTimes(1);
+    expect(listener.handler).toHaveBeenCalledWith(event);
+    expect(listener.handler).toHaveBeenCalledTimes(1);
   });
 
   it('should not route events to non-matching listeners', async () => {
-    const handler = vi.fn();
-    const bean = createBeanWithMethods('UserHandler', {
-      onUserCreated: handler,
-    });
-
-    const bus = new EventBus();
-    bus.register(bean, 'onUserCreated', UserCreatedEvent, 0);
-    bus.sortListeners();
+    const listener = new UserCreatedListener();
+    const bus = await createEventBusContext([listener]);
 
     await bus.publish(new OrderPlacedEvent('order-1'));
 
-    expect(handler).not.toHaveBeenCalled();
+    expect(listener.handler).not.toHaveBeenCalled();
   });
 
   it('should execute listeners in order', async () => {
     const callOrder: number[] = [];
 
-    const bean1 = createBeanWithMethods('FirstHandler', {
-      handle: () => callOrder.push(10),
-    });
-    const bean2 = createBeanWithMethods('SecondHandler', {
-      handle: () => callOrder.push(-5),
-    });
-    const bean3 = createBeanWithMethods('ThirdHandler', {
-      handle: () => callOrder.push(0),
-    });
+    class FirstListener extends ApplicationEventListener<UserCreatedEvent> {
+      readonly eventType = UserCreatedEvent;
+      get order() {
+        return 10;
+      }
+      onApplicationEvent() {
+        callOrder.push(10);
+      }
+    }
+    class SecondListener extends ApplicationEventListener<UserCreatedEvent> {
+      readonly eventType = UserCreatedEvent;
+      get order() {
+        return -5;
+      }
+      onApplicationEvent() {
+        callOrder.push(-5);
+      }
+    }
+    class ThirdListener extends ApplicationEventListener<UserCreatedEvent> {
+      readonly eventType = UserCreatedEvent;
+      get order() {
+        return 0;
+      }
+      onApplicationEvent() {
+        callOrder.push(0);
+      }
+    }
 
-    const bus = new EventBus();
-    bus.register(bean1, 'handle', UserCreatedEvent, 10);
-    bus.register(bean2, 'handle', UserCreatedEvent, -5);
-    bus.register(bean3, 'handle', UserCreatedEvent, 0);
-    bus.sortListeners();
+    const bus = await createEventBusContext([
+      new FirstListener(),
+      new SecondListener(),
+      new ThirdListener(),
+    ]);
 
     await bus.publish(new UserCreatedEvent('user-1'));
 
@@ -82,57 +121,49 @@ describe('EventBus', () => {
   it('should isolate errors between listeners', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const handler1 = vi.fn().mockRejectedValue(new Error('boom'));
-    const handler2 = vi.fn();
+    class FailingListener extends ApplicationEventListener<UserCreatedEvent> {
+      readonly eventType = UserCreatedEvent;
+      onApplicationEvent() {
+        throw new Error('boom');
+      }
+    }
 
-    const bean1 = createBeanWithMethods('FailingHandler', {
-      handle: handler1,
-    });
-    const bean2 = createBeanWithMethods('SuccessHandler', {
-      handle: handler2,
-    });
+    const successListener = new UserCreatedListener();
 
-    const bus = new EventBus();
-    bus.register(bean1, 'handle', UserCreatedEvent, 0);
-    bus.register(bean2, 'handle', UserCreatedEvent, 1);
-    bus.sortListeners();
+    const bus = await createEventBusContext([
+      new FailingListener(),
+      successListener,
+    ]);
 
     await bus.publish(new UserCreatedEvent('user-1'));
 
-    expect(handler1).toHaveBeenCalledTimes(1);
-    expect(handler2).toHaveBeenCalledTimes(1);
+    expect(successListener.handler).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('FailingHandler.handle'),
+      expect.stringContaining('FailingListener'),
       expect.any(Error),
     );
 
     errorSpy.mockRestore();
   });
 
-  it('should handle multiple event types from the same bean', async () => {
-    const userHandler = vi.fn();
-    const orderHandler = vi.fn();
+  it('should handle multiple event types', async () => {
+    const userListener = new UserCreatedListener();
+    const orderListener = new OrderPlacedListener();
 
-    const bean = createBeanWithMethods('MultiHandler', {
-      onUser: userHandler,
-      onOrder: orderHandler,
-    });
-
-    const bus = new EventBus();
-    bus.register(bean, 'onUser', UserCreatedEvent, 0);
-    bus.register(bean, 'onOrder', OrderPlacedEvent, 0);
-    bus.sortListeners();
+    const bus = await createEventBusContext([userListener, orderListener]);
 
     await bus.publish(new UserCreatedEvent('user-1'));
-    expect(userHandler).toHaveBeenCalledTimes(1);
-    expect(orderHandler).not.toHaveBeenCalled();
+    expect(userListener.handler).toHaveBeenCalledTimes(1);
+    expect(orderListener.handler).not.toHaveBeenCalled();
 
     await bus.publish(new OrderPlacedEvent('order-1'));
-    expect(orderHandler).toHaveBeenCalledTimes(1);
+    expect(orderListener.handler).toHaveBeenCalledTimes(1);
   });
 
   it('should handle zero listeners without errors', async () => {
-    const bus = new EventBus();
+    const ctx = await ApplicationContext.create([]);
+    const bus = new EventBus(ctx);
+    await bus.init();
     await bus.publish(new UserCreatedEvent('user-1'));
     // No error — just no listeners matched
   });
@@ -140,23 +171,65 @@ describe('EventBus', () => {
   it('should await async listeners sequentially', async () => {
     const callOrder: string[] = [];
 
-    const bean = createBeanWithMethods('AsyncHandler', {
-      slow: async () => {
+    class SlowListener extends ApplicationEventListener<UserCreatedEvent> {
+      readonly eventType = UserCreatedEvent;
+      get order() {
+        return 0;
+      }
+      async onApplicationEvent() {
         await new Promise((r) => setTimeout(r, 10));
         callOrder.push('slow');
-      },
-      fast: async () => {
+      }
+    }
+    class FastListener extends ApplicationEventListener<UserCreatedEvent> {
+      readonly eventType = UserCreatedEvent;
+      get order() {
+        return 1;
+      }
+      async onApplicationEvent() {
         callOrder.push('fast');
-      },
-    });
+      }
+    }
 
-    const bus = new EventBus();
-    bus.register(bean, 'slow', UserCreatedEvent, 0);
-    bus.register(bean, 'fast', UserCreatedEvent, 1);
-    bus.sortListeners();
+    const bus = await createEventBusContext([
+      new SlowListener(),
+      new FastListener(),
+    ]);
 
     await bus.publish(new UserCreatedEvent('user-1'));
 
     expect(callOrder).toEqual(['slow', 'fast']);
+  });
+
+  it('should respect supports() for conditional filtering', async () => {
+    class HighValueOrderEvent extends ApplicationEvent {
+      constructor(readonly total: number) {
+        super();
+      }
+    }
+
+    class HighValueOrderListener extends ApplicationEventListener<HighValueOrderEvent> {
+      readonly eventType = HighValueOrderEvent;
+      handler = vi.fn();
+
+      supports(event: ApplicationEvent): boolean {
+        return (event as HighValueOrderEvent).total > 10_000;
+      }
+
+      onApplicationEvent(event: HighValueOrderEvent) {
+        this.handler(event);
+      }
+    }
+
+    const listener = new HighValueOrderListener();
+    const bus = await createEventBusContext([listener]);
+
+    // Low value — should not trigger
+    await bus.publish(new HighValueOrderEvent(500));
+    expect(listener.handler).not.toHaveBeenCalled();
+
+    // High value — should trigger
+    await bus.publish(new HighValueOrderEvent(50_000));
+    expect(listener.handler).toHaveBeenCalledTimes(1);
   });
 });

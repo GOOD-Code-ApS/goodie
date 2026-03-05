@@ -5,7 +5,16 @@ import { createEventsPlugin } from '../src/events-transformer-plugin.js';
 
 const DECORATOR_STUBS = `
 export function Singleton() { return (t: any, c: any) => {} }
-export function EventListener(eventType: any, opts?: any) { return (t: any, c: any) => {} }
+`;
+
+const EVENT_STUBS = `
+export class ApplicationEvent {}
+export abstract class ApplicationEventListener<E extends ApplicationEvent = ApplicationEvent> {
+  abstract readonly eventType: new (...args: any[]) => E;
+  supports(_event: ApplicationEvent): boolean { return true; }
+  abstract onApplicationEvent(event: E): Promise<void> | void;
+  get order(): number { return 0; }
+}
 `;
 
 function createTestProject(
@@ -14,6 +23,7 @@ function createTestProject(
 ) {
   const project = new Project({ useInMemoryFileSystem: true });
   project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
+  project.createSourceFile('/src/events.ts', EVENT_STUBS);
 
   for (const [filePath, content] of Object.entries(files)) {
     project.createSourceFile(filePath, content);
@@ -41,7 +51,9 @@ describe('Events Transformer Plugin', () => {
     expect(eventBus).toBeDefined();
     expect(eventBus!.scope).toBe('singleton');
     expect(eventBus!.eager).toBe(true);
-    expect(eventBus!.constructorDeps).toHaveLength(0);
+    expect(eventBus!.metadata).toEqual({
+      postConstructMethods: ['init'],
+    });
     expect(eventBus!.baseTokenRefs).toEqual([
       {
         kind: 'class',
@@ -51,92 +63,114 @@ describe('Events Transformer Plugin', () => {
     ]);
   });
 
-  it('should wire listener beans as constructor deps on EventBus', () => {
+  it('should have ApplicationContext as sole dep on EventBus', () => {
     const result = createTestProject({
-      '/src/UserCreatedEvent.ts': `
-        export class UserCreatedEvent {
-          constructor(public userId: string) {}
-        }
-      `,
-      '/src/UserListener.ts': `
-        import { Singleton, EventListener } from './decorators.js'
-        import { UserCreatedEvent } from './UserCreatedEvent.js'
+      '/src/Service.ts': `
+        import { Singleton } from './decorators.js'
 
         @Singleton()
-        export class UserListener {
-          @EventListener(UserCreatedEvent)
-          onUserCreated(event: UserCreatedEvent) {}
-        }
+        export class Service {}
       `,
     });
 
     const eventBus = result.beans.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
     );
-    expect(eventBus).toBeDefined();
     expect(eventBus!.constructorDeps).toHaveLength(1);
     expect(eventBus!.constructorDeps[0].tokenRef).toEqual({
       kind: 'class',
-      className: 'UserListener',
-      importPath: '/src/UserListener.ts',
+      className: 'ApplicationContext',
+      importPath: '@goodie-ts/core',
     });
   });
 
-  it('should wire multiple listener beans', () => {
+  it('should add baseTokenRefs for ApplicationEventListener subclasses', () => {
+    const result = createTestProject({
+      '/src/UserCreatedEvent.ts': `
+        import { ApplicationEvent } from './events.js'
+
+        export class UserCreatedEvent extends ApplicationEvent {
+          constructor(public userId: string) { super(); }
+        }
+      `,
+      '/src/UserListener.ts': `
+        import { Singleton } from './decorators.js'
+        import { ApplicationEventListener } from './events.js'
+        import { UserCreatedEvent } from './UserCreatedEvent.js'
+
+        @Singleton()
+        export class UserListener extends ApplicationEventListener<UserCreatedEvent> {
+          readonly eventType = UserCreatedEvent;
+          onApplicationEvent(event: UserCreatedEvent) {}
+        }
+      `,
+    });
+
+    const listener = result.beans.find(
+      (b) =>
+        b.tokenRef.kind === 'class' && b.tokenRef.className === 'UserListener',
+    );
+    expect(listener).toBeDefined();
+    expect(listener!.baseTokenRefs).toContainEqual({
+      kind: 'class',
+      className: 'ApplicationEventListener',
+      importPath: '@goodie-ts/events',
+    });
+  });
+
+  it('should add baseTokenRefs for multiple listeners', () => {
     const result = createTestProject({
       '/src/MyEvent.ts': `
-        export class MyEvent {}
+        import { ApplicationEvent } from './events.js'
+        export class MyEvent extends ApplicationEvent {}
       `,
       '/src/ListenerA.ts': `
-        import { Singleton, EventListener } from './decorators.js'
+        import { Singleton } from './decorators.js'
+        import { ApplicationEventListener } from './events.js'
         import { MyEvent } from './MyEvent.js'
 
         @Singleton()
-        export class ListenerA {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
+        export class ListenerA extends ApplicationEventListener<MyEvent> {
+          readonly eventType = MyEvent;
+          onApplicationEvent(event: MyEvent) {}
         }
       `,
       '/src/ListenerB.ts': `
-        import { Singleton, EventListener } from './decorators.js'
+        import { Singleton } from './decorators.js'
+        import { ApplicationEventListener } from './events.js'
         import { MyEvent } from './MyEvent.js'
 
         @Singleton()
-        export class ListenerB {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
+        export class ListenerB extends ApplicationEventListener<MyEvent> {
+          readonly eventType = MyEvent;
+          onApplicationEvent(event: MyEvent) {}
         }
       `,
     });
 
-    const eventBus = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
+    const listenerA = result.beans.find(
+      (b) =>
+        b.tokenRef.kind === 'class' && b.tokenRef.className === 'ListenerA',
     );
-    expect(eventBus).toBeDefined();
-    expect(eventBus!.constructorDeps).toHaveLength(2);
+    const listenerB = result.beans.find(
+      (b) =>
+        b.tokenRef.kind === 'class' && b.tokenRef.className === 'ListenerB',
+    );
 
-    const depNames = eventBus!.constructorDeps.map((d) =>
-      d.tokenRef.kind === 'class' ? d.tokenRef.className : '',
-    );
-    expect(depNames).toContain('ListenerA');
-    expect(depNames).toContain('ListenerB');
+    expect(listenerA!.baseTokenRefs).toContainEqual({
+      kind: 'class',
+      className: 'ApplicationEventListener',
+      importPath: '@goodie-ts/events',
+    });
+    expect(listenerB!.baseTokenRefs).toContainEqual({
+      kind: 'class',
+      className: 'ApplicationEventListener',
+      importPath: '@goodie-ts/events',
+    });
   });
 
-  it('should not wire classes without @EventListener as deps', () => {
+  it('should not add baseTokenRefs to non-listener classes', () => {
     const result = createTestProject({
-      '/src/MyEvent.ts': `
-        export class MyEvent {}
-      `,
-      '/src/Listener.ts': `
-        import { Singleton, EventListener } from './decorators.js'
-        import { MyEvent } from './MyEvent.js'
-
-        @Singleton()
-        export class Listener {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
-        }
-      `,
       '/src/PlainService.ts': `
         import { Singleton } from './decorators.js'
 
@@ -147,96 +181,26 @@ describe('Events Transformer Plugin', () => {
       `,
     });
 
-    const eventBus = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
+    const plain = result.beans.find(
+      (b) =>
+        b.tokenRef.kind === 'class' && b.tokenRef.className === 'PlainService',
     );
-    expect(eventBus!.constructorDeps).toHaveLength(1);
-    expect(eventBus!.constructorDeps[0].tokenRef).toEqual({
-      kind: 'class',
-      className: 'Listener',
-      importPath: '/src/Listener.ts',
-    });
-  });
-
-  it('should detect @EventListener on multiple methods in the same class', () => {
-    const result = createTestProject({
-      '/src/EventA.ts': `
-        export class EventA {}
-      `,
-      '/src/EventB.ts': `
-        export class EventB {}
-      `,
-      '/src/MultiListener.ts': `
-        import { Singleton, EventListener } from './decorators.js'
-        import { EventA } from './EventA.js'
-        import { EventB } from './EventB.js'
-
-        @Singleton()
-        export class MultiListener {
-          @EventListener(EventA)
-          onA(event: EventA) {}
-
-          @EventListener(EventB)
-          onB(event: EventB) {}
-        }
-      `,
-    });
-
-    const eventBus = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
-    );
-    // MultiListener should appear as a single dep (not duplicated per method)
-    expect(eventBus!.constructorDeps).toHaveLength(1);
-    expect(eventBus!.constructorDeps[0].tokenRef).toEqual({
-      kind: 'class',
-      className: 'MultiListener',
-      importPath: '/src/MultiListener.ts',
-    });
+    expect(plain!.metadata.__isEventListener).toBeUndefined();
+    expect(plain!.baseTokenRefs).toBeUndefined();
   });
 
   it('should generate valid code with EventBus import', () => {
     const result = createTestProject({
-      '/src/MyEvent.ts': `
-        export class MyEvent {}
-      `,
-      '/src/Listener.ts': `
-        import { Singleton, EventListener } from './decorators.js'
-        import { MyEvent } from './MyEvent.js'
+      '/src/Service.ts': `
+        import { Singleton } from './decorators.js'
 
         @Singleton()
-        export class Listener {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
-        }
+        export class Service {}
       `,
     });
 
     expect(result.code).toContain('EventBus');
     expect(result.code).toContain('@goodie-ts/events');
-  });
-
-  it('should generate relative import paths for event types (not absolute)', () => {
-    const result = createTestProject({
-      '/src/UserCreatedEvent.ts': `
-        export class UserCreatedEvent {
-          constructor(public userId: string) {}
-        }
-      `,
-      '/src/UserListener.ts': `
-        import { Singleton, EventListener } from './decorators.js'
-        import { UserCreatedEvent } from './UserCreatedEvent.js'
-
-        @Singleton()
-        export class UserListener {
-          @EventListener(UserCreatedEvent)
-          onUserCreated(event: UserCreatedEvent) {}
-        }
-      `,
-    });
-
-    // Event type import should be relative, not an absolute path like /src/UserCreatedEvent.ts
-    expect(result.code).toContain('UserCreatedEvent');
-    expect(result.code).not.toMatch(/from\s+['"]\//);
   });
 
   it('should clear state between watch-mode rebuilds', () => {
@@ -245,17 +209,25 @@ describe('Events Transformer Plugin', () => {
     const makeProject = () => {
       const project = new Project({ useInMemoryFileSystem: true });
       project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
-      project.createSourceFile('/src/MyEvent.ts', 'export class MyEvent {}');
+      project.createSourceFile('/src/events.ts', EVENT_STUBS);
+      project.createSourceFile(
+        '/src/MyEvent.ts',
+        `
+        import { ApplicationEvent } from './events.js'
+        export class MyEvent extends ApplicationEvent {}
+      `,
+      );
       project.createSourceFile(
         '/src/Listener.ts',
         `
-        import { Singleton, EventListener } from './decorators.js'
+        import { Singleton } from './decorators.js'
+        import { ApplicationEventListener } from './events.js'
         import { MyEvent } from './MyEvent.js'
 
         @Singleton()
-        export class Listener {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
+        export class Listener extends ApplicationEventListener<MyEvent> {
+          readonly eventType = MyEvent;
+          onApplicationEvent(event: MyEvent) {}
         }
       `,
       );
@@ -269,143 +241,29 @@ describe('Events Transformer Plugin', () => {
       [plugin],
     );
 
-    // Second transform with the same plugin instance (simulates watch-mode rebuild)
+    // Second transform with the same plugin instance
     const result2 = transformInMemory(
       makeProject(),
       '/out/AppContext.generated.ts',
       [plugin],
     );
 
-    const getBus = (r: typeof result1) =>
+    const getListener = (r: typeof result1) =>
       r.beans.find(
         (b) =>
-          b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'Listener',
       );
 
-    // Should have exactly 1 dep each time — no stale accumulation
-    expect(getBus(result1)!.constructorDeps).toHaveLength(1);
-    expect(getBus(result2)!.constructorDeps).toHaveLength(1);
-  });
-
-  it('should resolve event class defined in the same file as the listener', () => {
-    const result = createTestProject({
-      '/src/Listener.ts': `
-        import { Singleton, EventListener } from './decorators.js'
-
-        export class InlineEvent {
-          constructor(public data: string) {}
-        }
-
-        @Singleton()
-        export class Listener {
-          @EventListener(InlineEvent)
-          handle(event: InlineEvent) {}
-        }
-      `,
-    });
-
-    const eventBus = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
+    // baseTokenRefs should not accumulate across rebuilds
+    const refs1 = getListener(result1)!.baseTokenRefs ?? [];
+    const refs2 = getListener(result2)!.baseTokenRefs ?? [];
+    const eventListenerRefs1 = refs1.filter(
+      (r) => r.className === 'ApplicationEventListener',
     );
-    expect(eventBus!.constructorDeps).toHaveLength(1);
-    // Should generate valid code without absolute paths
-    expect(result.code).toContain('InlineEvent');
-    expect(result.code).not.toMatch(/from\s+['"]\//);
-  });
-
-  it('should throw when event class cannot be resolved', () => {
-    expect(() =>
-      createTestProject({
-        '/src/Listener.ts': `
-          import { Singleton, EventListener } from './decorators.js'
-
-          @Singleton()
-          export class Listener {
-            @EventListener(NonExistentEvent)
-            handle(event: any) {}
-          }
-        `,
-      }),
-    ).toThrow(/Cannot resolve import path for event type 'NonExistentEvent'/);
-  });
-
-  it('should not retain stale entries when an @EventListener class is removed between runs', () => {
-    const plugin = createEventsPlugin();
-
-    // First run: two listener classes
-    const project1 = new Project({ useInMemoryFileSystem: true });
-    project1.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
-    project1.createSourceFile('/src/MyEvent.ts', 'export class MyEvent {}');
-    project1.createSourceFile(
-      '/src/ListenerA.ts',
-      `
-        import { Singleton, EventListener } from './decorators.js'
-        import { MyEvent } from './MyEvent.js'
-
-        @Singleton()
-        export class ListenerA {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
-        }
-      `,
+    const eventListenerRefs2 = refs2.filter(
+      (r) => r.className === 'ApplicationEventListener',
     );
-    project1.createSourceFile(
-      '/src/ListenerB.ts',
-      `
-        import { Singleton, EventListener } from './decorators.js'
-        import { MyEvent } from './MyEvent.js'
-
-        @Singleton()
-        export class ListenerB {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
-        }
-      `,
-    );
-
-    const result1 = transformInMemory(
-      project1,
-      '/out/AppContext.generated.ts',
-      [plugin],
-    );
-
-    // Second run: ListenerB removed
-    const project2 = new Project({ useInMemoryFileSystem: true });
-    project2.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
-    project2.createSourceFile('/src/MyEvent.ts', 'export class MyEvent {}');
-    project2.createSourceFile(
-      '/src/ListenerA.ts',
-      `
-        import { Singleton, EventListener } from './decorators.js'
-        import { MyEvent } from './MyEvent.js'
-
-        @Singleton()
-        export class ListenerA {
-          @EventListener(MyEvent)
-          handle(event: MyEvent) {}
-        }
-      `,
-    );
-
-    const result2 = transformInMemory(
-      project2,
-      '/out/AppContext.generated.ts',
-      [plugin],
-    );
-
-    const getBus = (r: typeof result1) =>
-      r.beans.find(
-        (b) =>
-          b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
-      );
-
-    expect(getBus(result1)!.constructorDeps).toHaveLength(2);
-    // After removing ListenerB, only ListenerA should remain — no stale ListenerB
-    expect(getBus(result2)!.constructorDeps).toHaveLength(1);
-    expect(getBus(result2)!.constructorDeps[0].tokenRef).toEqual({
-      kind: 'class',
-      className: 'ListenerA',
-      importPath: '/src/ListenerA.ts',
-    });
+    expect(eventListenerRefs1).toHaveLength(1);
+    expect(eventListenerRefs2).toHaveLength(1);
   });
 });

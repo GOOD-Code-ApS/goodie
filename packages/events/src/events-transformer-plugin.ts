@@ -1,189 +1,66 @@
-import {
-  type CodegenContribution,
-  InvalidDecoratorUsageError,
-  type IRBeanDefinition,
-  type MethodVisitorContext,
-  type TransformerPlugin,
+import type {
+  ClassVisitorContext,
+  IRBeanDefinition,
+  TransformerPlugin,
 } from '@goodie-ts/transformer';
-import { SyntaxKind } from 'ts-morph';
-
-interface ListenerMethodInfo {
-  methodName: string;
-  eventTypeName: string;
-  eventTypeImportPath: string;
-  order: number;
-}
-
-interface ListenerClassInfo {
-  className: string;
-  filePath: string;
-  methods: ListenerMethodInfo[];
-}
 
 /**
  * Create the events transformer plugin.
  *
- * Scans `@EventListener` decorators on methods at compile time and synthesizes
- * an `EventBus` bean with a custom factory that statically registers all listeners.
- * No runtime Symbol.metadata scanning needed.
+ * Detects classes extending `ApplicationEventListener` via `visitClass` and
+ * ensures they have `baseTokenRefs` so the runtime `EventBus` can discover
+ * them via `getAll(ApplicationEventListener)`.
+ *
+ * Synthesizes an `EventBus` bean that depends on `ApplicationContext` and
+ * discovers listeners at startup via `@PostConstruct`.
  */
 export function createEventsPlugin(): TransformerPlugin {
-  /** Classes that contain at least one @EventListener method. Keyed by filePath:className. */
-  const listenerClasses = new Map<string, ListenerClassInfo>();
-
   return {
     name: 'events',
 
-    beforeScan(): void {
-      listenerClasses.clear();
-    },
+    visitClass(ctx: ClassVisitorContext): void {
+      const extendsClause = ctx.classDeclaration.getExtends();
+      if (!extendsClause) return;
 
-    visitMethod(ctx: MethodVisitorContext): void {
-      const decorators = ctx.methodDeclaration.getDecorators();
+      const baseName = extendsClause.getExpression().getText();
+      if (baseName !== 'ApplicationEventListener') return;
 
-      for (const decorator of decorators) {
-        if (decorator.getName() !== 'EventListener') continue;
-
-        const args = decorator.getArguments();
-        if (args.length === 0) continue;
-
-        // Extract event type name and import path
-        const eventTypeArg = args[0];
-        const eventTypeName = eventTypeArg.getText();
-
-        // Resolve the import path for the event type
-        const sourceFile = ctx.methodDeclaration.getSourceFile();
-        let eventTypeImportPath = '';
-
-        // Check named imports
-        for (const imp of sourceFile.getImportDeclarations()) {
-          const namedImport = imp
-            .getNamedImports()
-            .find((ni) => ni.getName() === eventTypeName);
-          if (namedImport) {
-            const moduleFile = imp.getModuleSpecifierSourceFile();
-            eventTypeImportPath = moduleFile?.getFilePath() ?? '';
-            break;
-          }
-          // Check default import
-          const defaultImport = imp.getDefaultImport();
-          if (defaultImport?.getText() === eventTypeName) {
-            const moduleFile = imp.getModuleSpecifierSourceFile();
-            eventTypeImportPath = moduleFile?.getFilePath() ?? '';
-            break;
-          }
-        }
-
-        // Check if event class is defined in the same file
-        if (!eventTypeImportPath) {
-          const localClass = sourceFile
-            .getClasses()
-            .find((c) => c.getName() === eventTypeName);
-          if (localClass) {
-            eventTypeImportPath = sourceFile.getFilePath();
-          }
-        }
-
-        if (!eventTypeImportPath) {
-          throw new InvalidDecoratorUsageError(
-            'EventListener',
-            `Cannot resolve import path for event type '${eventTypeName}' on ${ctx.className}.${ctx.methodName}. ` +
-              `The event class must be imported or defined in the same file.`,
-            {
-              filePath: sourceFile.getFilePath(),
-              line: decorator.getStartLineNumber(),
-              column: 1,
-            },
-          );
-        }
-
-        // Extract order from options (second argument)
-        let order = 0;
-        if (args.length > 1) {
-          const opts = args[1];
-          if (opts.isKind(SyntaxKind.ObjectLiteralExpression)) {
-            const orderProp = opts.getProperty('order');
-            if (orderProp?.isKind(SyntaxKind.PropertyAssignment)) {
-              const initializer = orderProp.getInitializer();
-              if (initializer) {
-                const parsed = Number(initializer.getText());
-                if (!Number.isNaN(parsed)) order = parsed;
-              }
-            }
-          }
-        }
-
-        const key = `${ctx.filePath}:${ctx.className}`;
-        const existing = listenerClasses.get(key) ?? {
-          className: ctx.className,
-          filePath: ctx.filePath,
-          methods: [],
-        };
-        existing.methods.push({
-          methodName: ctx.methodName,
-          eventTypeName,
-          eventTypeImportPath,
-          order,
-        });
-        listenerClasses.set(key, existing);
-        break; // Only process first @EventListener per method
-      }
+      // Mark this bean as an event listener so beforeCodegen can add baseTokenRefs.
+      // The scanner stops at node_modules, so external base classes aren't captured
+      // automatically — this ensures ApplicationEventListener is registered.
+      ctx.metadata.__isEventListener = true;
     },
 
     beforeCodegen(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+      // Add baseTokenRefs for ApplicationEventListener subclasses
+      for (const bean of beans) {
+        if (!bean.metadata.__isEventListener) continue;
+
+        const baseRef = {
+          kind: 'class' as const,
+          className: 'ApplicationEventListener',
+          importPath: '@goodie-ts/events',
+        };
+
+        // Replace any existing ref (scanner may add one with local path) or add new
+        const existingIdx = bean.baseTokenRefs?.findIndex(
+          (r) => r.className === 'ApplicationEventListener',
+        );
+        if (
+          existingIdx !== undefined &&
+          existingIdx >= 0 &&
+          bean.baseTokenRefs
+        ) {
+          bean.baseTokenRefs[existingIdx] = baseRef;
+        } else if (bean.baseTokenRefs) {
+          bean.baseTokenRefs.push(baseRef);
+        } else {
+          bean.baseTokenRefs = [baseRef];
+        }
+      }
+
       // Always create EventBus when the plugin is installed — allows
       // @Inject() accessor events!: EventPublisher even with zero listeners
-      const listenerDeps: IRBeanDefinition['constructorDeps'] = [];
-      const matchedClasses: ListenerClassInfo[] = [];
-
-      for (const bean of beans) {
-        if (bean.tokenRef.kind !== 'class') continue;
-
-        const key = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
-        const info = listenerClasses.get(key);
-        if (info) {
-          listenerDeps.push({
-            tokenRef: {
-              kind: 'class',
-              className: bean.tokenRef.className,
-              importPath: bean.tokenRef.importPath,
-            },
-            optional: false,
-            collection: false,
-            sourceLocation: {
-              filePath: '@goodie-ts/events',
-              line: 0,
-              column: 0,
-            },
-          });
-          matchedClasses.push(info);
-        }
-      }
-
-      // Build custom factory that statically registers all listeners
-      const params = listenerDeps.map((_, i) => `dep${i}: unknown`).join(', ');
-      const registerCalls: string[] = [];
-
-      for (let i = 0; i < matchedClasses.length; i++) {
-        for (const method of matchedClasses[i].methods) {
-          registerCalls.push(
-            `    __bus.register(dep${i}, '${method.methodName}', ${method.eventTypeName}, ${method.order})`,
-          );
-        }
-      }
-
-      let customFactory: string;
-      if (registerCalls.length > 0) {
-        customFactory = `(${params}) => {
-    const __bus = new EventBus()
-${registerCalls.join('\n')}
-    __bus.sortListeners()
-    return __bus
-  }`;
-      } else {
-        customFactory = '() => new EventBus()';
-      }
-
       const eventBusBean: IRBeanDefinition = {
         tokenRef: {
           kind: 'class',
@@ -193,11 +70,25 @@ ${registerCalls.join('\n')}
         scope: 'singleton',
         eager: true,
         name: undefined,
-        constructorDeps: listenerDeps,
+        constructorDeps: [
+          {
+            tokenRef: {
+              kind: 'class',
+              className: 'ApplicationContext',
+              importPath: '@goodie-ts/core',
+            },
+            optional: false,
+            collection: false,
+            sourceLocation: {
+              filePath: '@goodie-ts/events',
+              line: 0,
+              column: 0,
+            },
+          },
+        ],
         fieldDeps: [],
         factoryKind: 'constructor',
         providesSource: undefined,
-        customFactory,
         baseTokenRefs: [
           {
             kind: 'class',
@@ -205,7 +96,9 @@ ${registerCalls.join('\n')}
             importPath: '@goodie-ts/events',
           },
         ],
-        metadata: {},
+        metadata: {
+          postConstructMethods: ['init'],
+        },
         sourceLocation: {
           filePath: '@goodie-ts/events',
           line: 0,
@@ -214,28 +107,6 @@ ${registerCalls.join('\n')}
       };
 
       return [...beans, eventBusBean];
-    },
-
-    codegen(): CodegenContribution {
-      // Import event type classes used in the factory
-      const imports: string[] = [];
-      const importedTypes = new Set<string>();
-
-      for (const info of listenerClasses.values()) {
-        for (const method of info.methods) {
-          if (
-            method.eventTypeImportPath &&
-            !importedTypes.has(method.eventTypeName)
-          ) {
-            importedTypes.add(method.eventTypeName);
-            imports.push(
-              `import { ${method.eventTypeName} } from '${method.eventTypeImportPath}'`,
-            );
-          }
-        }
-      }
-
-      return { imports };
     },
   };
 }

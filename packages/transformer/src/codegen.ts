@@ -108,6 +108,9 @@ export function generateCode(
     interceptorDepsPerBean,
   } = collectAllImports(beans, outputDir, relativeImport);
 
+  // ApplicationContext is already in the header import — prevent duplicate
+  classImports.delete('ApplicationContext');
+
   // If @Value is used, add the config token
   const needsInjectionToken = injectionTokens.length > 0 || hasValueFields;
   if (needsInjectionToken) {
@@ -255,9 +258,7 @@ export function generateCode(
     lines.push(
       `    dependencies: ${depsToCode(bean, resolveTokenRef, hasValueFields, interceptorDepsPerBean)},`,
     );
-    lines.push(
-      `    factory: ${bean.customFactory ?? factoryToCode(bean, interceptorDepsPerBean)},`,
-    );
+    lines.push(`    factory: ${factoryToCode(bean, interceptorDepsPerBean)},`);
     lines.push(`    eager: ${bean.eager},`);
     lines.push(`    metadata: ${metadataToCode(bean.metadata)},`);
     if (bean.baseTokenRefs && bean.baseTokenRefs.length > 0) {

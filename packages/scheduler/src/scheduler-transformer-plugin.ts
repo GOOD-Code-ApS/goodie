@@ -6,37 +6,19 @@ import {
 } from '@goodie-ts/transformer';
 import { SyntaxKind } from 'ts-morph';
 
-interface ScheduleMethodInfo {
-  methodName: string;
-  cron?: string;
-  fixedRate?: number;
-  fixedDelay?: number;
-  concurrent: boolean;
-}
-
-interface ScheduledClassInfo {
-  className: string;
-  filePath: string;
-  methods: ScheduleMethodInfo[];
-}
+import type { ScheduledMethodMeta } from './scheduler-service.js';
 
 /**
  * Create the scheduler transformer plugin.
  *
  * Scans `@Scheduled` decorators on methods at compile time, validates options,
- * and synthesizes a `SchedulerService` bean with a custom factory that
- * statically registers all schedules. No runtime Symbol.metadata scanning needed.
+ * and stores schedule metadata on each bean. When at least one `@Scheduled`
+ * method exists, synthesizes a `SchedulerService` bean that depends on
+ * `ApplicationContext` and discovers schedules via metadata at startup.
  */
 export function createSchedulerPlugin(): TransformerPlugin {
-  /** Classes that contain at least one @Scheduled method. Keyed by filePath:className. */
-  const scheduledClasses = new Map<string, ScheduledClassInfo>();
-
   return {
     name: 'scheduler',
-
-    beforeScan(): void {
-      scheduledClasses.clear();
-    },
 
     visitMethod(ctx: MethodVisitorContext): void {
       const decorators = ctx.methodDeclaration.getDecorators();
@@ -110,78 +92,30 @@ export function createSchedulerPlugin(): TransformerPlugin {
           );
         }
 
-        const key = `${ctx.filePath}:${ctx.className}`;
-        const existing = scheduledClasses.get(key) ?? {
-          className: ctx.className,
-          filePath: ctx.filePath,
-          methods: [],
-        };
-        existing.methods.push({
+        // Store metadata on the bean — merged into IRBeanDefinition.metadata by the scanner
+        const existing = (ctx.classMetadata.scheduledMethods ??
+          []) as ScheduledMethodMeta[];
+        existing.push({
           methodName: ctx.methodName,
           cron,
           fixedRate,
           fixedDelay,
           concurrent,
         });
-        scheduledClasses.set(key, existing);
+        ctx.classMetadata.scheduledMethods = existing;
+
         break; // Only process first @Scheduled per method
       }
     },
 
     beforeCodegen(beans: IRBeanDefinition[]): IRBeanDefinition[] {
       // Only create SchedulerService when @Scheduled methods are found
-      if (scheduledClasses.size === 0) return beans;
-
-      const scheduledDeps: IRBeanDefinition['constructorDeps'] = [];
-      const matchedClasses: ScheduledClassInfo[] = [];
-
-      for (const bean of beans) {
-        if (bean.tokenRef.kind !== 'class') continue;
-
-        const key = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
-        const info = scheduledClasses.get(key);
-        if (info) {
-          scheduledDeps.push({
-            tokenRef: {
-              kind: 'class',
-              className: bean.tokenRef.className,
-              importPath: bean.tokenRef.importPath,
-            },
-            optional: false,
-            collection: false,
-            sourceLocation: {
-              filePath: '@goodie-ts/scheduler',
-              line: 0,
-              column: 0,
-            },
-          });
-          matchedClasses.push(info);
-        }
-      }
-
-      // Build custom factory that statically registers all schedules
-      const params = scheduledDeps.map((_, i) => `dep${i}: unknown`).join(', ');
-      const addCalls: string[] = [];
-
-      for (let i = 0; i < matchedClasses.length; i++) {
-        for (const method of matchedClasses[i].methods) {
-          const optsStr = JSON.stringify({
-            cron: method.cron,
-            fixedRate: method.fixedRate,
-            fixedDelay: method.fixedDelay,
-            concurrent: method.concurrent,
-          });
-          addCalls.push(
-            `    __svc.addSchedule(dep${i}, '${method.methodName}', ${optsStr})`,
-          );
-        }
-      }
-
-      const customFactory = `(${params}) => {
-    const __svc = new SchedulerService()
-${addCalls.join('\n')}
-    return __svc
-  }`;
+      const hasScheduledMethods = beans.some(
+        (b) =>
+          b.metadata.scheduledMethods &&
+          (b.metadata.scheduledMethods as unknown[]).length > 0,
+      );
+      if (!hasScheduledMethods) return beans;
 
       const schedulerServiceBean: IRBeanDefinition = {
         tokenRef: {
@@ -192,11 +126,25 @@ ${addCalls.join('\n')}
         scope: 'singleton',
         eager: true,
         name: undefined,
-        constructorDeps: scheduledDeps,
+        constructorDeps: [
+          {
+            tokenRef: {
+              kind: 'class',
+              className: 'ApplicationContext',
+              importPath: '@goodie-ts/core',
+            },
+            optional: false,
+            collection: false,
+            sourceLocation: {
+              filePath: '@goodie-ts/scheduler',
+              line: 0,
+              column: 0,
+            },
+          },
+        ],
         fieldDeps: [],
         factoryKind: 'constructor',
         providesSource: undefined,
-        customFactory,
         metadata: {
           postConstructMethods: ['start'],
           preDestroyMethods: ['stop'],

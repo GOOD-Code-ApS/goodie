@@ -68,6 +68,20 @@ export class ApplicationContext {
   ): Promise<ApplicationContext> {
     const sorted = options?.preSorted ? definitions : topoSort(definitions);
     const ctx = new ApplicationContext(sorted);
+
+    // Self-register so beans can inject ApplicationContext
+    ctx.singletonCache.set(ApplicationContext, ctx);
+    const selfDef: BeanDefinition = {
+      token: ApplicationContext,
+      scope: 'singleton',
+      dependencies: [],
+      factory: () => ctx,
+      eager: false,
+      metadata: {},
+    };
+    ctx.defsByToken.set(ApplicationContext, [selfDef]);
+    ctx.primaryDef.set(ApplicationContext, selfDef);
+
     ctx.validateDependencies();
     await ctx.initPostProcessors();
     await ctx.initEagerBeans();

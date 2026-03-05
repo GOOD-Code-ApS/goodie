@@ -1,8 +1,8 @@
+import type { ApplicationContext } from '@goodie-ts/core';
 import { Cron } from 'croner';
 
-/** A scheduled method registration, populated at compile time by the plugin. */
-export interface ScheduleRoute {
-  bean: object;
+/** Compile-time metadata for a single @Scheduled method. */
+export interface ScheduledMethodMeta {
   methodName: string;
   cron?: string;
   fixedRate?: number;
@@ -24,55 +24,50 @@ interface ScheduledJob {
  *
  * Synthesized by the scheduler transformer plugin as an eager singleton
  * with `postConstructMethods: ['start']` and `preDestroyMethods: ['stop']`.
- * The plugin generates a custom factory that calls `addSchedule()` for each
- * scheduled method discovered at compile time — no runtime metadata scanning needed.
+ *
+ * At startup, iterates all bean definitions looking for `metadata.scheduledMethods`,
+ * resolves each bean, and starts the corresponding schedules.
  */
 export class SchedulerService {
   private readonly jobs: ScheduledJob[] = [];
-  private readonly routes: ScheduleRoute[] = [];
   private started = false;
 
-  /**
-   * Register a scheduled method. Called by the generated factory at compile time.
-   */
-  addSchedule(
-    bean: object,
-    methodName: string,
-    opts: {
-      cron?: string;
-      fixedRate?: number;
-      fixedDelay?: number;
-      concurrent: boolean;
-    },
-  ): void {
-    this.routes.push({ bean, methodName, ...opts });
-  }
+  constructor(private readonly ctx: ApplicationContext) {}
 
   /** Start all scheduled jobs. Called automatically via @PostConstruct. */
-  start(): void {
+  async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
 
-    for (const route of this.routes) {
-      const label = `${route.bean.constructor.name}.${route.methodName}`;
-      const method = (
-        route.bean as Record<string, (...args: unknown[]) => unknown>
-      )[route.methodName];
-      if (!method) continue;
+    for (const def of this.ctx.getDefinitions()) {
+      const scheduledMethods = def.metadata.scheduledMethods as
+        | ScheduledMethodMeta[]
+        | undefined;
+      if (!scheduledMethods || scheduledMethods.length === 0) continue;
 
-      const boundMethod = method.bind(route.bean);
+      const bean = await this.ctx.getAsync(def.token);
 
-      if (route.cron) {
-        this.startCronJob(label, route.cron, boundMethod, route.concurrent);
-      } else if (route.fixedRate !== undefined) {
-        this.startFixedRateJob(
-          label,
-          route.fixedRate,
-          boundMethod,
-          route.concurrent,
-        );
-      } else if (route.fixedDelay !== undefined) {
-        this.startFixedDelayJob(label, route.fixedDelay, boundMethod);
+      for (const meta of scheduledMethods) {
+        const label = `${(bean as object).constructor.name}.${meta.methodName}`;
+        const method = (
+          bean as Record<string, (...args: unknown[]) => unknown>
+        )[meta.methodName];
+        if (!method) continue;
+
+        const boundMethod = method.bind(bean);
+
+        if (meta.cron) {
+          this.startCronJob(label, meta.cron, boundMethod, meta.concurrent);
+        } else if (meta.fixedRate !== undefined) {
+          this.startFixedRateJob(
+            label,
+            meta.fixedRate,
+            boundMethod,
+            meta.concurrent,
+          );
+        } else if (meta.fixedDelay !== undefined) {
+          this.startFixedDelayJob(label, meta.fixedDelay, boundMethod);
+        }
       }
     }
   }
@@ -159,6 +154,7 @@ export class SchedulerService {
   ): void {
     let stopped = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let resolveDelay: (() => void) | undefined;
 
     const loop = async (): Promise<void> => {
       while (!stopped) {
@@ -169,8 +165,10 @@ export class SchedulerService {
         }
         if (!stopped) {
           await new Promise<void>((resolve) => {
+            resolveDelay = resolve;
             timeoutId = setTimeout(resolve, delayMs);
           });
+          resolveDelay = undefined;
         }
       }
     };
@@ -183,6 +181,7 @@ export class SchedulerService {
       stop: () => {
         stopped = true;
         if (timeoutId) clearTimeout(timeoutId);
+        if (resolveDelay) resolveDelay();
       },
       drained: loopPromise,
     });

@@ -1200,6 +1200,38 @@ describe('ApplicationContext — baseTokens', () => {
   });
 });
 
+// ── Self-injection ───────────────────────────────────────────────────
+
+describe('ApplicationContext — self-injection', () => {
+  it('ctx.get(ApplicationContext) returns the context itself', async () => {
+    class Foo {}
+    const ctx = await ApplicationContext.create([
+      makeDef(Foo, { factory: () => new Foo() }),
+    ]);
+    expect(ctx.get(ApplicationContext)).toBe(ctx);
+  });
+
+  it('ctx.getAsync(ApplicationContext) returns the context itself', async () => {
+    const ctx = await ApplicationContext.create([]);
+    const result = await ctx.getAsync(ApplicationContext);
+    expect(result).toBe(ctx);
+  });
+
+  it('beans can depend on ApplicationContext', async () => {
+    class Service {
+      constructor(readonly ctx: ApplicationContext) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        deps: [dep(ApplicationContext)],
+        factory: (appCtx) => new Service(appCtx as ApplicationContext),
+      }),
+    ]);
+    const svc = ctx.get(Service);
+    expect(svc.ctx).toBe(ctx);
+  });
+});
+
 // ── Helper ───────────────────────────────────────────────────────────
 
 function tokenDesc(token: unknown): string {
