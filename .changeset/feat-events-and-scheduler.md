@@ -13,4 +13,4 @@ Scheduler: @Scheduled decorator for cron/fixedRate/fixedDelay with compile-time 
 
 Core: ApplicationContext self-registration as a bean for constructor injection by framework services.
 
-Transformer: plugin system hooks (visitClass, visitMethod, beforeCodegen) for events and scheduler plugins, removed customFactory from IR.
+Transformer: plugin system hooks (visitClass, visitMethod, beforeCodegen) for events and scheduler plugins.
