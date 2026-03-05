@@ -160,11 +160,7 @@ export function generateCode(
   }
 
   // SecurityProvider import (when @Secured is used and routes need it)
-  const hasSecuredRoutes =
-    securityProvider !== undefined &&
-    (controllers ?? []).some(
-      (ctrl) => ctrl.secured || ctrl.routes.some((r) => r.security?.secured),
-    );
+  const hasSecuredRoutes = needsSecurity(controllers ?? [], securityProvider);
   if (hasSecuredRoutes && securityProvider) {
     const relImport = computeRelativeImport(
       outputDir,
@@ -865,18 +861,14 @@ function generateEmbeddedServerBeanDef(
   const ctrlVarNames = buildControllerVarNames(controllers);
 
   // Check if any route actually needs security middleware
-  const needsSecurity =
-    securityProvider !== undefined &&
-    controllers.some(
-      (ctrl) => ctrl.secured || ctrl.routes.some((r) => r.security?.secured),
-    );
+  const hasSecurity = needsSecurity(controllers, securityProvider);
 
   // Dependencies: one per controller + optional security provider
   const deps = controllers.map(
     (ctrl) =>
       `{ token: ${ctrl.classTokenRef.className}, optional: false, collection: false }`,
   );
-  if (needsSecurity) {
+  if (hasSecurity) {
     deps.push(
       `{ token: ${securityProvider!.className}, optional: false, collection: false }`,
     );
@@ -887,7 +879,7 @@ function generateEmbeddedServerBeanDef(
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     return `${varName}: any`;
   });
-  if (needsSecurity) {
+  if (hasSecurity) {
     params.push('__securityProvider: any');
   }
 
@@ -948,12 +940,12 @@ function generateEmbeddedServerBeanDef(
 
 /**
  * Generate security middleware for a route based on controller-level and method-level security.
- * Returns an array of inline middleware function strings in order: auth → roles.
+ * Returns an array of inline middleware function strings.
  */
 function generateSecurityMiddleware(
   ctrl: IRControllerDefinition,
   route: {
-    security?: { secured: boolean; roles?: string[]; anonymous: boolean };
+    security?: { secured: boolean; anonymous: boolean };
   },
   securityProvider?: ClassTokenRef,
 ): string[] {
@@ -968,22 +960,26 @@ function generateSecurityMiddleware(
 
   if (!needsAuth) return [];
 
-  const middlewares: string[] = [];
-
   // Auth middleware
-  middlewares.push(
+  return [
     `async (c: any, next: any) => { const principal = await __securityProvider.authenticate(c.req.raw); if (!principal) return c.json({ error: 'Unauthorized' }, 401); c.set('principal', principal); await next() }`,
+  ];
+}
+
+/**
+ * Check if any controller route needs security middleware.
+ * Shared predicate used by both import generation and EmbeddedServer wiring.
+ */
+export function needsSecurity(
+  controllers: IRControllerDefinition[],
+  securityProvider?: ClassTokenRef,
+): boolean {
+  return (
+    securityProvider !== undefined &&
+    controllers.some(
+      (ctrl) => ctrl.secured || ctrl.routes.some((r) => r.security?.secured),
+    )
   );
-
-  // Roles middleware (only when @Roles is specified)
-  if (security?.roles && security.roles.length > 0) {
-    const rolesArray = JSON.stringify(security.roles);
-    middlewares.push(
-      `async (c: any, next: any) => { const principal = c.get('principal'); if (!${rolesArray}.some((r: string) => principal.roles?.includes(r))) return c.json({ error: 'Forbidden' }, 403); await next() }`,
-    );
-  }
-
-  return middlewares;
 }
 
 /**

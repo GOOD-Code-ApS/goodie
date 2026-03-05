@@ -78,7 +78,6 @@ export function resolve(scanResult: ScanResult): ResolveResult {
       security: r.security
         ? {
             secured: r.security.secured,
-            roles: r.security.roles,
             anonymous: r.security.anonymous,
           }
         : undefined,

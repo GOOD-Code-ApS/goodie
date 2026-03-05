@@ -86,7 +86,6 @@ export interface IRModule {
 /** Security metadata for a route in the IR. */
 export interface IRRouteSecurity {
   secured: boolean;
-  roles?: string[];
   anonymous: boolean;
 }
 
@@ -102,7 +101,7 @@ export interface IRRouteDefinition {
   methodName: string;
   httpMethod: 'get' | 'post' | 'put' | 'delete' | 'patch';
   path: string;
-  /** Security metadata from @Secured, @Roles, @Anonymous decorators. */
+  /** Security metadata from @Secured, @Anonymous decorators. */
   security?: IRRouteSecurity;
   validation?: IRRouteValidation[];
 }

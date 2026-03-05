@@ -128,48 +128,6 @@ describe('Security Codegen', () => {
     });
   });
 
-  describe('roles middleware generation', () => {
-    it('should generate roles middleware for @Roles routes', () => {
-      const beans = [makeBean('AdminController', '/src/AdminController.ts')];
-      const controllers: IRControllerDefinition[] = [
-        {
-          classTokenRef: {
-            kind: 'class',
-            className: 'AdminController',
-            importPath: '/src/AdminController.ts',
-          },
-          basePath: '/admin',
-          secured: true,
-          routes: [
-            {
-              methodName: 'dashboard',
-              httpMethod: 'get',
-              path: '/dashboard',
-              security: {
-                secured: false,
-                roles: ['admin', 'analyst'],
-                anonymous: false,
-              },
-            },
-          ],
-        },
-      ];
-
-      const code = generateCode(
-        beans,
-        { outputPath: '/out/AppContext.generated.ts' },
-        undefined,
-        controllers,
-        securityProvider,
-      );
-
-      expect(code).toContain('__securityProvider.authenticate');
-      expect(code).toContain("c.json({ error: 'Forbidden' }, 403)");
-      expect(code).toContain('["admin","analyst"]');
-      expect(code).toContain('principal.roles?.includes(r)');
-    });
-  });
-
   describe('@Anonymous exemption', () => {
     it('should skip auth middleware for @Anonymous routes on @Secured class', () => {
       const beans = [makeBean('ApiController', '/src/ApiController.ts')];
@@ -242,44 +200,6 @@ describe('Security Codegen', () => {
         'token: JwtAuth, optional: false, collection: false',
       );
       expect(code).toContain('__securityProvider: any');
-    });
-  });
-
-  describe('middleware ordering', () => {
-    it('should generate auth before roles middleware', () => {
-      const beans = [makeBean('Ctrl', '/src/Ctrl.ts')];
-      const controllers: IRControllerDefinition[] = [
-        {
-          classTokenRef: {
-            kind: 'class',
-            className: 'Ctrl',
-            importPath: '/src/Ctrl.ts',
-          },
-          basePath: '/',
-          secured: true,
-          routes: [
-            {
-              methodName: 'admin',
-              httpMethod: 'get',
-              path: '/admin',
-              security: { secured: false, roles: ['admin'], anonymous: false },
-            },
-          ],
-        },
-      ];
-
-      const code = generateCode(
-        beans,
-        { outputPath: '/out/AppContext.generated.ts' },
-        undefined,
-        controllers,
-        securityProvider,
-      );
-
-      // Auth middleware should come before roles middleware
-      const authPos = code.indexOf('__securityProvider.authenticate');
-      const rolesPos = code.indexOf("c.json({ error: 'Forbidden' }");
-      expect(authPos).toBeLessThan(rolesPos);
     });
   });
 

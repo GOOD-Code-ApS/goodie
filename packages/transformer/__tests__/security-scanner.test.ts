@@ -16,7 +16,6 @@ const DECORATOR_STUBS = `
   export function Post(path?: string) { return (t: any, c: any) => {} }
   export function Singleton() { return (t: any, c: any) => {} }
   export function Secured() { return (t: any, c: any) => {} }
-  export function Roles(...roles: string[]) { return (t: any, c: any) => {} }
   export function Anonymous() { return (t: any, c: any) => {} }
 `;
 
@@ -94,61 +93,8 @@ describe('Security Scanner', () => {
       expect(routes[0].security).toBeUndefined();
       expect(routes[1].security).toEqual({
         secured: true,
-        roles: undefined,
         anonymous: false,
       });
-    });
-  });
-
-  describe('@Roles decorator', () => {
-    it('should extract role arguments from @Roles', () => {
-      const project = createProject({
-        '/src/decorators.ts': DECORATOR_STUBS,
-        '/src/AdminController.ts': `
-          import { Controller, Get, Secured, Roles } from './decorators.js'
-
-          @Secured()
-          @Controller('/admin')
-          export class AdminController {
-            @Roles('admin', 'analyst')
-            @Get('/dashboard')
-            dashboard() {}
-          }
-        `,
-      });
-
-      const result = scan(project);
-      const route = result.controllers[0].routes[0];
-
-      expect(route.security).toEqual({
-        secured: false,
-        roles: ['admin', 'analyst'],
-        anonymous: false,
-      });
-    });
-
-    it('should warn when @Roles used without @Secured', () => {
-      const project = createProject({
-        '/src/decorators.ts': DECORATOR_STUBS,
-        '/src/BadController.ts': `
-          import { Controller, Get, Roles } from './decorators.js'
-
-          @Controller('/api')
-          export class BadController {
-            @Roles('admin')
-            @Get('/data')
-            getData() {}
-          }
-        `,
-      });
-
-      const result = scan(project);
-
-      expect(result.warnings).toContainEqual(
-        expect.stringContaining(
-          '@Roles on BadController.getData has no effect without @Secured',
-        ),
-      );
     });
   });
 
@@ -177,7 +123,6 @@ describe('Security Scanner', () => {
 
       expect(routes[0].security).toEqual({
         secured: false,
-        roles: undefined,
         anonymous: true,
       });
       // The /data route has no method-level security decorators
@@ -249,7 +194,7 @@ describe('Security Scanner', () => {
       expect(result.securityProvider).toBeUndefined();
     });
 
-    it('should take the first SecurityProvider when multiple exist', () => {
+    it('should warn when multiple SecurityProvider implementations exist', () => {
       const project = createProject({
         '/src/decorators.ts': DECORATOR_STUBS,
         '/src/SecurityProvider.ts': SECURITY_PROVIDER_STUB,
@@ -275,18 +220,29 @@ describe('Security Scanner', () => {
 
       const result = scan(project);
 
+      // First one found is used
       expect(result.securityProvider).toBeDefined();
-      // First one found wins
-      expect(result.securityProvider!.className).toBeDefined();
+      // Warning is emitted about duplicate
+      expect(result.warnings).toContainEqual(
+        expect.stringContaining(
+          'Multiple SecurityProvider implementations found',
+        ),
+      );
+      expect(result.warnings).toContainEqual(
+        expect.stringContaining('JwtAuth'),
+      );
+      expect(result.warnings).toContainEqual(
+        expect.stringContaining('ApiKeyAuth'),
+      );
     });
   });
 
   describe('combined decorators', () => {
-    it('should handle @Secured + @Roles + @Anonymous on different methods', () => {
+    it('should handle @Secured + @Anonymous on different methods', () => {
       const project = createProject({
         '/src/decorators.ts': DECORATOR_STUBS,
         '/src/FullController.ts': `
-          import { Controller, Get, Post, Secured, Roles, Anonymous } from './decorators.js'
+          import { Controller, Get, Post, Secured, Anonymous } from './decorators.js'
 
           @Secured()
           @Controller('/api')
@@ -298,9 +254,8 @@ describe('Security Scanner', () => {
             @Get('/private')
             privateRoute() {}
 
-            @Roles('admin')
-            @Post('/admin')
-            adminRoute() {}
+            @Post('/submit')
+            submitRoute() {}
           }
         `,
       });
@@ -315,11 +270,9 @@ describe('Security Scanner', () => {
       // @Anonymous route
       expect(routes[0].security?.anonymous).toBe(true);
 
-      // Secured route (inherits from class, no method-level decorators)
+      // Secured routes (inherit from class, no method-level decorators)
       expect(routes[1].security).toBeUndefined();
-
-      // @Roles route
-      expect(routes[2].security?.roles).toEqual(['admin']);
+      expect(routes[2].security).toBeUndefined();
     });
   });
 });

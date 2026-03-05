@@ -20,10 +20,10 @@ import type { Principal } from './principal.js';
  * }
  * ```
  */
-export abstract class SecurityProvider {
+export abstract class SecurityProvider<P extends Principal = Principal> {
   /**
    * Authenticate an incoming request.
    * Return a Principal if authenticated, or null to reject with 401.
    */
-  abstract authenticate(request: Request): Promise<Principal | null>;
+  abstract authenticate(request: Request): Promise<P | null>;
 }

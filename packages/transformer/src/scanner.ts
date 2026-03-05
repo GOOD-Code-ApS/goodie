@@ -50,7 +50,6 @@ const DECORATOR_NAMES = {
   Delete: 'Delete',
   Patch: 'Patch',
   Secured: 'Secured',
-  Roles: 'Roles',
   Anonymous: 'Anonymous',
   Validate: 'Validate',
 } as const;
@@ -165,8 +164,6 @@ export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
 export interface ScannedRouteSecurity {
   /** Whether this route requires authentication (method-level @Secured). */
   secured: boolean;
-  /** Required roles from @Roles('admin', ...). */
-  roles?: string[];
   /** Whether @Anonymous exempts this route from class-level @Secured. */
   anonymous: boolean;
 }
@@ -183,7 +180,7 @@ export interface ScannedRoute {
   methodName: string;
   httpMethod: HttpMethod;
   path: string;
-  /** Security metadata from @Secured, @Roles, @Anonymous decorators. */
+  /** Security metadata from @Secured, @Anonymous decorators. */
   security?: ScannedRouteSecurity;
   validation?: ScannedValidation[];
 }
@@ -377,8 +374,14 @@ export function scan(
         if (scannedBean) {
           beans.push(scannedBean);
           // Detect SecurityProvider subclass
-          if (!securityProvider && extendsSecurityProvider(cls)) {
-            securityProvider = scannedBean.classTokenRef;
+          if (extendsSecurityProvider(cls)) {
+            if (securityProvider) {
+              warnings.push(
+                `Multiple SecurityProvider implementations found: "${securityProvider.className}" and "${scannedBean.classTokenRef.className}". Only the first one ("${securityProvider.className}") will be used. Remove one or use @Named qualifiers to disambiguate.`,
+              );
+            } else {
+              securityProvider = scannedBean.classTokenRef;
+            }
           }
         }
       }
@@ -556,24 +559,17 @@ function scanControllerRoutes(
     // Detect security decorators on the method
     const methodSecured = hasDecorator(decorators, DECORATOR_NAMES.Secured);
     const anonymous = hasDecorator(decorators, DECORATOR_NAMES.Anonymous);
-    const rolesDec = findDecorator(decorators, DECORATOR_NAMES.Roles);
-    const roles = rolesDec ? extractStringArrayArgs(rolesDec) : undefined;
 
     // Warnings for suspicious decorator combos
-    if (roles && !methodSecured && !classSecured) {
-      warnings.push(
-        `@Roles on ${cls.getName()}.${method.getName()} has no effect without @Secured on the method or class`,
-      );
-    }
     if (anonymous && !classSecured) {
       warnings.push(
         `@Anonymous on ${cls.getName()}.${method.getName()} has no effect without class-level @Secured`,
       );
     }
 
-    const hasSecurity = methodSecured || anonymous || roles !== undefined;
+    const hasSecurity = methodSecured || anonymous;
     const security: ScannedRouteSecurity | undefined = hasSecurity
-      ? { secured: methodSecured, roles, anonymous }
+      ? { secured: methodSecured, anonymous }
       : undefined;
 
     // Scan @Validate on this method
@@ -1140,23 +1136,6 @@ function extendsSecurityProvider(cls: ClassDeclaration): boolean {
   const extendsExpr = cls.getExtends();
   if (!extendsExpr) return false;
   return extendsExpr.getExpression().getText() === 'SecurityProvider';
-}
-
-/**
- * Extract string literal arguments from a decorator call.
- * E.g. @Roles('admin', 'analyst') → ['admin', 'analyst']
- */
-function extractStringArrayArgs(dec: Decorator): string[] {
-  return dec.getArguments().map((arg) => {
-    const text = arg.getText();
-    if (
-      (text.startsWith("'") && text.endsWith("'")) ||
-      (text.startsWith('"') && text.endsWith('"'))
-    ) {
-      return text.slice(1, -1);
-    }
-    return text;
-  });
 }
 
 // ── Source location ──
