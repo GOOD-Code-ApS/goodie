@@ -1,5 +1,13 @@
 # @goodie-ts/aop
 
+## 0.6.1
+
+### Patch Changes
+
+- Updated dependencies [cc600d7]
+- Updated dependencies [c77e195]
+  - @goodie-ts/core@0.6.0
+
 ## 0.6.0
 
 ### Minor Changes

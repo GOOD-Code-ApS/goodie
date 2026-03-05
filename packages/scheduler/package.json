@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/scheduler",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Task scheduling support for goodie-ts — @Scheduled decorator with cron, fixedRate, and fixedDelay",
   "license": "MIT",
   "type": "module",
