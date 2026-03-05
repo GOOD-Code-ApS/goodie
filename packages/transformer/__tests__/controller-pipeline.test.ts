@@ -157,6 +157,39 @@ describe('Controller Pipeline (Integration)', () => {
     expect(result.code).not.toContain('Hono');
   });
 
+  it('should generate zValidator middleware for @Validate routes in full pipeline', () => {
+    const result = createTestProject({
+      '/src/schema.ts': `
+        export const createTodoSchema = {}
+      `,
+      '/src/TodoController.ts': `
+        import { Controller, Post, Get, Validate } from './decorators.js'
+        import { createTodoSchema } from './schema.js'
+
+        @Controller('/todos')
+        export class TodoController {
+          @Post('/')
+          @Validate({ json: createTodoSchema })
+          create() {}
+
+          @Get('/')
+          list() {}
+        }
+      `,
+    });
+
+    // zValidator should be imported and used
+    expect(result.code).toContain(
+      "import { zValidator } from '@hono/zod-validator'",
+    );
+    expect(result.code).toContain("zValidator('json', createTodoSchema");
+    expect(result.code).toContain('Validation failed');
+    // Schema should be imported
+    expect(result.code).toContain('createTodoSchema');
+    // Non-validated route should not have zValidator
+    expect(result.code).toContain("__honoApp.get('/todos', async (c)");
+  });
+
   it('should generate all HTTP methods correctly in full pipeline', () => {
     const result = createTestProject({
       '/src/ApiController.ts': `

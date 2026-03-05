@@ -332,4 +332,119 @@ describe('Controller Scanner', () => {
       expect(result.controllers[0].routes[0].methodName).toBe('getAll');
     });
   });
+
+  describe('@Validate detection', () => {
+    it('should detect @Validate with json schema on a route method', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Post(path?: string) { return (t: any, c: any) => {} }
+          export function Validate(targets: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/schema.ts': `
+          export const createTodoSchema = {}
+        `,
+        '/src/TodoController.ts': `
+          import { Controller, Post, Validate } from './decorators.js'
+          import { createTodoSchema } from './schema.js'
+
+          @Controller('/todos')
+          export class TodoController {
+            @Post('/')
+            @Validate({ json: createTodoSchema })
+            create() {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.controllers[0].routes).toHaveLength(1);
+      const route = result.controllers[0].routes[0];
+      expect(route.validation).toHaveLength(1);
+      expect(route.validation![0].target).toBe('json');
+      expect(route.validation![0].schemaRef).toBe('createTodoSchema');
+      expect(route.validation![0].importPath).toBe('/src/schema.ts');
+    });
+
+    it('should detect multiple validation targets', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Get(path?: string) { return (t: any, c: any) => {} }
+          export function Validate(targets: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/schema.ts': `
+          export const querySchema = {}
+          export const paramSchema = {}
+        `,
+        '/src/ItemController.ts': `
+          import { Controller, Get, Validate } from './decorators.js'
+          import { querySchema, paramSchema } from './schema.js'
+
+          @Controller('/items')
+          export class ItemController {
+            @Get('/:id')
+            @Validate({ query: querySchema, param: paramSchema })
+            getById() {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      const route = result.controllers[0].routes[0];
+      expect(route.validation).toHaveLength(2);
+      expect(route.validation!.map((v) => v.target).sort()).toEqual([
+        'param',
+        'query',
+      ]);
+    });
+
+    it('should throw when @Validate value is an expression instead of identifier', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Post(path?: string) { return (t: any, c: any) => {} }
+          export function Validate(targets: any) { return (t: any, c: any) => {} }
+        `,
+        '/src/TodoController.ts': `
+          import { Controller, Post, Validate } from './decorators.js'
+
+          const makeSchema = () => ({})
+
+          @Controller('/todos')
+          export class TodoController {
+            @Post('/')
+            @Validate({ json: makeSchema() })
+            create() {}
+          }
+        `,
+      });
+
+      expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
+    });
+
+    it('should not include validation when @Validate is absent', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Controller(path?: string) { return (t: any, c: any) => {} }
+          export function Get(path?: string) { return (t: any, c: any) => {} }
+        `,
+        '/src/SimpleController.ts': `
+          import { Controller, Get } from './decorators.js'
+
+          @Controller('/simple')
+          export class SimpleController {
+            @Get('/')
+            index() {}
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.controllers[0].routes[0].validation).toBeUndefined();
+    });
+  });
 });

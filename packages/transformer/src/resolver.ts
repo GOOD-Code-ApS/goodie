@@ -72,6 +72,7 @@ export function resolve(scanResult: ScanResult): ResolveResult {
       methodName: r.methodName,
       httpMethod: r.httpMethod,
       path: r.path,
+      ...(r.validation ? { validation: r.validation } : {}),
     })),
   }));
 
