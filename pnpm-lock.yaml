@@ -211,6 +211,22 @@ importers:
         specifier: workspace:^
         version: link:../core
 
+  packages/events:
+    dependencies:
+      '@goodie-ts/core':
+        specifier: workspace:^
+        version: link:../core
+    devDependencies:
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
   packages/health:
     dependencies:
       '@goodie-ts/decorators':
@@ -311,6 +327,25 @@ importers:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../cli
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
+  packages/scheduler:
+    dependencies:
+      '@goodie-ts/core':
+        specifier: workspace:^
+        version: link:../core
+      croner:
+        specifier: ^9.0.0
+        version: 9.1.0
+    devDependencies:
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -1322,6 +1357,10 @@ packages:
   crc32-stream@6.0.0:
     resolution: {integrity: sha512-piICUB6ei4IlTv1+653yq5+KoqfBYmj9bw6LqXoOneTMDXk5nM1qt12mFW1caG3LlJXEKW1Bp0WggEmIfQB34g==}
     engines: {node: '>= 14'}
+
+  croner@9.1.0:
+    resolution: {integrity: sha512-p9nwwR4qyT5W996vBZhdvBCnMhicY5ytZkR4D1Xj0wuTDEiMnjwR57Q3RXYY/s0EpX6Ay3vgIcfaR+ewGHsi+g==}
+    engines: {node: '>=18.0'}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -3140,6 +3179,8 @@ snapshots:
     dependencies:
       crc-32: 1.2.2
       readable-stream: 4.7.0
+
+  croner@9.1.0: {}
 
   cross-spawn@7.0.6:
     dependencies:

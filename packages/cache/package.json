@@ -30,7 +30,7 @@
   "files": [
     "dist"
   ],
-  "dependencies": {
+  "peerDependencies": {
     "@goodie-ts/aop": "workspace:^",
     "@goodie-ts/decorators": "workspace:^"
   },

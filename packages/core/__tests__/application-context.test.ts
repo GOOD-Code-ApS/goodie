@@ -1029,9 +1029,11 @@ describe('ApplicationContext — getDefinitions', () => {
     ];
     const ctx = await ApplicationContext.create(defs);
     const returned = ctx.getDefinitions();
-    expect(returned).toHaveLength(2);
+    // +1 for self-registered ApplicationContext definition
+    expect(returned).toHaveLength(3);
     expect(returned.map((d) => d.token)).toContain(Foo);
     expect(returned.map((d) => d.token)).toContain(Bar);
+    expect(returned.map((d) => d.token)).toContain(ApplicationContext);
   });
 
   it('returns a defensive copy (different array instances, same contents)', async () => {
@@ -1197,6 +1199,38 @@ describe('ApplicationContext — baseTokens', () => {
     const all = await ctx.getAllAsync(HealthIndicator);
     expect(all).toHaveLength(1);
     expect(all[0]).toBeInstanceOf(AsyncIndicator);
+  });
+});
+
+// ── Self-injection ───────────────────────────────────────────────────
+
+describe('ApplicationContext — self-injection', () => {
+  it('ctx.get(ApplicationContext) returns the context itself', async () => {
+    class Foo {}
+    const ctx = await ApplicationContext.create([
+      makeDef(Foo, { factory: () => new Foo() }),
+    ]);
+    expect(ctx.get(ApplicationContext)).toBe(ctx);
+  });
+
+  it('ctx.getAsync(ApplicationContext) returns the context itself', async () => {
+    const ctx = await ApplicationContext.create([]);
+    const result = await ctx.getAsync(ApplicationContext);
+    expect(result).toBe(ctx);
+  });
+
+  it('beans can depend on ApplicationContext', async () => {
+    class Service {
+      constructor(readonly ctx: ApplicationContext) {}
+    }
+    const ctx = await ApplicationContext.create([
+      makeDef(Service, {
+        deps: [dep(ApplicationContext)],
+        factory: (appCtx) => new Service(appCtx as ApplicationContext),
+      }),
+    ]);
+    const svc = ctx.get(Service);
+    expect(svc.ctx).toBe(ctx);
   });
 });
 
