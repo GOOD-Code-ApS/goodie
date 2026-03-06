@@ -1,9 +1,10 @@
-import type {
-  ClassVisitorContext,
-  CodegenContribution,
-  IRBeanDefinition,
-  MethodVisitorContext,
-  TransformerPlugin,
+import {
+  type ClassVisitorContext,
+  type CodegenContribution,
+  InvalidDecoratorUsageError,
+  type IRBeanDefinition,
+  type MethodVisitorContext,
+  type TransformerPlugin,
 } from '@goodie-ts/transformer';
 import { SyntaxKind } from 'ts-morph';
 
@@ -178,7 +179,18 @@ function scanValidateDecorator(
       kind !== SyntaxKind.Identifier &&
       kind !== SyntaxKind.PropertyAccessExpression
     ) {
-      continue; // Skip non-identifier expressions silently
+      const sourceFile = method.getSourceFile();
+      throw new InvalidDecoratorUsageError(
+        `@Validate({ ${target}: ... }) value must be a variable reference, got expression: ${initializer.getText()}`,
+        {
+          filePath: sourceFile.getFilePath(),
+          line: initializer.getStartLineNumber(),
+          column:
+            initializer.getStart() -
+            sourceFile.getFullText().lastIndexOf('\n', initializer.getStart()),
+        },
+        'Use a named import or variable instead of an inline expression.',
+      );
     }
 
     const schemaRef = initializer.getText();

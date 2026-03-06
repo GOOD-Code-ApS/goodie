@@ -1,4 +1,7 @@
-import { transformInMemory } from '@goodie-ts/transformer';
+import {
+  InvalidDecoratorUsageError,
+  transformInMemory,
+} from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
@@ -246,5 +249,22 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toMatch(
       /import \{ createTodoSchema \} from '\.\.\/src\/schema\.js'/,
     );
+  });
+
+  it('throws InvalidDecoratorUsageError for expression-based @Validate values', () => {
+    expect(() =>
+      createProject({
+        '/src/Ctrl.ts': `
+          import { Controller, Post, Validate } from './decorators.js'
+
+          @Controller('/api')
+          class Ctrl {
+            @Post('/')
+            @Validate({ json: makeSchema() })
+            create() {}
+          }
+        `,
+      }),
+    ).toThrow(InvalidDecoratorUsageError);
   });
 });
