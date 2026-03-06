@@ -144,8 +144,8 @@ export default function createHonoPlugin(): TransformerPlugin {
         '  return ctx',
         '}',
         '',
-        'export function createClient(baseUrl: string) {',
-        '  return hc<AppType>(baseUrl)',
+        'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
+        '  return hc<AppType>(baseUrl, options)',
         '}',
       ];
 
@@ -324,7 +324,7 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     );
     const clientFactoryName = `create${ctrl.className}Client`;
     lines.push(
-      `export function ${clientFactoryName}(baseUrl: string) { return hc<${routesTypeName}>(baseUrl) }`,
+      `export function ${clientFactoryName}(baseUrl: string, options?: Parameters<typeof hc>[1]) { return hc<${routesTypeName}>(baseUrl, options) }`,
     );
     lines.push('');
   }

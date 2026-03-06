@@ -43,9 +43,9 @@ describe('Hono Plugin Codegen', () => {
       'export type AppType = ReturnType<typeof createRouter>',
     );
     expect(result.code).toContain(
-      'export function createClient(baseUrl: string)',
+      'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
-    expect(result.code).toContain('hc<AppType>(baseUrl)');
+    expect(result.code).toContain('hc<AppType>(baseUrl, options)');
   });
 
   it('imports Hono, hc, and EmbeddedServer', () => {
@@ -311,9 +311,9 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     expect(result.code).toContain(
-      'export function createClient(baseUrl: string)',
+      'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
-    expect(result.code).toContain('return hc<AppType>(baseUrl)');
+    expect(result.code).toContain('return hc<AppType>(baseUrl, options)');
   });
 
   it('chains route registrations for type inference', () => {
@@ -339,7 +339,7 @@ describe('Hono Plugin — RPC Client', () => {
       'export type CtrlRoutes = ReturnType<typeof __createCtrlRoutes>',
     );
     expect(result.code).toContain(
-      'export function createCtrlClient(baseUrl: string)',
+      'export function createCtrlClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
     // Top-level composition via .route()
     expect(result.code).toContain('return new Hono()');
@@ -373,15 +373,15 @@ describe('Hono Plugin — RPC Client', () => {
     expect(result.code).toContain('export type TodoControllerRoutes =');
     // Per-controller client factories
     expect(result.code).toContain(
-      'export function createUserControllerClient(baseUrl: string)',
+      'export function createUserControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
     expect(result.code).toContain(
-      'export function createTodoControllerClient(baseUrl: string)',
+      'export function createTodoControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
     // Still has the full AppType and createClient
     expect(result.code).toContain('export type AppType =');
     expect(result.code).toContain(
-      'export function createClient(baseUrl: string)',
+      'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
   });
 
@@ -426,7 +426,7 @@ describe('Hono Plugin — RPC Client', () => {
     expect(result.code).toContain(".post('/echo'");
     expect(result.code).toContain('export type RootControllerRoutes =');
     expect(result.code).toContain(
-      'export function createRootControllerClient(baseUrl: string)',
+      'export function createRootControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
   });
 });
