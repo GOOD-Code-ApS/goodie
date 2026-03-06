@@ -101,9 +101,7 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain(
-      'const userController = ctx.get(UserController)',
-    );
+    expect(result.code).toContain('ctx.get(UserController)');
   });
 
   it('does not generate createRouter or startServer when no controllers exist', () => {
@@ -332,15 +330,59 @@ describe('Hono Plugin — RPC Client', () => {
       `,
     });
 
-    // Per-controller sub-app with chained routes (relative paths)
-    expect(result.code).toContain('const __ctrlRoutes = new Hono()');
+    // Per-controller route factory function
+    expect(result.code).toContain('function __createCtrlRoutes(ctrl: Ctrl)');
     expect(result.code).toContain(".get('/items'");
     expect(result.code).toContain(".post('/items'");
+    // Per-controller type and client
+    expect(result.code).toContain(
+      'export type CtrlRoutes = ReturnType<typeof __createCtrlRoutes>',
+    );
+    expect(result.code).toContain(
+      'export function createCtrlClient(baseUrl: string)',
+    );
     // Top-level composition via .route()
     expect(result.code).toContain('return new Hono()');
     expect(result.code).toContain(".route('/api'");
-    // Should NOT have separate __honoApp variable
-    expect(result.code).not.toContain('const __honoApp');
+  });
+
+  it('generates per-controller route types and client factories', () => {
+    const result = createProject({
+      '/src/UserController.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api/users')
+        class UserController {
+          @Get('/')
+          list() {}
+        }
+      `,
+      '/src/TodoController.ts': `
+        import { Controller, Get, Post } from './decorators.js'
+        @Controller('/api/todos')
+        class TodoController {
+          @Get('/')
+          list() {}
+          @Post('/')
+          create() {}
+        }
+      `,
+    });
+
+    // Per-controller route types
+    expect(result.code).toContain('export type UserControllerRoutes =');
+    expect(result.code).toContain('export type TodoControllerRoutes =');
+    // Per-controller client factories
+    expect(result.code).toContain(
+      'export function createUserControllerClient(baseUrl: string)',
+    );
+    expect(result.code).toContain(
+      'export function createTodoControllerClient(baseUrl: string)',
+    );
+    // Still has the full AppType and createClient
+    expect(result.code).toContain('export type AppType =');
+    expect(result.code).toContain(
+      'export function createClient(baseUrl: string)',
+    );
   });
 
   it('createRouter has no explicit return type annotation', () => {

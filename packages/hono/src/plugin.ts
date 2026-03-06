@@ -279,21 +279,13 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
-  // No explicit return type — TypeScript infers the chained route type for RPC
-  lines.push('export function createRouter(ctx: ApplicationContext) {');
-
+  // Per-controller route factory functions (top-level for type extraction)
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
-    lines.push(`  const ${varName} = ctx.get(${ctrl.className})`);
-  }
+    const factoryName = `__create${ctrl.className}Routes`;
 
-  // Per-controller sub-apps with chained routes (relative paths)
-  // Splits type inference per controller for better IDE performance
-  for (const ctrl of controllers) {
-    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
-    const routesVar = `__${varName}Routes`;
-
-    lines.push(`  const ${routesVar} = new Hono()`);
+    lines.push(`function ${factoryName}(${varName}: ${ctrl.className}) {`);
+    lines.push('  return new Hono()');
     for (const route of ctrl.routes) {
       const relativePath = escapeStringLiteral(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
@@ -323,17 +315,31 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
       lines.push('      return c.json(result)');
       lines.push('    })');
     }
+    lines.push('}');
+
+    // Per-controller route type and client factory
+    const routesTypeName = `${ctrl.className}Routes`;
+    lines.push(
+      `export type ${routesTypeName} = ReturnType<typeof ${factoryName}>`,
+    );
+    const clientFactoryName = `create${ctrl.className}Client`;
+    lines.push(
+      `export function ${clientFactoryName}(baseUrl: string) { return hc<${routesTypeName}>(baseUrl) }`,
+    );
+    lines.push('');
   }
 
-  // Compose sub-apps via .route() for split type inference
+  // createRouter composes all sub-apps
+  lines.push('export function createRouter(ctx: ApplicationContext) {');
   lines.push('  return new Hono()');
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
-    const routesVar = `__${varName}Routes`;
+    const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
-    lines.push(`    .route('${basePath}', ${routesVar})`);
+    lines.push(
+      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})))`,
+    );
   }
-
   lines.push('}');
   lines.push('');
   lines.push('export type AppType = ReturnType<typeof createRouter>');
