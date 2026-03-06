@@ -62,19 +62,37 @@ export function resolve(scanResult: ScanResult): ResolveResult {
     modules.push(resolveModule(scannedModule, warnings));
   }
 
-  // Resolve controllers
+  // Resolve controllers — store route metadata on bean metadata
   const controllers: IRControllerDefinition[] = (
     scanResult.controllers ?? []
-  ).map((c) => ({
-    classTokenRef: c.classTokenRef,
-    basePath: c.basePath,
-    routes: c.routes.map((r) => ({
-      methodName: r.methodName,
-      httpMethod: r.httpMethod,
-      path: r.path,
-      ...(r.validation ? { validation: r.validation } : {}),
-    })),
-  }));
+  ).map((c) => {
+    const controllerDef: IRControllerDefinition = {
+      classTokenRef: c.classTokenRef,
+      basePath: c.basePath,
+      routes: c.routes.map((r) => ({
+        methodName: r.methodName,
+        httpMethod: r.httpMethod,
+        path: r.path,
+        ...(r.validation ? { validation: r.validation } : {}),
+      })),
+    };
+
+    // Store controller data on the bean's metadata so plugins can read it
+    const bean = beans.find(
+      (b) =>
+        b.tokenRef.kind === 'class' &&
+        b.tokenRef.className === c.classTokenRef.className &&
+        b.tokenRef.importPath === c.classTokenRef.importPath,
+    );
+    if (bean) {
+      bean.metadata.controller = {
+        basePath: controllerDef.basePath,
+        routes: controllerDef.routes,
+      };
+    }
+
+    return controllerDef;
+  });
 
   return { beans, modules, controllers, warnings };
 }

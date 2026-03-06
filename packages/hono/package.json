@@ -18,13 +18,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
     }
   },
+  "goodie": {
+    "beans": "dist/beans.json",
+    "plugin": "dist/plugin.js"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && goodie generate --mode library",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
     "ts-morph": "^24.0.0"

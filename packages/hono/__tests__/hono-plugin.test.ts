@@ -2,19 +2,25 @@ import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
+import createHonoPlugin from '../src/plugin.js';
 
-function createProject(files: Record<string, string>) {
+const honoPlugin = createHonoPlugin();
+
+function createProject(
+  files: Record<string, string>,
+  outputPath = '/out/AppContext.generated.ts',
+) {
   const project = new Project({ useInMemoryFileSystem: true });
   project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
   for (const [filePath, content] of Object.entries(files)) {
     project.createSourceFile(filePath, content);
   }
-  return project;
+  return transformInMemory(project, outputPath, [honoPlugin]);
 }
 
-describe('EmbeddedServer Codegen', () => {
-  it('generates EmbeddedServer bean when @Controller classes exist', () => {
-    const project = createProject({
+describe('Hono Plugin Codegen', () => {
+  it('generates createRouter and startServer when @Controller classes exist', () => {
+    const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
         @Controller('/api/users')
@@ -25,14 +31,15 @@ describe('EmbeddedServer Codegen', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts');
-
-    expect(result.code).toContain('token: EmbeddedServer,');
-    expect(result.code).toContain('new EmbeddedServer(__honoApp)');
+    expect(result.code).toContain(
+      'export function createRouter(ctx: ApplicationContext): Hono',
+    );
+    expect(result.code).toContain('export async function startServer');
+    expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
   });
 
-  it('imports EmbeddedServer and Hono', () => {
-    const project = createProject({
+  it('imports Hono and EmbeddedServer', () => {
+    const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
         @Controller('/api/users')
@@ -43,35 +50,14 @@ describe('EmbeddedServer Codegen', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts');
-
+    expect(result.code).toContain("import { Hono } from 'hono'");
     expect(result.code).toContain(
       "import { EmbeddedServer } from '@goodie-ts/hono'",
     );
-    expect(result.code).toContain("import { Hono } from 'hono'");
   });
 
-  it('generates startServer that uses EmbeddedServer.listen()', () => {
-    const project = createProject({
-      '/src/MyController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/')
-        class MyController {
-          @Get('/')
-          index() {}
-        }
-      `,
-    });
-
-    const result = transformInMemory(project, '/out/AppContext.generated.ts');
-
-    expect(result.code).toContain('export async function startServer');
-    expect(result.code).toContain('await app.start()');
-    expect(result.code).toContain('ctx.get(EmbeddedServer).listen(options)');
-  });
-
-  it('wires routes in the EmbeddedServer factory', () => {
-    const project = createProject({
+  it('wires routes in createRouter', () => {
+    const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get, Post } from './decorators.js'
         @Controller('/api/users')
@@ -84,16 +70,31 @@ describe('EmbeddedServer Codegen', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts');
-
     expect(result.code).toContain("__honoApp.get('/api/users'");
     expect(result.code).toContain("__honoApp.post('/api/users'");
     expect(result.code).toContain('userController.list(c)');
     expect(result.code).toContain('userController.create(c)');
   });
 
-  it('does not generate EmbeddedServer when no controllers exist', () => {
-    const project = createProject({
+  it('retrieves controllers from ApplicationContext in createRouter', () => {
+    const result = createProject({
+      '/src/UserController.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api/users')
+        class UserController {
+          @Get('/')
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      'const userController = ctx.get(UserController)',
+    );
+  });
+
+  it('does not generate createRouter or startServer when no controllers exist', () => {
+    const result = createProject({
       '/src/MyService.ts': `
         import { Singleton } from './decorators.js'
         @Singleton()
@@ -101,15 +102,14 @@ describe('EmbeddedServer Codegen', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts');
-
     expect(result.code).not.toContain('EmbeddedServer');
     expect(result.code).not.toContain('startServer');
     expect(result.code).not.toContain('Hono');
+    expect(result.code).not.toContain('createRouter');
   });
 
   it('handles multiple controllers', () => {
-    const project = createProject({
+    const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
         @Controller('/api/users')
@@ -130,12 +130,116 @@ describe('EmbeddedServer Codegen', () => {
       `,
     });
 
-    const result = transformInMemory(project, '/out/AppContext.generated.ts');
-
-    expect(result.code).toContain('token: EmbeddedServer,');
-    expect(result.code).toContain('export async function startServer');
+    expect(result.code).toContain('export function createRouter');
     expect(result.code).toContain("__honoApp.get('/api/users'");
     expect(result.code).toContain("__honoApp.get('/api/todos'");
     expect(result.code).toContain("__honoApp.post('/api/todos'");
+  });
+
+  it('generates Response passthrough in route handlers', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      'if (result instanceof Response) return result',
+    );
+    expect(result.code).toContain('return c.json(result)');
+  });
+
+  it('generates void/null guard for route handlers', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Post } from './decorators.js'
+        @Controller('/')
+        class Ctrl {
+          @Post('/')
+          action() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      'if (result === undefined || result === null) return c.body(null, 204)',
+    );
+  });
+
+  it('handles all HTTP methods', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post, Put, Delete, Patch } from './decorators.js'
+        @Controller('/r')
+        class Ctrl {
+          @Get('/') a() {}
+          @Post('/') b() {}
+          @Put('/') c() {}
+          @Delete('/') d() {}
+          @Patch('/') e() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain("__honoApp.get('/r'");
+    expect(result.code).toContain("__honoApp.post('/r'");
+    expect(result.code).toContain("__honoApp.put('/r'");
+    expect(result.code).toContain("__honoApp.delete('/r'");
+    expect(result.code).toContain("__honoApp.patch('/r'");
+  });
+
+  it('uses collision-safe variable names for same-prefix controllers', () => {
+    const result = createProject({
+      '/src/UserController.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/v1/users')
+        class UserController {
+          @Get('/') list() {}
+        }
+      `,
+      '/src/UserControllerV2.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/v2/users')
+        class UserControllerV2 {
+          @Get('/') list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('userController');
+    expect(result.code).toContain('userControllerV2');
+  });
+
+  it('emits zValidator middleware for @Validate routes', () => {
+    const result = createProject({
+      '/src/schema.ts': `
+        export const createTodoSchema = {}
+      `,
+      '/src/TodoController.ts': `
+        import { Controller, Post, Get, Validate } from './decorators.js'
+        import { createTodoSchema } from './schema.js'
+
+        @Controller('/todos')
+        class TodoController {
+          @Post('/')
+          @Validate({ json: createTodoSchema })
+          create() {}
+
+          @Get('/')
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      "import { zValidator } from '@hono/zod-validator'",
+    );
+    expect(result.code).toContain("zValidator('json', createTodoSchema");
+    expect(result.code).toContain('Validation failed');
   });
 });

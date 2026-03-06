@@ -3,7 +3,6 @@ import path from 'node:path';
 import type {
   IRBeanDefinition,
   IRControllerDefinition,
-  IRRouteValidation,
   TokenRef,
 } from './ir.js';
 import type { CodegenContribution } from './options.js';
@@ -85,9 +84,6 @@ export function generateCode(
   };
   const lines: string[] = [];
 
-  // Generate EmbeddedServer when controllers exist (implies @goodie-ts/hono is installed)
-  const needsEmbeddedServer = (controllers ?? []).length > 0;
-
   // Check if any bean uses @Value
   const hasValueFields = beans.some(
     (b) =>
@@ -150,26 +146,6 @@ export function generateCode(
     lines.push(
       `import { ${classNames.sort().join(', ')} } from '${relativePath}'`,
     );
-  }
-
-  // EmbeddedServer imports (when controllers exist)
-  if (needsEmbeddedServer) {
-    lines.push("import { Hono } from 'hono'");
-    lines.push("import { EmbeddedServer } from '@goodie-ts/hono'");
-
-    // Validation imports (when any route has @Validate)
-    const allRoutes = (controllers ?? []).flatMap((c) => c.routes);
-    const hasValidation = allRoutes.some(
-      (r) => r.validation && r.validation.length > 0,
-    );
-    if (hasValidation) {
-      lines.push("import { zValidator } from '@hono/zod-validator'");
-      // Collect unique schema imports
-      const schemaImports = collectSchemaImports(controllers ?? [], outputDir);
-      for (const [schemaRef, importSpec] of schemaImports) {
-        lines.push(`import { ${schemaRef} } from '${importSpec}'`);
-      }
-    }
   }
 
   // Type-only imports for types referenced in token generics
@@ -289,11 +265,6 @@ export function generateCode(
     lines.push('  },');
   }
 
-  // EmbeddedServer bean definition (when controllers with routes exist)
-  if (needsEmbeddedServer) {
-    lines.push(...generateEmbeddedServerBeanDef(controllers!));
-  }
-
   if (needsConfigBean) {
     lines.push('  ]');
     lines.push('}');
@@ -348,18 +319,6 @@ export function generateCode(
       lines.push(...codeLines);
       lines.push('');
     }
-  }
-
-  // Generate startServer() when controllers exist
-  if (needsEmbeddedServer) {
-    lines.push(
-      'export async function startServer(options?: { port?: number }) {',
-    );
-    lines.push('  const ctx = await app.start()');
-    lines.push('  ctx.get(EmbeddedServer).listen(options)');
-    lines.push('  return ctx');
-    lines.push('}');
-    lines.push('');
   }
 
   return lines.join('\n');
@@ -845,159 +804,4 @@ function escapeStringLiteral(value: string): string {
     .replace(/'/g, "\\'")
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r');
-}
-
-// ── EmbeddedServer bean generation ──
-
-/**
- * Generate the EmbeddedServer bean definition lines (to be inserted inside the definitions array).
- * The factory creates a Hono app, wires all controller routes, and returns new EmbeddedServer(app).
- */
-function generateEmbeddedServerBeanDef(
-  controllers: IRControllerDefinition[],
-): string[] {
-  const lines: string[] = [];
-  const ctrlVarNames = buildControllerVarNames(controllers);
-
-  // Dependencies: one per controller
-  const deps = controllers.map(
-    (ctrl) =>
-      `{ token: ${ctrl.classTokenRef.className}, optional: false, collection: false }`,
-  );
-
-  // Factory params: collision-safe controller variable names
-  const params = controllers.map((ctrl) => {
-    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
-    return `${varName}: any`;
-  });
-
-  lines.push('  {');
-  lines.push('    token: EmbeddedServer,');
-  lines.push("    scope: 'singleton',");
-  lines.push(`    dependencies: [${deps.join(', ')}],`);
-  lines.push(`    factory: (${params.join(', ')}) => {`);
-  lines.push('      const __honoApp = new Hono()');
-
-  for (const ctrl of controllers) {
-    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
-    for (const route of ctrl.routes) {
-      const fullPath = escapeStringLiteral(
-        joinPaths(ctrl.basePath, route.path),
-      );
-      const validationMiddleware = generateValidationMiddleware(
-        route.validation,
-      );
-
-      if (validationMiddleware.length > 0) {
-        // Route with validation middleware
-        lines.push(`      __honoApp.${route.httpMethod}('${fullPath}',`);
-        for (const mw of validationMiddleware) {
-          lines.push(`        ${mw},`);
-        }
-        lines.push('        async (c) => {');
-      } else {
-        lines.push(
-          `      __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
-        );
-      }
-      lines.push(
-        `        const result = await ${varName}.${route.methodName}(c)`,
-      );
-      lines.push('        if (result instanceof Response) return result');
-      lines.push(
-        '        if (result === undefined || result === null) return c.body(null, 204)',
-      );
-      lines.push('        return c.json(result)');
-      lines.push('      })');
-    }
-  }
-
-  lines.push('      return new EmbeddedServer(__honoApp)');
-  lines.push('    },');
-  lines.push('    eager: false,');
-  lines.push('    metadata: {},');
-  lines.push('  },');
-
-  return lines;
-}
-
-/**
- * Build a Map<"className:importPath", uniqueVarName> with collision detection.
- * When two controllers produce the same camelCase name, append _2, _3, etc.
- * Uses composite key to handle same-named controllers from different files.
- */
-function buildControllerVarNames(
-  controllers: IRControllerDefinition[],
-): Map<string, string> {
-  const result = new Map<string, string>();
-  const varNameCounts = new Map<string, number>();
-
-  for (const ctrl of controllers) {
-    const key = controllerKey(ctrl);
-    const className = ctrl.classTokenRef.className;
-    const baseVarName = className.charAt(0).toLowerCase() + className.slice(1);
-    const count = varNameCounts.get(baseVarName) ?? 0;
-
-    if (count === 0) {
-      result.set(key, baseVarName);
-    } else {
-      result.set(key, `${baseVarName}_${count + 1}`);
-    }
-    varNameCounts.set(baseVarName, count + 1);
-  }
-
-  return result;
-}
-
-/** Stable key for a controller to avoid same-name collisions across files. */
-function controllerKey(ctrl: IRControllerDefinition): string {
-  return `${ctrl.classTokenRef.className}:${ctrl.classTokenRef.importPath}`;
-}
-
-/** Join a base path and a route path, normalizing slashes. */
-function joinPaths(basePath: string, routePath: string): string {
-  // Normalize: remove trailing slash from base, ensure leading slash on route
-  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
-  const route = routePath.startsWith('/') ? routePath : `/${routePath}`;
-
-  // Special case: if route is just '/', return the base
-  if (route === '/') return base || '/';
-
-  return `${base}${route}`;
-}
-
-/** Generate zValidator() middleware calls for a route's validation targets. */
-function generateValidationMiddleware(
-  validation: IRRouteValidation[] | undefined,
-): string[] {
-  if (!validation || validation.length === 0) return [];
-  return validation.map(
-    (v) =>
-      `zValidator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.issues.map((i: any) => ({ path: i.path, message: i.message })) }, 400) })`,
-  );
-}
-
-/**
- * Collect unique schema imports from validated routes.
- * Returns a Map from schema variable name to relative import path.
- */
-function collectSchemaImports(
-  controllers: IRControllerDefinition[],
-  outputDir: string,
-): Map<string, string> {
-  const imports = new Map<string, string>();
-  for (const ctrl of controllers) {
-    for (const route of ctrl.routes) {
-      if (!route.validation) continue;
-      for (const v of route.validation) {
-        if (!imports.has(v.schemaRef)) {
-          imports.set(
-            v.schemaRef,
-            computeRelativeImport(outputDir, v.importPath),
-          );
-        }
-      }
-    }
-  }
-  return imports;
 }

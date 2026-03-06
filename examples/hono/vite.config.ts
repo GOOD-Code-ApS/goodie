@@ -2,7 +2,7 @@ import { diPlugin } from '@goodie-ts/vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [diPlugin({ scan: ['@goodie-ts'] })],
+  plugins: [diPlugin({ scan: ['@goodie-ts'], configDir: 'config' })],
   esbuild: { target: 'es2022' },
   build: {
     lib: {

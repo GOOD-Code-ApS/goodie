@@ -1,4 +1,4 @@
-import { EmbeddedServer } from '@goodie-ts/hono';
+import type { ApplicationContext } from '@goodie-ts/core';
 import { TransactionManager } from '@goodie-ts/kysely';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
@@ -7,7 +7,7 @@ import {
 } from '@testcontainers/postgresql';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { buildDefinitions } from '../src/AppContext.generated.js';
+import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
 
 describe('Health API', () => {
   let container: StartedPostgreSqlContainer;
@@ -25,14 +25,12 @@ describe('Health API', () => {
     transactional: TransactionManager,
   });
 
-  function app(
-    resolve: (token: typeof EmbeddedServer) => EmbeddedServer,
-  ): Hono {
-    return resolve(EmbeddedServer).app;
+  function app(ctx: ApplicationContext): Hono {
+    return createRouter(ctx);
   }
 
-  test('GET /health returns UP with indicators', async ({ resolve }) => {
-    const honoApp = app(resolve);
+  test('GET /health returns UP with indicators', async ({ ctx }) => {
+    const honoApp = app(ctx);
 
     const res = await honoApp.request('/health');
 
@@ -46,9 +44,9 @@ describe('Health API', () => {
   });
 
   test('GET /health includes database indicator with live connection', async ({
-    resolve,
+    ctx,
   }) => {
-    const honoApp = app(resolve);
+    const honoApp = app(ctx);
 
     const res = await honoApp.request('/health');
 
