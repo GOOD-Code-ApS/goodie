@@ -109,8 +109,12 @@ export interface ClassVisitorContext {
    * Register this class as a bean from a plugin.
    * Allows plugins to make decorated classes into beans without the scanner
    * hardcoding knowledge of plugin-specific decorators (e.g. `@Controller`).
+   *
+   * @param options.scope - Bean scope ('singleton' or 'prototype')
+   * @param options.decoratorName - Name of the decorator for error messages (e.g. 'Controller')
+   * @throws If another plugin has already registered this class as a bean
    */
-  registerBean(options: { scope: Scope }): void;
+  registerBean(options: { scope: Scope; decoratorName?: string }): void;
 }
 
 /** Context passed to visitMethod hook. */

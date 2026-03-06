@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TransformerPlugin } from '../src/options.js';
+import { InvalidDecoratorUsageError } from '../src/transformer-errors.js';
 import { createTestProject } from './helpers.js';
 
 /**
@@ -15,7 +16,7 @@ function createControllerPlugin(): TransformerPlugin {
         .find((d) => d.getName() === 'Controller');
       if (!controllerDec) return;
 
-      ctx.registerBean({ scope: 'singleton' });
+      ctx.registerBean({ scope: 'singleton', decoratorName: 'Controller' });
 
       let basePath = '/';
       const args = controllerDec.getArguments();
@@ -153,5 +154,106 @@ describe('Controller as Plugin-Registered Bean', () => {
 
     // Without a plugin calling registerBean, @Controller alone does nothing
     expect(result.beans).toHaveLength(0);
+  });
+
+  it('should throw when @Controller is combined with @Singleton', () => {
+    expect(() =>
+      createTestProject(
+        {
+          '/src/UserController.ts': `
+          import { Controller, Singleton } from './decorators.js'
+
+          @Controller('/users')
+          @Singleton()
+          export class UserController {}
+        `,
+        },
+        undefined,
+        [createControllerPlugin()],
+      ),
+    ).toThrow(InvalidDecoratorUsageError);
+  });
+
+  it('should throw when @Controller is combined with @Injectable', () => {
+    expect(() =>
+      createTestProject(
+        {
+          '/src/UserController.ts': `
+          import { Controller, Injectable } from './decorators.js'
+
+          @Controller('/users')
+          @Injectable()
+          export class UserController {}
+        `,
+        },
+        undefined,
+        [createControllerPlugin()],
+      ),
+    ).toThrow(InvalidDecoratorUsageError);
+  });
+
+  it('should throw when @Controller is combined with @Module', () => {
+    expect(() =>
+      createTestProject(
+        {
+          '/src/UserController.ts': `
+          import { Controller, Module } from './decorators.js'
+
+          @Controller('/users')
+          @Module()
+          export class UserController {}
+        `,
+        },
+        undefined,
+        [createControllerPlugin()],
+      ),
+    ).toThrow(InvalidDecoratorUsageError);
+  });
+
+  it('should throw when @Controller is applied to abstract class', () => {
+    expect(() =>
+      createTestProject(
+        {
+          '/src/UserController.ts': `
+          import { Controller } from './decorators.js'
+
+          @Controller('/users')
+          export abstract class UserController {}
+        `,
+        },
+        undefined,
+        [createControllerPlugin()],
+      ),
+    ).toThrow(/Cannot apply @Controller/);
+  });
+
+  it('should throw when two plugins register the same class', () => {
+    const plugin1 = createControllerPlugin();
+    const plugin2: TransformerPlugin = {
+      name: 'duplicate-registrar',
+      visitClass(ctx) {
+        const dec = ctx.classDeclaration
+          .getDecorators()
+          .find((d) => d.getName() === 'Controller');
+        if (dec) {
+          ctx.registerBean({ scope: 'singleton', decoratorName: 'Duplicate' });
+        }
+      },
+    };
+
+    expect(() =>
+      createTestProject(
+        {
+          '/src/UserController.ts': `
+          import { Controller } from './decorators.js'
+
+          @Controller('/users')
+          export class UserController {}
+        `,
+        },
+        undefined,
+        [plugin1, plugin2],
+      ),
+    ).toThrow(/already registered as a bean/);
   });
 });

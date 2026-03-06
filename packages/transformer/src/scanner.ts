@@ -172,6 +172,7 @@ export function scan(
 
       // Track plugin-driven bean registration
       let pluginBeanScope: Scope | undefined;
+      let pluginDecoratorName: string | undefined;
 
       // Run plugin visitor hooks for any decorated class with a name
       if (hasVisitors) {
@@ -186,8 +187,16 @@ export function scan(
             className,
             filePath,
             metadata,
-            registerBean(options: { scope: Scope }) {
+            registerBean(options: { scope: Scope; decoratorName?: string }) {
+              if (pluginBeanScope !== undefined) {
+                throw new InvalidDecoratorUsageError(
+                  options.decoratorName ?? 'bean',
+                  `Class "${className}" was already registered as a bean by a plugin (via @${pluginDecoratorName ?? 'unknown'}). Only one plugin may register a class as a bean.`,
+                  getSourceLocation(cls, sourceFile),
+                );
+              }
               pluginBeanScope = options.scope;
+              pluginDecoratorName = options.decoratorName;
             },
           };
           for (const plugin of plugins!) {
@@ -217,13 +226,26 @@ export function scan(
         DECORATOR_NAMES.PostProcessor,
       );
       const isPluginBean = pluginBeanScope !== undefined;
+      const coreDecoratorBean =
+        isModule || isInjectable || isSingleton || isPostProcessor;
 
-      const isBean =
-        isModule ||
-        isInjectable ||
-        isSingleton ||
-        isPostProcessor ||
-        isPluginBean;
+      // Plugin-registered beans cannot be combined with core DI decorators
+      if (isPluginBean && coreDecoratorBean) {
+        const coreDecName = isModule
+          ? 'Module'
+          : isSingleton
+            ? 'Singleton'
+            : isPostProcessor
+              ? 'PostProcessor'
+              : 'Injectable';
+        throw new InvalidDecoratorUsageError(
+          pluginDecoratorName ?? 'bean',
+          `@${pluginDecoratorName ?? 'PluginBean'} cannot be combined with @${coreDecName} on class "${cls.getName()}". @${pluginDecoratorName ?? 'PluginBean'} already registers the class as a bean.`,
+          getSourceLocation(cls, sourceFile),
+        );
+      }
+
+      const isBean = coreDecoratorBean || isPluginBean;
       if (!isBean) continue;
 
       if (cls.isAbstract()) {
@@ -235,7 +257,7 @@ export function scan(
               ? 'PostProcessor'
               : isInjectable
                 ? 'Injectable'
-                : 'bean';
+                : (pluginDecoratorName ?? 'bean');
         throw new InvalidDecoratorUsageError(
           decoratorName,
           `Cannot apply @${decoratorName}() to abstract class "${cls.getName()}". Abstract classes cannot be instantiated. Remove the decorator or make the class concrete.`,
