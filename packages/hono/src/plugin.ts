@@ -287,41 +287,51 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     lines.push(`  const ${varName} = ctx.get(${ctrl.className})`);
   }
 
-  // Collect all routes across controllers for chaining
-  const allRoutes: {
-    ctrl: ControllerBean;
-    route: RouteDefinition;
-    varName: string;
-  }[] = [];
+  // Per-controller sub-apps with chained routes (relative paths)
+  // Splits type inference per controller for better IDE performance
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
+    const routesVar = `__${varName}Routes`;
+
+    lines.push(`  const ${routesVar} = new Hono()`);
     for (const route of ctrl.routes) {
-      allRoutes.push({ ctrl, route, varName });
+      const relativePath = escapeStringLiteral(
+        route.path.startsWith('/') ? route.path : `/${route.path}`,
+      );
+      const validationMiddleware = generateValidationMiddleware(
+        route.validation,
+      );
+
+      if (validationMiddleware.length > 0) {
+        lines.push(`    .${route.httpMethod}('${relativePath}',`);
+        for (const mw of validationMiddleware) {
+          lines.push(`      ${mw},`);
+        }
+        lines.push('      async (c) => {');
+      } else {
+        lines.push(
+          `    .${route.httpMethod}('${relativePath}', async (c) => {`,
+        );
+      }
+      lines.push(
+        `      const result = await ${varName}.${route.methodName}(c)`,
+      );
+      lines.push('      if (result instanceof Response) return result');
+      lines.push(
+        '      if (result === undefined || result === null) return c.body(null, 204)',
+      );
+      lines.push('      return c.json(result)');
+      lines.push('    })');
     }
   }
 
-  // Chain route registrations: new Hono().get(...).post(...)
+  // Compose sub-apps via .route() for split type inference
   lines.push('  return new Hono()');
-  for (const { ctrl, route, varName } of allRoutes) {
-    const fullPath = escapeStringLiteral(joinPaths(ctrl.basePath, route.path));
-    const validationMiddleware = generateValidationMiddleware(route.validation);
-
-    if (validationMiddleware.length > 0) {
-      lines.push(`    .${route.httpMethod}('${fullPath}',`);
-      for (const mw of validationMiddleware) {
-        lines.push(`      ${mw},`);
-      }
-      lines.push('      async (c) => {');
-    } else {
-      lines.push(`    .${route.httpMethod}('${fullPath}', async (c) => {`);
-    }
-    lines.push(`      const result = await ${varName}.${route.methodName}(c)`);
-    lines.push('      if (result instanceof Response) return result');
-    lines.push(
-      '      if (result === undefined || result === null) return c.body(null, 204)',
-    );
-    lines.push('      return c.json(result)');
-    lines.push('    })');
+  for (const ctrl of controllers) {
+    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
+    const routesVar = `__${varName}Routes`;
+    const basePath = escapeStringLiteral(ctrl.basePath);
+    lines.push(`    .route('${basePath}', ${routesVar})`);
   }
 
   lines.push('}');

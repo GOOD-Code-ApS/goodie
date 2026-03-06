@@ -81,8 +81,10 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain(".get('/api/users'");
-    expect(result.code).toContain(".post('/api/users'");
+    // Routes use relative paths in sub-app, basePath in .route()
+    expect(result.code).toContain(".route('/api/users'");
+    expect(result.code).toContain(".get('/'");
+    expect(result.code).toContain(".post('/'");
     expect(result.code).toContain('userController.list(c)');
     expect(result.code).toContain('userController.create(c)');
   });
@@ -145,9 +147,8 @@ describe('Hono Plugin Codegen', () => {
     });
 
     expect(result.code).toContain('export function createRouter');
-    expect(result.code).toContain(".get('/api/users'");
-    expect(result.code).toContain(".get('/api/todos'");
-    expect(result.code).toContain(".post('/api/todos'");
+    expect(result.code).toContain(".route('/api/users'");
+    expect(result.code).toContain(".route('/api/todos'");
   });
 
   it('generates Response passthrough in route handlers', () => {
@@ -200,11 +201,12 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain(".get('/r'");
-    expect(result.code).toContain(".post('/r'");
-    expect(result.code).toContain(".put('/r'");
-    expect(result.code).toContain(".delete('/r'");
-    expect(result.code).toContain(".patch('/r'");
+    expect(result.code).toContain(".route('/r'");
+    expect(result.code).toContain(".get('/'");
+    expect(result.code).toContain(".post('/'");
+    expect(result.code).toContain(".put('/'");
+    expect(result.code).toContain(".delete('/'");
+    expect(result.code).toContain(".patch('/'");
   });
 
   it('uses collision-safe variable names for same-prefix controllers', () => {
@@ -330,10 +332,13 @@ describe('Hono Plugin — RPC Client', () => {
       `,
     });
 
-    // Should chain: return new Hono().get(...).post(...)
+    // Per-controller sub-app with chained routes (relative paths)
+    expect(result.code).toContain('const __ctrlRoutes = new Hono()');
+    expect(result.code).toContain(".get('/items'");
+    expect(result.code).toContain(".post('/items'");
+    // Top-level composition via .route()
     expect(result.code).toContain('return new Hono()');
-    expect(result.code).toContain(".get('/api/items'");
-    expect(result.code).toContain(".post('/api/items'");
+    expect(result.code).toContain(".route('/api'");
     // Should NOT have separate __honoApp variable
     expect(result.code).not.toContain('const __honoApp');
   });
