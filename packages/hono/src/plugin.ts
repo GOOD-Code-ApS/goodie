@@ -143,6 +143,10 @@ export default function createHonoPlugin(): TransformerPlugin {
         '  ctx.get(EmbeddedServer).listen(router, options)',
         '  return ctx',
         '}',
+        '',
+        'export function createClient(baseUrl: string) {',
+        '  return hc<AppType>(baseUrl)',
+        '}',
       ];
 
       return { imports, code };
@@ -253,6 +257,7 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
 function buildImports(controllers: ControllerBean[]): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
+  imports.push("import { hc } from 'hono/client'");
   imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
 
   const allRoutes = controllers.flatMap((c) => c.routes);
@@ -274,47 +279,54 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
-  lines.push('export function createRouter(ctx: ApplicationContext): Hono {');
-  lines.push('  const __honoApp = new Hono()');
+  // No explicit return type — TypeScript infers the chained route type for RPC
+  lines.push('export function createRouter(ctx: ApplicationContext) {');
 
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     lines.push(`  const ${varName} = ctx.get(${ctrl.className})`);
   }
 
+  // Collect all routes across controllers for chaining
+  const allRoutes: {
+    ctrl: ControllerBean;
+    route: RouteDefinition;
+    varName: string;
+  }[] = [];
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     for (const route of ctrl.routes) {
-      const fullPath = escapeStringLiteral(
-        joinPaths(ctrl.basePath, route.path),
-      );
-      const validationMiddleware = generateValidationMiddleware(
-        route.validation,
-      );
-
-      if (validationMiddleware.length > 0) {
-        lines.push(`  __honoApp.${route.httpMethod}('${fullPath}',`);
-        for (const mw of validationMiddleware) {
-          lines.push(`    ${mw},`);
-        }
-        lines.push('    async (c) => {');
-      } else {
-        lines.push(
-          `  __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
-        );
-      }
-      lines.push(`    const result = await ${varName}.${route.methodName}(c)`);
-      lines.push('    if (result instanceof Response) return result');
-      lines.push(
-        '    if (result === undefined || result === null) return c.body(null, 204)',
-      );
-      lines.push('    return c.json(result)');
-      lines.push('  })');
+      allRoutes.push({ ctrl, route, varName });
     }
   }
 
-  lines.push('  return __honoApp');
+  // Chain route registrations: new Hono().get(...).post(...)
+  lines.push('  return new Hono()');
+  for (const { ctrl, route, varName } of allRoutes) {
+    const fullPath = escapeStringLiteral(joinPaths(ctrl.basePath, route.path));
+    const validationMiddleware = generateValidationMiddleware(route.validation);
+
+    if (validationMiddleware.length > 0) {
+      lines.push(`    .${route.httpMethod}('${fullPath}',`);
+      for (const mw of validationMiddleware) {
+        lines.push(`      ${mw},`);
+      }
+      lines.push('      async (c) => {');
+    } else {
+      lines.push(`    .${route.httpMethod}('${fullPath}', async (c) => {`);
+    }
+    lines.push(`      const result = await ${varName}.${route.methodName}(c)`);
+    lines.push('      if (result instanceof Response) return result');
+    lines.push(
+      '      if (result === undefined || result === null) return c.body(null, 204)',
+    );
+    lines.push('      return c.json(result)');
+    lines.push('    })');
+  }
+
   lines.push('}');
+  lines.push('');
+  lines.push('export type AppType = ReturnType<typeof createRouter>');
 
   return lines;
 }

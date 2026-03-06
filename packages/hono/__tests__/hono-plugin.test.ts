@@ -35,13 +35,20 @@ describe('Hono Plugin Codegen', () => {
     });
 
     expect(result.code).toContain(
-      'export function createRouter(ctx: ApplicationContext): Hono',
+      'export function createRouter(ctx: ApplicationContext)',
     );
     expect(result.code).toContain('export async function startServer');
     expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
+    expect(result.code).toContain(
+      'export type AppType = ReturnType<typeof createRouter>',
+    );
+    expect(result.code).toContain(
+      'export function createClient(baseUrl: string)',
+    );
+    expect(result.code).toContain('hc<AppType>(baseUrl)');
   });
 
-  it('imports Hono and EmbeddedServer', () => {
+  it('imports Hono, hc, and EmbeddedServer', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
@@ -54,6 +61,7 @@ describe('Hono Plugin Codegen', () => {
     });
 
     expect(result.code).toContain("import { Hono } from 'hono'");
+    expect(result.code).toContain("import { hc } from 'hono/client'");
     expect(result.code).toContain(
       "import { EmbeddedServer } from '@goodie-ts/hono'",
     );
@@ -73,8 +81,8 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain("__honoApp.get('/api/users'");
-    expect(result.code).toContain("__honoApp.post('/api/users'");
+    expect(result.code).toContain(".get('/api/users'");
+    expect(result.code).toContain(".post('/api/users'");
     expect(result.code).toContain('userController.list(c)');
     expect(result.code).toContain('userController.create(c)');
   });
@@ -109,6 +117,9 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).not.toContain('startServer');
     expect(result.code).not.toContain('Hono');
     expect(result.code).not.toContain('createRouter');
+    expect(result.code).not.toContain('AppType');
+    expect(result.code).not.toContain('createClient');
+    expect(result.code).not.toContain('hc');
   });
 
   it('handles multiple controllers', () => {
@@ -134,9 +145,9 @@ describe('Hono Plugin Codegen', () => {
     });
 
     expect(result.code).toContain('export function createRouter');
-    expect(result.code).toContain("__honoApp.get('/api/users'");
-    expect(result.code).toContain("__honoApp.get('/api/todos'");
-    expect(result.code).toContain("__honoApp.post('/api/todos'");
+    expect(result.code).toContain(".get('/api/users'");
+    expect(result.code).toContain(".get('/api/todos'");
+    expect(result.code).toContain(".post('/api/todos'");
   });
 
   it('generates Response passthrough in route handlers', () => {
@@ -189,11 +200,11 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain("__honoApp.get('/r'");
-    expect(result.code).toContain("__honoApp.post('/r'");
-    expect(result.code).toContain("__honoApp.put('/r'");
-    expect(result.code).toContain("__honoApp.delete('/r'");
-    expect(result.code).toContain("__honoApp.patch('/r'");
+    expect(result.code).toContain(".get('/r'");
+    expect(result.code).toContain(".post('/r'");
+    expect(result.code).toContain(".put('/r'");
+    expect(result.code).toContain(".delete('/r'");
+    expect(result.code).toContain(".patch('/r'");
   });
 
   it('uses collision-safe variable names for same-prefix controllers', () => {
@@ -266,5 +277,83 @@ describe('Hono Plugin Codegen', () => {
         `,
       }),
     ).toThrow(InvalidDecoratorUsageError);
+  });
+});
+
+describe('Hono Plugin — RPC Client', () => {
+  it('exports AppType as ReturnType of createRouter', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      'export type AppType = ReturnType<typeof createRouter>',
+    );
+  });
+
+  it('generates createClient that wraps hc<AppType>', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      'export function createClient(baseUrl: string)',
+    );
+    expect(result.code).toContain('return hc<AppType>(baseUrl)');
+  });
+
+  it('chains route registrations for type inference', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/items')
+          list() {}
+          @Post('/items')
+          create() {}
+        }
+      `,
+    });
+
+    // Should chain: return new Hono().get(...).post(...)
+    expect(result.code).toContain('return new Hono()');
+    expect(result.code).toContain(".get('/api/items'");
+    expect(result.code).toContain(".post('/api/items'");
+    // Should NOT have separate __honoApp variable
+    expect(result.code).not.toContain('const __honoApp');
+  });
+
+  it('createRouter has no explicit return type annotation', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    // No `: Hono` return type — TypeScript must infer the chained type
+    expect(result.code).not.toContain(
+      'createRouter(ctx: ApplicationContext): Hono',
+    );
+    expect(result.code).toContain('createRouter(ctx: ApplicationContext)');
   });
 });
