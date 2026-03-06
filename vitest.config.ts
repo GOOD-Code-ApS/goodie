@@ -52,6 +52,14 @@ export default defineConfig({
         __dirname,
         'packages/kysely/src/index.ts',
       ),
+      '@goodie-ts/events': path.resolve(
+        __dirname,
+        'packages/events/src/index.ts',
+      ),
+      '@goodie-ts/scheduler': path.resolve(
+        __dirname,
+        'packages/scheduler/src/index.ts',
+      ),
     },
   },
   test: {

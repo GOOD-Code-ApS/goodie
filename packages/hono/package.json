@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/hono",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Hono HTTP controller integration for goodie-ts",
   "license": "MIT",
   "type": "module",
@@ -24,13 +24,13 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "dependencies": {
-    "@goodie-ts/core": "workspace:^"
-  },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
     "ts-morph": "^24.0.0"
+  },
+  "dependencies": {
+    "@goodie-ts/core": "workspace:^"
   },
   "peerDependencies": {
     "@hono/node-server": ">=1.0.0",

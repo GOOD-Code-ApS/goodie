@@ -1,5 +1,13 @@
 # @goodie-ts/decorators
 
+## 0.5.3
+
+### Patch Changes
+
+- Updated dependencies [cc600d7]
+- Updated dependencies [c77e195]
+  - @goodie-ts/core@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes

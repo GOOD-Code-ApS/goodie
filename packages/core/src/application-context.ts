@@ -68,6 +68,23 @@ export class ApplicationContext {
   ): Promise<ApplicationContext> {
     const sorted = options?.preSorted ? definitions : topoSort(definitions);
     const ctx = new ApplicationContext(sorted);
+
+    // Self-register so beans can inject ApplicationContext.
+    // Cast needed because ApplicationContext has a private constructor,
+    // making typeof ApplicationContext incompatible with Constructor<T>.
+    const selfToken = ApplicationContext as unknown as Token;
+    ctx.singletonCache.set(selfToken, ctx);
+    const selfDef: BeanDefinition = {
+      token: selfToken as Constructor,
+      scope: 'singleton',
+      dependencies: [],
+      factory: () => ctx,
+      eager: false,
+      metadata: {},
+    };
+    ctx.defsByToken.set(selfToken, [selfDef]);
+    ctx.primaryDef.set(selfToken, selfDef);
+
     ctx.validateDependencies();
     await ctx.initPostProcessors();
     await ctx.initEagerBeans();
@@ -194,10 +211,12 @@ export class ApplicationContext {
   }
 
   /**
-   * Returns a shallow defensive copy of the bean definitions used to build this context.
+   * Returns a shallow defensive copy of the bean definitions used to build this context,
+   * including the self-registered ApplicationContext definition.
    */
   getDefinitions(): readonly BeanDefinition[] {
-    return [...this.sortedDefs];
+    const selfDef = this.primaryDef.get(ApplicationContext as unknown as Token);
+    return selfDef ? [selfDef, ...this.sortedDefs] : [...this.sortedDefs];
   }
 
   /**

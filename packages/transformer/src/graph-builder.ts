@@ -211,6 +211,9 @@ function validateProviders(beans: IRBeanDefinition[]): void {
     registered.add(tokenRefKey(bean.tokenRef));
   }
 
+  // Well-known tokens always available at runtime (self-registered by ApplicationContext)
+  registered.add('class:@goodie-ts/core:ApplicationContext');
+
   // Validate all required deps have providers
   for (const bean of beans) {
     const ownerName =

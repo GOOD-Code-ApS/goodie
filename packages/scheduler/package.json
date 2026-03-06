@@ -1,19 +1,19 @@
 {
-  "name": "@goodie-ts/aop",
-  "version": "0.6.1",
-  "description": "Aspect-oriented programming support for goodie-ts",
+  "name": "@goodie-ts/scheduler",
+  "version": "0.6.0",
+  "description": "Task scheduling support for goodie-ts — @Scheduled decorator with cron, fixedRate, and fixedDelay",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/GOOD-Code-ApS/goodie.git",
-    "directory": "packages/aop"
+    "directory": "packages/scheduler"
   },
   "publishConfig": {
     "access": "public"
   },
   "goodie": {
-    "plugin": "./dist/aop-transformer-plugin.js"
+    "plugin": "./dist/scheduler-transformer-plugin.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,10 +28,12 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:^"
+    "@goodie-ts/core": "workspace:^",
+    "croner": "^9.0.0"
   },
   "devDependencies": {
     "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
     "ts-morph": "^24.0.0"
   },
   "files": [
