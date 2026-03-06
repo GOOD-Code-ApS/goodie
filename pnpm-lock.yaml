@@ -163,7 +163,11 @@ importers:
         specifier: ^22.0.0
         version: 22.19.11
 
-  packages/core: {}
+  packages/core:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
 
   packages/events:
     dependencies:

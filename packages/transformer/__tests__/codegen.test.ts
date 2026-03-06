@@ -907,4 +907,140 @@ describe('Code Generator', () => {
       '{ token: Repo, optional: false, collection: true }',
     );
   });
+
+  it('should emit loadConfigFiles in factory when configDir is set', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [{ fieldName: 'port', key: 'PORT' }],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+      configDir: '/project/config',
+    });
+
+    expect(code).toContain('loadConfigFiles');
+    expect(code).toContain(
+      "import { ApplicationContext, Goodie, loadConfigFiles } from '@goodie-ts/core'",
+    );
+    expect(code).toContain(
+      'loadConfigFiles("/project/config", process.env.NODE_ENV)',
+    );
+    expect(code).toContain('...process.env');
+    expect(code).toContain('...config');
+  });
+
+  it('should embed configDir path verbatim (resolution happens in transform.ts)', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [{ fieldName: 'port', key: 'PORT' }],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+      configDir: '/resolved/project/config',
+    });
+
+    expect(code).toContain(
+      'loadConfigFiles("/resolved/project/config", process.env.NODE_ENV)',
+    );
+  });
+
+  it('should not emit loadConfigFiles when configDir is not set', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Config',
+          importPath: '/src/Config.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [{ fieldName: 'port', key: 'PORT' }],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+    });
+
+    expect(code).not.toContain('loadConfigFiles');
+    expect(code).toContain('{ ...process.env, ...config }');
+  });
+
+  it('should generate config bean when configDir is set even without @Value fields', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'Service',
+          importPath: '/src/Service.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {},
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+      configDir: '/project/config',
+    });
+
+    expect(code).toContain(
+      "import { ApplicationContext, Goodie, loadConfigFiles } from '@goodie-ts/core'",
+    );
+    expect(code).toContain('export const __Goodie_Config');
+    expect(code).toContain('export function buildDefinitions(');
+    expect(code).toContain(
+      'loadConfigFiles("/project/config", process.env.NODE_ENV)',
+    );
+    expect(code).toContain('token: __Goodie_Config,');
+  });
 });
