@@ -1,3 +1,4 @@
+import type { Scope } from '@goodie-ts/core';
 import type { ClassDeclaration, MethodDeclaration } from 'ts-morph';
 import type { IRBeanDefinition } from './ir.js';
 
@@ -104,6 +105,12 @@ export interface ClassVisitorContext {
   filePath: string;
   /** Store arbitrary metadata that will be available in later hooks. */
   metadata: Record<string, unknown>;
+  /**
+   * Register this class as a bean from a plugin.
+   * Allows plugins to make decorated classes into beans without the scanner
+   * hardcoding knowledge of plugin-specific decorators (e.g. `@Controller`).
+   */
+  registerBean(options: { scope: Scope }): void;
 }
 
 /** Context passed to visitMethod hook. */

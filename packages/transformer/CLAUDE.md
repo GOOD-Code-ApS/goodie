@@ -40,9 +40,9 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
 - **`IRProvides`** — module factory method descriptor (used during resolver expansion)
 
-## Controller Support
+## Plugin Bean Registration
 
-The scanner recognizes `@Controller` as a decorator that implies singleton bean registration (similar to how `@PostProcessor` implies singleton). Beyond this, the transformer has **zero knowledge of HTTP methods, routes, or validation**. All route scanning (`@Get`, `@Post`, `@Validate`, etc.) and codegen (`createRouter`, `startServer`) is handled by the `@goodie-ts/hono` plugin via `visitClass`/`visitMethod` hooks. This follows the Micronaut pattern where `micronaut-inject` knows nothing about HTTP.
+Plugins can register classes as beans via `ctx.registerBean({ scope })` in their `visitClass` hook. This allows external packages to define bean-producing decorators (e.g. `@Controller`) without the scanner hardcoding knowledge of them. The scanner has **zero knowledge of HTTP, controllers, or any plugin-specific decorators**.
 
 ## Codegen Conventions
 

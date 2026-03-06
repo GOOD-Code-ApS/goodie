@@ -43,7 +43,6 @@ const DECORATOR_NAMES = {
   PostConstruct: 'PostConstruct',
   PostProcessor: 'PostProcessor',
   Value: 'Value',
-  Controller: 'Controller',
 } as const;
 
 /** A class decorated with @Injectable, @Singleton, or @Module. */
@@ -171,6 +170,9 @@ export function scan(
       const decorators = cls.getDecorators();
       if (decorators.length === 0) continue;
 
+      // Track plugin-driven bean registration
+      let pluginBeanScope: Scope | undefined;
+
       // Run plugin visitor hooks for any decorated class with a name
       if (hasVisitors) {
         const className = cls.getName();
@@ -184,6 +186,9 @@ export function scan(
             className,
             filePath,
             metadata,
+            registerBean(options: { scope: Scope }) {
+              pluginBeanScope = options.scope;
+            },
           };
           for (const plugin of plugins!) {
             plugin.visitClass?.(classCtx);
@@ -211,25 +216,26 @@ export function scan(
         decorators,
         DECORATOR_NAMES.PostProcessor,
       );
-      const isController = hasDecorator(decorators, DECORATOR_NAMES.Controller);
+      const isPluginBean = pluginBeanScope !== undefined;
 
-      if (
-        (isModule ||
-          isInjectable ||
-          isSingleton ||
-          isPostProcessor ||
-          isController) &&
-        cls.isAbstract()
-      ) {
+      const isBean =
+        isModule ||
+        isInjectable ||
+        isSingleton ||
+        isPostProcessor ||
+        isPluginBean;
+      if (!isBean) continue;
+
+      if (cls.isAbstract()) {
         const decoratorName = isModule
           ? 'Module'
-          : isController
-            ? 'Controller'
-            : isSingleton
-              ? 'Singleton'
-              : isPostProcessor
-                ? 'PostProcessor'
-                : 'Injectable';
+          : isSingleton
+            ? 'Singleton'
+            : isPostProcessor
+              ? 'PostProcessor'
+              : isInjectable
+                ? 'Injectable'
+                : 'bean';
         throw new InvalidDecoratorUsageError(
           decoratorName,
           `Cannot apply @${decoratorName}() to abstract class "${cls.getName()}". Abstract classes cannot be instantiated. Remove the decorator or make the class concrete.`,
@@ -245,49 +251,20 @@ export function scan(
         );
       }
 
-      if (isController && isModule) {
-        throw new InvalidDecoratorUsageError(
-          'Controller',
-          `@Controller cannot be combined with @Module on class "${cls.getName()}". Controllers and modules are separate concepts.`,
-          getSourceLocation(cls, sourceFile),
-        );
-      }
-
-      if (isController && isInjectable) {
-        throw new InvalidDecoratorUsageError(
-          'Controller',
-          `@Controller cannot be combined with @Injectable on class "${cls.getName()}". Controllers are implicitly singletons — use @Controller() alone.`,
-          getSourceLocation(cls, sourceFile),
-        );
-      }
-
-      if (isController && isSingleton) {
-        throw new InvalidDecoratorUsageError(
-          'Controller',
-          `@Controller cannot be combined with @Singleton on class "${cls.getName()}". Controllers are implicitly singletons — use @Controller() alone.`,
-          getSourceLocation(cls, sourceFile),
-        );
-      }
-
-      if (
-        isController ||
+      const isSingletonScope =
         isModule ||
-        isInjectable ||
         isSingleton ||
-        isPostProcessor
-      ) {
-        const isSingletonScope =
-          isController || isModule || isSingleton || isPostProcessor;
-        const scannedBean = scanBean(
-          cls,
-          decorators,
-          sourceFile,
-          isSingletonScope,
-          isModule,
-          typeCache,
-        );
-        if (scannedBean) beans.push(scannedBean);
-      }
+        isPostProcessor ||
+        pluginBeanScope === 'singleton';
+      const scannedBean = scanBean(
+        cls,
+        decorators,
+        sourceFile,
+        isSingletonScope,
+        isModule,
+        typeCache,
+      );
+      if (scannedBean) beans.push(scannedBean);
     }
   }
 
