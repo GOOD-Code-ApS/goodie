@@ -181,7 +181,8 @@ function scanValidateDecorator(
     ) {
       const sourceFile = method.getSourceFile();
       throw new InvalidDecoratorUsageError(
-        `@Validate({ ${target}: ... }) value must be a variable reference, got expression: ${initializer.getText()}`,
+        'Validate',
+        `value for "${target}" must be a variable reference, got expression: ${initializer.getText()}`,
         {
           filePath: sourceFile.getFilePath(),
           line: initializer.getStartLineNumber(),
@@ -189,7 +190,6 @@ function scanValidateDecorator(
             initializer.getStart() -
             sourceFile.getFullText().lastIndexOf('\n', initializer.getStart()),
         },
-        'Use a named import or variable instead of an inline expression.',
       );
     }
 
