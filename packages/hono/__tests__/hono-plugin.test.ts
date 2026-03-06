@@ -48,7 +48,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain('hc<AppType>(baseUrl, options)');
   });
 
-  it('imports Hono, hc, and EmbeddedServer', () => {
+  it('imports Hono, hc, EmbeddedServer, and HTTP_FILTER', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
@@ -64,6 +64,9 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain("import { hc } from 'hono/client'");
     expect(result.code).toContain(
       "import { EmbeddedServer } from '@goodie-ts/hono'",
+    );
+    expect(result.code).toContain(
+      "import { HTTP_FILTER } from '@goodie-ts/http'",
     );
   });
 

@@ -149,10 +149,9 @@ export default function createHonoPlugin(): TransformerPlugin {
       const controllerBeans = extractControllerBeans(beans);
       if (controllerBeans.length === 0) return {};
 
-      const hasHttpFilters = hasHttpFilterBeans(beans);
-      const imports = buildImports(controllerBeans, hasHttpFilters);
+      const imports = buildImports(controllerBeans);
       const code = [
-        ...generateCreateRouter(controllerBeans, hasHttpFilters),
+        ...generateCreateRouter(controllerBeans),
         '',
         'export async function startServer(options?: { port?: number; host?: string }) {',
         '  const ctx = await app.start()',
@@ -286,26 +285,12 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
   return result;
 }
 
-function hasHttpFilterBeans(beans: IRBeanDefinition[]): boolean {
-  return beans.some((b) =>
-    b.baseTokenRefs?.some(
-      (ref) => ref.kind === 'injection-token' && ref.tokenName === 'HttpFilter',
-    ),
-  );
-}
-
-function buildImports(
-  controllers: ControllerBean[],
-  hasHttpFilters: boolean,
-): string[] {
+function buildImports(controllers: ControllerBean[]): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
   imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
-
-  if (hasHttpFilters) {
-    imports.push("import { HTTP_FILTER } from '@goodie-ts/http'");
-  }
+  imports.push("import { HTTP_FILTER } from '@goodie-ts/http'");
 
   const allRoutes = controllers.flatMap((c) => c.routes);
 
@@ -331,10 +316,7 @@ function buildImports(
   return imports;
 }
 
-function generateCreateRouter(
-  controllers: ControllerBean[],
-  hasHttpFilters: boolean,
-): string[] {
+function generateCreateRouter(controllers: ControllerBean[]): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
@@ -396,18 +378,14 @@ function generateCreateRouter(
     lines.push('');
   }
 
-  // createRouter composes all sub-apps
+  // createRouter composes all sub-apps with HttpFilter middleware
   lines.push('export function createRouter(ctx: ApplicationContext) {');
-  if (hasHttpFilters) {
-    lines.push(
-      '  const __filters = ctx.getAll(HTTP_FILTER).sort((a, b) => a.order - b.order)',
-    );
-    lines.push('  const __app = new Hono()');
-    lines.push('  for (const f of __filters) __app.use(f.middleware() as any)');
-    lines.push('  return __app');
-  } else {
-    lines.push('  return new Hono()');
-  }
+  lines.push(
+    '  const __filters = ctx.getAll(HTTP_FILTER).sort((a, b) => a.order - b.order)',
+  );
+  lines.push('  const __app = new Hono()');
+  lines.push('  for (const f of __filters) __app.use(f.middleware() as any)');
+  lines.push('  return __app');
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
