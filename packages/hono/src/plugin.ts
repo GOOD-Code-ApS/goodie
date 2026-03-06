@@ -143,6 +143,10 @@ export default function createHonoPlugin(): TransformerPlugin {
         '  ctx.get(EmbeddedServer).listen(router, options)',
         '  return ctx',
         '}',
+        '',
+        'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
+        '  return hc<AppType>(baseUrl, options)',
+        '}',
       ];
 
       return { imports, code };
@@ -253,6 +257,7 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
 function buildImports(controllers: ControllerBean[]): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
+  imports.push("import { hc } from 'hono/client'");
   imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
 
   const allRoutes = controllers.flatMap((c) => c.routes);
@@ -274,47 +279,69 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
-  lines.push('export function createRouter(ctx: ApplicationContext): Hono {');
-  lines.push('  const __honoApp = new Hono()');
-
+  // Per-controller route factory functions (top-level for type extraction)
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
-    lines.push(`  const ${varName} = ctx.get(${ctrl.className})`);
-  }
+    const factoryName = `__create${ctrl.className}Routes`;
 
-  for (const ctrl of controllers) {
-    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
+    lines.push(`function ${factoryName}(${varName}: ${ctrl.className}) {`);
+    lines.push('  return new Hono()');
     for (const route of ctrl.routes) {
-      const fullPath = escapeStringLiteral(
-        joinPaths(ctrl.basePath, route.path),
+      const relativePath = escapeStringLiteral(
+        route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
       const validationMiddleware = generateValidationMiddleware(
         route.validation,
       );
 
       if (validationMiddleware.length > 0) {
-        lines.push(`  __honoApp.${route.httpMethod}('${fullPath}',`);
+        lines.push(`    .${route.httpMethod}('${relativePath}',`);
         for (const mw of validationMiddleware) {
-          lines.push(`    ${mw},`);
+          lines.push(`      ${mw},`);
         }
-        lines.push('    async (c) => {');
+        lines.push('      async (c) => {');
       } else {
         lines.push(
-          `  __honoApp.${route.httpMethod}('${fullPath}', async (c) => {`,
+          `    .${route.httpMethod}('${relativePath}', async (c) => {`,
         );
       }
-      lines.push(`    const result = await ${varName}.${route.methodName}(c)`);
-      lines.push('    if (result instanceof Response) return result');
       lines.push(
-        '    if (result === undefined || result === null) return c.body(null, 204)',
+        `      const result = await ${varName}.${route.methodName}(c)`,
       );
-      lines.push('    return c.json(result)');
-      lines.push('  })');
+      lines.push('      if (result instanceof Response) return result');
+      lines.push(
+        '      if (result === undefined || result === null) return c.body(null, 204)',
+      );
+      lines.push('      return c.json(result)');
+      lines.push('    })');
     }
+    lines.push('}');
+
+    // Per-controller route type and client factory
+    const routesTypeName = `${ctrl.className}Routes`;
+    lines.push(
+      `export type ${routesTypeName} = ReturnType<typeof ${factoryName}>`,
+    );
+    const clientFactoryName = `create${ctrl.className}Client`;
+    lines.push(
+      `export function ${clientFactoryName}(baseUrl: string, options?: Parameters<typeof hc>[1]) { return hc<${routesTypeName}>(baseUrl, options) }`,
+    );
+    lines.push('');
   }
 
-  lines.push('  return __honoApp');
+  // createRouter composes all sub-apps
+  lines.push('export function createRouter(ctx: ApplicationContext) {');
+  lines.push('  return new Hono()');
+  for (const ctrl of controllers) {
+    const factoryName = `__create${ctrl.className}Routes`;
+    const basePath = escapeStringLiteral(ctrl.basePath);
+    lines.push(
+      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})))`,
+    );
+  }
   lines.push('}');
+  lines.push('');
+  lines.push('export type AppType = ReturnType<typeof createRouter>');
 
   return lines;
 }
@@ -344,13 +371,6 @@ function buildControllerVarNames(
 
 function controllerKey(ctrl: ControllerBean): string {
   return `${ctrl.className}:${ctrl.importPath}`;
-}
-
-function joinPaths(basePath: string, routePath: string): string {
-  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
-  const route = routePath.startsWith('/') ? routePath : `/${routePath}`;
-  if (route === '/') return base || '/';
-  return `${base}${route}`;
 }
 
 function escapeStringLiteral(value: string): string {
