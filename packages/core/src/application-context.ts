@@ -6,6 +6,7 @@ import {
   MissingDependencyError,
 } from './errors.js';
 import type { InjectionToken } from './injection-token.js';
+import { isMetricsEnabled, StartupMetrics } from './startup-metrics.js';
 import { topoSort } from './topo-sort.js';
 import type { AbstractConstructor, Constructor } from './types.js';
 
@@ -27,6 +28,7 @@ export class ApplicationContext {
   private readonly asyncInFlight = new Map<Token, Promise<unknown>>();
   private readonly postProcessors: BeanPostProcessor[] = [];
   private closed = false;
+  private startupMetrics: StartupMetrics | undefined;
 
   private constructor(private readonly sortedDefs: BeanDefinition[]) {
     for (const def of sortedDefs) {
@@ -66,8 +68,19 @@ export class ApplicationContext {
     definitions: BeanDefinition[],
     options?: { preSorted?: boolean },
   ): Promise<ApplicationContext> {
-    const sorted = options?.preSorted ? definitions : topoSort(definitions);
+    const metrics = isMetricsEnabled() ? new StartupMetrics() : undefined;
+    const totalStart = metrics ? performance.now() : 0;
+
+    const sorted = metrics
+      ? metrics.timeStageSync('topoSort', () =>
+          options?.preSorted ? definitions : topoSort(definitions),
+        )
+      : options?.preSorted
+        ? definitions
+        : topoSort(definitions);
+
     const ctx = new ApplicationContext(sorted);
+    ctx.startupMetrics = metrics;
 
     // Self-register so beans can inject ApplicationContext.
     // Cast needed because ApplicationContext has a private constructor,
@@ -85,9 +98,22 @@ export class ApplicationContext {
     ctx.defsByToken.set(selfToken, [selfDef]);
     ctx.primaryDef.set(selfToken, selfDef);
 
-    ctx.validateDependencies();
-    await ctx.initPostProcessors();
-    await ctx.initEagerBeans();
+    if (metrics) {
+      metrics.timeStageSync('validateDependencies', () =>
+        ctx.validateDependencies(),
+      );
+      await metrics.timeStage('initPostProcessors', () =>
+        ctx.initPostProcessors(),
+      );
+      await metrics.timeStage('initEagerBeans', () => ctx.initEagerBeans());
+      metrics.setTotal(performance.now() - totalStart);
+      metrics.print();
+    } else {
+      ctx.validateDependencies();
+      await ctx.initPostProcessors();
+      await ctx.initEagerBeans();
+    }
+
     return ctx;
   }
 
@@ -220,6 +246,14 @@ export class ApplicationContext {
   }
 
   /**
+   * Returns startup metrics if GOODIE_DEBUG was enabled during creation,
+   * or undefined otherwise.
+   */
+  getStartupMetrics(): StartupMetrics | undefined {
+    return this.startupMetrics;
+  }
+
+  /**
    * Close the context. Calls `@PreDestroy` methods on instantiated singletons
    * in reverse-topological order (dependents destroyed before dependencies),
    * then clears caches and rejects further calls.
@@ -288,7 +322,16 @@ export class ApplicationContext {
   private async initEagerBeans(): Promise<void> {
     for (const def of this.sortedDefs) {
       if (def.eager && !def.metadata.isBeanPostProcessor) {
-        await this.resolveAsyncRaw(def, false);
+        if (this.startupMetrics) {
+          const start = performance.now();
+          await this.resolveAsyncRaw(def, false);
+          this.startupMetrics.recordBean(
+            tokenName(def.token),
+            performance.now() - start,
+          );
+        } else {
+          await this.resolveAsyncRaw(def, false);
+        }
       }
     }
   }
