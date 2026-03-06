@@ -1,5 +1,13 @@
 # @goodie-ts/testing
 
+## 0.5.5
+
+### Patch Changes
+
+- Updated dependencies [ce2a7e9]
+  - @goodie-ts/core@0.8.0
+  - @goodie-ts/kysely@0.5.4
+
 ## 0.5.4
 
 ### Patch Changes

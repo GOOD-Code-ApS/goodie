@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/kysely",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Kysely integration for goodie-ts — @Transactional decorator, TransactionManager, CrudRepository",
   "license": "MIT",
   "type": "module",
