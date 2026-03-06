@@ -45,7 +45,7 @@ pnpm clean          # Clean all dist/
 | Package | Purpose |
 |---------|---------|
 | `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), BeanDefinition, InjectionToken, topoSort |
-| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config plugins. Controller metadata stored on beans for external plugins. |
+| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config plugins. Framework-agnostic — no HTTP knowledge. |
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
 | `packages/testing` | TestContext with bean overrides and @MockDefinition |

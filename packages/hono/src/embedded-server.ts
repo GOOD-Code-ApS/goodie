@@ -28,6 +28,9 @@ export class EmbeddedServer {
   }
 
   async stop(): Promise<void> {
-    this.server?.close();
+    return new Promise((resolve, reject) => {
+      if (!this.server) return resolve();
+      this.server.close((err) => (err ? reject(err) : resolve()));
+    });
   }
 }

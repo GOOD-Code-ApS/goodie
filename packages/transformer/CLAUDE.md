@@ -40,9 +40,9 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
 - **`IRProvides`** / **`IRModule`** — module factory methods
 
-## Controller Metadata
+## Controller Support
 
-The resolver stores controller route data on `bean.metadata.controller` during resolution. This allows external plugins (e.g., `@goodie-ts/hono`) to read controller metadata and generate framework-specific code without coupling the transformer to any HTTP framework. The transformer itself does NOT generate route-wiring code — that responsibility belongs to the framework plugin.
+The scanner recognizes `@Controller` as a decorator that implies singleton bean registration (similar to how `@PostProcessor` implies singleton). Beyond this, the transformer has **zero knowledge of HTTP methods, routes, or validation**. All route scanning (`@Get`, `@Post`, `@Validate`, etc.) and codegen (`createRouter`, `startServer`) is handled by the `@goodie-ts/hono` plugin via `visitClass`/`visitMethod` hooks. This follows the Micronaut pattern where `micronaut-inject` knows nothing about HTTP.
 
 ## Codegen Conventions
 

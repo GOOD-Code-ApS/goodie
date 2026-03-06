@@ -1,33 +1,130 @@
 import type {
+  ClassVisitorContext,
   CodegenContribution,
   IRBeanDefinition,
-  IRRouteDefinition,
-  IRRouteValidation,
+  MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
+import { SyntaxKind } from 'ts-morph';
 
-interface ControllerMeta {
-  basePath: string;
-  routes: IRRouteDefinition[];
+/** HTTP method for a route. */
+type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
+
+/** Route decorator names mapped to HTTP methods. */
+const ROUTE_DECORATOR_MAP: Record<string, HttpMethod> = {
+  Get: 'get',
+  Post: 'post',
+  Put: 'put',
+  Delete: 'delete',
+  Patch: 'patch',
+};
+
+/** A validation target for a route method. */
+interface RouteValidation {
+  target: 'json' | 'query' | 'param';
+  schemaRef: string;
+  importPath: string;
 }
 
+/** A route method on a controller. */
+interface RouteDefinition {
+  methodName: string;
+  httpMethod: HttpMethod;
+  path: string;
+  validation?: RouteValidation[];
+}
+
+/** Controller metadata stored on bean metadata by visitClass. */
+interface ControllerMeta {
+  basePath: string;
+  routes: RouteDefinition[];
+}
+
+/** Extracted controller bean for codegen. */
 interface ControllerBean {
   className: string;
   importPath: string;
   basePath: string;
-  routes: IRRouteDefinition[];
+  routes: RouteDefinition[];
 }
 
 /**
- * Transformer plugin that generates `createRouter()` and `startServer()`
- * for `@Controller` beans. Reads controller metadata from bean IR (set by
- * the resolver) and contributes Hono route-wiring code.
+ * Transformer plugin that scans `@Controller` classes and `@Get`/`@Post`/etc.
+ * route methods, then generates `createRouter()` and `startServer()`.
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
 export default function createHonoPlugin(): TransformerPlugin {
   return {
     name: 'hono',
+
+    visitClass(ctx: ClassVisitorContext): void {
+      const { classDeclaration, metadata } = ctx;
+      const decorators = classDeclaration.getDecorators();
+      const controllerDec = decorators.find(
+        (d) => d.getName() === 'Controller',
+      );
+      if (!controllerDec) return;
+
+      // Extract basePath from @Controller argument
+      let basePath = '/';
+      const args = controllerDec.getArguments();
+      if (args.length > 0) {
+        const argText = args[0].getText();
+        if (
+          (argText.startsWith("'") && argText.endsWith("'")) ||
+          (argText.startsWith('"') && argText.endsWith('"'))
+        ) {
+          basePath = argText.slice(1, -1);
+        }
+      }
+
+      // Initialize controller metadata — routes populated by visitMethod
+      metadata.controller = { basePath, routes: [] } satisfies ControllerMeta;
+    },
+
+    visitMethod(ctx: MethodVisitorContext): void {
+      const controller = ctx.classMetadata.controller as
+        | ControllerMeta
+        | undefined;
+      if (!controller) return;
+
+      const { methodDeclaration, methodName } = ctx;
+      const decorators = methodDeclaration.getDecorators();
+
+      // Find a route decorator (@Get, @Post, etc.)
+      let httpMethod: HttpMethod | undefined;
+      let path = '/';
+      for (const dec of decorators) {
+        const matched = ROUTE_DECORATOR_MAP[dec.getName()];
+        if (!matched) continue;
+        httpMethod = matched;
+
+        const args = dec.getArguments();
+        if (args.length > 0) {
+          const argText = args[0].getText();
+          if (
+            (argText.startsWith("'") && argText.endsWith("'")) ||
+            (argText.startsWith('"') && argText.endsWith('"'))
+          ) {
+            path = argText.slice(1, -1);
+          }
+        }
+        break;
+      }
+
+      if (!httpMethod) return;
+
+      // Scan @Validate
+      const validation = scanValidateDecorator(decorators, methodDeclaration);
+
+      controller.routes.push({
+        methodName,
+        httpMethod,
+        path,
+        ...(validation.length > 0 ? { validation } : {}),
+      });
+    },
 
     codegen(beans: IRBeanDefinition[]): CodegenContribution {
       const controllerBeans = extractControllerBeans(beans);
@@ -48,6 +145,79 @@ export default function createHonoPlugin(): TransformerPlugin {
       return { imports, code };
     },
   };
+}
+
+/** Extract @Validate({ json: schema, query: schema, param: schema }) from method decorators. */
+function scanValidateDecorator(
+  decorators: import('ts-morph').Decorator[],
+  method: import('ts-morph').MethodDeclaration,
+): RouteValidation[] {
+  const validateDec = decorators.find((d) => d.getName() === 'Validate');
+  if (!validateDec) return [];
+
+  const args = validateDec.getArguments();
+  if (args.length === 0) return [];
+
+  const arg = args[0];
+  if (arg.getKind() !== SyntaxKind.ObjectLiteralExpression) return [];
+
+  const validations: RouteValidation[] = [];
+  const objLiteral = arg.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+
+  for (const prop of objLiteral.getProperties()) {
+    if (prop.getKind() !== SyntaxKind.PropertyAssignment) continue;
+    const propAssign = prop.asKindOrThrow(SyntaxKind.PropertyAssignment);
+    const target = propAssign.getName() as 'json' | 'query' | 'param';
+    if (target !== 'json' && target !== 'query' && target !== 'param') continue;
+
+    const initializer = propAssign.getInitializer();
+    if (!initializer) continue;
+
+    const kind = initializer.getKind();
+    if (
+      kind !== SyntaxKind.Identifier &&
+      kind !== SyntaxKind.PropertyAccessExpression
+    ) {
+      continue; // Skip non-identifier expressions silently
+    }
+
+    const schemaRef = initializer.getText();
+    const importPath = resolveSchemaImportPath(initializer, method);
+
+    validations.push({ target, schemaRef, importPath });
+  }
+
+  return validations;
+}
+
+/** Resolve the import path of a schema variable reference. */
+function resolveSchemaImportPath(
+  node: import('ts-morph').Node,
+  method: import('ts-morph').MethodDeclaration,
+): string {
+  const sourceFile = method.getSourceFile();
+  const varName = node.getText();
+
+  for (const importDecl of sourceFile.getImportDeclarations()) {
+    for (const namedImport of importDecl.getNamedImports()) {
+      if (namedImport.getName() === varName) {
+        const moduleSpecifier = importDecl.getModuleSpecifierSourceFile();
+        if (moduleSpecifier) {
+          return moduleSpecifier.getFilePath();
+        }
+      }
+    }
+  }
+
+  const symbol = node.getSymbol();
+  if (symbol) {
+    const declarations = symbol.getDeclarations();
+    if (declarations.length > 0) {
+      return declarations[0].getSourceFile().getFilePath();
+    }
+  }
+
+  return sourceFile.getFilePath();
 }
 
 function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
@@ -178,7 +348,7 @@ function escapeStringLiteral(value: string): string {
 }
 
 function generateValidationMiddleware(
-  validation: IRRouteValidation[] | undefined,
+  validation: RouteValidation[] | undefined,
 ): string[] {
   if (!validation || validation.length === 0) return [];
   return validation.map(

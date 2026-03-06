@@ -1,6 +1,5 @@
 import type {
   IRBeanDefinition,
-  IRControllerDefinition,
   IRDependency,
   IRModule,
   TokenRef,
@@ -20,8 +19,6 @@ const RESERVED_CONFIG_TOKEN = '__Goodie_Config';
 export interface GraphResult {
   /** Bean definitions in topological order (dependencies before dependents). */
   beans: IRBeanDefinition[];
-  /** Controller definitions discovered during scanning. */
-  controllers: IRControllerDefinition[];
   warnings: string[];
 }
 
@@ -60,7 +57,7 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
   // Topological sort with cycle detection
   const sorted = topoSort(allBeans);
 
-  return { beans: sorted, controllers: resolveResult.controllers, warnings };
+  return { beans: sorted, warnings };
 }
 
 /**

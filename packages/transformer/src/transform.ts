@@ -167,12 +167,7 @@ export async function transform(
     version: PKG_VERSION,
     configDir: resolvedConfigDir,
   };
-  const currentHash = computeIRHash(
-    finalBeans,
-    codegenOptions,
-    contributions,
-    graphResult.controllers,
-  );
+  const currentHash = computeIRHash(finalBeans, codegenOptions, contributions);
 
   let existingHash: string | undefined;
   try {
@@ -200,7 +195,6 @@ export async function transform(
     finalBeans,
     { ...codegenOptions, hash: currentHash },
     contributions,
-    graphResult.controllers,
   );
 
   // 12. Write output
@@ -291,7 +285,6 @@ export function transformInMemory(
     finalBeans,
     { outputPath, version: PKG_VERSION },
     contributions,
-    graphResult.controllers,
   );
 
   return {
@@ -394,7 +387,6 @@ export async function transformLibrary(
       finalBeans,
       { outputPath: options.codeOutputPath, version: PKG_VERSION },
       contributions,
-      graphResult.controllers,
     );
 
     const codeDir = path.dirname(options.codeOutputPath);

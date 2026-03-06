@@ -940,7 +940,7 @@ describe('Code Generator', () => {
       "import { ApplicationContext, Goodie, loadConfigFiles } from '@goodie-ts/core'",
     );
     expect(code).toContain(
-      'loadConfigFiles("/project/config", process.env.NODE_ENV)',
+      'loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? "/project/config", process.env.NODE_ENV)',
     );
     expect(code).toContain('...process.env');
     expect(code).toContain('...config');
@@ -974,7 +974,7 @@ describe('Code Generator', () => {
     });
 
     expect(code).toContain(
-      'loadConfigFiles("/resolved/project/config", process.env.NODE_ENV)',
+      'loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? "/resolved/project/config", process.env.NODE_ENV)',
     );
   });
 
@@ -1039,7 +1039,7 @@ describe('Code Generator', () => {
     expect(code).toContain('export const __Goodie_Config');
     expect(code).toContain('export function buildDefinitions(');
     expect(code).toContain(
-      'loadConfigFiles("/project/config", process.env.NODE_ENV)',
+      'loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? "/project/config", process.env.NODE_ENV)',
     );
     expect(code).toContain('token: __Goodie_Config,');
   });

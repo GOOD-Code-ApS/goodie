@@ -241,5 +241,10 @@ describe('Hono Plugin Codegen', () => {
     );
     expect(result.code).toContain("zValidator('json', createTodoSchema");
     expect(result.code).toContain('Validation failed');
+
+    // Schema import should use a relative path, not an absolute one
+    expect(result.code).toMatch(
+      /import \{ createTodoSchema \} from '\.\.\/src\/schema\.js'/,
+    );
   });
 });
