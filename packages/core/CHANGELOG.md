@@ -1,5 +1,16 @@
 # @goodie-ts/core
 
+## 0.8.0
+
+### Minor Changes
+
+- ce2a7e9: feat(core,transformer): JSON config file support via configDir option
+
+  - `loadConfigFiles(dir, env?)` reads `default.json` and `{env}.json`, flattens nested keys to dot-separated strings
+  - `flattenObject()` utility for nested object → flat string map conversion
+  - `configDir` option in `TransformOptions` generates code that loads config files at startup
+  - Priority: file defaults < env file < process.env < explicit config param
+
 ## 0.7.0
 
 ### Minor Changes
