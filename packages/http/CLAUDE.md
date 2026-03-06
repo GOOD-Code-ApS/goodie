@@ -9,7 +9,6 @@ Framework-agnostic HTTP abstractions for goodie-ts. Provides route decorators, m
 | `src/controller.ts` | `@Controller(basePath?)` — marks class as HTTP controller |
 | `src/route.ts` | `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` — method decorators via `createRouteDecorator()` |
 | `src/cors.ts` | `@Cors(options?)` — compile-time CORS marker decorator |
-| `src/validate.ts` | `@Validate({ json, query, param })` — compile-time validation marker decorator |
 | `src/metadata.ts` | `HTTP_META` symbol keys, `ControllerMetadata`, `RouteMetadata` types |
 | `src/http-filter.ts` | `HttpFilter` interface + `HTTP_FILTER` injection token |
 | `src/index.ts` | Public exports |
@@ -19,8 +18,6 @@ Framework-agnostic HTTP abstractions for goodie-ts. Provides route decorators, m
 All are Symbols under the `HTTP_META` object:
 - `CONTROLLER` — `ControllerMetadata` (`{ basePath }`)
 - `ROUTES` — `RouteMetadata[]` (`{ method, path, methodName }`)
-- `VALIDATION` — `ValidateMetadata`
-
 ## HttpFilter
 
 Generic middleware discovery mechanism. Library packages register `HttpFilter` beans with `baseTokens: [HTTP_FILTER]`. The HTTP runtime plugin (e.g. Hono) discovers them via `ctx.getAll(HTTP_FILTER)`, sorts by `order`, and applies as middleware.
@@ -43,6 +40,7 @@ Lower `order` values run first. This enables loose coupling — security, loggin
 
 ## Gotchas
 
-- `@Cors` and `@Validate` are compile-time-only (no-op at runtime). Config is extracted via AST scanning in the Hono plugin.
+- `@Cors` is compile-time-only (no-op at runtime). Config is extracted via AST scanning in the Hono plugin.
 - Variable references in `@Cors` config are not auto-imported in generated code — only literal values work reliably.
 - Route decorators are matched by name only (no import source verification), but only scanned on `@Controller` classes.
+- `@Validate` lives in `@goodie-ts/hono` (not here) — it's tightly coupled to `@hono/zod-validator`.
