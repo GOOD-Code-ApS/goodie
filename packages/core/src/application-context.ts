@@ -72,7 +72,7 @@ export class ApplicationContext {
     const totalStart = metrics ? performance.now() : 0;
 
     const sorted = metrics
-      ? await metrics.timeStage('topoSort', () =>
+      ? metrics.timeStageSync('topoSort', () =>
           options?.preSorted ? definitions : topoSort(definitions),
         )
       : options?.preSorted
@@ -99,7 +99,7 @@ export class ApplicationContext {
     ctx.primaryDef.set(selfToken, selfDef);
 
     if (metrics) {
-      await metrics.timeStage('validateDependencies', () =>
+      metrics.timeStageSync('validateDependencies', () =>
         ctx.validateDependencies(),
       );
       await metrics.timeStage('initPostProcessors', () =>

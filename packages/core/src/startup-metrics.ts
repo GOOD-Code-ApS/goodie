@@ -8,9 +8,19 @@ export class StartupMetrics {
   private totalMs = 0;
 
   /**
-   * Time a named stage and record its duration.
+   * Time a synchronous stage and record its duration.
    */
-  async timeStage<T>(name: string, fn: () => T | Promise<T>): Promise<T> {
+  timeStageSync<T>(name: string, fn: () => T): T {
+    const start = performance.now();
+    const result = fn();
+    this.timings.set(name, performance.now() - start);
+    return result;
+  }
+
+  /**
+   * Time an async stage and record its duration.
+   */
+  async timeStage<T>(name: string, fn: () => Promise<T>): Promise<T> {
     const start = performance.now();
     const result = await fn();
     this.timings.set(name, performance.now() - start);
