@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/vite-plugin",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Vite plugin for goodie-ts compile-time dependency injection",
   "license": "MIT",
   "type": "module",
