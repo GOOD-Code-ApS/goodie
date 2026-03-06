@@ -10,7 +10,7 @@ Scanner → Resolver → GraphBuilder → Codegen
 
 | Stage | File | Input → Output |
 |-------|------|----------------|
-| Scanner | `src/scanner.ts` | ts-morph `Project` → `ScanResult` (AST-level beans, modules) |
+| Scanner | `src/scanner.ts` | ts-morph `Project` → `ScanResult` (AST-level beans) |
 | Resolver | `src/resolver.ts` | `ScanResult` → `ResolveResult` (typed IR with TokenRefs) |
 | GraphBuilder | `src/graph-builder.ts` | `ResolveResult` → `GraphResult` (validated, topo-sorted) |
 | Codegen | `src/codegen.ts` | `IRBeanDefinition[]` → generated TypeScript string |
@@ -23,7 +23,7 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 
 | File | Role |
 |------|------|
-| `src/ir.ts` | IR types: `IRBeanDefinition`, `TokenRef`, `IRDependency`, `IRModule`, etc. |
+| `src/ir.ts` | IR types: `IRBeanDefinition`, `TokenRef`, `IRDependency`, `IRProvides`, etc. |
 | `src/transform.ts` | `transform()`, `transformInMemory()`, and `transformLibrary()` orchestrators |
 | `src/aop-scanner.ts` | `scanAopDecoratorDefinitions()` — scans `createAopDecorator<{...}>()` calls, extracts config from type parameters via type checker |
 | `src/aop-plugin.ts` | `createDeclarativeAopPlugin()` — generic AOP plugin driven by `AopDecoratorDeclaration` mappings |
@@ -38,7 +38,7 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 - **`TokenRef`** — union: `ClassTokenRef { kind: 'class', className, importPath }` or `InjectionTokenRef { kind: 'injection-token', tokenName, importPath?, typeAnnotation?, typeImports? }`
 - **`IRBeanDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, metadata, sourceLocation
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
-- **`IRProvides`** / **`IRModule`** — module factory methods (IRModule has `constructorDeps` and `fieldDeps` for module constructor/field injection)
+- **`IRProvides`** — module factory method descriptor (used during resolver expansion)
 
 ## Controller Support
 
@@ -65,11 +65,10 @@ Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in pa
 
 ## Graph Builder Details
 
-- Expands modules: registers module class + each `@Provides` as separate bean
-- Module instances are implicit singletons with constructor and field injection support
-- `@Provides` methods get the module instance as their first dependency
-- Resolves `@Named()` qualifiers to match `@Inject('name')`
 - Validates required providers exist, detects cycles
+- Resolves `@Named()` qualifiers to match `@Inject('name')`
+- Topological sort for dependency ordering
+- Note: `@Provides` expansion now happens in the resolver stage, not the graph builder
 
 ## Library Import Path Reconciliation
 

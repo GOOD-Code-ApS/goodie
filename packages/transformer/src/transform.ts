@@ -128,12 +128,7 @@ export async function transform(
     beans = [...beans, ...libraryBeans];
     // Reconcile: scanned deps use absolute paths from ts-morph, but library
     // beans use bare package specifiers. Rewrite dep tokenRefs to match.
-    reconcileLibraryImportPaths(
-      beans,
-      libraryBeans,
-      resolveResult.modules,
-      discovery.packageDirs,
-    );
+    reconcileLibraryImportPaths(beans, libraryBeans, discovery.packageDirs);
   }
 
   // 6. afterResolve hook
@@ -156,7 +151,6 @@ export async function transform(
       reconcileLibraryImportPaths(
         beans,
         bareSpecifierBeans,
-        resolveResult.modules,
         discovery.packageDirs,
       );
     }
@@ -279,7 +273,7 @@ export function transformInMemory(
   // 4b. Inject library beans (before afterResolve so plugins see them)
   if (libraryBeans && libraryBeans.length > 0) {
     beans = [...beans, ...libraryBeans];
-    reconcileLibraryImportPaths(beans, libraryBeans, resolveResult.modules);
+    reconcileLibraryImportPaths(beans, libraryBeans);
   }
 
   // 5. afterResolve hook
@@ -296,11 +290,7 @@ export function transformInMemory(
         b.tokenRef.kind === 'class' && !b.tokenRef.importPath.startsWith('/'),
     );
     if (bareSpecifierBeans.length > 0) {
-      reconcileLibraryImportPaths(
-        beans,
-        bareSpecifierBeans,
-        resolveResult.modules,
-      );
+      reconcileLibraryImportPaths(beans, bareSpecifierBeans);
     }
   }
 
@@ -504,7 +494,6 @@ export async function transformLibrary(
 function reconcileLibraryImportPaths(
   allBeans: IRBeanDefinition[],
   libraryBeans: IRBeanDefinition[],
-  modules?: import('./ir.js').IRModule[],
   packageDirs?: Map<string, string>,
 ): void {
   // Build className → library tokenRef map (skip ambiguous names)
@@ -558,23 +547,6 @@ function reconcileLibraryImportPaths(
       bean.baseTokenRefs = bean.baseTokenRefs.map(
         (ref) => reconcileRef(ref) as typeof ref,
       );
-    }
-  }
-
-  // Also reconcile module constructor/field deps (modules are expanded later in buildGraph)
-  if (modules) {
-    for (const mod of modules) {
-      for (const dep of mod.constructorDeps) {
-        dep.tokenRef = reconcileRef(dep.tokenRef);
-      }
-      for (const field of mod.fieldDeps) {
-        field.tokenRef = reconcileRef(field.tokenRef);
-      }
-      for (const provides of mod.provides) {
-        for (const dep of provides.dependencies) {
-          dep.tokenRef = reconcileRef(dep.tokenRef);
-        }
-      }
     }
   }
 }

@@ -196,9 +196,9 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.modules).toHaveLength(1);
-      expect(result.modules[0].classTokenRef.className).toBe('AppModule');
-      expect(result.beans).toHaveLength(0);
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].classTokenRef.className).toBe('AppModule');
+      expect(result.beans[0].scope).toBe('singleton');
     });
 
     it('should scan @Provides methods', () => {
@@ -223,12 +223,14 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.modules).toHaveLength(1);
-      expect(result.modules[0].provides).toHaveLength(2);
-      expect(result.modules[0].provides[0].methodName).toBe('dbUrl');
-      expect(result.modules[0].provides[0].returnTypeName).toBe('string');
-      expect(result.modules[0].provides[1].methodName).toBe('port');
-      expect(result.modules[0].provides[1].returnTypeName).toBe('number');
+      const appModule = result.beans.find(
+        (b) => b.classTokenRef.className === 'AppModule',
+      )!;
+      expect(appModule.provides).toHaveLength(2);
+      expect(appModule.provides[0].methodName).toBe('dbUrl');
+      expect(appModule.provides[0].returnTypeName).toBe('string');
+      expect(appModule.provides[1].methodName).toBe('port');
+      expect(appModule.provides[1].returnTypeName).toBe('number');
     });
 
     it('should scan @Provides method parameters', () => {
@@ -258,9 +260,12 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.modules[0].provides[0].params).toHaveLength(1);
-      expect(result.modules[0].provides[0].params[0].paramName).toBe('repo');
-      expect(result.modules[0].provides[0].params[0].typeName).toBe('Repo');
+      const appModule = result.beans.find(
+        (b) => b.classTokenRef.className === 'AppModule',
+      )!;
+      expect(appModule.provides[0].params).toHaveLength(1);
+      expect(appModule.provides[0].params[0].paramName).toBe('repo');
+      expect(appModule.provides[0].params[0].typeName).toBe('Repo');
     });
 
     it('should detect @Eager on @Provides methods', () => {
@@ -287,15 +292,44 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.modules).toHaveLength(1);
-      expect(result.modules[0].provides).toHaveLength(2);
-      expect(result.modules[0].provides[0].methodName).toBe('startupService');
-      expect(result.modules[0].provides[0].eager).toBe(true);
-      expect(result.modules[0].provides[1].methodName).toBe('lazyService');
-      expect(result.modules[0].provides[1].eager).toBe(false);
+      const appModule = result.beans.find(
+        (b) => b.classTokenRef.className === 'AppModule',
+      )!;
+      expect(appModule.provides).toHaveLength(2);
+      expect(appModule.provides[0].methodName).toBe('startupService');
+      expect(appModule.provides[0].eager).toBe(true);
+      expect(appModule.provides[1].methodName).toBe('lazyService');
+      expect(appModule.provides[1].eager).toBe(false);
     });
 
-    it('should scan module imports', () => {
+    it('should scan @Provides on a @Singleton bean (not just @Module)', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Provides() { return (t: any, c: any) => {} }
+        `,
+        '/src/AppConfig.ts': `
+          import { Singleton, Provides } from './decorators.js'
+
+          @Singleton()
+          export class AppConfig {
+            @Provides()
+            dbUrl(): string { return 'postgres://localhost' }
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].classTokenRef.className).toBe('AppConfig');
+      expect(result.beans[0].scope).toBe('singleton');
+      expect(result.beans[0].isModule).toBe(false);
+      expect(result.beans[0].provides).toHaveLength(1);
+      expect(result.beans[0].provides[0].methodName).toBe('dbUrl');
+    });
+
+    it('should scan @Module as a singleton bean', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Module(opts?: any) { return (t: any, c: any) => {} }
@@ -308,20 +342,16 @@ describe('Scanner', () => {
         `,
         '/src/AppModule.ts': `
           import { Module } from './decorators.js'
-          import { DbModule } from './DbModule.js'
 
-          @Module({ imports: [DbModule] })
+          @Module()
           export class AppModule {}
         `,
       });
 
       const result = scan(project);
-      const appModule = result.modules.find(
-        (m) => m.classTokenRef.className === 'AppModule',
-      )!;
 
-      expect(appModule.imports).toHaveLength(1);
-      expect(appModule.imports[0].className).toBe('DbModule');
+      expect(result.beans).toHaveLength(2);
+      expect(result.beans.every((b) => b.scope === 'singleton')).toBe(true);
     });
   });
 
@@ -498,7 +528,10 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const provides = result.modules[0].provides[0];
+      const appModule = result.beans.find(
+        (b) => b.classTokenRef.className === 'AppModule',
+      )!;
+      const provides = appModule.provides[0];
 
       expect(provides.returnTypeName).toBe('Repository<User>');
       expect(provides.returnResolvedBaseTypeName).toBe('Repository');
@@ -1128,8 +1161,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(2);
-      expect(result.modules).toHaveLength(1);
+      expect(result.beans).toHaveLength(3);
     });
 
     it('should ignore classes without decorators', () => {

@@ -46,7 +46,7 @@ const DECORATOR_NAMES = {
   Controller: 'Controller',
 } as const;
 
-/** A class decorated with @Injectable or @Singleton (but not @Module). */
+/** A class decorated with @Injectable, @Singleton, or @Module. */
 export interface ScannedBean {
   classDeclaration: ClassDeclaration;
   classTokenRef: ClassTokenRef;
@@ -65,6 +65,10 @@ export interface ScannedBean {
   valueFields: ScannedValueField[];
   /** Base classes this bean extends (for baseTokens registration). */
   baseClasses: ClassTokenRef[];
+  /** Whether this bean was decorated with @Module(). */
+  isModule: boolean;
+  /** @Provides methods defined on this class (any bean, not just @Module). */
+  provides: ScannedProvides[];
   sourceLocation: SourceLocation;
 }
 
@@ -120,23 +124,7 @@ export interface ScannedFieldInjection {
   sourceLocation: SourceLocation;
 }
 
-/** A @Module class with its @Provides methods. */
-export interface ScannedModule {
-  classDeclaration: ClassDeclaration;
-  classTokenRef: ClassTokenRef;
-  imports: ScannedModuleImport[];
-  provides: ScannedProvides[];
-  constructorParams: ScannedConstructorParam[];
-  fieldInjections: ScannedFieldInjection[];
-  sourceLocation: SourceLocation;
-}
-
-export interface ScannedModuleImport {
-  className: string;
-  sourceFile: SourceFile | undefined;
-}
-
-/** A @Provides method inside a @Module. */
+/** A @Provides method inside a bean class. */
 export interface ScannedProvides {
   methodName: string;
   returnTypeName: string | undefined;
@@ -154,7 +142,6 @@ export interface ScannedProvides {
 /** Result of scanning source files. */
 export interface ScanResult {
   beans: ScannedBean[];
-  modules: ScannedModule[];
   warnings: string[];
   /** Plugin-accumulated class metadata, keyed by "filePath:className". Only populated when plugins with visitor hooks are provided. */
   pluginMetadata?: Map<string, Record<string, unknown>>;
@@ -166,7 +153,6 @@ export function scan(
   plugins?: TransformerPlugin[],
 ): ScanResult {
   const beans: ScannedBean[] = [];
-  const modules: ScannedModule[] = [];
   const warnings: string[] = [];
   const pluginMetadata = new Map<string, Record<string, unknown>>();
   const hasVisitors =
@@ -283,31 +269,21 @@ export function scan(
         );
       }
 
-      if (isController) {
-        // Controllers are implicitly singletons — register as bean only.
-        // Route scanning is done by the hono plugin via visitClass/visitMethod.
+      if (
+        isController ||
+        isModule ||
+        isInjectable ||
+        isSingleton ||
+        isPostProcessor
+      ) {
+        const isSingletonScope =
+          isController || isModule || isSingleton || isPostProcessor;
         const scannedBean = scanBean(
           cls,
           decorators,
           sourceFile,
-          true,
-          typeCache,
-        );
-        if (scannedBean) beans.push(scannedBean);
-      } else if (isModule) {
-        const scannedModule = scanModule(
-          cls,
-          decorators,
-          sourceFile,
-          typeCache,
-        );
-        if (scannedModule) modules.push(scannedModule);
-      } else if (isInjectable || isSingleton || isPostProcessor) {
-        const scannedBean = scanBean(
-          cls,
-          decorators,
-          sourceFile,
-          isSingleton || isPostProcessor,
+          isSingletonScope,
+          isModule,
           typeCache,
         );
         if (scannedBean) beans.push(scannedBean);
@@ -317,7 +293,6 @@ export function scan(
 
   return {
     beans,
-    modules,
     warnings,
     ...(hasVisitors ? { pluginMetadata } : {}),
   };
@@ -328,6 +303,7 @@ function scanBean(
   decorators: Decorator[],
   sourceFile: SourceFile,
   isSingleton: boolean,
+  isModule: boolean,
   cache: TypeResolutionCache,
 ): ScannedBean | undefined {
   const className = cls.getName();
@@ -345,6 +321,7 @@ function scanBean(
   );
   const valueFields = scanValueFields(cls);
   const baseClasses = extractBaseClasses(cls);
+  const provides = scanProvidesMethods(cls, sourceFile, cache);
 
   return {
     classDeclaration: cls,
@@ -363,36 +340,8 @@ function scanBean(
     isBeanPostProcessor,
     valueFields,
     baseClasses,
-    sourceLocation: getSourceLocation(cls, sourceFile),
-  };
-}
-
-function scanModule(
-  cls: ClassDeclaration,
-  decorators: Decorator[],
-  sourceFile: SourceFile,
-  cache: TypeResolutionCache,
-): ScannedModule | undefined {
-  const className = cls.getName();
-  if (!className) return undefined;
-
-  const moduleDecorator = findDecorator(decorators, DECORATOR_NAMES.Module)!;
-  const imports = getModuleImports(moduleDecorator);
-  const provides = scanProvidesMethods(cls, sourceFile, cache);
-  const constructorParams = scanConstructorParams(cls, cache);
-  const fieldInjections = scanFieldInjections(cls, cache);
-
-  return {
-    classDeclaration: cls,
-    classTokenRef: {
-      kind: 'class',
-      className,
-      importPath: sourceFile.getFilePath(),
-    },
-    imports,
+    isModule,
     provides,
-    constructorParams,
-    fieldInjections,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
 }
@@ -809,46 +758,6 @@ function getNamedValue(decorators: Decorator[]): string | undefined {
     return text.slice(1, -1);
   }
   return text;
-}
-
-function getModuleImports(decorator: Decorator): ScannedModuleImport[] {
-  const args = decorator.getArguments();
-  if (args.length === 0) return [];
-
-  const arg = args[0];
-  // The argument should be an object literal: { imports: [A, B] }
-  if (arg.getKind() !== SyntaxKind.ObjectLiteralExpression) return [];
-
-  const objLiteral = arg.asKind(SyntaxKind.ObjectLiteralExpression);
-  if (!objLiteral) return [];
-
-  const importsProp = objLiteral.getProperty('imports');
-  if (!importsProp) return [];
-
-  const initializer = importsProp
-    .asKind(SyntaxKind.PropertyAssignment)
-    ?.getInitializer();
-  if (
-    !initializer ||
-    initializer.getKind() !== SyntaxKind.ArrayLiteralExpression
-  )
-    return [];
-
-  const arrayLiteral = initializer.asKind(SyntaxKind.ArrayLiteralExpression);
-  if (!arrayLiteral) return [];
-
-  return arrayLiteral.getElements().map((element) => {
-    const text = element.getText();
-    const symbol = element.getType().getSymbol();
-    let sourceFile: SourceFile | undefined;
-    if (symbol) {
-      const decls = symbol.getDeclarations();
-      if (decls.length > 0) {
-        sourceFile = decls[0].getSourceFile();
-      }
-    }
-    return { className: text, sourceFile };
-  });
 }
 
 // ── Source location ──

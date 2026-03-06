@@ -1,10 +1,7 @@
 import type {
-  ClassTokenRef,
   IRBeanDefinition,
   IRDependency,
   IRFieldInjection,
-  IRModule,
-  IRProvides,
   SourceLocation,
   TokenRef,
 } from './ir.js';
@@ -12,7 +9,6 @@ import type {
   ScannedBean,
   ScannedConstructorParam,
   ScannedFieldInjection,
-  ScannedModule,
   ScannedTypeArgument,
   ScanResult,
 } from './scanner.js';
@@ -21,7 +17,6 @@ import { UnresolvableTypeError } from './transformer-errors.js';
 /** Result of the resolver stage. */
 export interface ResolveResult {
   beans: IRBeanDefinition[];
-  modules: IRModule[];
   warnings: string[];
 }
 
@@ -44,29 +39,26 @@ const PRIMITIVE_TYPES = new Set([
 /**
  * Resolve scanned AST information into typed IR.
  * Converts raw type names and source files into TokenRefs.
+ *
+ * Beans with @Provides methods are expanded inline: the bean itself is
+ * registered as a singleton, and each @Provides method becomes a separate
+ * bean with `factoryKind: 'provides'`.
  */
 export function resolve(scanResult: ScanResult): ResolveResult {
   const warnings: string[] = [...scanResult.warnings];
   const beans: IRBeanDefinition[] = [];
-  const modules: IRModule[] = [];
 
-  // Resolve regular beans
   for (const scanned of scanResult.beans) {
-    beans.push(resolveBean(scanned, warnings));
+    beans.push(...resolveBean(scanned, warnings));
   }
 
-  // Resolve modules
-  for (const scannedModule of scanResult.modules) {
-    modules.push(resolveModule(scannedModule, warnings));
-  }
-
-  return { beans, modules, warnings };
+  return { beans, warnings };
 }
 
 function resolveBean(
   scanned: ScannedBean,
   _warnings: string[],
-): IRBeanDefinition {
+): IRBeanDefinition[] {
   const constructorDeps = resolveConstructorParams(
     scanned.constructorParams,
     scanned.classTokenRef.className,
@@ -94,8 +86,11 @@ function resolveBean(
       default: vf.defaultValue,
     }));
   }
+  if (scanned.isModule) {
+    metadata.isModule = true;
+  }
 
-  return {
+  const beanDef: IRBeanDefinition = {
     tokenRef: scanned.classTokenRef,
     scope: scanned.scope,
     eager: scanned.eager,
@@ -109,30 +104,32 @@ function resolveBean(
     metadata,
     sourceLocation: scanned.sourceLocation,
   };
-}
 
-function resolveModule(
-  scannedModule: ScannedModule,
-  warnings: string[],
-): IRModule {
-  const imports: ClassTokenRef[] = [];
-  for (const imp of scannedModule.imports) {
-    if (!imp.sourceFile) {
-      warnings.push(
-        `Module ${scannedModule.classTokenRef.className}: could not resolve import '${imp.className}' — it may be missing or not in scope`,
-      );
-      continue;
-    }
-    imports.push({
-      kind: 'class' as const,
-      className: imp.className,
-      importPath: imp.sourceFile.getFilePath(),
-    });
+  const result: IRBeanDefinition[] = [beanDef];
+
+  // Expand @Provides methods into separate beans
+  if (scanned.provides.length > 0) {
+    const providesBeans = expandProvides(scanned, beanDef);
+    result.push(...providesBeans);
   }
 
+  return result;
+}
+
+/**
+ * Expand @Provides methods on a bean into separate IRBeanDefinition entries.
+ * Each @Provides method becomes a bean with `factoryKind: 'provides'` whose
+ * first constructor dependency is the owning bean instance.
+ */
+function expandProvides(
+  scanned: ScannedBean,
+  ownerBean: IRBeanDefinition,
+): IRBeanDefinition[] {
+  const className = scanned.classTokenRef.className;
+
   // Two-pass provides resolution:
-  // Pass 1: resolve return types to get each method's tokenRef + return type name
-  const providesWithTokens = scannedModule.provides.map((p) => ({
+  // Pass 1: resolve return types to get each method's tokenRef
+  const providesWithTokens = scanned.provides.map((p) => ({
     scanned: p,
     tokenRef: resolveProvidesReturnType(
       p.returnTypeName,
@@ -161,53 +158,48 @@ function resolveModule(
     }
   }
 
-  // Pass 2: resolve params, wiring primitive params to matching provides
-  const provides: IRProvides[] = providesWithTokens.map(
-    ({ scanned: p, tokenRef }) => {
-      const dependencies = resolveProvidesParams(
-        p.params,
-        `${scannedModule.classTokenRef.className}.${p.methodName}`,
-        providesByReturnType,
-      );
+  // Pass 2: resolve params and create bean definitions
+  return providesWithTokens.map(({ scanned: p, tokenRef }) => {
+    const dependencies = resolveProvidesParams(
+      p.params,
+      `${className}.${p.methodName}`,
+      providesByReturnType,
+    );
 
-      return {
+    // Owner bean instance is the implicit first dependency
+    const ownerDep: IRDependency = {
+      tokenRef: ownerBean.tokenRef,
+      optional: false,
+      collection: false,
+      sourceLocation: p.sourceLocation,
+    };
+
+    return {
+      tokenRef,
+      scope: 'singleton' as const,
+      eager: p.eager,
+      name: undefined,
+      constructorDeps: [ownerDep, ...dependencies],
+      fieldDeps: [],
+      factoryKind: 'provides' as const,
+      providesSource: {
+        moduleTokenRef: scanned.classTokenRef,
         methodName: p.methodName,
-        tokenRef,
-        scope: 'singleton' as const,
-        eager: p.eager,
-        dependencies,
-        sourceLocation: p.sourceLocation,
-      };
-    },
-  );
-
-  const constructorDeps = scannedModule.constructorParams
-    ? resolveConstructorParams(
-        scannedModule.constructorParams,
-        scannedModule.classTokenRef.className,
-      )
-    : [];
-
-  const fieldDeps = scannedModule.fieldInjections
-    ? resolveFieldInjections(
-        scannedModule.fieldInjections,
-        scannedModule.classTokenRef.className,
-      )
-    : [];
-
-  return {
-    classTokenRef: scannedModule.classTokenRef,
-    imports,
-    provides,
-    constructorDeps,
-    fieldDeps,
-    sourceLocation: scannedModule.sourceLocation,
-  };
+      },
+      baseTokenRefs: undefined,
+      metadata: {},
+      sourceLocation: p.sourceLocation,
+    };
+  });
 }
 
 /**
  * Resolve @Provides method parameters, with special handling for primitives.
  * Primitive-typed params are matched to other @Provides methods that return that type.
+ *
+ * Note: primitive param resolution is scoped to the owning bean's @Provides methods.
+ * A primitive @Provides on bean X cannot be auto-wired as a param of bean Y's @Provides.
+ * Cross-bean primitive wiring requires an explicit InjectionToken.
  */
 function resolveProvidesParams(
   params: ScannedConstructorParam[],

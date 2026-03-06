@@ -198,9 +198,12 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.modules).toHaveLength(1);
-      expect(result.modules[0].provides).toHaveLength(1);
-      expect(result.modules[0].provides[0].tokenRef).toEqual({
+      // @Provides is expanded into a separate bean with factoryKind: 'provides'
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans).toHaveLength(1);
+      expect(providesBeans[0].tokenRef).toEqual({
         kind: 'class',
         className: 'Client',
         importPath: '/src/Client.ts',
@@ -224,7 +227,11 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.modules[0].provides[0].tokenRef).toEqual({
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans).toHaveLength(1);
+      expect(providesBeans[0].tokenRef).toEqual({
         kind: 'injection-token',
         tokenName: 'dbUrl',
         importPath: undefined,
@@ -254,12 +261,15 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.modules).toHaveLength(1);
-      const eager = result.modules[0].provides.find(
-        (p) => p.methodName === 'startupService',
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans).toHaveLength(2);
+      const eager = providesBeans.find(
+        (b) => b.providesSource?.methodName === 'startupService',
       )!;
-      const lazy = result.modules[0].provides.find(
-        (p) => p.methodName === 'lazyService',
+      const lazy = providesBeans.find(
+        (b) => b.providesSource?.methodName === 'lazyService',
       )!;
       expect(eager.eager).toBe(true);
       expect(lazy.eager).toBe(false);
@@ -282,7 +292,10 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.modules[0].provides[0].scope).toBe('singleton');
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans[0].scope).toBe('singleton');
     });
 
     it('should resolve @Provides method parameter dependencies', () => {
@@ -309,72 +322,93 @@ describe('Resolver', () => {
         `,
       });
 
-      const provides = result.modules[0].provides[0];
-      expect(provides.dependencies).toHaveLength(1);
-      expect(provides.dependencies[0].tokenRef).toMatchObject({
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans).toHaveLength(1);
+      // First dep is the owner module, second is the method param
+      expect(providesBeans[0].constructorDeps).toHaveLength(2);
+      expect(providesBeans[0].constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'AppModule',
+      });
+      expect(providesBeans[0].constructorDeps[1].tokenRef).toMatchObject({
         kind: 'class',
         className: 'Config',
       });
     });
   });
 
-  describe('module resolution', () => {
-    it('should warn when module import cannot be resolved', () => {
-      const loc = { filePath: '/src/AppModule.ts', line: 1, column: 1 };
-      const result = resolve({
-        beans: [],
-        modules: [
-          {
-            classDeclaration: undefined as any,
-            classTokenRef: {
-              kind: 'class' as const,
-              className: 'AppModule',
-              importPath: '/src/AppModule.ts',
-            },
-            imports: [{ className: 'MissingModule', sourceFile: undefined }],
-            provides: [],
-            sourceLocation: loc,
-          },
-        ],
-        warnings: [],
+  describe('@Provides on non-@Module beans', () => {
+    it('should expand @Provides on a @Singleton without setting isModule', () => {
+      const result = scanAndResolve({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Provides() { return (t: any, c: any) => {} }
+        `,
+        '/src/AppConfig.ts': `
+          import { Singleton, Provides } from './decorators.js'
+
+          @Singleton()
+          export class AppConfig {
+            @Provides()
+            dbUrl(): string { return 'postgres://localhost' }
+          }
+        `,
       });
 
-      const appModule = result.modules.find(
-        (m) => m.classTokenRef.className === 'AppModule',
+      // The @Singleton bean itself should NOT have isModule metadata
+      const configBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'AppConfig' &&
+          b.factoryKind === 'constructor',
       )!;
-      // Unresolvable imports are skipped with a warning
-      expect(appModule.imports).toHaveLength(0);
-      expect(result.warnings.some((w) => w.includes('MissingModule'))).toBe(
-        true,
-      );
-    });
+      expect(configBean.metadata.isModule).toBeUndefined();
 
-    it('should resolve module imports to ClassTokenRefs', () => {
+      // The @Provides method should still expand into a separate bean
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans).toHaveLength(1);
+      expect(providesBeans[0].tokenRef).toEqual({
+        kind: 'injection-token',
+        tokenName: 'dbUrl',
+        importPath: undefined,
+        typeAnnotation: 'string',
+      });
+      expect(providesBeans[0].constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'AppConfig',
+      });
+    });
+  });
+
+  describe('module bean resolution', () => {
+    it('should register @Module class as a bean with isModule metadata', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Module(opts?: any) { return (t: any, c: any) => {} }
-        `,
-        '/src/DbModule.ts': `
-          import { Module } from './decorators.js'
-          @Module()
-          export class DbModule {}
+          export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
-          import { DbModule } from './DbModule.js'
+          import { Module, Provides } from './decorators.js'
 
-          @Module({ imports: [DbModule] })
-          export class AppModule {}
+          @Module()
+          export class AppModule {
+            @Provides()
+            dbUrl(): string { return 'postgres://localhost' }
+          }
         `,
       });
 
-      const appModule = result.modules.find(
-        (m) => m.classTokenRef.className === 'AppModule',
-      )!;
-      expect(appModule.imports).toHaveLength(1);
-      expect(appModule.imports[0]).toMatchObject({
+      const moduleBeans = result.beans.filter(
+        (b) => b.factoryKind === 'constructor' && b.metadata.isModule,
+      );
+      expect(moduleBeans).toHaveLength(1);
+      expect(moduleBeans[0].tokenRef).toMatchObject({
         kind: 'class',
-        className: 'DbModule',
+        className: 'AppModule',
       });
     });
   });
@@ -529,7 +563,11 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.modules[0].provides[0].tokenRef).toEqual({
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans).toHaveLength(1);
+      expect(providesBeans[0].tokenRef).toEqual({
         kind: 'injection-token',
         tokenName: 'Repository<User>',
         importPath: '/src/Repository.ts',
