@@ -11,4 +11,3 @@ export type {
 } from './metadata.js';
 export { HTTP_META } from './metadata.js';
 export { Delete, Get, Patch, Post, Put } from './route.js';
-export { Validate } from './validate.js';
