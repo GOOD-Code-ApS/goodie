@@ -334,9 +334,6 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:^
         version: link:../core
-      '@goodie-ts/kysely':
-        specifier: workspace:^
-        version: link:../kysely
       vitest:
         specifier: '>=3.0.0'
         version: 3.2.4(@types/node@22.19.11)(tsx@4.21.0)(yaml@2.8.2)
