@@ -36,7 +36,7 @@ describe('Kysely Transformer Plugin', () => {
       "import { TransactionManager, TransactionalInterceptor } from '@goodie-ts/kysely'",
     );
     expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/aop'",
+      "import { buildInterceptorChain } from '@goodie-ts/core'",
     );
   });
 

@@ -4,8 +4,8 @@ import {
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
-import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
-import { createAopPlugin } from '../src/aop-transformer-plugin.js';
+import { createAopPlugin } from '../src/builtin-aop-plugin.js';
+import { DECORATOR_STUBS } from './helpers.js';
 
 describe('AOP Integration — Generated Code', () => {
   function createProject(files: Record<string, string>) {
@@ -50,7 +50,7 @@ describe('AOP Integration — Generated Code', () => {
     expect(postProcessorBean).toBeUndefined();
   });
 
-  it('imports buildInterceptorChain from @goodie-ts/aop', () => {
+  it('imports buildInterceptorChain from @goodie-ts/core', () => {
     const project = createProject({
       '/src/TimingInterceptor.ts': `
         import { Singleton } from './decorators.js'
@@ -71,7 +71,7 @@ describe('AOP Integration — Generated Code', () => {
     ]);
 
     expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/aop'",
+      "import { buildInterceptorChain } from '@goodie-ts/core'",
     );
   });
 
@@ -128,7 +128,7 @@ describe('AOP Integration — Generated Code', () => {
     expect(result.code).toContain('wrapBeforeAdvice');
     expect(result.code).toContain('wrapAfterAdvice');
     expect(result.code).toContain(
-      "import { buildInterceptorChain, wrapBeforeAdvice, wrapAfterAdvice } from '@goodie-ts/aop'",
+      "import { buildInterceptorChain, wrapBeforeAdvice, wrapAfterAdvice } from '@goodie-ts/core'",
     );
   });
 

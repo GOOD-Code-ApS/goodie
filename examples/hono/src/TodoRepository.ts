@@ -1,4 +1,4 @@
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 import { Retryable } from '@goodie-ts/resilience';
 import type { Database } from './Database.js';
 import type { Todo } from './db/schema.js';

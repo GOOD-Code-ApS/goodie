@@ -28,7 +28,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/aop": "workspace:^"
+    "@goodie-ts/core": "workspace:^"
   },
   "peerDependencies": {
     "kysely": ">=0.27.0"

@@ -326,7 +326,7 @@ export function createDeclarativeAopPlugin(
       }
 
       // Always add buildInterceptorChain when there's any AOP wiring
-      imports.push("import { buildInterceptorChain } from '@goodie-ts/aop'");
+      imports.push("import { buildInterceptorChain } from '@goodie-ts/core'");
 
       return { imports };
     },

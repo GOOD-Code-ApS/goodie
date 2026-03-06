@@ -1,4 +1,4 @@
-import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
+import type { InvocationContext, MethodInterceptor } from '@goodie-ts/core';
 import type { TransactionManager } from './transaction-manager.js';
 
 /** Metadata shape expected from the kysely transformer plugin. */

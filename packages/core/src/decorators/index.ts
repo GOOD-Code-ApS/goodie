@@ -1,3 +1,12 @@
+export type { AfterOptions } from './after.js';
+export { After } from './after.js';
+export type { AroundOptions } from './around.js';
+export { Around } from './around.js';
+export type { BeforeOptions } from './before.js';
+export { Before } from './before.js';
+export { ConfigurationProperties } from './configuration-properties.js';
+export type { AopDecoratorConfig } from './create-aop-decorator.js';
+export { createAopDecorator } from './create-aop-decorator.js';
 export { Eager } from './eager.js';
 export { Inject } from './inject.js';
 export { Injectable } from './injectable.js';

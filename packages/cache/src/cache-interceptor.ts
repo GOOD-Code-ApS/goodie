@@ -1,5 +1,5 @@
-import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
-import { Singleton } from '@goodie-ts/decorators';
+import type { InvocationContext, MethodInterceptor } from '@goodie-ts/core';
+import { Singleton } from '@goodie-ts/core';
 import type { CacheManager } from './cache-manager.js';
 
 /** Metadata shape expected from the cache transformer plugin. */

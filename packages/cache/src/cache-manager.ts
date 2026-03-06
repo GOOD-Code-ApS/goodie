@@ -1,4 +1,4 @@
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 
 /** Entry stored in a cache with optional TTL. */
 interface CacheEntry<T = unknown> {

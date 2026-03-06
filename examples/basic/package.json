@@ -8,8 +8,7 @@
     "generate": "goodie generate"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:*",
-    "@goodie-ts/decorators": "workspace:*"
+    "@goodie-ts/core": "workspace:*"
   },
   "devDependencies": {
     "@goodie-ts/cli": "workspace:*",

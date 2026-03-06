@@ -20,7 +20,7 @@ import {
   ApplicationEventListener,
   EventPublisher,
 } from '@goodie-ts/events';
-import { Singleton, Inject } from '@goodie-ts/decorators';
+import { Singleton, Inject } from '@goodie-ts/core';
 
 // Define an event class
 class UserCreatedEvent extends ApplicationEvent {

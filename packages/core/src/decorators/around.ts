@@ -1,4 +1,4 @@
-import type { MethodInterceptor } from '../types.js';
+import type { MethodInterceptor } from '../aop-types.js';
 
 type Constructor<T = MethodInterceptor> = new (...args: any[]) => T;
 
@@ -11,9 +11,8 @@ export interface AroundOptions {
  * The interceptor's `intercept()` wraps the full method execution.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
- * The `@goodie-ts/aop` transformer plugin reads decorator arguments via
- * ts-morph AST inspection and generates `buildInterceptorChain()` calls
- * in the factory function.
+ * The AOP transformer plugin reads decorator arguments via ts-morph AST
+ * inspection and generates `buildInterceptorChain()` calls in the factory function.
  */
 export function Around(
   _interceptorClass: Constructor,

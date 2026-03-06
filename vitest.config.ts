@@ -5,10 +5,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@goodie-ts/core': path.resolve(__dirname, 'packages/core/src/index.ts'),
-      '@goodie-ts/decorators': path.resolve(
-        __dirname,
-        'packages/decorators/src/index.ts',
-      ),
       '@goodie-ts/transformer': path.resolve(
         __dirname,
         'packages/transformer/src/index.ts',
@@ -26,7 +22,6 @@ export default defineConfig({
         'packages/testing/src/index.ts',
       ),
       '@goodie-ts/cli': path.resolve(__dirname, 'packages/cli/src/index.ts'),
-      '@goodie-ts/aop': path.resolve(__dirname, 'packages/aop/src/index.ts'),
       '@goodie-ts/hono': path.resolve(__dirname, 'packages/hono/src/index.ts'),
       '@goodie-ts/health': path.resolve(
         __dirname,
@@ -43,10 +38,6 @@ export default defineConfig({
       '@goodie-ts/resilience': path.resolve(
         __dirname,
         'packages/resilience/src/index.ts',
-      ),
-      '@goodie-ts/config': path.resolve(
-        __dirname,
-        'packages/config/src/index.ts',
       ),
       '@goodie-ts/kysely': path.resolve(
         __dirname,

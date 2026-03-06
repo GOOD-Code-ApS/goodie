@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { wrapAfterAdvice, wrapBeforeAdvice } from '../src/advice-wrappers.js';
+import type { AfterAdvice, BeforeAdvice } from '../src/aop-types.js';
 import { buildInterceptorChain } from '../src/interceptor-chain.js';
-import type { AfterAdvice, BeforeAdvice } from '../src/types.js';
 
 describe('wrapBeforeAdvice', () => {
   it('runs before advice then proceeds', () => {

@@ -31,8 +31,7 @@
     "dist"
   ],
   "dependencies": {
-    "@goodie-ts/aop": "workspace:^",
-    "@goodie-ts/decorators": "workspace:^"
+    "@goodie-ts/core": "workspace:^"
   },
   "devDependencies": {
     "@goodie-ts/cli": "workspace:*",

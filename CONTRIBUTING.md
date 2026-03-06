@@ -56,10 +56,10 @@ Library beans allow packages to ship pre-scanned bean definitions so consumers d
 
 ### 1. Decorate source classes
 
-Add `@Singleton()` (from `@goodie-ts/decorators`) to classes that should be discoverable:
+Add `@Singleton()` (from `@goodie-ts/core`) to classes that should be discoverable:
 
 ```typescript
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 
 @Singleton()
 export class MyInterceptor implements MethodInterceptor { ... }
@@ -76,7 +76,7 @@ export class MyInterceptor implements MethodInterceptor { ... }
     "build": "tsc && goodie generate --mode library"
   },
   "dependencies": {
-    "@goodie-ts/decorators": "workspace:^"
+    "@goodie-ts/core": "workspace:^"
   },
   "devDependencies": {
     "@goodie-ts/cli": "workspace:*"
@@ -96,7 +96,7 @@ Consumers automatically discover beans via `discoverLibraryBeans()` at build tim
 
 ## Adding Declarative AOP to a Package
 
-For packages that provide AOP decorators (e.g. `@Log`, `@Cacheable`, `@Retryable`), use `createAopDecorator<{...}>()` from `@goodie-ts/aop`. The full AOP configuration lives in the type parameter — the transformer extracts it at build time via the TypeScript type checker.
+For packages that provide AOP decorators (e.g. `@Log`, `@Cacheable`, `@Retryable`), use `createAopDecorator<{...}>()` from `@goodie-ts/core`. The full AOP configuration lives in the type parameter — the transformer extracts it at build time via the TypeScript type checker.
 
 ### How it works
 
@@ -109,7 +109,7 @@ No hand-written transformer plugins, no `goodie.aop` in package.json — the sou
 ### `createAopDecorator` API
 
 ```typescript
-import { createAopDecorator } from '@goodie-ts/aop';
+import { createAopDecorator } from '@goodie-ts/core';
 import type { MyInterceptor } from './my-interceptor.js';
 
 export const MyDecorator = createAopDecorator<{
@@ -193,4 +193,4 @@ For non-AOP concerns (config binding, migration wiring, etc.), implement a `Tran
 
 The plugin module must have a **default export** that is a no-arg factory function returning a `TransformerPlugin`. Plugins are auto-discovered from packages in the scanned scopes (default: `@goodie-ts`) — consumers don't need to list them manually.
 
-See `packages/config` and `packages/kysely` for examples.
+See `packages/kysely` for an example.

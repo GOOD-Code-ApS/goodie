@@ -1,10 +1,9 @@
-import { InjectionToken } from '@goodie-ts/core';
-import { describe, expect, it } from 'vitest';
 import {
   Eager,
   getClassMetadata,
   Inject,
   Injectable,
+  InjectionToken,
   META,
   Module,
   Named,
@@ -15,7 +14,8 @@ import {
   Provides,
   Singleton,
   Value,
-} from '../src/index.js';
+} from '@goodie-ts/core';
+import { describe, expect, it } from 'vitest';
 
 // Polyfill for test environment
 Symbol.metadata ??= Symbol('Symbol.metadata');

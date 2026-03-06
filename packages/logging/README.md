@@ -1,6 +1,6 @@
 # @goodie-ts/logging
 
-Method logging for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — `@Log` decorator and `LoggerFactory` static API. Built on `@goodie-ts/aop`.
+Method logging for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — `@Log` decorator and `LoggerFactory` static API. Built on the AOP interceptor chain in `@goodie-ts/core`.
 
 ## Install
 
@@ -16,7 +16,7 @@ Two approaches: **AOP** (`@Log`) for automatic entry/exit logging, and **imperat
 
 ```typescript
 import { Log } from '@goodie-ts/logging';
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 
 @Singleton()
 class UserService {
@@ -32,7 +32,7 @@ class UserService {
 
 ```typescript
 import { LoggerFactory } from '@goodie-ts/logging';
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 
 @Singleton()
 class OrderService {

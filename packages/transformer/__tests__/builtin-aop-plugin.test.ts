@@ -1,9 +1,9 @@
+import type { InterceptedMethodDescriptor } from '@goodie-ts/core';
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
-import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
-import { createAopPlugin } from '../src/aop-transformer-plugin.js';
-import type { InterceptedMethodDescriptor } from '../src/types.js';
+import { createAopPlugin } from '../src/builtin-aop-plugin.js';
+import { DECORATOR_STUBS } from './helpers.js';
 
 describe('AOP Plugin', () => {
   function createProject(files: Record<string, string>) {

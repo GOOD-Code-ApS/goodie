@@ -1,4 +1,4 @@
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 import type { HealthResult } from './health-indicator.js';
 import { HealthIndicator } from './health-indicator.js';
 
