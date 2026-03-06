@@ -75,7 +75,7 @@ Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in pa
 Library beans use bare package specifiers (`@goodie-ts/kysely`) in their tokenRefs (set by `rewriteImportPaths` during `transformLibrary`). When user code imports a library class, ts-morph resolves the dependency to the declaration's absolute file path. `reconcileLibraryImportPaths()` in `transform.ts` bridges this mismatch:
 
 1. **Bean lookup** — className → library bean tokenRef map. Rewrites deps when className matches a known library bean.
-2. **`packageDirs` fallback** — for non-bean library classes (e.g. `CrudRepository` used in `baseTokenRefs`), checks if the absolute import path falls under a known library package directory (resolved via `fs.realpathSync` during `discoverAll()`). `DiscoverAllResult.packageDirs` maps real directory paths → bare package names.
+2. **`packageDirs` fallback** — for non-bean library classes (e.g. abstract base classes used in `baseTokenRefs`), checks if the absolute import path falls under a known library package directory (resolved via `fs.realpathSync` during `discoverAll()`). `DiscoverAllResult.packageDirs` maps real directory paths → bare package names.
 
 ## Library Mode (`transformLibrary`)
 

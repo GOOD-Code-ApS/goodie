@@ -524,7 +524,7 @@ function reconcileLibraryImportPaths(
       }
       return ref;
     }
-    // Fallback: class isn't a bean but may live in a library package (e.g. CrudRepository).
+    // Fallback: class isn't a bean but may live in a library package.
     // Check if the absolute import path falls under a known library package directory.
     if (packageDirs && ref.importPath.startsWith('/')) {
       for (const [realDir, pkgName] of packageDirs) {

@@ -1,23 +1,25 @@
 import { Singleton } from '@goodie-ts/core';
-// biome-ignore lint/style/useImportType: DI requires value import for constructor injection
-import { CrudRepository, TransactionManager } from '@goodie-ts/kysely';
 import { Retryable } from '@goodie-ts/resilience';
+// biome-ignore lint/style/useImportType: DI requires value import for constructor injection
+import { Kysely } from 'kysely';
 import type { Database, Todo } from './db/schema.js';
 
 @Singleton()
-export class TodoRepository extends CrudRepository<Todo, Database> {
-  constructor(transactionManager: TransactionManager) {
-    super('todos', transactionManager);
+export class TodoRepository {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  @Retryable({ maxAttempts: 3, delay: 100 })
+  async findAll(): Promise<Todo[]> {
+    return this.db.selectFrom('todos').selectAll().execute();
   }
 
   @Retryable({ maxAttempts: 3, delay: 100 })
-  override async findAll(): Promise<Todo[]> {
-    return super.findAll();
-  }
-
-  @Retryable({ maxAttempts: 3, delay: 100 })
-  override async findById(id: unknown): Promise<Todo | undefined> {
-    return super.findById(id);
+  async findById(id: string): Promise<Todo | undefined> {
+    return this.db
+      .selectFrom('todos')
+      .selectAll()
+      .where('id', '=', id)
+      .executeTakeFirst();
   }
 
   async create(title: string): Promise<Todo> {
@@ -41,6 +43,10 @@ export class TodoRepository extends CrudRepository<Todo, Database> {
   }
 
   async delete(id: string): Promise<Todo | undefined> {
-    return this.deleteById(id);
+    return this.db
+      .deleteFrom('todos')
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst();
   }
 }
