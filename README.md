@@ -91,7 +91,7 @@ const userService = app.context.get(UserService);
 |---------|-------------|
 | [`@goodie-ts/cache`](./packages/cache) | In-memory caching — `@Cacheable`, `@CacheEvict`, `@CachePut` |
 | [`@goodie-ts/hono`](./packages/hono) | HTTP routing — `@Controller`, `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch`, `ServerConfig`, `EmbeddedServer`, transformer plugin |
-| [`@goodie-ts/kysely`](./packages/kysely) | Kysely integration — `@Transactional`, `@Migration`, `CrudRepository` |
+| [`@goodie-ts/kysely`](./packages/kysely) | Kysely integration — `KyselyDatabase`, `@Transactional`, `@Migration` |
 | [`@goodie-ts/logging`](./packages/logging) | Method logging — `@Log`, `LoggerFactory`, `MDC` |
 | [`@goodie-ts/health`](./packages/health) | Health checks — `HealthIndicator`, `HealthAggregator`, `UptimeHealthIndicator` |
 | [`@goodie-ts/resilience`](./packages/resilience) | Resilience patterns — `@Retryable`, `@CircuitBreaker`, `@Timeout` |

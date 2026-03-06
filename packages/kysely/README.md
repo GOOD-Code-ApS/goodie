@@ -1,6 +1,6 @@
 # @goodie-ts/kysely
 
-[Kysely](https://kysely.dev/) integration for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — declarative transactions, auto-wired migrations, and a CRUD repository base class.
+[Kysely](https://kysely.dev/) integration for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — `KyselyDatabase` library bean, declarative transactions, and auto-wired migrations.
 
 ## Install
 
@@ -10,7 +10,7 @@ pnpm add @goodie-ts/kysely kysely
 
 ## Overview
 
-Provides `@Transactional` for declarative transaction management, `@Migration` for auto-discovered database migrations, and `CrudRepository<T>` for common CRUD operations. All backed by `TransactionManager` which uses `AsyncLocalStorage` for transaction propagation.
+Provides `KyselyDatabase` as a library-provided `@Singleton` that creates and manages a `Kysely<any>` instance from configuration. Use `@Module` with `@Provides` for typed `Kysely<DB>` access. Includes `@Transactional` for declarative transaction management, `@Migration` for auto-discovered database migrations, and `TransactionManager` with `AsyncLocalStorage` for transaction propagation.
 
 ## Decorators
 
@@ -22,13 +22,26 @@ Provides `@Transactional` for declarative transaction management, `@Migration` f
 ## Usage
 
 ```typescript
-import { Singleton } from '@goodie-ts/core';
-import { Transactional, CrudRepository, TransactionManager } from '@goodie-ts/kysely';
+import { Module, Provides, Singleton } from '@goodie-ts/core';
+import { KyselyDatabase, Transactional } from '@goodie-ts/kysely';
+import type { Kysely } from 'kysely';
+
+@Module()
+class DatabaseModule {
+  constructor(private db: KyselyDatabase) {}
+
+  @Provides()
+  typedKysely(): Kysely<Database> {
+    return this.db.kysely as Kysely<Database>;
+  }
+}
 
 @Singleton()
-class TodoRepository extends CrudRepository<Todo> {
-  constructor(transactionManager: TransactionManager) {
-    super('todos', transactionManager);
+class TodoRepository {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async findAll(): Promise<Todo[]> {
+    return this.db.selectFrom('todos').selectAll().execute();
   }
 }
 
@@ -39,7 +52,7 @@ class TodoService {
   @Transactional()
   async createMany(titles: string[]) {
     for (const title of titles) {
-      await this.repo.save({ title, completed: false });
+      await this.repo.create(title);
     }
     // All-or-nothing: rolls back on error
   }
@@ -80,7 +93,7 @@ export default defineConfig({
 });
 ```
 
-The `database` option specifies the class name of your Kysely wrapper (a `@Singleton` with a `.kysely` property).
+The kysely plugin is auto-discovered — no manual `plugins` configuration needed. `KyselyDatabase` is provided as a library bean.
 
 ## License
 

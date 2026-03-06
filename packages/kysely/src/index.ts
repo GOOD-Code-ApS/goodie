@@ -1,5 +1,4 @@
 export { AbstractMigration } from './abstract-migration.js';
-export { CrudRepository } from './crud-repository.js';
 export { DatasourceConfig, PoolConfig } from './datasource-config.js';
 export { getMigrationName, Migration } from './decorators/migration.js';
 export { Transactional } from './decorators/transactional.js';
