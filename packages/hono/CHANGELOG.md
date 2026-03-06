@@ -1,5 +1,35 @@
 # @goodie-ts/hono
 
+## 0.7.0
+
+### Minor Changes
+
+- ce2a7e9: feat(hono)!: move controller scanning from transformer into hono plugin
+
+  BREAKING CHANGE: Removed public exports from `@goodie-ts/transformer`:
+  `IRControllerDefinition`, `IRRouteDefinition`, `IRRouteValidation`,
+  `HttpMethod`, `ScannedController`, `ScannedRoute`, `ScannedValidation`.
+
+  The transformer core no longer has any HTTP/controller knowledge beyond
+  `@Controller` implying singleton registration. All route scanning
+  (`@Get`, `@Post`, `@Validate`, etc.) now lives in the hono plugin's
+  `visitClass`/`visitMethod` hooks, following the Micronaut pattern where
+  HTTP processing is fully owned by the framework module.
+
+- ce2a7e9: feat(hono): extract route codegen into hono plugin, add ServerConfig and configDir support
+
+  - Move `createRouter()`/`startServer()` code generation from transformer core into `@goodie-ts/hono` plugin, auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }`
+  - Add `ServerConfig` class with `@ConfigurationProperties('server')` for host/port configuration
+  - Rewrite `EmbeddedServer` as a `@Singleton` with `ServerConfig` dependency (no longer synthesized in codegen)
+  - Resolver now stores controller metadata on `bean.metadata.controller` so plugins can read it
+  - Remove `hono` peer dependency from `@goodie-ts/transformer` — no longer coupled
+  - Add `configDir` option to `@goodie-ts/vite-plugin` for JSON config file support
+
+### Patch Changes
+
+- Updated dependencies [ce2a7e9]
+  - @goodie-ts/core@0.8.0
+
 ## 0.6.1
 
 ### Patch Changes
