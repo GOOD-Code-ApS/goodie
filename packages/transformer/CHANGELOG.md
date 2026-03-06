@@ -1,5 +1,26 @@
 # @goodie-ts/transformer
 
+## 0.10.0
+
+### Minor Changes
+
+- 4e7ae76: Remove `@Controller` from scanner's hardcoded decorator names. Plugins can now register classes as beans via `ctx.registerBean({ scope })` in their `visitClass` hook. The hono plugin uses this to register `@Controller` classes as singletons — the DI core no longer has any HTTP knowledge.
+
+  **BREAKING:** `@Controller` is no longer recognized by the scanner without the hono plugin. Projects using `@Controller` must have `@goodie-ts/hono` installed (which was already required for route codegen).
+
+- f793885: refactor!: unify @Module into @Singleton — @Provides is now an orthogonal capability on any bean
+
+  - Removed `IRModule`, `ScannedModule`, `ScannedModuleImport` types
+  - `@Module` classes are now scanned as regular beans (singleton scope) with `isModule` metadata
+  - `@Provides` expansion happens in the resolver stage instead of graph-builder's `expandModules()`
+  - Removed module imports (`@Module({ imports: [...] })`) — use constructor injection instead
+  - Any bean can now have `@Provides` methods, not just `@Module` classes
+
+### Patch Changes
+
+- Updated dependencies [2002163]
+  - @goodie-ts/core@0.8.1
+
 ## 0.9.1
 
 ### Patch Changes

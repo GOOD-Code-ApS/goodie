@@ -1,5 +1,11 @@
 # @goodie-ts/core
 
+## 0.8.1
+
+### Patch Changes
+
+- 2002163: feat(core): runtime startup metrics gated behind GOODIE_DEBUG=true
+
 ## 0.8.0
 
 ### Minor Changes

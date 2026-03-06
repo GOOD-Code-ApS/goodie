@@ -1,5 +1,20 @@
 # @goodie-ts/hono
 
+## 0.8.0
+
+### Minor Changes
+
+- 0c2a4ba: Add `@Cors()` decorator for compile-time CORS middleware generation. Can be applied at class level (all routes) or method level (specific routes). Method-level `@Cors` overrides class-level. The hono plugin emits Hono's `cors()` middleware from `hono/cors` in the generated code.
+- 2c564dd: Generate RPC-compatible typed routes via method chaining. The hono plugin now chains route registrations (`new Hono().get(...).post(...)`) instead of separate statements, enabling TypeScript to infer the full route type. Exports `AppType` and `createClient(baseUrl)` for end-to-end type-safe client usage with Hono's `hc`.
+- 4e7ae76: Remove `@Controller` from scanner's hardcoded decorator names. Plugins can now register classes as beans via `ctx.registerBean({ scope })` in their `visitClass` hook. The hono plugin uses this to register `@Controller` classes as singletons — the DI core no longer has any HTTP knowledge.
+
+  **BREAKING:** `@Controller` is no longer recognized by the scanner without the hono plugin. Projects using `@Controller` must have `@goodie-ts/hono` installed (which was already required for route codegen).
+
+### Patch Changes
+
+- Updated dependencies [2002163]
+  - @goodie-ts/core@0.8.1
+
 ## 0.7.0
 
 ### Minor Changes
