@@ -45,12 +45,12 @@ pnpm clean          # Clean all dist/
 | Package | Purpose |
 |---------|---------|
 | `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), BeanDefinition, InjectionToken, topoSort |
-| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config plugins |
+| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config plugins. Framework-agnostic — no HTTP knowledge. |
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
 | `packages/testing` | TestContext with bean overrides and @MockDefinition |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
-| `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc. |
+| `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc., ServerConfig, EmbeddedServer, transformer plugin |
 | `packages/kysely` | Kysely integration — @Transactional, @Migration, CrudRepository |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
 | `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |

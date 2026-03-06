@@ -40,6 +40,10 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
 - **`IRProvides`** / **`IRModule`** — module factory methods
 
+## Controller Support
+
+The scanner recognizes `@Controller` as a decorator that implies singleton bean registration (similar to how `@PostProcessor` implies singleton). Beyond this, the transformer has **zero knowledge of HTTP methods, routes, or validation**. All route scanning (`@Get`, `@Post`, `@Validate`, etc.) and codegen (`createRouter`, `startServer`) is handled by the `@goodie-ts/hono` plugin via `visitClass`/`visitMethod` hooks. This follows the Micronaut pattern where `micronaut-inject` knows nothing about HTTP.
+
 ## Codegen Conventions
 
 - **Token variable names**: Pascal_Snake_Case + `_Token` suffix
@@ -50,6 +54,14 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 - **Factory patterns**: constructor → `new Cls(dep0, dep1)`, provides → `(dep0 as Module).method(dep1)`
 - **Field injection**: factory body creates instance, assigns fields, returns instance
 - **Module metadata**: `{ isModule: true }` on module bean definitions
+
+## Plugin System
+
+External packages can contribute codegen via the `TransformerPlugin` interface:
+- `visitClass` / `visitMethod` — scan hooks called during the single AST pass
+- `codegen(beans)` — returns `CodegenContribution` (`{ imports, code }`) appended to generated output
+
+Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, config) are always active.
 
 ## Graph Builder Details
 
@@ -78,7 +90,7 @@ Consumers discover AOP mappings via `discoverAopMappings()`, which reads beans.j
 
 ## Testing
 
-Tests use `createTestProject` helper for in-memory ts-morph projects — no real filesystem needed.
+Tests use `createTestProject` helper for in-memory ts-morph projects — no real filesystem needed. The `createTestProject` helper accepts an optional `plugins` parameter for testing external plugin codegen.
 
 ## Error Types
 

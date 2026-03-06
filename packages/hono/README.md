@@ -5,14 +5,16 @@ HTTP controller routing decorators for [goodie-ts](https://github.com/GOOD-Code-
 ## Install
 
 ```bash
-pnpm add @goodie-ts/hono hono
+pnpm add @goodie-ts/hono hono @hono/node-server
 ```
 
 ## Overview
 
-Provides `@Controller` and HTTP method decorators (`@Get`, `@Post`, etc.) that mark classes and methods for route registration. At build time, the transformer scans these decorators and generates a `createRouter(ctx)` function that wires controllers from the DI container to Hono routes. No runtime scanning required.
+Provides `@Controller` and HTTP method decorators (`@Get`, `@Post`, etc.) that mark classes and methods for route registration. At build time, the hono transformer plugin scans controller metadata on beans and generates a `createRouter(ctx)` function that wires controllers from the DI container to Hono routes. No runtime scanning required.
 
 `@Controller` implicitly registers the class as a singleton bean — no need to add `@Singleton`.
+
+The package also ships `ServerConfig` (configurable via `@ConfigurationProperties('server')`) and `EmbeddedServer` as library beans, auto-discovered at build time.
 
 ## Decorators
 
@@ -56,14 +58,38 @@ export class TodoController {
 }
 ```
 
-The transformer generates a `createRouter` function in `AppContext.generated.ts`:
+The hono plugin generates `createRouter` and `startServer` in `AppContext.generated.ts`:
+
+```typescript
+import { startServer } from './AppContext.generated.js';
+
+// Starts the DI context, wires routes, and listens on configured port
+await startServer();
+```
+
+Or for more control:
 
 ```typescript
 import { createRouter } from './AppContext.generated.js';
 
 const ctx = await app.start();
-const server = createRouter(ctx);
-serve({ fetch: server.fetch, port: 3000 });
+const router = createRouter(ctx);
+// Use router.fetch for testing or pass to a custom server
+```
+
+## Server Configuration
+
+`ServerConfig` is auto-discovered as a library bean. Configure it via a JSON config file:
+
+```json
+// config/default.json
+{ "server": { "host": "localhost", "port": 3000 } }
+```
+
+Or override at startup:
+
+```typescript
+await startServer({ port: 8080 });
 ```
 
 ## Route Handler Return Values
@@ -77,6 +103,9 @@ serve({ fetch: server.fetch, port: 3000 });
 ## Peer Dependencies
 
 - `hono` >= 4.0.0
+- `@hono/node-server` >= 1.0.0 (optional — only needed for `EmbeddedServer`)
+- `@hono/zod-validator` >= 0.4.0 (optional — only needed for `@Validate`)
+- `zod` >= 3.0.0 (optional — only needed for `@Validate`)
 
 ## License
 

@@ -1,7 +1,6 @@
 import type {
   ClassTokenRef,
   IRBeanDefinition,
-  IRControllerDefinition,
   IRDependency,
   IRFieldInjection,
   IRModule,
@@ -23,7 +22,6 @@ import { UnresolvableTypeError } from './transformer-errors.js';
 export interface ResolveResult {
   beans: IRBeanDefinition[];
   modules: IRModule[];
-  controllers: IRControllerDefinition[];
   warnings: string[];
 }
 
@@ -62,21 +60,7 @@ export function resolve(scanResult: ScanResult): ResolveResult {
     modules.push(resolveModule(scannedModule, warnings));
   }
 
-  // Resolve controllers
-  const controllers: IRControllerDefinition[] = (
-    scanResult.controllers ?? []
-  ).map((c) => ({
-    classTokenRef: c.classTokenRef,
-    basePath: c.basePath,
-    routes: c.routes.map((r) => ({
-      methodName: r.methodName,
-      httpMethod: r.httpMethod,
-      path: r.path,
-      ...(r.validation ? { validation: r.validation } : {}),
-    })),
-  }));
-
-  return { beans, modules, controllers, warnings };
+  return { beans, modules, warnings };
 }
 
 function resolveBean(

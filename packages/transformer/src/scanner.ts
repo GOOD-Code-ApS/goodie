@@ -44,12 +44,6 @@ const DECORATOR_NAMES = {
   PostProcessor: 'PostProcessor',
   Value: 'Value',
   Controller: 'Controller',
-  Get: 'Get',
-  Post: 'Post',
-  Put: 'Put',
-  Delete: 'Delete',
-  Patch: 'Patch',
-  Validate: 'Validate',
 } as const;
 
 /** A class decorated with @Injectable or @Singleton (but not @Module). */
@@ -155,40 +149,10 @@ export interface ScannedProvides {
   sourceLocation: SourceLocation;
 }
 
-/** HTTP method for a route. */
-export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
-
-/** A validation target extracted from @Validate on a route method. */
-export interface ScannedValidation {
-  target: 'json' | 'query' | 'param';
-  schemaRef: string;
-  importPath: string;
-}
-
-/** A route method discovered on a @Controller class. */
-export interface ScannedRoute {
-  methodName: string;
-  httpMethod: HttpMethod;
-  path: string;
-  validation?: ScannedValidation[];
-}
-
-/** A class decorated with @Controller(basePath). */
-export interface ScannedController {
-  classDeclaration: ClassDeclaration;
-  classTokenRef: ClassTokenRef;
-  basePath: string;
-  routes: ScannedRoute[];
-  /** The ScannedBean for this controller (controllers are singletons). */
-  beanRef: ScannedBean;
-  sourceLocation: SourceLocation;
-}
-
 /** Result of scanning source files. */
 export interface ScanResult {
   beans: ScannedBean[];
   modules: ScannedModule[];
-  controllers: ScannedController[];
   warnings: string[];
   /** Plugin-accumulated class metadata, keyed by "filePath:className". Only populated when plugins with visitor hooks are provided. */
   pluginMetadata?: Map<string, Record<string, unknown>>;
@@ -201,7 +165,6 @@ export function scan(
 ): ScanResult {
   const beans: ScannedBean[] = [];
   const modules: ScannedModule[] = [];
-  const controllers: ScannedController[] = [];
   const warnings: string[] = [];
   const pluginMetadata = new Map<string, Record<string, unknown>>();
   const hasVisitors =
@@ -319,7 +282,8 @@ export function scan(
       }
 
       if (isController) {
-        // Controllers are implicitly singletons — scan as bean too
+        // Controllers are implicitly singletons — register as bean only.
+        // Route scanning is done by the hono plugin via visitClass/visitMethod.
         const scannedBean = scanBean(
           cls,
           decorators,
@@ -327,16 +291,7 @@ export function scan(
           true,
           typeCache,
         );
-        if (scannedBean) {
-          beans.push(scannedBean);
-          const scannedController = scanController(
-            cls,
-            decorators,
-            sourceFile,
-            scannedBean,
-          );
-          if (scannedController) controllers.push(scannedController);
-        }
+        if (scannedBean) beans.push(scannedBean);
       } else if (isModule) {
         const scannedModule = scanModule(
           cls,
@@ -361,7 +316,6 @@ export function scan(
   return {
     beans,
     modules,
-    controllers,
     warnings,
     ...(hasVisitors ? { pluginMetadata } : {}),
   };
@@ -435,186 +389,6 @@ function scanModule(
     provides,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
-}
-
-function scanController(
-  cls: ClassDeclaration,
-  decorators: Decorator[],
-  sourceFile: SourceFile,
-  beanRef: ScannedBean,
-): ScannedController | undefined {
-  const className = cls.getName();
-  if (!className) return undefined;
-
-  const controllerDec = findDecorator(decorators, DECORATOR_NAMES.Controller)!;
-  const args = controllerDec.getArguments();
-  let basePath = '/';
-  if (args.length > 0) {
-    const argText = args[0].getText();
-    if (
-      (argText.startsWith("'") && argText.endsWith("'")) ||
-      (argText.startsWith('"') && argText.endsWith('"'))
-    ) {
-      basePath = argText.slice(1, -1);
-    }
-  }
-
-  const routes = scanControllerRoutes(cls);
-
-  return {
-    classDeclaration: cls,
-    classTokenRef: {
-      kind: 'class',
-      className,
-      importPath: sourceFile.getFilePath(),
-    },
-    basePath,
-    routes,
-    beanRef,
-    sourceLocation: getSourceLocation(cls, sourceFile),
-  };
-}
-
-/**
- * HTTP method decorator names mapped to their HTTP method.
- * Note: Like all decorator detection in the scanner, matching is by name only
- * (no import source verification). Route decorators are only scanned on
- * @Controller classes, limiting false positives to unlikely edge cases.
- */
-const ROUTE_DECORATOR_MAP: Record<string, HttpMethod> = {
-  [DECORATOR_NAMES.Get]: 'get',
-  [DECORATOR_NAMES.Post]: 'post',
-  [DECORATOR_NAMES.Put]: 'put',
-  [DECORATOR_NAMES.Delete]: 'delete',
-  [DECORATOR_NAMES.Patch]: 'patch',
-};
-
-function scanControllerRoutes(cls: ClassDeclaration): ScannedRoute[] {
-  const routes: ScannedRoute[] = [];
-
-  for (const method of cls.getMethods()) {
-    const decorators = method.getDecorators();
-    let httpMethod: HttpMethod | undefined;
-    let path = '/';
-
-    // Find the route decorator
-    for (const dec of decorators) {
-      const matched = ROUTE_DECORATOR_MAP[dec.getName()];
-      if (!matched) continue;
-      httpMethod = matched;
-
-      const args = dec.getArguments();
-      if (args.length > 0) {
-        const argText = args[0].getText();
-        if (
-          (argText.startsWith("'") && argText.endsWith("'")) ||
-          (argText.startsWith('"') && argText.endsWith('"'))
-        ) {
-          path = argText.slice(1, -1);
-        }
-      }
-      break;
-    }
-
-    if (!httpMethod) continue;
-
-    // Scan @Validate on this method
-    const validation = scanValidateDecorator(method.getDecorators(), cls);
-
-    routes.push({
-      methodName: method.getName(),
-      httpMethod,
-      path,
-      ...(validation.length > 0 ? { validation } : {}),
-    });
-  }
-
-  return routes;
-}
-
-/** Extract validation targets from @Validate({ json: schema, query: schema, param: schema }). */
-function scanValidateDecorator(
-  decorators: Decorator[],
-  cls: ClassDeclaration,
-): ScannedValidation[] {
-  const validateDec = findDecorator(decorators, DECORATOR_NAMES.Validate);
-  if (!validateDec) return [];
-
-  const args = validateDec.getArguments();
-  if (args.length === 0) return [];
-
-  const arg = args[0];
-  if (arg.getKind() !== SyntaxKind.ObjectLiteralExpression) return [];
-
-  const validations: ScannedValidation[] = [];
-  const objLiteral = arg.asKindOrThrow(SyntaxKind.ObjectLiteralExpression);
-
-  for (const prop of objLiteral.getProperties()) {
-    if (prop.getKind() !== SyntaxKind.PropertyAssignment) continue;
-    const propAssign = prop.asKindOrThrow(SyntaxKind.PropertyAssignment);
-    const target = propAssign.getName() as 'json' | 'query' | 'param';
-    if (target !== 'json' && target !== 'query' && target !== 'param') continue;
-
-    const initializer = propAssign.getInitializer();
-    if (!initializer) continue;
-
-    // Validate that the schema reference is a simple identifier or property access
-    // to prevent arbitrary expressions from being embedded in generated code.
-    const kind = initializer.getKind();
-    if (
-      kind !== SyntaxKind.Identifier &&
-      kind !== SyntaxKind.PropertyAccessExpression
-    ) {
-      throw new InvalidDecoratorUsageError(
-        'Validate',
-        `@Validate({ ${target}: ... }) value must be a variable reference or property access (e.g. mySchema or schemas.user), not an expression. Found: ${initializer.getText()}`,
-        getSourceLocation(initializer, cls.getSourceFile()),
-      );
-    }
-
-    const schemaRef = initializer.getText();
-
-    // Resolve import path of the schema variable
-    const importPath = resolveSchemaImportPath(initializer, cls);
-
-    validations.push({ target, schemaRef, importPath });
-  }
-
-  return validations;
-}
-
-/** Resolve the import path of a schema variable reference. */
-function resolveSchemaImportPath(
-  node: import('ts-morph').Node,
-  cls: ClassDeclaration,
-): string {
-  const sourceFile = cls.getSourceFile();
-  const varName = node.getText();
-
-  // Try to find the import declaration that brings this symbol into scope
-  for (const importDecl of sourceFile.getImportDeclarations()) {
-    for (const namedImport of importDecl.getNamedImports()) {
-      if (namedImport.getName() === varName) {
-        const moduleSpecifier = importDecl.getModuleSpecifierSourceFile();
-        if (moduleSpecifier) {
-          return moduleSpecifier.getFilePath();
-        }
-      }
-    }
-  }
-
-  // Fallback: symbol resolution via ts-morph type checker
-  const symbol = node.getSymbol();
-  if (symbol) {
-    const declarations = symbol.getDeclarations();
-    if (declarations.length > 0) {
-      const declSourceFile = declarations[0].getSourceFile();
-      return declSourceFile.getFilePath();
-    }
-  }
-
-  // Fallback: schema is defined in the same file as the controller
-  return sourceFile.getFilePath();
 }
 
 function scanConstructorParams(

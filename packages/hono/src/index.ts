@@ -8,4 +8,5 @@ export type {
 } from './metadata.js';
 export { HONO_META } from './metadata.js';
 export { Delete, Get, Patch, Post, Put } from './route.js';
+export { ServerConfig } from './server-config.js';
 export { Validate } from './validate.js';

@@ -14,6 +14,7 @@ export type {
 export { ApplicationContext } from './application-context.js';
 export type { BeanDefinition, Dependency } from './bean-definition.js';
 export type { BeanPostProcessor } from './bean-post-processor.js';
+export { flattenObject, loadConfigFiles } from './config-loader.js';
 export type {
   AfterOptions,
   AopDecoratorConfig,

@@ -1,4 +1,5 @@
 import { Project } from 'ts-morph';
+import type { TransformerPlugin } from '../src/options.js';
 import { transformInMemory } from '../src/transform.js';
 
 /** Standard decorator stubs for in-memory test projects. */
@@ -44,6 +45,7 @@ export function Validate(targets: any) { return (t: any, c: any) => {} }
 export function createTestProject(
   files: Record<string, string>,
   outputPath = '/out/AppContext.generated.ts',
+  plugins?: TransformerPlugin[],
 ) {
   const project = new Project({ useInMemoryFileSystem: true });
 
@@ -56,5 +58,5 @@ export function createTestProject(
     project.createSourceFile(filePath, content);
   }
 
-  return transformInMemory(project, outputPath);
+  return transformInMemory(project, outputPath, plugins);
 }
