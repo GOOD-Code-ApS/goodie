@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/cli",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "CLI for goodie-ts compile-time dependency injection",
   "license": "MIT",
   "type": "module",
