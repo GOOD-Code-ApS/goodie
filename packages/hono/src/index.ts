@@ -4,7 +4,6 @@ export { Cors } from './cors.js';
 export { EmbeddedServer } from './embedded-server.js';
 export type {
   ControllerMetadata,
-  CorsMetadata,
   RouteMetadata,
   ValidateMetadata,
   ValidationTarget,

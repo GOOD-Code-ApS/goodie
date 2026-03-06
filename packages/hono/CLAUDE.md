@@ -64,3 +64,4 @@ The transformer core knows nothing about HTTP methods, routes, or controllers. T
 - Route decorators are matched by name only (no import source verification), but only scanned on `@Controller` classes
 - Controller variable names in generated code use collision-safe naming (`className:importPath` keying)
 - `@Validate` generates `zValidator()` middleware — requires `@hono/zod-validator` and `zod` as peer deps
+- **Variable references in `@Cors` and `@Validate` config are not auto-imported** — `scanCorsDecorator` and `scanValidateDecorator` use raw AST text (`getText()`). If you write `@Cors({ origin: ALLOWED_ORIGINS })`, the generated code emits `cors({ origin: ALLOWED_ORIGINS })` but does NOT import `ALLOWED_ORIGINS`. Only literal values and inline expressions work reliably.
