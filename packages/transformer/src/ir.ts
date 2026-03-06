@@ -60,7 +60,7 @@ export interface IRFieldInjection {
   optional: boolean;
 }
 
-/** A @Provides method discovered inside a @Module class. */
+/** A @Provides method discovered inside a bean class. */
 export interface IRProvides {
   methodName: string;
   /** Token for the bean this method produces. */
@@ -69,21 +69,6 @@ export interface IRProvides {
   eager: boolean;
   /** Dependencies of the method parameters. */
   dependencies: IRDependency[];
-  sourceLocation: SourceLocation;
-}
-
-/** A @Module class with its @Provides methods. */
-export interface IRModule {
-  /** The module class itself. */
-  classTokenRef: ClassTokenRef;
-  /** Imported module class refs (from @Module({ imports: [...] })). */
-  imports: ClassTokenRef[];
-  /** @Provides methods defined on this module. */
-  provides: IRProvides[];
-  /** Constructor dependencies of the module class. */
-  constructorDeps: IRDependency[];
-  /** Field-injected dependencies of the module class. */
-  fieldDeps: IRFieldInjection[];
   sourceLocation: SourceLocation;
 }
 

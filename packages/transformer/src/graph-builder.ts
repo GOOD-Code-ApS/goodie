@@ -1,9 +1,4 @@
-import type {
-  IRBeanDefinition,
-  IRDependency,
-  IRModule,
-  TokenRef,
-} from './ir.js';
+import type { IRBeanDefinition, TokenRef } from './ir.js';
 import type { ResolveResult } from './resolver.js';
 import {
   AmbiguousProviderError,
@@ -23,16 +18,12 @@ export interface GraphResult {
 }
 
 /**
- * Build a full dependency graph from resolved IR, expand modules,
+ * Build a full dependency graph from resolved IR,
  * validate, and return beans in topological order.
  */
 export function buildGraph(resolveResult: ResolveResult): GraphResult {
   const warnings: string[] = [...resolveResult.warnings];
   const allBeans: IRBeanDefinition[] = [...resolveResult.beans];
-
-  // Expand modules: register the module class itself + each @Provides as a bean
-  const processedModules = new Set<string>();
-  expandModules(resolveResult.modules, allBeans, processedModules);
 
   // Guard: no user-defined bean may use the reserved config token name
   for (const bean of allBeans) {
@@ -58,102 +49,6 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
   const sorted = topoSort(allBeans);
 
   return { beans: sorted, warnings };
-}
-
-/**
- * Recursively expand modules: register the module class as a singleton,
- * and each @Provides method as a separate bean.
- * Handles transitive imports (A imports B, B imports C) with cycle detection.
- */
-function expandModules(
-  modules: IRModule[],
-  allBeans: IRBeanDefinition[],
-  processed: Set<string>,
-): void {
-  // Build a lookup map: tokenRefKey → IRModule (for transitive resolution)
-  const moduleLookup = new Map<string, IRModule>();
-  for (const mod of modules) {
-    moduleLookup.set(tokenRefKey(mod.classTokenRef), mod);
-  }
-
-  const visiting = new Set<string>(); // cycle detection
-  const displayPath: string[] = []; // human-readable names parallel to visiting
-
-  function expandModule(mod: IRModule): void {
-    const key = tokenRefKey(mod.classTokenRef);
-    if (processed.has(key)) return; // already expanded (handles diamond imports)
-
-    if (visiting.has(key)) {
-      throw new CircularDependencyError(
-        [...displayPath, tokenRefDisplayName(mod.classTokenRef)],
-        mod.sourceLocation,
-      );
-    }
-
-    visiting.add(key);
-    displayPath.push(tokenRefDisplayName(mod.classTokenRef));
-
-    // Recursively expand imported modules first
-    for (const importRef of mod.imports) {
-      const importKey = tokenRefKey(importRef);
-      const importedModule = moduleLookup.get(importKey);
-      if (importedModule) {
-        expandModule(importedModule);
-      }
-      // Non-module imports are silently ignored (they may be regular beans)
-    }
-
-    visiting.delete(key);
-    displayPath.pop();
-    processed.add(key);
-
-    // Register the module class itself as an implicit singleton
-    allBeans.push({
-      tokenRef: mod.classTokenRef,
-      scope: 'singleton',
-      eager: false,
-      name: undefined,
-      constructorDeps: mod.constructorDeps,
-      fieldDeps: mod.fieldDeps,
-      factoryKind: 'constructor',
-      providesSource: undefined,
-      baseTokenRefs: [],
-      metadata: { isModule: true },
-      sourceLocation: mod.sourceLocation,
-    });
-
-    // Register each @Provides method as a separate bean
-    for (const provides of mod.provides) {
-      // Module instance is the implicit first dependency
-      const moduleDep: IRDependency = {
-        tokenRef: mod.classTokenRef,
-        optional: false,
-        collection: false,
-        sourceLocation: provides.sourceLocation,
-      };
-
-      allBeans.push({
-        tokenRef: provides.tokenRef,
-        scope: provides.scope,
-        eager: provides.eager,
-        name: undefined,
-        constructorDeps: [moduleDep, ...provides.dependencies],
-        fieldDeps: [],
-        factoryKind: 'provides',
-        providesSource: {
-          moduleTokenRef: mod.classTokenRef,
-          methodName: provides.methodName,
-        },
-        baseTokenRefs: [],
-        metadata: {},
-        sourceLocation: provides.sourceLocation,
-      });
-    }
-  }
-
-  for (const mod of modules) {
-    expandModule(mod);
-  }
 }
 
 /**

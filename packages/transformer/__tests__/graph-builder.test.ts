@@ -247,8 +247,8 @@ describe('Graph Builder', () => {
     });
   });
 
-  describe('transitive module imports', () => {
-    it('should expand transitive imports (A imports B, B imports C)', () => {
+  describe('modules with @Provides', () => {
+    it('should expand multiple modules with their @Provides methods', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/CModule.ts': `
@@ -261,18 +261,11 @@ describe('Graph Builder', () => {
         `,
         '/src/BModule.ts': `
           import { Module, Provides } from './decorators.js'
-          import { CModule } from './CModule.js'
-          @Module({ imports: [CModule] })
+          @Module()
           export class BModule {
             @Provides()
             bValue(): number { return 2 }
           }
-        `,
-        '/src/AModule.ts': `
-          import { Module } from './decorators.js'
-          import { BModule } from './BModule.js'
-          @Module({ imports: [BModule] })
-          export class AModule {}
         `,
       });
 
@@ -281,118 +274,32 @@ describe('Graph Builder', () => {
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
       );
-      // All modules and their provides should be expanded
       expect(names).toContain('CModule');
       expect(names).toContain('cValue');
       expect(names).toContain('BModule');
       expect(names).toContain('bValue');
-      expect(names).toContain('AModule');
     });
 
-    it('should handle diamond imports (A→B+C, B→D, C→D)', () => {
-      const result = pipeline({
-        '/src/decorators.ts': decoratorsFile,
-        '/src/DModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          @Module()
-          export class DModule {
-            @Provides()
-            dValue(): string { return 'd' }
-          }
-        `,
-        '/src/BModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          import { DModule } from './DModule.js'
-          @Module({ imports: [DModule] })
-          export class BModule {
-            @Provides()
-            bValue(): number { return 2 }
-          }
-        `,
-        '/src/CModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          import { DModule } from './DModule.js'
-          @Module({ imports: [DModule] })
-          export class CModule {
-            @Provides()
-            cValue(): boolean { return true }
-          }
-        `,
-        '/src/AModule.ts': `
-          import { Module } from './decorators.js'
-          import { BModule } from './BModule.js'
-          import { CModule } from './CModule.js'
-          @Module({ imports: [BModule, CModule] })
-          export class AModule {}
-        `,
-      });
-
-      const names = result.beans.map((b) =>
-        b.tokenRef.kind === 'class'
-          ? b.tokenRef.className
-          : b.tokenRef.tokenName,
-      );
-      // DModule should appear only once (diamond dedup)
-      expect(names.filter((n) => n === 'DModule')).toHaveLength(1);
-      expect(names).toContain('BModule');
-      expect(names).toContain('CModule');
-      expect(names).toContain('AModule');
-      expect(names).toContain('dValue');
-    });
-
-    it('should throw CircularDependencyError for circular module imports with class names', () => {
+    it('should throw CircularDependencyError for circular constructor deps between modules', () => {
       const act = () =>
         pipeline({
           '/src/decorators.ts': decoratorsFile,
           '/src/AModule.ts': `
             import { Module } from './decorators.js'
             import { BModule } from './BModule.js'
-            @Module({ imports: [BModule] })
-            export class AModule {}
+            @Module()
+            export class AModule { constructor(private b: BModule) {} }
           `,
           '/src/BModule.ts': `
             import { Module } from './decorators.js'
             import { AModule } from './AModule.js'
-            @Module({ imports: [AModule] })
-            export class BModule {}
+            @Module()
+            export class BModule { constructor(private a: AModule) {} }
           `,
         });
       expect(act).toThrow(CircularDependencyError);
-      // Error message should contain class names, not internal key format
       expect(act).toThrow(/AModule/);
       expect(act).toThrow(/BModule/);
-      // Should NOT contain internal key format like "class:/src/..."
-      try {
-        act();
-      } catch (err) {
-        expect((err as Error).message).not.toMatch(/class:\/src\//);
-      }
-    });
-
-    it('should silently ignore import of non-module class', () => {
-      const result = pipeline({
-        '/src/decorators.ts': decoratorsFile,
-        '/src/Config.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
-          export class Config {}
-        `,
-        '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
-          import { Config } from './Config.js'
-          @Module({ imports: [Config] })
-          export class AppModule {}
-        `,
-      });
-
-      // Config should be a regular bean, AppModule a module bean
-      const names = result.beans.map((b) =>
-        b.tokenRef.kind === 'class'
-          ? b.tokenRef.className
-          : b.tokenRef.tokenName,
-      );
-      expect(names).toContain('Config');
-      expect(names).toContain('AppModule');
     });
   });
 
