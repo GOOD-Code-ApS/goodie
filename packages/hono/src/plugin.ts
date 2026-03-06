@@ -333,7 +333,6 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   lines.push('export function createRouter(ctx: ApplicationContext) {');
   lines.push('  return new Hono()');
   for (const ctrl of controllers) {
-    const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
     lines.push(
@@ -372,13 +371,6 @@ function buildControllerVarNames(
 
 function controllerKey(ctrl: ControllerBean): string {
   return `${ctrl.className}:${ctrl.importPath}`;
-}
-
-function joinPaths(basePath: string, routePath: string): string {
-  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
-  const route = routePath.startsWith('/') ? routePath : `/${routePath}`;
-  if (route === '/') return base || '/';
-  return `${base}${route}`;
 }
 
 function escapeStringLiteral(value: string): string {
