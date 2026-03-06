@@ -16,6 +16,10 @@ export default async function createDialect(config: DatasourceConfig) {
       return createMysqlDialect(config);
     case 'sqlite':
       return createSqliteDialect(config);
+    default:
+      throw new Error(
+        `Unsupported dialect: '${dialect}'. Supported dialects: 'postgres', 'mysql', 'sqlite'.`,
+      );
   }
 }
 

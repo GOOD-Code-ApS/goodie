@@ -66,7 +66,7 @@ export async function transform(
   const skipDiscovery =
     options.disablePluginDiscovery && options.disableLibraryBeanDiscovery;
   const discovery = skipDiscovery
-    ? { plugins: [], manifests: [] }
+    ? { plugins: [], manifests: [], packageDirs: new Map<string, string>() }
     : (options.discoveryCache ??
       (await discoverAll(baseDir, options.scanScopes)));
 
@@ -128,13 +128,37 @@ export async function transform(
     beans = [...beans, ...libraryBeans];
     // Reconcile: scanned deps use absolute paths from ts-morph, but library
     // beans use bare package specifiers. Rewrite dep tokenRefs to match.
-    reconcileLibraryImportPaths(beans, libraryBeans, resolveResult.modules);
+    reconcileLibraryImportPaths(
+      beans,
+      libraryBeans,
+      resolveResult.modules,
+      discovery.packageDirs,
+    );
   }
 
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
+    }
+  }
+
+  // 6b. Reconcile again — plugins may add synthetic beans with bare package specifiers
+  // (e.g. TransactionManager from the kysely plugin) that scanned beans reference
+  // via absolute paths.
+  if (!options.disableLibraryBeanDiscovery) {
+    // Collect all beans with bare package specifier import paths (library + plugin-synthesized)
+    const bareSpecifierBeans = beans.filter(
+      (b) =>
+        b.tokenRef.kind === 'class' && !b.tokenRef.importPath.startsWith('/'),
+    );
+    if (bareSpecifierBeans.length > 0) {
+      reconcileLibraryImportPaths(
+        beans,
+        bareSpecifierBeans,
+        resolveResult.modules,
+        discovery.packageDirs,
+      );
     }
   }
 
@@ -262,6 +286,21 @@ export function transformInMemory(
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
+    }
+  }
+
+  // 5b. Reconcile again — plugins may add synthetic beans with bare package specifiers
+  if (libraryBeans && libraryBeans.length > 0) {
+    const bareSpecifierBeans = beans.filter(
+      (b) =>
+        b.tokenRef.kind === 'class' && !b.tokenRef.importPath.startsWith('/'),
+    );
+    if (bareSpecifierBeans.length > 0) {
+      reconcileLibraryImportPaths(
+        beans,
+        bareSpecifierBeans,
+        resolveResult.modules,
+      );
     }
   }
 
@@ -466,6 +505,7 @@ function reconcileLibraryImportPaths(
   allBeans: IRBeanDefinition[],
   libraryBeans: IRBeanDefinition[],
   modules?: import('./ir.js').IRModule[],
+  packageDirs?: Map<string, string>,
 ): void {
   // Build className → library tokenRef map (skip ambiguous names)
   const libraryClassMap = new Map<
@@ -488,10 +528,21 @@ function reconcileLibraryImportPaths(
   ): IRBeanDefinition['tokenRef'] {
     if (ref.kind !== 'class') return ref;
     const libRef = libraryClassMap.get(ref.className);
-    if (!libRef || libRef.kind !== 'class') return ref;
-    // Only rewrite if the import paths differ (scanned has absolute, lib has bare specifier)
-    if (ref.importPath !== libRef.importPath) {
-      return { ...ref, importPath: libRef.importPath };
+    if (libRef && libRef.kind === 'class') {
+      // Only rewrite if the import paths differ (scanned has absolute, lib has bare specifier)
+      if (ref.importPath !== libRef.importPath) {
+        return { ...ref, importPath: libRef.importPath };
+      }
+      return ref;
+    }
+    // Fallback: class isn't a bean but may live in a library package (e.g. CrudRepository).
+    // Check if the absolute import path falls under a known library package directory.
+    if (packageDirs && ref.importPath.startsWith('/')) {
+      for (const [realDir, pkgName] of packageDirs) {
+        if (ref.importPath.startsWith(`${realDir}/`)) {
+          return { ...ref, importPath: pkgName };
+        }
+      }
     }
     return ref;
   }
@@ -502,6 +553,11 @@ function reconcileLibraryImportPaths(
     }
     for (const field of bean.fieldDeps) {
       field.tokenRef = reconcileRef(field.tokenRef);
+    }
+    if (bean.baseTokenRefs) {
+      bean.baseTokenRefs = bean.baseTokenRefs.map(
+        (ref) => reconcileRef(ref) as typeof ref,
+      );
     }
   }
 

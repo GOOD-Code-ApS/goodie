@@ -240,12 +240,6 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:^
         version: link:../core
-      better-sqlite3:
-        specifier: '>=9.0.0'
-        version: 12.6.2
-      pg:
-        specifier: '>=8.0.0'
-        version: 8.19.0
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
@@ -262,12 +256,18 @@ importers:
       '@types/pg':
         specifier: ^8.0.0
         version: 8.18.0
+      better-sqlite3:
+        specifier: ^9.0.0
+        version: 9.6.0
       kysely:
         specifier: ^0.27.0
         version: 0.27.6
       mysql2:
         specifier: ^3.0.0
         version: 3.19.0(@types/node@22.19.11)
+      pg:
+        specifier: ^8.0.0
+        version: 8.19.0
       ts-morph:
         specifier: ^24.0.0
         version: 24.0.0
@@ -1225,9 +1225,8 @@ packages:
     resolution: {integrity: sha512-pbnl5XzGBdrFU/wT4jqmJVPn2B6UHPBOhzMQkY/SPUPB6QtUXtmBHBIwCbXJol93mOpGMnQyP/+BB19q04xj7g==}
     engines: {node: '>=4'}
 
-  better-sqlite3@12.6.2:
-    resolution: {integrity: sha512-8VYKM3MjCa9WcaSAI3hzwhmyHVlH8tiGFwf0RlTsZPWJ1I5MkzjiudCo4KC4DxOaL/53A5B1sI/IbldNFDbsKA==}
-    engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x}
+  better-sqlite3@9.6.0:
+    resolution: {integrity: sha512-yR5HATnqeYNVnkaUTf4bOP2dJSnyhP4puJN/QPRyx4YkBEEUxib422n2XzPqDEHjQQqazoYoADdAm5vE15+dAQ==}
 
   bindings@1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
@@ -3151,7 +3150,7 @@ snapshots:
     dependencies:
       is-windows: 1.0.2
 
-  better-sqlite3@12.6.2:
+  better-sqlite3@9.6.0:
     dependencies:
       bindings: 1.5.0
       prebuild-install: 7.1.3

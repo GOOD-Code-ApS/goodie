@@ -34,14 +34,19 @@ export class TransactionManager {
   ) {
     if (kyselyOrProvider) {
       if ('kysely' in kyselyOrProvider) {
+        // Capture the current value (may already be set if @PostConstruct ran)
         this.kyselyRef = kyselyOrProvider.kysely;
         // Make the provider's .kysely property transaction-aware.
         // Any code accessing provider.kysely (e.g. database.kysely) will
         // automatically use the active transaction when inside one.
+        // The setter ensures @PostConstruct can still assign the value.
         const tm = this;
         Object.defineProperty(kyselyOrProvider, 'kysely', {
           get() {
             return tm.getConnection();
+          },
+          set(value: Kysely<any>) {
+            tm.kyselyRef = value;
           },
           configurable: true,
         });

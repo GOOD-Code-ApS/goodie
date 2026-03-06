@@ -7,7 +7,7 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 - `@Controller` / `@Get` / `@Post` for declarative HTTP routing (codegen via hono plugin)
 - `KyselyDatabase` library bean from `@goodie-ts/kysely` for database connectivity
 - `DatasourceConfig` / `PoolConfig` library beans via `@ConfigurationProperties('datasource')`
-- `@Module` with `@Provides` for typed `Kysely<DB>` injection (single cast in module, no casts in consumers)
+- `CrudRepository<T, DB>` — typed base class for CRUD operations with `Kysely<DB>` access
 - `@Singleton` classes with constructor injection for repository and service layers
 - `configDir: 'config'` in vite config for JSON-based configuration files
 - `ServerConfig` from `@goodie-ts/hono` library beans (host/port via `@ConfigurationProperties`)
@@ -21,10 +21,12 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 Library beans: KyselyDatabase(@Singleton) ← DatasourceConfig ← PoolConfig
   └── config/default.json: { "datasource": { "url": "...", "dialect": "postgres", "pool": {...} } }
 │
-@Module DatabaseModule(KyselyDatabase)
-├── @Provides typedKysely(): Kysely<DB>   → typed database access (single cast here)
+@Singleton TodoRepository extends CrudRepository<Todo, Database>
+├── Inherits findAll(), findById(), save(), deleteById() from base class
+├── Custom queries via this.db (typed Kysely<Database>)
+└── Injects TransactionManager (auto-wired by kysely plugin)
 │
-@Singleton TodoRepository(Kysely<DB>)     → fully typed Kysely queries, no casts
+@Singleton DatabaseHealthIndicator(KyselyDatabase) → SELECT 1 health check
 @Singleton TodoService(todoRepository)    → business logic layer
 │
 @Controller('/api/todos') TodoController(todoService) → Hono routes via decorators
@@ -41,8 +43,8 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 | File | Role |
 |------|------|
 | `src/db/schema.ts` | Kysely `Database` interface with typed table definitions |
-| `src/DatabaseModule.ts` | `@Module` providing typed `Kysely<DB>` from `KyselyDatabase` library bean |
-| `src/TodoRepository.ts` | `@Singleton` CRUD repository injecting `Kysely<DB>` directly |
+| `src/DatabaseHealthIndicator.ts` | `@Singleton` health check using `KyselyDatabase` with `sql\`SELECT 1\`` |
+| `src/TodoRepository.ts` | `@Singleton` extending `CrudRepository<Todo, Database>` with typed custom queries |
 | `src/TodoService.ts` | `@Singleton` business logic delegating to repository |
 | `src/TodoController.ts` | `@Controller('/api/todos')` with `@Get`, `@Post`, `@Patch`, `@Delete` routes |
 | `src/main.ts` | Bootstrap: `startServer()` from generated file |
@@ -89,7 +91,7 @@ Tests use `createRouter(ctx)` to get a Hono app wired to the test DI context. `h
 
 ```bash
 # Generate DI code
-node scripts/generate.js
+pnpm generate
 
 # Build
 pnpm build

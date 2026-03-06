@@ -14,7 +14,7 @@ Kysely database integration for goodie-ts: `KyselyDatabase` library bean, `@Tran
 | `src/transactional-interceptor.ts` | `TransactionalInterceptor` — AOP interceptor wrapping methods in transactions (order `-40`) |
 | `src/migration-runner.ts` | `MigrationRunner` — runs `@Migration` classes in sorted order via `@PostConstruct` |
 | `src/abstract-migration.ts` | `AbstractMigration` — base class with `up(db)` / `down?(db)` |
-| `src/crud-repository.ts` | `CrudRepository<T>` — generic CRUD base class, multi-dialect |
+| `src/crud-repository.ts` | `CrudRepository<T, DB>` — generic CRUD base class with typed `Kysely<DB>` access, multi-dialect |
 | `src/kysely-transformer-plugin.ts` | `createKyselyPlugin()` — finds `KyselyDatabase` from library beans, synthesizes `TransactionManager` and interceptor |
 | `src/decorators/transactional.ts` | `@Transactional({ propagation? })` — `REQUIRED` (default) or `REQUIRES_NEW` |
 | `src/decorators/migration.ts` | `@Migration('name')` — marks a class as a migration with a sortable name |
@@ -25,24 +25,26 @@ Library-provided `@Singleton` that creates and manages a `Kysely<any>` instance:
 - Depends on `DatasourceConfig` (injected via constructor)
 - `@PostConstruct init()` — dynamically imports the dialect driver and creates the `Kysely` instance
 - `@PreDestroy destroy()` — closes the connection pool
-- Non-generic (`Kysely<any>`) — users bridge to their schema type via a `@Module` with `@Provides`
+- Non-generic (`Kysely<any>`) — inject directly for untyped access (e.g. health checks with `sql\`SELECT 1\``)
 
-### Typed access pattern
+### Typed access via CrudRepository
+
+Subclasses of `CrudRepository<T, DB>` get typed `Kysely<DB>` access via the `this.db` getter:
 
 ```typescript
-@Module()
-class DatabaseModule {
-  constructor(private db: KyselyDatabase) {}
-
-  @Provides()
-  typedKysely(): Kysely<DB> {
-    return this.db.kysely as Kysely<DB>;
-  }
-}
-
 @Singleton()
-class TodoRepository {
-  constructor(private readonly kysely: Kysely<DB>) {}  // fully typed, no casts
+class TodoRepository extends CrudRepository<Todo, Database> {
+  constructor(transactionManager: TransactionManager) {
+    super('todos', transactionManager);
+  }
+
+  async create(title: string): Promise<Todo> {
+    return this.db  // typed Kysely<Database>
+      .insertInto('todos')
+      .values({ title })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+  }
 }
 ```
 
@@ -91,11 +93,15 @@ No configuration needed — the plugin discovers `KyselyDatabase` automatically 
 
 ## CrudRepository
 
-Generic base class providing `findAll()`, `findById(id)`, `save(entity)`, `deleteById(id)`. Uses `TransactionManager.getConnection()` for transaction awareness. Uses dialect-based `supportsReturning(dialect)` — PostgreSQL/SQLite use `RETURNING`; MySQL falls back to INSERT + SELECT or SELECT + DELETE.
+`CrudRepository<T, DB>` — generic base class providing `findAll()`, `findById(id)`, `save(entity)`, `deleteById(id)`. Uses `TransactionManager.getConnection()` for transaction awareness. Uses dialect-based `supportsReturning` — PostgreSQL/SQLite use `RETURNING`; MySQL falls back to INSERT + SELECT or SELECT + DELETE.
+
+Dual accessor pattern:
+- `this.db` — returns typed `Kysely<DB>` for subclass custom queries (full type safety)
+- Private `raw` getter — returns `Kysely<any>` for base class methods (dynamic table/column names)
 
 ## Gotchas
 
-- `KyselyDatabase` is non-generic — inject it directly for untyped access, or use a `@Module` with `@Provides` for typed `Kysely<DB>`
+- `KyselyDatabase` is non-generic — inject it directly for untyped access (e.g. health checks), or extend `CrudRepository<T, DB>` for typed access
 - Test transactions skip nested transactions to avoid Kysely's "already in transaction" error
-- `CrudRepository.db` returns `Kysely<any>` — type erasure is intentional since the transformer can't generate clean tokens for `Kysely<DB>` generics
+- `CrudRepository<T, DB>` is not a bean (abstract with primitive constructor params) — import path reconciliation uses `packageDirs` fallback
 - Dialect drivers (`pg`, `mysql2`, `better-sqlite3`) are optional peer dependencies — only the configured dialect needs to be installed

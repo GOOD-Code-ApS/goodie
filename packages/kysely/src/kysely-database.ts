@@ -12,22 +12,21 @@ import type { Dialect } from './dialect.js';
  * - `mysql` → `mysql2` + `MysqlDialect`
  * - `sqlite` → `better-sqlite3` + `SqliteDialect`
  *
- * Generic parameter `DB` defaults to `any` in the library. Users bridge
- * to their schema type via a thin `@Module`:
+ * Non-generic (`Kysely<any>`) by design. Users bridge to their schema
+ * type via a `@Module` with `@Provides`:
  * ```typescript
  * @Module()
  * class DatabaseModule {
  *   constructor(private db: KyselyDatabase) {}
  *
  *   @Provides()
- *   typedDb(): KyselyDatabase<DB> {
- *     return this.db as KyselyDatabase<DB>;
+ *   typedKysely(): Kysely<DB> {
+ *     return this.db.kysely as Kysely<DB>;
  *   }
  * }
  * ```
  *
- * Repositories then inject `KyselyDatabase<DB>` for fully typed,
- * transaction-aware access via the `.kysely` property.
+ * Repositories then inject `Kysely<DB>` for fully typed access.
  */
 @Singleton()
 export class KyselyDatabase {
@@ -49,6 +48,6 @@ export class KyselyDatabase {
 
   @PreDestroy()
   async destroy() {
-    await this.kysely.destroy();
+    await this.kysely?.destroy();
   }
 }
