@@ -215,7 +215,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       "import { LoggingInterceptor } from '@goodie-ts/logging'",
     );
     expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/aop'",
+      "import { buildInterceptorChain } from '@goodie-ts/core'",
     );
   });
 

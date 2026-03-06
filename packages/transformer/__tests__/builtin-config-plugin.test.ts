@@ -1,7 +1,7 @@
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it, vi } from 'vitest';
-import { createConfigPlugin } from '../src/config-transformer-plugin.js';
+import { createConfigPlugin } from '../src/builtin-config-plugin.js';
 
 const DECORATOR_STUBS = `
 export function Injectable() { return (t: any, c: any) => {} }

@@ -23,6 +23,8 @@ Scanner → Resolver → GraphBuilder → Codegen
 3. **GraphBuilder** — validates the dependency graph, expands modules, detects cycles
 4. **Codegen** — emits typed `BeanDefinition[]`, factory functions, and token exports
 
+The transformer includes built-in plugins for **AOP** (`@Around`, `@Before`, `@After`) and **config** (`@ConfigurationProperties`) that are always active — no manual plugin configuration needed.
+
 ## Usage
 
 Most users should use [`@goodie-ts/vite-plugin`](https://www.npmjs.com/package/@goodie-ts/vite-plugin) which calls the transformer automatically. For direct use:

@@ -29,14 +29,14 @@ The result: full DI with zero runtime reflection, type-safe tokens, and instant 
 ### Install
 
 ```bash
-pnpm add @goodie-ts/core @goodie-ts/decorators
+pnpm add @goodie-ts/core
 pnpm add -D @goodie-ts/transformer @goodie-ts/vite-plugin
 ```
 
 ### Decorate
 
 ```typescript
-import { Singleton, Inject } from '@goodie-ts/decorators';
+import { Singleton, Inject } from '@goodie-ts/core';
 
 @Singleton()
 class UserRepository {
@@ -79,9 +79,8 @@ const userService = app.context.get(UserService);
 
 | Package | Description |
 |---------|-------------|
-| [`@goodie-ts/core`](./packages/core) | Runtime container, `ApplicationContext`, `InjectionToken`, topological sort |
-| [`@goodie-ts/decorators`](./packages/decorators) | `@Singleton`, `@Injectable`, `@Inject`, `@Value`, `@Module`, `@Provides`, and more |
-| [`@goodie-ts/transformer`](./packages/transformer) | ts-morph scanner and code generator (build-time only) |
+| [`@goodie-ts/core`](./packages/core) | Runtime container, decorators, AOP interceptor chain, `ApplicationContext`, `InjectionToken`, topological sort |
+| [`@goodie-ts/transformer`](./packages/transformer) | ts-morph scanner, code generator, and built-in AOP + config plugins (build-time only) |
 | [`@goodie-ts/cli`](./packages/cli) | CLI tool — `goodie generate` with watch mode |
 | [`@goodie-ts/vite-plugin`](./packages/vite-plugin) | Vite integration — runs transformer on build and HMR |
 | [`@goodie-ts/testing`](./packages/testing) | `TestContext` with bean overrides and `@MockDefinition` |
@@ -90,9 +89,7 @@ const userService = app.context.get(UserService);
 
 | Package | Description |
 |---------|-------------|
-| [`@goodie-ts/aop`](./packages/aop) | AOP foundation — `createAopDecorator`, `@Before`, `@Around`, `@After`, interceptor chain |
 | [`@goodie-ts/cache`](./packages/cache) | In-memory caching — `@Cacheable`, `@CacheEvict`, `@CachePut` |
-| [`@goodie-ts/config`](./packages/config) | Configuration binding — `@ConfigurationProperties` |
 | [`@goodie-ts/hono`](./packages/hono) | HTTP routing — `@Controller`, `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` |
 | [`@goodie-ts/kysely`](./packages/kysely) | Kysely integration — `@Transactional`, `@Migration`, `CrudRepository` |
 | [`@goodie-ts/logging`](./packages/logging) | Method logging — `@Log`, `LoggerFactory`, `MDC` |

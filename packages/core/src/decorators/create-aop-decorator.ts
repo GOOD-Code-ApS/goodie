@@ -1,4 +1,4 @@
-import type { MethodInterceptor } from './types.js';
+import type { MethodInterceptor } from '../aop-types.js';
 
 /** Base constraint for the config type parameter of `createAopDecorator`. */
 export interface AopDecoratorConfig {

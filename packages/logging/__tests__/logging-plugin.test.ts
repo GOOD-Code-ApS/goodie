@@ -73,7 +73,7 @@ describe('Logging Transformer Plugin', () => {
       "import { LoggingInterceptor } from '@goodie-ts/logging'",
     );
     expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/aop'",
+      "import { buildInterceptorChain } from '@goodie-ts/core'",
     );
   });
 
@@ -306,9 +306,7 @@ describe('Logging Transformer Plugin', () => {
     expect(chainCalls2).toHaveLength(1);
   });
 
-  it('should coexist with @Around from AOP plugin', async () => {
-    const { createAopPlugin } = await import('@goodie-ts/aop');
-
+  it('should coexist with @Around from AOP plugin', () => {
     const project = createProject({
       '/src/TimingInterceptor.ts': `
         import { Singleton } from './decorators.js'
@@ -334,7 +332,7 @@ describe('Logging Transformer Plugin', () => {
     const result = transformInMemory(
       project,
       '/out/AppContext.generated.ts',
-      [plugin, createAopPlugin()],
+      [plugin],
       LOGGING_LIBRARY_BEANS,
     );
 

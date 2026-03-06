@@ -1,6 +1,6 @@
 # @goodie-ts/cache
 
-In-memory caching for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) via decorators. Built on `@goodie-ts/aop`.
+In-memory caching for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) via decorators. Built on the AOP interceptor chain in `@goodie-ts/core`.
 
 ## Install
 
@@ -24,7 +24,7 @@ Declarative caching using `@Cacheable`, `@CacheEvict`, and `@CachePut` decorator
 
 ```typescript
 import { Cacheable, CacheEvict } from '@goodie-ts/cache';
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 
 @Singleton()
 class UserService {

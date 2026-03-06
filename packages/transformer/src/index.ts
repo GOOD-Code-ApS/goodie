@@ -9,6 +9,9 @@ export { createDeclarativeAopPlugin } from './aop-plugin.js';
 // AOP decorator scanner
 export type { ScannedAopDecorator } from './aop-scanner.js';
 export { scanAopDecoratorDefinitions } from './aop-scanner.js';
+// Built-in plugins
+export { createAopPlugin } from './builtin-aop-plugin.js';
+export { createConfigPlugin } from './builtin-config-plugin.js';
 export type { CodegenOptions } from './codegen.js';
 // Code Generator
 export { generateCode } from './codegen.js';

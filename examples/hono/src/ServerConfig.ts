@@ -1,5 +1,4 @@
-import { ConfigurationProperties } from '@goodie-ts/config';
-import { Singleton } from '@goodie-ts/decorators';
+import { ConfigurationProperties, Singleton } from '@goodie-ts/core';
 
 @Singleton()
 @ConfigurationProperties('server')

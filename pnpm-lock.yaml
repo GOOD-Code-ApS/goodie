@@ -35,9 +35,6 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@goodie-ts/decorators':
-        specifier: workspace:*
-        version: link:../../packages/decorators
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
@@ -63,21 +60,12 @@ importers:
 
   examples/hono:
     dependencies:
-      '@goodie-ts/aop':
-        specifier: workspace:*
-        version: link:../../packages/aop
       '@goodie-ts/cache':
         specifier: workspace:*
         version: link:../../packages/cache
-      '@goodie-ts/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@goodie-ts/decorators':
-        specifier: workspace:*
-        version: link:../../packages/decorators
       '@goodie-ts/health':
         specifier: workspace:*
         version: link:../../packages/health
@@ -143,27 +131,11 @@ importers:
         specifier: ^6.0.0
         version: 6.4.1(@types/node@22.19.11)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/aop:
+  packages/cache:
     dependencies:
       '@goodie-ts/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
-      '@goodie-ts/transformer':
-        specifier: workspace:*
-        version: link:../transformer
-      ts-morph:
-        specifier: ^24.0.0
-        version: 24.0.0
-
-  packages/cache:
-    dependencies:
-      '@goodie-ts/aop':
-        specifier: workspace:^
-        version: link:../aop
-      '@goodie-ts/decorators':
-        specifier: workspace:^
-        version: link:../decorators
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
@@ -191,25 +163,7 @@ importers:
         specifier: ^22.0.0
         version: 22.19.11
 
-  packages/config:
-    devDependencies:
-      '@goodie-ts/transformer':
-        specifier: workspace:*
-        version: link:../transformer
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.11
-      ts-morph:
-        specifier: ^24.0.0
-        version: 24.0.0
-
   packages/core: {}
-
-  packages/decorators:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
 
   packages/events:
     dependencies:
@@ -229,9 +183,9 @@ importers:
 
   packages/health:
     dependencies:
-      '@goodie-ts/decorators':
+      '@goodie-ts/core':
         specifier: workspace:^
-        version: link:../decorators
+        version: link:../core
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
@@ -276,9 +230,9 @@ importers:
 
   packages/kysely:
     dependencies:
-      '@goodie-ts/aop':
+      '@goodie-ts/core':
         specifier: workspace:^
-        version: link:../aop
+        version: link:../core
     devDependencies:
       '@goodie-ts/transformer':
         specifier: workspace:*
@@ -295,12 +249,9 @@ importers:
 
   packages/logging:
     dependencies:
-      '@goodie-ts/aop':
+      '@goodie-ts/core':
         specifier: workspace:^
-        version: link:../aop
-      '@goodie-ts/decorators':
-        specifier: workspace:^
-        version: link:../decorators
+        version: link:../core
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
@@ -317,12 +268,9 @@ importers:
 
   packages/resilience:
     dependencies:
-      '@goodie-ts/aop':
+      '@goodie-ts/core':
         specifier: workspace:^
-        version: link:../aop
-      '@goodie-ts/decorators':
-        specifier: workspace:^
-        version: link:../decorators
+        version: link:../core
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*

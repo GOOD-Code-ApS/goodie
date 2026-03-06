@@ -18,6 +18,9 @@ This package provides the runtime container that resolves pre-built `BeanDefinit
 - **`Goodie` / `GoodieBuilder`** — Bootstrap builder: `Goodie.build(definitions).start()`
 - **`InjectionToken<T>`** — Typed token for interfaces, primitives, and generics
 - **`BeanDefinition<T>`** — Bean descriptor with token, scope, factory, dependencies, and metadata
+- **`buildInterceptorChain`** — AOP runtime: chains `MethodInterceptor` instances around a method
+- **`wrapBeforeAdvice` / `wrapAfterAdvice`** — Adapt `BeforeAdvice` / `AfterAdvice` into `MethodInterceptor`
+- **`MethodInterceptor`, `InvocationContext`** — AOP type contracts for interceptors
 
 ## Usage
 

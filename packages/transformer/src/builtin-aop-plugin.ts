@@ -1,10 +1,13 @@
 import type {
+  InterceptedMethodDescriptor,
+  InterceptorRef,
+} from '@goodie-ts/core';
+import type { IRBeanDefinition } from './ir.js';
+import type {
   CodegenContribution,
-  IRBeanDefinition,
   MethodVisitorContext,
   TransformerPlugin,
-} from '@goodie-ts/transformer';
-import type { InterceptedMethodDescriptor, InterceptorRef } from './types.js';
+} from './options.js';
 
 /** Internal tracking of AOP annotations found during method visiting. */
 interface AopMethodInfo {
@@ -18,7 +21,7 @@ interface AopMethodInfo {
 const AOP_DECORATOR_NAMES = ['Around', 'Before', 'After'] as const;
 
 /**
- * Create the AOP transformer plugin.
+ * Built-in AOP transformer plugin.
  *
  * Scans @Around/@Before/@After decorators on methods. At compile time,
  * interceptors become normal bean dependencies and the codegen generates
@@ -158,11 +161,9 @@ export function createAopPlugin(): TransformerPlugin {
 
       return {
         imports: [
-          `import { ${importSymbols.join(', ')} } from '@goodie-ts/aop'`,
+          `import { ${importSymbols.join(', ')} } from '@goodie-ts/core'`,
         ],
       };
     },
   };
 }
-
-export default createAopPlugin;

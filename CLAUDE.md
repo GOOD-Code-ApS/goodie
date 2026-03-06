@@ -13,14 +13,11 @@ The transformer uses ts-morph to scan decorated classes at build time, producing
 ## Package Dependency Graph
 
 ```
-decorators  ─┐
-              ├→  transformer  →  vite-plugin / cli
-core  ───────┘         │
-  ↑                    ↓
-  └──────────── generated code (imports core + aop)
+core  ──────→  transformer  →  vite-plugin / cli
+  ↑                 │
+  └──────── generated code (imports core)
 testing → core
-aop ──→ transformer (plugin)
-cache / logging / resilience / config / kysely / hono ──→ aop + transformer (plugins)
+cache / logging / resilience / kysely / hono ──→ core + transformer (plugins)
 ```
 
 ## Key Design Decisions
@@ -47,15 +44,12 @@ pnpm clean          # Clean all dist/
 
 | Package | Purpose |
 |---------|---------|
-| `packages/core` | Runtime container, BeanDefinition, InjectionToken, topoSort |
-| `packages/decorators` | @Injectable, @Singleton, @Module, @Provides, @Inject, @Value, lifecycle hooks |
-| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system |
+| `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), BeanDefinition, InjectionToken, topoSort |
+| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config plugins |
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
 | `packages/testing` | TestContext with bean overrides and @MockDefinition |
-| `packages/aop` | AOP foundation — @Before, @Around, @After, interceptor chain, `createAopDecorator()` |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
-| `packages/config` | Configuration binding — @ConfigurationProperties |
 | `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc. |
 | `packages/kysely` | Kysely integration — @Transactional, @Migration, CrudRepository |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
@@ -78,4 +72,4 @@ pnpm clean          # Clean all dist/
 
 ## TODO: peerDependency migration at 1.0.0
 
-Library packages (decorators, aop, cache, logging, resilience, health, hono, kysely, events, scheduler, testing) currently declare `@goodie-ts/core` and other `@goodie-ts/*` runtime deps as regular `dependencies`. They should be `peerDependencies` to prevent duplicate copies causing class identity mismatches at runtime. This migration is blocked while packages are at `0.x` because Changesets + `onlyUpdatePeerDependentsWhenOutOfRange` treats every minor bump as out-of-range in `0.x` semver (`^0.5.0` does not include `0.6.0`), forcing all peer dependents to `1.0.0`. When ready to release `1.0.0`, move `@goodie-ts/*` runtime deps to `peerDependencies` across all library packages. Build-time tools (cli, vite-plugin, transformer) should keep regular dependencies.
+Library packages (cache, logging, resilience, health, hono, kysely, events, scheduler, testing) currently declare `@goodie-ts/core` and other `@goodie-ts/*` runtime deps as regular `dependencies`. They should be `peerDependencies` to prevent duplicate copies causing class identity mismatches at runtime. This migration is blocked while packages are at `0.x` because Changesets + `onlyUpdatePeerDependentsWhenOutOfRange` treats every minor bump as out-of-range in `0.x` semver (`^0.5.0` does not include `0.6.0`), forcing all peer dependents to `1.0.0`. When ready to release `1.0.0`, move `@goodie-ts/*` runtime deps to `peerDependencies` across all library packages. Build-time tools (cli, vite-plugin, transformer) should keep regular dependencies.

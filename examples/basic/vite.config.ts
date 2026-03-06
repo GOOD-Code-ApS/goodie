@@ -10,7 +10,7 @@ export default defineConfig({
       fileName: 'main',
     },
     rollupOptions: {
-      external: ['@goodie-ts/core', '@goodie-ts/decorators'],
+      external: ['@goodie-ts/core'],
     },
   },
 });

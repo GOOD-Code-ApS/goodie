@@ -1,4 +1,4 @@
-import type { InvocationContext } from '@goodie-ts/aop';
+import type { InvocationContext } from '@goodie-ts/core';
 import { describe, expect, it } from 'vitest';
 import { RetryInterceptor } from '../src/retry-interceptor.js';
 

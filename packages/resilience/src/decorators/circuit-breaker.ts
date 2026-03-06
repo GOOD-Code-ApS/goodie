@@ -1,4 +1,4 @@
-import { createAopDecorator } from '@goodie-ts/aop';
+import { createAopDecorator } from '@goodie-ts/core';
 import type { CircuitBreakerInterceptor } from '../circuit-breaker-interceptor.js';
 
 export interface CircuitBreakerOptions {

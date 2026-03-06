@@ -12,11 +12,8 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-        '@goodie-ts/config',
         '@goodie-ts/core',
-        '@goodie-ts/decorators',
         '@goodie-ts/health',
-        '@goodie-ts/aop',
         '@goodie-ts/cache',
         '@goodie-ts/logging',
         '@goodie-ts/resilience',

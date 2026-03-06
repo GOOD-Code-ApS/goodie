@@ -29,7 +29,7 @@ Exactly one of `cron`, `fixedRate`, or `fixedDelay` must be specified.
 
 ```typescript
 import { Scheduled } from '@goodie-ts/scheduler';
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 
 @Singleton()
 class BackgroundTasks {

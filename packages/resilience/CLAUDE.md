@@ -1,6 +1,6 @@
 # @goodie-ts/resilience
 
-Resilience patterns for goodie-ts: `@Retryable`, `@CircuitBreaker`, and `@Timeout` decorators. Built on `@goodie-ts/aop` interceptor chain.
+Resilience patterns for goodie-ts: `@Retryable`, `@CircuitBreaker`, and `@Timeout` decorators. Built on `@goodie-ts/core` interceptor chain.
 
 ## Key Files
 
