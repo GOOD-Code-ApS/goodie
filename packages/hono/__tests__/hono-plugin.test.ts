@@ -403,4 +403,30 @@ describe('Hono Plugin — RPC Client', () => {
     );
     expect(result.code).toContain('createRouter(ctx: ApplicationContext)');
   });
+
+  it('handles root-path controller mounting', () => {
+    const result = createProject({
+      '/src/RootController.ts': `
+        import { Controller, Get, Post } from './decorators.js'
+        @Controller('/')
+        class RootController {
+          @Get('/health')
+          health() {}
+          @Post('/echo')
+          echo() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      'function __createRootControllerRoutes(rootController: RootController)',
+    );
+    expect(result.code).toContain(".route('/'");
+    expect(result.code).toContain(".get('/health'");
+    expect(result.code).toContain(".post('/echo'");
+    expect(result.code).toContain('export type RootControllerRoutes =');
+    expect(result.code).toContain(
+      'export function createRootControllerClient(baseUrl: string)',
+    );
+  });
 });
