@@ -302,6 +302,33 @@ describe('Scanner', () => {
       expect(appModule.provides[1].eager).toBe(false);
     });
 
+    it('should scan @Provides on a @Singleton bean (not just @Module)', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Provides() { return (t: any, c: any) => {} }
+        `,
+        '/src/AppConfig.ts': `
+          import { Singleton, Provides } from './decorators.js'
+
+          @Singleton()
+          export class AppConfig {
+            @Provides()
+            dbUrl(): string { return 'postgres://localhost' }
+          }
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].classTokenRef.className).toBe('AppConfig');
+      expect(result.beans[0].scope).toBe('singleton');
+      expect(result.beans[0].isModule).toBe(false);
+      expect(result.beans[0].provides).toHaveLength(1);
+      expect(result.beans[0].provides[0].methodName).toBe('dbUrl');
+    });
+
     it('should scan @Module as a singleton bean', () => {
       const project = createProject({
         '/src/decorators.ts': `

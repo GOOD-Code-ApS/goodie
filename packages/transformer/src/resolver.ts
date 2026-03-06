@@ -86,7 +86,7 @@ function resolveBean(
       default: vf.defaultValue,
     }));
   }
-  if (scanned.isModule || scanned.provides.length > 0) {
+  if (scanned.isModule) {
     metadata.isModule = true;
   }
 
@@ -196,6 +196,10 @@ function expandProvides(
 /**
  * Resolve @Provides method parameters, with special handling for primitives.
  * Primitive-typed params are matched to other @Provides methods that return that type.
+ *
+ * Note: primitive param resolution is scoped to the owning bean's @Provides methods.
+ * A primitive @Provides on bean X cannot be auto-wired as a param of bean Y's @Provides.
+ * Cross-bean primitive wiring requires an explicit InjectionToken.
  */
 function resolveProvidesParams(
   params: ScannedConstructorParam[],

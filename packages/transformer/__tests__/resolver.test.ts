@@ -339,6 +339,51 @@ describe('Resolver', () => {
     });
   });
 
+  describe('@Provides on non-@Module beans', () => {
+    it('should expand @Provides on a @Singleton without setting isModule', () => {
+      const result = scanAndResolve({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Provides() { return (t: any, c: any) => {} }
+        `,
+        '/src/AppConfig.ts': `
+          import { Singleton, Provides } from './decorators.js'
+
+          @Singleton()
+          export class AppConfig {
+            @Provides()
+            dbUrl(): string { return 'postgres://localhost' }
+          }
+        `,
+      });
+
+      // The @Singleton bean itself should NOT have isModule metadata
+      const configBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'AppConfig' &&
+          b.factoryKind === 'constructor',
+      )!;
+      expect(configBean.metadata.isModule).toBeUndefined();
+
+      // The @Provides method should still expand into a separate bean
+      const providesBeans = result.beans.filter(
+        (b) => b.factoryKind === 'provides',
+      );
+      expect(providesBeans).toHaveLength(1);
+      expect(providesBeans[0].tokenRef).toEqual({
+        kind: 'injection-token',
+        tokenName: 'dbUrl',
+        importPath: undefined,
+        typeAnnotation: 'string',
+      });
+      expect(providesBeans[0].constructorDeps[0].tokenRef).toMatchObject({
+        kind: 'class',
+        className: 'AppConfig',
+      });
+    });
+  });
+
   describe('module bean resolution', () => {
     it('should register @Module class as a bean with isModule metadata', () => {
       const result = scanAndResolve({

@@ -110,6 +110,59 @@ describe('Graph Builder', () => {
     });
   });
 
+  describe('@Provides on non-@Module beans', () => {
+    it('should expand @Provides on @Singleton and wire dependencies', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/AppConfig.ts': `
+          import { Singleton, Provides } from './decorators.js'
+
+          @Singleton()
+          export class AppConfig {
+            @Provides()
+            dbUrl(): string { return 'postgres://localhost' }
+          }
+        `,
+        '/src/Service.ts': `
+          import { Singleton } from './decorators.js'
+          import { AppConfig } from './AppConfig.js'
+
+          @Singleton()
+          export class Service {
+            constructor(private config: AppConfig) {}
+          }
+        `,
+      });
+
+      const names = result.beans.map((b) =>
+        b.tokenRef.kind === 'class'
+          ? b.tokenRef.className
+          : b.tokenRef.tokenName,
+      );
+      expect(names).toContain('AppConfig');
+      expect(names).toContain('dbUrl');
+      expect(names).toContain('Service');
+
+      // AppConfig should NOT have isModule metadata
+      const configBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'AppConfig',
+      )!;
+      expect(configBean.metadata.isModule).toBeUndefined();
+
+      // dbUrl provides bean should have AppConfig as first dep
+      const dbUrlBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'injection-token' &&
+          b.tokenRef.tokenName === 'dbUrl',
+      )!;
+      expect(dbUrlBean.factoryKind).toBe('provides');
+      expect(dbUrlBean.constructorDeps[0].tokenRef).toMatchObject({
+        className: 'AppConfig',
+      });
+    });
+  });
+
   describe('module expansion', () => {
     it('should register module class as implicit singleton', () => {
       const result = pipeline({
