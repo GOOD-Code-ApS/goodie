@@ -7,6 +7,8 @@ import type { TransformerPlugin } from './options.js';
 export interface DiscoverAllResult {
   plugins: TransformerPlugin[];
   manifests: Array<{ packageName: string; manifest: LibraryBeansManifest }>;
+  /** Maps resolved real directory path → bare package name for each discovered library package. */
+  packageDirs: Map<string, string>;
 }
 
 /**
@@ -28,6 +30,7 @@ export async function discoverAll(
   const scopes = scanScopes ?? ['@goodie-ts'];
   const plugins: TransformerPlugin[] = [];
   const manifests: DiscoverAllResult['manifests'] = [];
+  const packageDirs: Map<string, string> = new Map();
 
   for (const scope of scopes) {
     const scopeDir = path.join(root, 'node_modules', scope);
@@ -61,6 +64,17 @@ export async function discoverAll(
         | undefined;
       if (!goodieField) continue;
 
+      // Resolve the real path (follows symlinks, e.g. pnpm workspaces)
+      const packageName = pkgJson.name as string | undefined;
+      if (packageName) {
+        try {
+          const realDir = fs.realpathSync(path.join(scopeDir, entry));
+          packageDirs.set(realDir, packageName);
+        } catch {
+          // Symlink target doesn't exist — skip
+        }
+      }
+
       // Plugin discovery
       if (goodieField.plugin) {
         const pluginEntryPath = path.resolve(
@@ -88,7 +102,6 @@ export async function discoverAll(
 
       // Library manifest discovery
       if (goodieField.beans) {
-        const packageName = pkgJson.name as string | undefined;
         if (!packageName) continue;
 
         const beansJsonPath = path.resolve(scopeDir, entry, goodieField.beans);
@@ -105,7 +118,7 @@ export async function discoverAll(
     }
   }
 
-  return { plugins, manifests };
+  return { plugins, manifests, packageDirs };
 }
 
 /**

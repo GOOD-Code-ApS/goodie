@@ -1,28 +1,27 @@
 import { Singleton } from '@goodie-ts/core';
+// biome-ignore lint/style/useImportType: DI requires value import for constructor injection
+import { CrudRepository, TransactionManager } from '@goodie-ts/kysely';
 import { Retryable } from '@goodie-ts/resilience';
-import type { Database } from './Database.js';
-import type { Todo } from './db/schema.js';
+import type { Database, Todo } from './db/schema.js';
 
 @Singleton()
-export class TodoRepository {
-  constructor(private database: Database) {}
-
-  @Retryable({ maxAttempts: 3, delay: 100 })
-  async findAll(): Promise<Todo[]> {
-    return this.database.kysely.selectFrom('todos').selectAll().execute();
+export class TodoRepository extends CrudRepository<Todo, Database> {
+  constructor(transactionManager: TransactionManager) {
+    super('todos', transactionManager);
   }
 
   @Retryable({ maxAttempts: 3, delay: 100 })
-  async findById(id: string): Promise<Todo | undefined> {
-    return this.database.kysely
-      .selectFrom('todos')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirst();
+  override async findAll(): Promise<Todo[]> {
+    return super.findAll();
+  }
+
+  @Retryable({ maxAttempts: 3, delay: 100 })
+  override async findById(id: unknown): Promise<Todo | undefined> {
+    return super.findById(id);
   }
 
   async create(title: string): Promise<Todo> {
-    return this.database.kysely
+    return this.db
       .insertInto('todos')
       .values({ title })
       .returningAll()
@@ -33,7 +32,7 @@ export class TodoRepository {
     id: string,
     data: { title?: string; completed?: boolean },
   ): Promise<Todo | undefined> {
-    return this.database.kysely
+    return this.db
       .updateTable('todos')
       .set(data)
       .where('id', '=', id)
@@ -42,10 +41,6 @@ export class TodoRepository {
   }
 
   async delete(id: string): Promise<Todo | undefined> {
-    return this.database.kysely
-      .deleteFrom('todos')
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirst();
+    return this.deleteById(id);
   }
 }

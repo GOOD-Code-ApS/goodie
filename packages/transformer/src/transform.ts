@@ -66,7 +66,7 @@ export async function transform(
   const skipDiscovery =
     options.disablePluginDiscovery && options.disableLibraryBeanDiscovery;
   const discovery = skipDiscovery
-    ? { plugins: [], manifests: [] }
+    ? { plugins: [], manifests: [], packageDirs: new Map<string, string>() }
     : (options.discoveryCache ??
       (await discoverAll(baseDir, options.scanScopes)));
 
@@ -126,12 +126,39 @@ export async function transform(
   // 5b. Inject library beans (before afterResolve so plugins see them)
   if (!options.disableLibraryBeanDiscovery && libraryBeans.length > 0) {
     beans = [...beans, ...libraryBeans];
+    // Reconcile: scanned deps use absolute paths from ts-morph, but library
+    // beans use bare package specifiers. Rewrite dep tokenRefs to match.
+    reconcileLibraryImportPaths(
+      beans,
+      libraryBeans,
+      resolveResult.modules,
+      discovery.packageDirs,
+    );
   }
 
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
+    }
+  }
+
+  // 6b. Reconcile again — plugins may add synthetic beans with bare package specifiers
+  // (e.g. TransactionManager from the kysely plugin) that scanned beans reference
+  // via absolute paths.
+  if (!options.disableLibraryBeanDiscovery) {
+    // Collect all beans with bare package specifier import paths (library + plugin-synthesized)
+    const bareSpecifierBeans = beans.filter(
+      (b) =>
+        b.tokenRef.kind === 'class' && !b.tokenRef.importPath.startsWith('/'),
+    );
+    if (bareSpecifierBeans.length > 0) {
+      reconcileLibraryImportPaths(
+        beans,
+        bareSpecifierBeans,
+        resolveResult.modules,
+        discovery.packageDirs,
+      );
     }
   }
 
@@ -252,12 +279,28 @@ export function transformInMemory(
   // 4b. Inject library beans (before afterResolve so plugins see them)
   if (libraryBeans && libraryBeans.length > 0) {
     beans = [...beans, ...libraryBeans];
+    reconcileLibraryImportPaths(beans, libraryBeans, resolveResult.modules);
   }
 
   // 5. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
       beans = plugin.afterResolve(beans);
+    }
+  }
+
+  // 5b. Reconcile again — plugins may add synthetic beans with bare package specifiers
+  if (libraryBeans && libraryBeans.length > 0) {
+    const bareSpecifierBeans = beans.filter(
+      (b) =>
+        b.tokenRef.kind === 'class' && !b.tokenRef.importPath.startsWith('/'),
+    );
+    if (bareSpecifierBeans.length > 0) {
+      reconcileLibraryImportPaths(
+        beans,
+        bareSpecifierBeans,
+        resolveResult.modules,
+      );
     }
   }
 
@@ -444,6 +487,96 @@ export async function transformLibrary(
     code,
     codeOutputPath: options.codeOutputPath,
   };
+}
+
+/**
+ * Reconcile import paths between scanned beans (absolute paths from ts-morph)
+ * and library beans (bare package specifiers like `@goodie-ts/kysely`).
+ *
+ * When user code imports a library class, ts-morph resolves the dependency to
+ * the declaration's absolute file path. But the library bean's tokenRef uses
+ * a bare package specifier (set by `rewriteImportPaths` during library build).
+ * This mismatch causes the graph builder to see them as different tokens.
+ *
+ * Fix: rewrite dependency tokenRefs in scanned beans to use the library bean's
+ * import path when the className matches.
+ */
+function reconcileLibraryImportPaths(
+  allBeans: IRBeanDefinition[],
+  libraryBeans: IRBeanDefinition[],
+  modules?: import('./ir.js').IRModule[],
+  packageDirs?: Map<string, string>,
+): void {
+  // Build className → library tokenRef map (skip ambiguous names)
+  const libraryClassMap = new Map<
+    string,
+    IRBeanDefinition['tokenRef'] | null
+  >();
+  for (const lib of libraryBeans) {
+    if (lib.tokenRef.kind !== 'class') continue;
+    const name = lib.tokenRef.className;
+    if (libraryClassMap.has(name)) {
+      // Ambiguous — two library beans with same className, skip both
+      libraryClassMap.set(name, null);
+    } else {
+      libraryClassMap.set(name, lib.tokenRef);
+    }
+  }
+
+  function reconcileRef(
+    ref: IRBeanDefinition['tokenRef'],
+  ): IRBeanDefinition['tokenRef'] {
+    if (ref.kind !== 'class') return ref;
+    const libRef = libraryClassMap.get(ref.className);
+    if (libRef && libRef.kind === 'class') {
+      // Only rewrite if the import paths differ (scanned has absolute, lib has bare specifier)
+      if (ref.importPath !== libRef.importPath) {
+        return { ...ref, importPath: libRef.importPath };
+      }
+      return ref;
+    }
+    // Fallback: class isn't a bean but may live in a library package (e.g. CrudRepository).
+    // Check if the absolute import path falls under a known library package directory.
+    if (packageDirs && ref.importPath.startsWith('/')) {
+      for (const [realDir, pkgName] of packageDirs) {
+        if (ref.importPath.startsWith(`${realDir}/`)) {
+          return { ...ref, importPath: pkgName };
+        }
+      }
+    }
+    return ref;
+  }
+
+  for (const bean of allBeans) {
+    for (const dep of bean.constructorDeps) {
+      dep.tokenRef = reconcileRef(dep.tokenRef);
+    }
+    for (const field of bean.fieldDeps) {
+      field.tokenRef = reconcileRef(field.tokenRef);
+    }
+    if (bean.baseTokenRefs) {
+      bean.baseTokenRefs = bean.baseTokenRefs.map(
+        (ref) => reconcileRef(ref) as typeof ref,
+      );
+    }
+  }
+
+  // Also reconcile module constructor/field deps (modules are expanded later in buildGraph)
+  if (modules) {
+    for (const mod of modules) {
+      for (const dep of mod.constructorDeps) {
+        dep.tokenRef = reconcileRef(dep.tokenRef);
+      }
+      for (const field of mod.fieldDeps) {
+        field.tokenRef = reconcileRef(field.tokenRef);
+      }
+      for (const provides of mod.provides) {
+        for (const dep of provides.dependencies) {
+          dep.tokenRef = reconcileRef(dep.tokenRef);
+        }
+      }
+    }
+  }
 }
 
 /**

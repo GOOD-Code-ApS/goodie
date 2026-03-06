@@ -5,8 +5,9 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 ## What It Demonstrates
 
 - `@Controller` / `@Get` / `@Post` for declarative HTTP routing (codegen via hono plugin)
-- `@Value('DATABASE_URL')` for config injection directly into a `@Singleton` class
-- `@PostConstruct` for initializing infrastructure after field injection
+- `KyselyDatabase` library bean from `@goodie-ts/kysely` for database connectivity
+- `DatasourceConfig` / `PoolConfig` library beans via `@ConfigurationProperties('datasource')`
+- `CrudRepository<T, DB>` — typed base class for CRUD operations with `Kysely<DB>` access
 - `@Singleton` classes with constructor injection for repository and service layers
 - `configDir: 'config'` in vite config for JSON-based configuration files
 - `ServerConfig` from `@goodie-ts/hono` library beans (host/port via `@ConfigurationProperties`)
@@ -17,12 +18,16 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 ## Architecture
 
 ```
-@Singleton Database
-├── @Value('DATABASE_URL')           → config injection (default from config/default.json or process.env)
-├── @PostConstruct init()            → creates pg Pool + Kysely instance
+Library beans: KyselyDatabase(@Singleton) ← DatasourceConfig ← PoolConfig
+  └── config/default.json: { "datasource": { "url": "...", "dialect": "postgres", "pool": {...} } }
 │
-@Singleton TodoRepository(database)  → Kysely queries via database.kysely
-@Singleton TodoService(todoRepository) → Business logic layer
+@Singleton TodoRepository extends CrudRepository<Todo, Database>
+├── Inherits findAll(), findById(), save(), deleteById() from base class
+├── Custom queries via this.db (typed Kysely<Database>)
+└── Injects TransactionManager (auto-wired by kysely plugin)
+│
+@Singleton DatabaseHealthIndicator(KyselyDatabase) → SELECT 1 health check
+@Singleton TodoService(todoRepository)    → business logic layer
 │
 @Controller('/api/todos') TodoController(todoService) → Hono routes via decorators
 │
@@ -38,12 +43,12 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 | File | Role |
 |------|------|
 | `src/db/schema.ts` | Kysely `Database` interface with typed table definitions |
-| `src/Database.ts` | `@Singleton` with `@Value('DATABASE_URL')` + `@PostConstruct` for Kysely setup |
-| `src/TodoRepository.ts` | `@Singleton` CRUD repository using Kysely query builder |
+| `src/DatabaseHealthIndicator.ts` | `@Singleton` health check using `KyselyDatabase` with `sql\`SELECT 1\`` |
+| `src/TodoRepository.ts` | `@Singleton` extending `CrudRepository<Todo, Database>` with typed custom queries |
 | `src/TodoService.ts` | `@Singleton` business logic delegating to repository |
 | `src/TodoController.ts` | `@Controller('/api/todos')` with `@Get`, `@Post`, `@Patch`, `@Delete` routes |
 | `src/main.ts` | Bootstrap: `startServer()` from generated file |
-| `config/default.json` | JSON config file for server host/port |
+| `config/default.json` | JSON config file for server, datasource, and pool settings |
 | `vite.config.ts` | Vite config with `diPlugin({ configDir: 'config' })` |
 | `src/AppContext.generated.ts` | **Generated** — gitignored, created by transformer + hono plugin |
 
@@ -65,7 +70,7 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 const container = await new PostgreSqlContainer('postgres:17-alpine').start();
 
 const test = createGoodieTest(buildDefinitions(), {
-  config: () => ({ DATABASE_URL: container.getConnectionUri() }),
+  config: () => ({ 'datasource.url': container.getConnectionUri() }),
   transactional: TransactionManager,
 });
 
@@ -82,21 +87,17 @@ test('POST /api/todos creates a todo', async ({ ctx }) => {
 
 Tests use `createRouter(ctx)` to get a Hono app wired to the test DI context. `honoApp.request()` invokes routes in-process without HTTP overhead.
 
-## Design Note — Database Wrapper Class
-
-The `Database` class wraps `Kysely<DB>` because the transformer cannot generate clean tokens for external library generic types (e.g., `Kysely<Database>` resolves to file paths in identifiers). Wrapping in a local class gives the transformer a clean class token.
-
 ## Running
 
 ```bash
 # Generate DI code
-node scripts/generate.js
+pnpm generate
 
 # Build
 pnpm build
 
 # Start server (requires running PostgreSQL)
-DATABASE_URL=postgres://user:pass@localhost:5432/todos pnpm start
+pnpm start
 
 # Run integration tests (requires Docker)
 pnpm test

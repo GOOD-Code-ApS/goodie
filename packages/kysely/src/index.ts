@@ -1,7 +1,11 @@
 export { AbstractMigration } from './abstract-migration.js';
 export { CrudRepository } from './crud-repository.js';
+export { DatasourceConfig, PoolConfig } from './datasource-config.js';
 export { getMigrationName, Migration } from './decorators/migration.js';
 export { Transactional } from './decorators/transactional.js';
+export type { Dialect } from './dialect.js';
+export { DIALECTS, supportsReturning, validateDialect } from './dialect.js';
+export { KyselyDatabase } from './kysely-database.js';
 export type { KyselyPluginOptions } from './kysely-transformer-plugin.js';
 export { createKyselyPlugin } from './kysely-transformer-plugin.js';
 export { MigrationRunner } from './migration-runner.js';

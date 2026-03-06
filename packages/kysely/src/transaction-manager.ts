@@ -1,12 +1,15 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Kysely, Transaction } from 'kysely';
+import type { Dialect } from './dialect.js';
+import { supportsReturning as dialectSupportsReturning } from './dialect.js';
 
 /**
- * An object that exposes a `.kysely` property — e.g. a Database wrapper class.
+ * An object that exposes a `.kysely` property — e.g. KyselyDatabase or a custom wrapper.
  * Used for duck-type detection in the TransactionManager constructor.
  */
 export interface KyselyProvider {
   kysely: Kysely<any>;
+  dialect?: Dialect;
 }
 
 /**
@@ -15,41 +18,59 @@ export interface KyselyProvider {
  * Provides transaction propagation across async call chains without
  * explicitly threading a transaction object through every method.
  *
- * When auto-wired via `createKyselyPlugin({ database: 'Database' })`,
- * the constructor receives the Database bean and reads its `.kysely` property.
+ * When auto-wired via `createKyselyPlugin()`, the constructor receives
+ * the KyselyDatabase bean and reads its `.kysely` property.
  * Manual `configure()` is still supported for backward compatibility.
  */
 export class TransactionManager {
   private readonly storage = new AsyncLocalStorage<Transaction<any>>();
   private kyselyRef?: Kysely<any>;
   private testTransactionActive = false;
+  private _supportsReturning?: boolean;
 
-  constructor(kyselyOrProvider?: Kysely<any> | KyselyProvider) {
+  constructor(
+    kyselyOrProvider?: Kysely<any> | KyselyProvider,
+    dialect?: Dialect,
+  ) {
     if (kyselyOrProvider) {
       if ('kysely' in kyselyOrProvider) {
+        // Capture the current value (may already be set if @PostConstruct ran)
         this.kyselyRef = kyselyOrProvider.kysely;
         // Make the provider's .kysely property transaction-aware.
         // Any code accessing provider.kysely (e.g. database.kysely) will
         // automatically use the active transaction when inside one.
+        // The setter ensures @PostConstruct can still assign the value.
         const tm = this;
         Object.defineProperty(kyselyOrProvider, 'kysely', {
           get() {
             return tm.getConnection();
+          },
+          set(value: Kysely<any>) {
+            tm.kyselyRef = value;
           },
           configurable: true,
         });
       } else {
         this.kyselyRef = kyselyOrProvider;
       }
+      const resolvedDialect =
+        dialect ??
+        ('dialect' in kyselyOrProvider
+          ? (kyselyOrProvider as KyselyProvider).dialect
+          : undefined);
+      if (resolvedDialect) {
+        this._supportsReturning = dialectSupportsReturning(resolvedDialect);
+      }
     }
   }
 
   /**
    * Configure the Kysely instance used for transactions.
-   * Unnecessary when auto-wired via `createKyselyPlugin({ database: '...' })`.
+   * Called by KyselyDatabase after creating the Kysely instance in @PostConstruct.
    */
-  configure(kysely: Kysely<any>): void {
+  configure(kysely: Kysely<any>, dialect: Dialect): void {
     this.kyselyRef = kysely;
+    this._supportsReturning = dialectSupportsReturning(dialect);
   }
 
   private get kysely(): Kysely<any> {
@@ -98,6 +119,19 @@ export class TransactionManager {
    */
   getConnection(): Kysely<any> {
     return this.currentTransaction() ?? this.kysely;
+  }
+
+  /**
+   * Whether the underlying dialect supports RETURNING clauses.
+   * Eagerly derived at construction / configure time.
+   */
+  get supportsReturning(): boolean {
+    if (this._supportsReturning === undefined) {
+      throw new Error(
+        'TransactionManager not configured. Call configure(kysely) or pass a Kysely instance to the constructor.',
+      );
+    }
+    return this._supportsReturning;
   }
 
   /**

@@ -80,6 +80,10 @@ export interface IRModule {
   imports: ClassTokenRef[];
   /** @Provides methods defined on this module. */
   provides: IRProvides[];
+  /** Constructor dependencies of the module class. */
+  constructorDeps: IRDependency[];
+  /** Field-injected dependencies of the module class. */
+  fieldDeps: IRFieldInjection[];
   sourceLocation: SourceLocation;
 }
 

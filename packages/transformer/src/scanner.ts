@@ -126,6 +126,8 @@ export interface ScannedModule {
   classTokenRef: ClassTokenRef;
   imports: ScannedModuleImport[];
   provides: ScannedProvides[];
+  constructorParams: ScannedConstructorParam[];
+  fieldInjections: ScannedFieldInjection[];
   sourceLocation: SourceLocation;
 }
 
@@ -377,6 +379,8 @@ function scanModule(
   const moduleDecorator = findDecorator(decorators, DECORATOR_NAMES.Module)!;
   const imports = getModuleImports(moduleDecorator);
   const provides = scanProvidesMethods(cls, sourceFile, cache);
+  const constructorParams = scanConstructorParams(cls, cache);
+  const fieldInjections = scanFieldInjections(cls, cache);
 
   return {
     classDeclaration: cls,
@@ -387,6 +391,8 @@ function scanModule(
     },
     imports,
     provides,
+    constructorParams,
+    fieldInjections,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
 }
