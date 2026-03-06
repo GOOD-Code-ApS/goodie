@@ -29,6 +29,12 @@ export interface TransformOptions {
    * Useful in watch mode where `node_modules` doesn't change between rebuilds.
    */
   discoveryCache?: import('./discover-plugins.js').DiscoverAllResult;
+  /**
+   * Directory containing JSON config files (`default.json`, `{env}.json`).
+   * When set, the generated `__Goodie_Config` factory merges file-based config
+   * before `process.env` (priority: file defaults < env file < process.env < explicit config).
+   */
+  configDir?: string;
 }
 
 /** Options for building a library's beans.json manifest. */

@@ -155,16 +155,19 @@ export async function transform(
   }
 
   // 10. Check IR hash — skip codegen + write if DI graph unchanged
+  // Resolve configDir relative to tsconfig directory (not CWD) so the baked-in
+  // absolute path is correct regardless of where the build command runs from.
+  const resolvedConfigDir = options.configDir
+    ? path.isAbsolute(options.configDir)
+      ? options.configDir
+      : path.resolve(baseDir, options.configDir)
+    : undefined;
   const codegenOptions = {
     outputPath: options.outputPath,
     version: PKG_VERSION,
+    configDir: resolvedConfigDir,
   };
-  const currentHash = computeIRHash(
-    finalBeans,
-    codegenOptions,
-    contributions,
-    graphResult.controllers,
-  );
+  const currentHash = computeIRHash(finalBeans, codegenOptions, contributions);
 
   let existingHash: string | undefined;
   try {
@@ -192,7 +195,6 @@ export async function transform(
     finalBeans,
     { ...codegenOptions, hash: currentHash },
     contributions,
-    graphResult.controllers,
   );
 
   // 12. Write output
@@ -283,7 +285,6 @@ export function transformInMemory(
     finalBeans,
     { outputPath, version: PKG_VERSION },
     contributions,
-    graphResult.controllers,
   );
 
   return {
@@ -386,7 +387,6 @@ export async function transformLibrary(
       finalBeans,
       { outputPath: options.codeOutputPath, version: PKG_VERSION },
       contributions,
-      graphResult.controllers,
     );
 
     const codeDir = path.dirname(options.codeOutputPath);

@@ -1,5 +1,12 @@
 # @goodie-ts/cli
 
+## 0.6.2
+
+### Patch Changes
+
+- Updated dependencies [4ca51c5]
+  - @goodie-ts/transformer@0.8.0
+
 ## 0.6.1
 
 ### Patch Changes

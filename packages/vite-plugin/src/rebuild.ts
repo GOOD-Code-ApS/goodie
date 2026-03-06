@@ -22,6 +22,7 @@ export async function runRebuild(
       include: options.include,
       plugins: options.plugins,
       scanScopes: options.scanScopes,
+      configDir: options.configDir,
     });
     return { success: true, result };
   } catch (error) {

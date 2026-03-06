@@ -32,8 +32,13 @@ diPlugin({
   outputPath: 'src/AppContext.generated.ts',   // default
   include: ['src/**/*.ts'],                    // source file globs
   debounceMs: 100,                             // HMR rebuild debounce
+  configDir: 'config',                         // JSON config file directory
 });
 ```
+
+### `configDir`
+
+When set, the generated code loads JSON config files (`default.json`, `{NODE_ENV}.json`) from this directory at startup. Config values are flattened to dot-separated keys and merged with `process.env`. See `@goodie-ts/core` for `loadConfigFiles()` details.
 
 ## Behavior
 

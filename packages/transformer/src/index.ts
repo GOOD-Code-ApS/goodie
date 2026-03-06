@@ -30,13 +30,10 @@ export type {
   ClassTokenRef,
   InjectionTokenRef,
   IRBeanDefinition,
-  IRControllerDefinition,
   IRDependency,
   IRFieldInjection,
   IRModule,
   IRProvides,
-  IRRouteDefinition,
-  IRRouteValidation,
   SourceLocation,
   TokenRef,
 } from './ir.js';
@@ -65,17 +62,13 @@ export type { ResolveResult } from './resolver.js';
 // Resolver
 export { resolve } from './resolver.js';
 export type {
-  HttpMethod,
   ScannedBean,
   ScannedConstructorParam,
-  ScannedController,
   ScannedFieldInjection,
   ScannedModule,
   ScannedModuleImport,
   ScannedProvides,
-  ScannedRoute,
   ScannedTypeArgument,
-  ScannedValidation,
   ScanResult,
 } from './scanner.js';
 // Scanner
