@@ -8,6 +8,8 @@ import type {
 } from './aop-plugin.js';
 import { createDeclarativeAopPlugin } from './aop-plugin.js';
 import { scanAopDecoratorDefinitions } from './aop-scanner.js';
+import { createAopPlugin } from './builtin-aop-plugin.js';
+import { createConfigPlugin } from './builtin-config-plugin.js';
 import { computeIRHash, extractIRHash, generateCode } from './codegen.js';
 import {
   discoverAll,
@@ -97,9 +99,10 @@ export async function transform(
   const aopPlugins =
     aopMappings.length > 0 ? [createDeclarativeAopPlugin(aopMappings)] : [];
 
-  // Declarative AOP plugin comes first so explicit plugins can override
+  // Built-in plugins always active; declarative AOP comes next; then discovered + user plugins
+  const builtinPlugins = [createAopPlugin(), createConfigPlugin()];
   const activePlugins = mergePlugins(
-    [...aopPlugins, ...discoveredPlugins],
+    [...builtinPlugins, ...aopPlugins, ...discoveredPlugins],
     options.plugins ?? [],
   );
 
@@ -221,7 +224,11 @@ export function transformInMemory(
     aopMappings && aopMappings.length > 0
       ? [createDeclarativeAopPlugin(aopMappings)]
       : [];
-  const activePlugins = [...aopPlugins, ...(plugins ?? [])];
+  const builtinPlugins = [createAopPlugin(), createConfigPlugin()];
+  const activePlugins = mergePlugins(
+    [...builtinPlugins, ...aopPlugins],
+    plugins ?? [],
+  );
 
   // 1. beforeScan hooks
   for (const plugin of activePlugins) {
@@ -324,8 +331,9 @@ export async function transformLibrary(
   const aopPlugins =
     aopMappings.length > 0 ? [createDeclarativeAopPlugin(aopMappings)] : [];
 
+  const builtinPlugins = [createAopPlugin(), createConfigPlugin()];
   const activePlugins = mergePlugins(
-    [...aopPlugins, ...discovered],
+    [...builtinPlugins, ...aopPlugins, ...discovered],
     options.plugins ?? [],
   );
 

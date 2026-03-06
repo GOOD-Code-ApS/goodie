@@ -1,5 +1,5 @@
-import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
-import { Singleton } from '@goodie-ts/decorators';
+import type { InvocationContext, MethodInterceptor } from '@goodie-ts/core';
+import { Singleton } from '@goodie-ts/core';
 import type { Logger } from './logger.js';
 import { LoggerFactory } from './logger-factory.js';
 import { MDC } from './mdc.js';

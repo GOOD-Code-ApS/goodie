@@ -1,4 +1,4 @@
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 import { Order } from './model.js';
 import type { Repository } from './Repository.js';
 

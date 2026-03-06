@@ -1,6 +1,6 @@
 # @goodie-ts/cache
 
-In-memory caching for goodie-ts via `@Cacheable`, `@CacheEvict`, and `@CachePut` decorators. Built on `@goodie-ts/aop` interceptor chain.
+In-memory caching for goodie-ts via `@Cacheable`, `@CacheEvict`, and `@CachePut` decorators. Built on `@goodie-ts/core` interceptor chain.
 
 ## Key Files
 

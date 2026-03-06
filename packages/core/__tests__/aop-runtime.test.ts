@@ -1,14 +1,17 @@
-import type { BeanDefinition } from '@goodie-ts/core';
-import { ApplicationContext } from '@goodie-ts/core';
-import { describe, expect, it } from 'vitest';
-import { wrapAfterAdvice, wrapBeforeAdvice } from '../src/advice-wrappers.js';
-import { buildInterceptorChain } from '../src/interceptor-chain.js';
 import type {
   AfterAdvice,
+  BeanDefinition,
   BeforeAdvice,
   InvocationContext,
   MethodInterceptor,
-} from '../src/types.js';
+} from '@goodie-ts/core';
+import {
+  ApplicationContext,
+  buildInterceptorChain,
+  wrapAfterAdvice,
+  wrapBeforeAdvice,
+} from '@goodie-ts/core';
+import { describe, expect, it } from 'vitest';
 
 /**
  * Runtime integration tests that simulate what generated code does:

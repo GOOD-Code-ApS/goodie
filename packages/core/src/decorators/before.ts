@@ -1,4 +1,4 @@
-import type { BeforeAdvice } from '../types.js';
+import type { BeforeAdvice } from '../aop-types.js';
 
 type Constructor<T = BeforeAdvice> = new (...args: any[]) => T;
 
@@ -11,9 +11,9 @@ export interface BeforeOptions {
  * The advice class should implement `BeforeAdvice`.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
- * The `@goodie-ts/aop` transformer plugin reads decorator arguments via
- * ts-morph AST inspection and generates `buildInterceptorChain()` calls
- * with `wrapBeforeAdvice()` in the factory function.
+ * The AOP transformer plugin reads decorator arguments via ts-morph AST
+ * inspection and generates `buildInterceptorChain()` calls with
+ * `wrapBeforeAdvice()` in the factory function.
  */
 export function Before(
   _adviceClass: Constructor,

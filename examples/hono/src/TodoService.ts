@@ -1,5 +1,5 @@
 import { Cacheable, CacheEvict } from '@goodie-ts/cache';
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 import { Transactional } from '@goodie-ts/kysely';
 import { LoggerFactory } from '@goodie-ts/logging';
 import { Timeout } from '@goodie-ts/resilience';

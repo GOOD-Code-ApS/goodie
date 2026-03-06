@@ -1,10 +1,7 @@
-import type {
-  ClassVisitorContext,
-  TransformerPlugin,
-} from '@goodie-ts/transformer';
+import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 
 /**
- * Create the config transformer plugin.
+ * Built-in config transformer plugin.
  *
  * Scans `@ConfigurationProperties(prefix)` on classes that also have
  * `@Singleton` (or `@Injectable`). For each public class field, generates a
@@ -90,8 +87,6 @@ export function createConfigPlugin(): TransformerPlugin {
         if (prop.getDecorators().some((d) => d.getName() === 'Value')) continue;
 
         // Get default value from initializer
-        // TODO: process.env values are always strings — add type coercion
-        // (to number, boolean, etc.) based on the field's TypeScript type annotation.
         const initializer = prop.getInitializer();
         const defaultValue = initializer ? initializer.getText() : undefined;
 
@@ -101,8 +96,6 @@ export function createConfigPlugin(): TransformerPlugin {
       if (fields.length === 0) return;
 
       // Merge valueFields metadata — codegen handles the rest.
-      // The scanner may have already populated valueFields from @Value decorators,
-      // so we append rather than overwrite to preserve both sources.
       const newFields = fields.map((f) => ({
         fieldName: f.fieldName,
         key: `${prefix}.${f.fieldName}`,
@@ -117,5 +110,3 @@ export function createConfigPlugin(): TransformerPlugin {
     },
   };
 }
-
-export default createConfigPlugin;

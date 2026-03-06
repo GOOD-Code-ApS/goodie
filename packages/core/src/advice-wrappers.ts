@@ -3,7 +3,7 @@ import type {
   BeforeAdvice,
   InvocationContext,
   MethodInterceptor,
-} from './types.js';
+} from './aop-types.js';
 
 /** Wrap a BeforeAdvice into a MethodInterceptor for the interceptor chain. */
 export function wrapBeforeAdvice(advice: BeforeAdvice): MethodInterceptor {

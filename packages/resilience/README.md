@@ -1,6 +1,6 @@
 # @goodie-ts/resilience
 
-Resilience patterns for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — retry, circuit breaker, and timeout decorators. Built on `@goodie-ts/aop`.
+Resilience patterns for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — retry, circuit breaker, and timeout decorators. Built on the AOP interceptor chain in `@goodie-ts/core`.
 
 ## Install
 
@@ -24,7 +24,7 @@ Declarative resilience via decorators. Interceptors execute in order: **Timeout 
 
 ```typescript
 import { Retryable, CircuitBreaker, Timeout } from '@goodie-ts/resilience';
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 
 @Singleton()
 class PaymentService {

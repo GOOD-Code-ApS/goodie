@@ -1,6 +1,6 @@
 # @goodie-ts/core
 
-Runtime DI container. No compile-time or decorator concerns — this package only resolves pre-built `BeanDefinition[]`.
+Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefinition[]` and provides the interceptor chain for AOP.
 
 ## Key Files
 
@@ -12,6 +12,10 @@ Runtime DI container. No compile-time or decorator concerns — this package onl
 | `src/goodie.ts` | `Goodie.build(defs)` → `GoodieBuilder` → `.start()` bootstrap |
 | `src/topo-sort.ts` | DFS topological sort with cycle detection |
 | `src/errors.ts` | `DIError` hierarchy |
+| `src/aop-types.ts` | AOP types: `MethodInterceptor`, `InvocationContext`, `BeforeAdvice`, `AfterAdvice`, `InterceptorRef`, `InterceptedMethodDescriptor` |
+| `src/interceptor-chain.ts` | `buildInterceptorChain()` — chains interceptors with proceed/original-method fallback |
+| `src/advice-wrappers.ts` | `wrapBeforeAdvice()`, `wrapAfterAdvice()` — adapt advice to `MethodInterceptor` |
+| `src/decorators/` | All decorators: `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, `@Value`, `@Around`, `@Before`, `@After`, `@ConfigurationProperties`, `createAopDecorator()`, lifecycle hooks |
 
 ## Core Types
 

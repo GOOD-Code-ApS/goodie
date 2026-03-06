@@ -1,4 +1,4 @@
-import type { InvocationContext } from '@goodie-ts/aop';
+import type { InvocationContext } from '@goodie-ts/core';
 import { describe, expect, it, vi } from 'vitest';
 import { CacheInterceptor } from '../src/cache-interceptor.js';
 import { CacheManager } from '../src/cache-manager.js';

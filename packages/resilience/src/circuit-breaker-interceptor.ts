@@ -1,5 +1,5 @@
-import type { InvocationContext, MethodInterceptor } from '@goodie-ts/aop';
-import { Singleton } from '@goodie-ts/decorators';
+import type { InvocationContext, MethodInterceptor } from '@goodie-ts/core';
+import { Singleton } from '@goodie-ts/core';
 
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 

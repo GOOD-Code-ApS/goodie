@@ -1,4 +1,4 @@
-import type { InvocationContext, MethodInterceptor } from './types.js';
+import type { InvocationContext, MethodInterceptor } from './aop-types.js';
 
 /**
  * Build an interceptor chain for a method.

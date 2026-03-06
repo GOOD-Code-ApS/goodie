@@ -1,4 +1,4 @@
-import type { Scope } from '@goodie-ts/core';
+import type { Scope } from '../types.js';
 import { META, setMeta } from './metadata.js';
 
 /**

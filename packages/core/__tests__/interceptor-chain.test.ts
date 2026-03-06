@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { InvocationContext, MethodInterceptor } from '../src/aop-types.js';
 import { buildInterceptorChain } from '../src/interceptor-chain.js';
-import type { InvocationContext, MethodInterceptor } from '../src/types.js';
 
 describe('InterceptorChain', () => {
   it('single interceptor wraps method', () => {

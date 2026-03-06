@@ -29,7 +29,7 @@ interface TypeResolutionCache {
   typeArgs: Map<string, ScannedTypeArgument[]>;
 }
 
-/** Names of decorators we recognize from @goodie-ts/decorators. */
+/** Names of decorators we recognize from @goodie-ts/core. */
 const DECORATOR_NAMES = {
   Injectable: 'Injectable',
   Singleton: 'Singleton',

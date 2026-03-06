@@ -1,6 +1,6 @@
 # @goodie-ts/logging
 
-Method-level logging for goodie-ts via `@Log` decorator and `LoggerFactory` static API. Built on `@goodie-ts/aop` interceptor chain.
+Method-level logging for goodie-ts via `@Log` decorator and `LoggerFactory` static API. Built on `@goodie-ts/core` interceptor chain.
 
 ## Key Files
 

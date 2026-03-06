@@ -1,4 +1,4 @@
-import { createAopDecorator } from '@goodie-ts/aop';
+import { createAopDecorator } from '@goodie-ts/core';
 import type { CacheInterceptor } from '../cache-interceptor.js';
 
 /**

@@ -1,9 +1,4 @@
-import {
-  PostConstruct,
-  PreDestroy,
-  Singleton,
-  Value,
-} from '@goodie-ts/decorators';
+import { PostConstruct, PreDestroy, Singleton, Value } from '@goodie-ts/core';
 import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import type { Database as DB } from './db/schema.js';

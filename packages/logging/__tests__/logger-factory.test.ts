@@ -1,4 +1,4 @@
-import type { InvocationContext } from '@goodie-ts/aop';
+import type { InvocationContext } from '@goodie-ts/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Logger } from '../src/logger.js';
 import { ConsoleLogger } from '../src/logger.js';

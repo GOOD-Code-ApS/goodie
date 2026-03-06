@@ -15,7 +15,7 @@ Extend `HealthIndicator` to define custom health checks. The plugin auto-wires a
 ## Define a Health Indicator
 
 ```typescript
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 import { HealthIndicator, HealthResult } from '@goodie-ts/health';
 
 @Singleton()
@@ -38,7 +38,7 @@ class DatabaseHealthIndicator extends HealthIndicator {
 ## Use the Aggregator
 
 ```typescript
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 import { HealthAggregator } from '@goodie-ts/health';
 
 @Singleton()

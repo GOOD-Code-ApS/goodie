@@ -22,7 +22,7 @@ Provides `@Transactional` for declarative transaction management, `@Migration` f
 ## Usage
 
 ```typescript
-import { Singleton } from '@goodie-ts/decorators';
+import { Singleton } from '@goodie-ts/core';
 import { Transactional, CrudRepository, TransactionManager } from '@goodie-ts/kysely';
 
 @Singleton()

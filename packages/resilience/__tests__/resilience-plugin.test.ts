@@ -108,7 +108,7 @@ describe('Resilience Transformer Plugin', () => {
     expect(result.code).toContain('RetryInterceptor');
     expect(result.code).toContain("from '@goodie-ts/resilience'");
     expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/aop'",
+      "import { buildInterceptorChain } from '@goodie-ts/core'",
     );
   });
 
