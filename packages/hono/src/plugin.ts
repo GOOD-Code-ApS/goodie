@@ -289,8 +289,7 @@ function buildImports(controllers: ControllerBean[]): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
-  imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
-  imports.push("import { HTTP_FILTER } from '@goodie-ts/http'");
+  imports.push("import { EmbeddedServer, HTTP_FILTER } from '@goodie-ts/hono'");
 
   const allRoutes = controllers.flatMap((c) => c.routes);
 

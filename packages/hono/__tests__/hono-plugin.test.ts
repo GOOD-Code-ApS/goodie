@@ -63,10 +63,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain("import { Hono } from 'hono'");
     expect(result.code).toContain("import { hc } from 'hono/client'");
     expect(result.code).toContain(
-      "import { EmbeddedServer } from '@goodie-ts/hono'",
-    );
-    expect(result.code).toContain(
-      "import { HTTP_FILTER } from '@goodie-ts/http'",
+      "import { EmbeddedServer, HTTP_FILTER } from '@goodie-ts/hono'",
     );
   });
 
