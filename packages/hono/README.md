@@ -77,6 +77,32 @@ const router = createRouter(ctx);
 // Use router.fetch for testing or pass to a custom server
 ```
 
+## RPC Client (Type-Safe)
+
+The plugin generates typed RPC clients using Hono's `hc`. Per-controller clients are generated for use with larger applications:
+
+```typescript
+// Full app client
+import { createClient } from './AppContext.generated.js';
+
+const client = createClient('http://localhost:3000');
+// client.api.todos.$get(), client.api.todos.$post(), etc.
+```
+
+```typescript
+// Per-controller client (better for larger apps)
+import { createTodoControllerClient } from './AppContext.generated.js';
+
+const todoClient = createTodoControllerClient('http://localhost:3000/api/todos');
+// todoClient.$get(), todoClient.$post(), etc.
+```
+
+Per-controller types are also exported for custom use:
+
+```typescript
+import type { TodoControllerRoutes } from './AppContext.generated.js';
+```
+
 ## Server Configuration
 
 `ServerConfig` is auto-discovered as a library bean. Configure it via a JSON config file:
