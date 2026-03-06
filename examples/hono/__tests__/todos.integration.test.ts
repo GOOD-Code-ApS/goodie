@@ -21,7 +21,10 @@ describe('Hono + PostgreSQL Todo API', () => {
   });
 
   const test = createGoodieTest(buildDefinitions(), {
-    config: () => ({ DATABASE_URL: container.getConnectionUri() }),
+    config: () => ({
+      'datasource.url': container.getConnectionUri(),
+      'datasource.dialect': 'postgres',
+    }),
     transactional: TransactionManager,
   });
 

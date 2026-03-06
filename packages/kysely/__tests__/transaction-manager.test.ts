@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TransactionManager } from '../src/transaction-manager.js';
 
 /** Create a mock Kysely instance with configurable transaction behavior. */
-function createMockKysely(opts?: { supportsReturning?: boolean }) {
+function createMockKysely() {
   const mockTransaction = { isTransaction: true };
 
   const kysely = {
@@ -10,9 +10,6 @@ function createMockKysely(opts?: { supportsReturning?: boolean }) {
       execute: vi.fn(async (fn: (trx: unknown) => Promise<unknown>) => {
         return fn(mockTransaction);
       }),
-    }),
-    getExecutor: () => ({
-      adapter: { supportsReturning: opts?.supportsReturning ?? false },
     }),
   };
 
@@ -23,7 +20,7 @@ function createMockKysely(opts?: { supportsReturning?: boolean }) {
 function createTm() {
   const { kysely, mockTransaction } = createMockKysely();
   const tm = new TransactionManager();
-  tm.configure(kysely as never);
+  tm.configure(kysely as never, 'postgres');
   return { tm, kysely, mockTransaction };
 }
 
@@ -70,7 +67,7 @@ describe('TransactionManager', () => {
         return fn({ ...mockTransaction, call: transactionCallCount });
       }),
     });
-    tm.configure(kysely as never);
+    tm.configure(kysely as never, 'postgres');
 
     let outerTrx: unknown;
     let innerTrx: unknown;
@@ -130,9 +127,9 @@ describe('TransactionManager', () => {
     ).rejects.toThrow('TransactionManager not configured');
   });
 
-  it('should accept Kysely in constructor', async () => {
+  it('should accept Kysely and dialect in constructor', async () => {
     const { kysely } = createMockKysely();
-    const tm = new TransactionManager(kysely as never);
+    const tm = new TransactionManager(kysely as never, 'postgres');
 
     const result = await tm.runInTransaction(async () => 'via constructor');
     expect(result).toBe('via constructor');
@@ -141,7 +138,7 @@ describe('TransactionManager', () => {
   it('should accept a KyselyProvider (duck-typed object with .kysely) in constructor', async () => {
     const { kysely } = createMockKysely();
     const provider = { kysely: kysely as never };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider, 'postgres');
 
     const result = await tm.runInTransaction(async () => 'via provider');
     expect(result).toBe('via provider');
@@ -150,7 +147,7 @@ describe('TransactionManager', () => {
   it('should use the .kysely property from a KyselyProvider, not the provider itself', () => {
     const { kysely } = createMockKysely();
     const provider = { kysely: kysely as never };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider, 'postgres');
 
     // getConnection() should return the raw kysely, not the provider wrapper
     expect(tm.getConnection()).toBe(kysely);
@@ -159,7 +156,7 @@ describe('TransactionManager', () => {
   it('should make provider.kysely transaction-aware via property redefinition', async () => {
     const { kysely, mockTransaction } = createMockKysely();
     const provider = { kysely: kysely as never };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider, 'postgres');
 
     // Outside a transaction: provider.kysely returns the raw Kysely
     expect(provider.kysely).toBe(kysely);
@@ -176,35 +173,30 @@ describe('TransactionManager', () => {
   it('should accept no args and fall back to configure()', async () => {
     const tm = new TransactionManager();
     const { kysely } = createMockKysely();
-    tm.configure(kysely as never);
+    tm.configure(kysely as never, 'postgres');
 
     const result = await tm.runInTransaction(async () => 'via configure');
     expect(result).toBe('via configure');
   });
 
-  it('should eagerly derive supportsReturning at configure time', () => {
-    const { kysely } = createMockKysely({ supportsReturning: true });
+  it('should set supportsReturning from dialect at configure time', () => {
+    const { kysely } = createMockKysely();
     const tm = new TransactionManager();
-    tm.configure(kysely as never);
-
-    // Should be available immediately without lazy evaluation
-    expect(tm.supportsReturning).toBe(true);
-  });
-
-  it('should accept explicit supportsReturning via options to avoid Kysely internals', () => {
-    // Kysely mock returns false from getExecutor, but explicit option overrides it
-    const { kysely } = createMockKysely({ supportsReturning: false });
-    const tm = new TransactionManager(kysely as never, {
-      supportsReturning: true,
-    });
+    tm.configure(kysely as never, 'postgres');
 
     expect(tm.supportsReturning).toBe(true);
   });
 
-  it('should accept explicit supportsReturning in configure() options', () => {
-    const { kysely } = createMockKysely({ supportsReturning: false });
-    const tm = new TransactionManager();
-    tm.configure(kysely as never, { supportsReturning: true });
+  it('should set supportsReturning to false for mysql dialect', () => {
+    const { kysely } = createMockKysely();
+    const tm = new TransactionManager(kysely as never, 'mysql');
+
+    expect(tm.supportsReturning).toBe(false);
+  });
+
+  it('should set supportsReturning to true for sqlite dialect', () => {
+    const { kysely } = createMockKysely();
+    const tm = new TransactionManager(kysely as never, 'sqlite');
 
     expect(tm.supportsReturning).toBe(true);
   });
@@ -216,27 +208,18 @@ describe('TransactionManager', () => {
     );
   });
 
-  it('should reset supportsReturning cache when configure() is called', () => {
-    function createKyselyWithReturning(supports: boolean) {
-      return {
-        ...createMockKysely().kysely,
-        getExecutor: () => ({
-          adapter: { supportsReturning: supports },
-        }),
-      };
-    }
+  it('should reset supportsReturning when configure() is called with a different dialect', () => {
+    const { kysely: kysely1 } = createMockKysely();
+    const { kysely: kysely2 } = createMockKysely();
 
     const tm = new TransactionManager();
-    const kysely1 = createKyselyWithReturning(true);
-    tm.configure(kysely1 as never);
+    tm.configure(kysely1 as never, 'postgres');
 
     expect(tm.supportsReturning).toBe(true);
 
-    // Reconfigure with a dialect that does NOT support returning
-    const kysely2 = createKyselyWithReturning(false);
-    tm.configure(kysely2 as never);
+    // Reconfigure with mysql dialect
+    tm.configure(kysely2 as never, 'mysql');
 
-    // Should reflect the new dialect, not the cached value
     expect(tm.supportsReturning).toBe(false);
   });
 });

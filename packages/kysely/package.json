@@ -13,6 +13,7 @@
     "access": "public"
   },
   "goodie": {
+    "beans": "dist/beans.json",
     "plugin": "./dist/kysely-transformer-plugin.js"
   },
   "main": "dist/index.js",
@@ -24,19 +25,37 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && goodie generate --mode library",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
     "@goodie-ts/core": "workspace:^"
   },
   "peerDependencies": {
-    "kysely": ">=0.27.0"
+    "kysely": ">=0.27.0",
+    "pg": ">=8.0.0",
+    "mysql2": ">=3.0.0",
+    "better-sqlite3": ">=9.0.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
+    "@types/better-sqlite3": "^7.0.0",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.0.0",
     "kysely": "^0.27.0",
+    "mysql2": "^3.0.0",
     "ts-morph": "^24.0.0"
   },
   "files": [

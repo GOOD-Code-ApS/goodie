@@ -181,10 +181,26 @@ function resolveModule(
     },
   );
 
+  const constructorDeps = scannedModule.constructorParams
+    ? resolveConstructorParams(
+        scannedModule.constructorParams,
+        scannedModule.classTokenRef.className,
+      )
+    : [];
+
+  const fieldDeps = scannedModule.fieldInjections
+    ? resolveFieldInjections(
+        scannedModule.fieldInjections,
+        scannedModule.classTokenRef.className,
+      )
+    : [];
+
   return {
     classTokenRef: scannedModule.classTokenRef,
     imports,
     provides,
+    constructorDeps,
+    fieldDeps,
     sourceLocation: scannedModule.sourceLocation,
   };
 }

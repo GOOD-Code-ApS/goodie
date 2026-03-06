@@ -1,21 +1,15 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Kysely, Transaction } from 'kysely';
+import type { Dialect } from './dialect.js';
+import { supportsReturning as dialectSupportsReturning } from './dialect.js';
 
 /**
- * An object that exposes a `.kysely` property — e.g. a Database wrapper class.
+ * An object that exposes a `.kysely` property — e.g. KyselyDatabase or a custom wrapper.
  * Used for duck-type detection in the TransactionManager constructor.
  */
 export interface KyselyProvider {
   kysely: Kysely<any>;
-}
-
-export interface TransactionManagerOptions {
-  /**
-   * Explicitly set whether the dialect supports RETURNING clauses.
-   * When provided, avoids probing Kysely internals at runtime.
-   * When omitted, auto-detected once from the Kysely adapter.
-   */
-  supportsReturning?: boolean;
+  dialect?: Dialect;
 }
 
 /**
@@ -24,8 +18,8 @@ export interface TransactionManagerOptions {
  * Provides transaction propagation across async call chains without
  * explicitly threading a transaction object through every method.
  *
- * When auto-wired via `createKyselyPlugin({ database: 'Database' })`,
- * the constructor receives the Database bean and reads its `.kysely` property.
+ * When auto-wired via `createKyselyPlugin()`, the constructor receives
+ * the KyselyDatabase bean and reads its `.kysely` property.
  * Manual `configure()` is still supported for backward compatibility.
  */
 export class TransactionManager {
@@ -36,7 +30,7 @@ export class TransactionManager {
 
   constructor(
     kyselyOrProvider?: Kysely<any> | KyselyProvider,
-    options?: TransactionManagerOptions,
+    dialect?: Dialect,
   ) {
     if (kyselyOrProvider) {
       if ('kysely' in kyselyOrProvider) {
@@ -54,17 +48,24 @@ export class TransactionManager {
       } else {
         this.kyselyRef = kyselyOrProvider;
       }
-      this.deriveSupportsReturning(options?.supportsReturning);
+      const resolvedDialect =
+        dialect ??
+        ('dialect' in kyselyOrProvider
+          ? (kyselyOrProvider as KyselyProvider).dialect
+          : undefined);
+      if (resolvedDialect) {
+        this._supportsReturning = dialectSupportsReturning(resolvedDialect);
+      }
     }
   }
 
   /**
    * Configure the Kysely instance used for transactions.
-   * Unnecessary when auto-wired via `createKyselyPlugin({ database: '...' })`.
+   * Called by KyselyDatabase after creating the Kysely instance in @PostConstruct.
    */
-  configure(kysely: Kysely<any>, options?: TransactionManagerOptions): void {
+  configure(kysely: Kysely<any>, dialect: Dialect): void {
     this.kyselyRef = kysely;
-    this.deriveSupportsReturning(options?.supportsReturning);
+    this._supportsReturning = dialectSupportsReturning(dialect);
   }
 
   private get kysely(): Kysely<any> {
@@ -126,20 +127,6 @@ export class TransactionManager {
       );
     }
     return this._supportsReturning;
-  }
-
-  /**
-   * Eagerly derive the `supportsReturning` capability.
-   * When `explicit` is provided, uses it directly (avoids Kysely internals).
-   * Otherwise, probes the Kysely adapter once.
-   */
-  private deriveSupportsReturning(explicit?: boolean): void {
-    if (explicit !== undefined) {
-      this._supportsReturning = explicit;
-    } else {
-      this._supportsReturning =
-        this.kysely.getExecutor().adapter.supportsReturning;
-    }
   }
 
   /**

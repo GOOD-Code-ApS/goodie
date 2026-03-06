@@ -7,7 +7,7 @@ export interface Database {
 export interface TodoTable {
   id: Generated<string>;
   title: string;
-  completed: boolean;
+  completed: Generated<boolean>;
   created_at: Generated<Date>;
 }
 

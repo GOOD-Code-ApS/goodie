@@ -38,7 +38,7 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 - **`TokenRef`** — union: `ClassTokenRef { kind: 'class', className, importPath }` or `InjectionTokenRef { kind: 'injection-token', tokenName, importPath?, typeAnnotation?, typeImports? }`
 - **`IRBeanDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, metadata, sourceLocation
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
-- **`IRProvides`** / **`IRModule`** — module factory methods
+- **`IRProvides`** / **`IRModule`** — module factory methods (IRModule has `constructorDeps` and `fieldDeps` for module constructor/field injection)
 
 ## Controller Support
 
@@ -66,10 +66,14 @@ Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in pa
 ## Graph Builder Details
 
 - Expands modules: registers module class + each `@Provides` as separate bean
-- Module instances are implicit singletons
+- Module instances are implicit singletons with constructor and field injection support
 - `@Provides` methods get the module instance as their first dependency
 - Resolves `@Named()` qualifiers to match `@Inject('name')`
 - Validates required providers exist, detects cycles
+
+## Library Bean Import Path Reconciliation
+
+Library beans use bare package specifiers (`@goodie-ts/kysely`) in their tokenRefs (set by `rewriteImportPaths` during `transformLibrary`). When user code imports a library class, ts-morph resolves the dependency to the declaration's absolute file path. `reconcileLibraryImportPaths()` in `transform.ts` bridges this mismatch by rewriting dependency tokenRefs (in beans and modules) to use the library bean's import path when the className matches.
 
 ## Library Mode (`transformLibrary`)
 
