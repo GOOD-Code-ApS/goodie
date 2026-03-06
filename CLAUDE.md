@@ -50,7 +50,8 @@ pnpm clean          # Clean all dist/
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
 | `packages/testing` | TestContext with bean overrides and @MockDefinition |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
-| `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc., ServerConfig, EmbeddedServer, transformer plugin |
+| `packages/http` | Framework-agnostic HTTP abstractions — @Controller, @Get, @Post, @Cors, @Validate, HttpFilter interface |
+| `packages/hono` | Hono runtime — EmbeddedServer, ServerConfig, transformer plugin. Re-exports `@goodie-ts/http` decorators. |
 | `packages/kysely` | Kysely integration — KyselyDatabase, @Transactional, @Migration |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
 | `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |
