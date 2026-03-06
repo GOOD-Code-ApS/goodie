@@ -32,14 +32,10 @@
     "@goodie-ts/core": "workspace:^"
   },
   "peerDependencies": {
-    "vitest": ">=3.0.0",
-    "@goodie-ts/kysely": "workspace:^"
+    "vitest": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "vitest": {
-      "optional": true
-    },
-    "@goodie-ts/kysely": {
       "optional": true
     }
   },
