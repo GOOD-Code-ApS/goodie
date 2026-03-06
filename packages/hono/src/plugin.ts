@@ -80,6 +80,8 @@ export default function createHonoPlugin(): TransformerPlugin {
         }
       }
 
+      ctx.registerBean({ scope: 'singleton', decoratorName: 'Controller' });
+
       // Initialize controller metadata — routes populated by visitMethod
       metadata.controller = { basePath, routes: [] } satisfies ControllerMeta;
     },
