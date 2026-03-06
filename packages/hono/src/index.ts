@@ -1,4 +1,6 @@
 export { Controller } from './controller.js';
+export type { CorsOptions } from './cors.js';
+export { Cors } from './cors.js';
 export { EmbeddedServer } from './embedded-server.js';
 export type {
   ControllerMetadata,

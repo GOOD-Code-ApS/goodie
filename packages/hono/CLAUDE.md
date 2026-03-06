@@ -9,6 +9,7 @@ HTTP controller decorators and Hono integration for goodie-ts. Provides route me
 | `src/metadata.ts` | `HONO_META` symbol keys, `ControllerMetadata`, `RouteMetadata` types |
 | `src/controller.ts` | `@Controller(basePath?)` — marks class as HTTP controller, stores basePath |
 | `src/route.ts` | `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` — method decorators via `createRouteDecorator()` |
+| `src/cors.ts` | `@Cors(options?)` — compile-time CORS decorator, emits `cors()` middleware from `hono/cors` |
 | `src/validate.ts` | `@Validate({ json: schema })` — attaches validation metadata for zod-validator middleware |
 | `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host` and `port` defaults |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` that wraps `@hono/node-server`, uses `ServerConfig` for defaults |
@@ -58,6 +59,9 @@ The transformer core knows nothing about HTTP methods, routes, or controllers. T
 
 ## Gotchas
 
+- `@Cors()` at class level applies to all routes; method-level `@Cors` overrides class-level for that route
+- `@Cors` is compile-time-only (no-op at runtime), same pattern as `@Validate`
 - Route decorators are matched by name only (no import source verification), but only scanned on `@Controller` classes
 - Controller variable names in generated code use collision-safe naming (`className:importPath` keying)
 - `@Validate` generates `zValidator()` middleware — requires `@hono/zod-validator` and `zod` as peer deps
+- **Variable references in `@Cors` and `@Validate` config are not auto-imported** — `scanCorsDecorator` and `scanValidateDecorator` use raw AST text (`getText()`). If you write `@Cors({ origin: ALLOWED_ORIGINS })`, the generated code emits `cors({ origin: ALLOWED_ORIGINS })` but does NOT import `ALLOWED_ORIGINS`. Only literal values and inline expressions work reliably.

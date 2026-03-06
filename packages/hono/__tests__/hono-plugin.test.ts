@@ -280,6 +280,168 @@ describe('Hono Plugin Codegen', () => {
   });
 });
 
+describe('Hono Plugin — @Cors', () => {
+  it('emits cors() import when @Cors is used', () => {
+    const result = createProject({
+      '/src/ApiController.ts': `
+        import { Controller, Get, Cors } from './decorators.js'
+
+        @Cors()
+        @Controller('/api')
+        class ApiController {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain("import { cors } from 'hono/cors'");
+  });
+
+  it('emits cors() middleware for class-level @Cors() with no args', () => {
+    const result = createProject({
+      '/src/ApiController.ts': `
+        import { Controller, Get, Cors } from './decorators.js'
+
+        @Cors()
+        @Controller('/api')
+        class ApiController {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('cors(),');
+  });
+
+  it('emits cors(config) for class-level @Cors with options', () => {
+    const result = createProject({
+      '/src/ApiController.ts': `
+        import { Controller, Get, Cors } from './decorators.js'
+
+        @Cors({ origin: 'https://example.com', allowMethods: ['GET', 'POST'] })
+        @Controller('/api')
+        class ApiController {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain("cors({ origin: 'https://example.com'");
+    expect(result.code).toContain("allowMethods: ['GET', 'POST']");
+  });
+
+  it('applies class-level @Cors to all routes', () => {
+    const result = createProject({
+      '/src/ApiController.ts': `
+        import { Controller, Get, Post, Cors } from './decorators.js'
+
+        @Cors({ origin: '*' })
+        @Controller('/api')
+        class ApiController {
+          @Get('/a')
+          a() {}
+          @Post('/b')
+          b() {}
+        }
+      `,
+    });
+
+    // Both routes should have cors middleware
+    const corsMatches = result.code.match(/cors\(\{ origin: '\*' \}\)/g);
+    expect(corsMatches).toHaveLength(2);
+  });
+
+  it('method-level @Cors overrides class-level', () => {
+    const result = createProject({
+      '/src/ApiController.ts': `
+        import { Controller, Get, Cors } from './decorators.js'
+
+        @Cors({ origin: 'https://example.com' })
+        @Controller('/api')
+        class ApiController {
+          @Get('/default')
+          defaultCors() {}
+
+          @Cors({ origin: '*' })
+          @Get('/public')
+          publicCors() {}
+        }
+      `,
+    });
+
+    // /api/default should use class-level cors
+    expect(result.code).toContain("cors({ origin: 'https://example.com' })");
+    // /api/public should use method-level cors (origin: '*')
+    expect(result.code).toContain("cors({ origin: '*' })");
+  });
+
+  it('does not emit cors for routes without @Cors', () => {
+    const result = createProject({
+      '/src/ApiController.ts': `
+        import { Controller, Get } from './decorators.js'
+
+        @Controller('/api')
+        class ApiController {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).not.toContain('cors');
+    expect(result.code).not.toContain('hono/cors');
+  });
+
+  it('method-level @Cors without class-level only affects that route', () => {
+    const result = createProject({
+      '/src/ApiController.ts': `
+        import { Controller, Get, Cors } from './decorators.js'
+
+        @Controller('/api')
+        class ApiController {
+          @Cors({ origin: '*' })
+          @Get('/public')
+          publicRoute() {}
+
+          @Get('/private')
+          privateRoute() {}
+        }
+      `,
+    });
+
+    // Only the /public route should have cors
+    const corsMatches = result.code.match(/cors\(/g);
+    expect(corsMatches).toHaveLength(1);
+  });
+
+  it('cors middleware appears before validation middleware', () => {
+    const result = createProject({
+      '/src/schema.ts': `
+        export const bodySchema = {}
+      `,
+      '/src/ApiController.ts': `
+        import { Controller, Post, Cors, Validate } from './decorators.js'
+        import { bodySchema } from './schema.js'
+
+        @Cors({ origin: '*' })
+        @Controller('/api')
+        class ApiController {
+          @Post('/data')
+          @Validate({ json: bodySchema })
+          create() {}
+        }
+      `,
+    });
+
+    const corsIdx = result.code.indexOf('cors(');
+    const validatorIdx = result.code.indexOf('zValidator(');
+    expect(corsIdx).toBeLessThan(validatorIdx);
+  });
+});
+
 describe('Hono Plugin — RPC Client', () => {
   it('exports AppType as ReturnType of createRouter', () => {
     const result = createProject({

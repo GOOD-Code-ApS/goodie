@@ -33,12 +33,16 @@ interface RouteDefinition {
   httpMethod: HttpMethod;
   path: string;
   validation?: RouteValidation[];
+  /** Raw CORS config source text from @Cors(), or true for @Cors() with no args. */
+  cors?: string | true;
 }
 
 /** Controller metadata stored on bean metadata by visitClass. */
 interface ControllerMeta {
   basePath: string;
   routes: RouteDefinition[];
+  /** Class-level CORS config source text, or true for @Cors() with no args. */
+  cors?: string | true;
 }
 
 /** Extracted controller bean for codegen. */
@@ -47,6 +51,7 @@ interface ControllerBean {
   importPath: string;
   basePath: string;
   routes: RouteDefinition[];
+  cors?: string | true;
 }
 
 /**
@@ -82,8 +87,15 @@ export default function createHonoPlugin(): TransformerPlugin {
 
       ctx.registerBean({ scope: 'singleton', decoratorName: 'Controller' });
 
+      // Scan class-level @Cors
+      const classCors = scanCorsDecorator(decorators);
+
       // Initialize controller metadata — routes populated by visitMethod
-      metadata.controller = { basePath, routes: [] } satisfies ControllerMeta;
+      metadata.controller = {
+        basePath,
+        routes: [],
+        ...(classCors !== undefined ? { cors: classCors } : {}),
+      } satisfies ControllerMeta;
     },
 
     visitMethod(ctx: MethodVisitorContext): void {
@@ -121,11 +133,15 @@ export default function createHonoPlugin(): TransformerPlugin {
       // Scan @Validate
       const validation = scanValidateDecorator(decorators, methodDeclaration);
 
+      // Scan method-level @Cors
+      const methodCors = scanCorsDecorator(decorators);
+
       controller.routes.push({
         methodName,
         httpMethod,
         path,
         ...(validation.length > 0 ? { validation } : {}),
+        ...(methodCors !== undefined ? { cors: methodCors } : {}),
       });
     },
 
@@ -238,6 +254,20 @@ function resolveSchemaImportPath(
   return sourceFile.getFilePath();
 }
 
+/** Extract @Cors() config from decorators. Returns the raw source text of the config object, `true` for no-arg @Cors(), or `undefined` if absent. */
+function scanCorsDecorator(
+  decorators: import('ts-morph').Decorator[],
+): string | true | undefined {
+  const corsDec = decorators.find((d) => d.getName() === 'Cors');
+  if (!corsDec) return undefined;
+
+  const args = corsDec.getArguments();
+  if (args.length === 0) return true;
+
+  // Return the raw source text of the options object
+  return args[0].getText();
+}
+
 function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
   const result: ControllerBean[] = [];
   for (const bean of beans) {
@@ -249,6 +279,7 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
       importPath: bean.tokenRef.importPath,
       basePath: ctrl.basePath,
       routes: ctrl.routes,
+      ...(ctrl.cors !== undefined ? { cors: ctrl.cors } : {}),
     });
   }
   return result;
@@ -261,6 +292,15 @@ function buildImports(controllers: ControllerBean[]): string[] {
   imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
 
   const allRoutes = controllers.flatMap((c) => c.routes);
+
+  // Check if any route needs CORS (class-level or method-level)
+  const hasCors =
+    controllers.some((c) => c.cors !== undefined) ||
+    allRoutes.some((r) => r.cors !== undefined);
+  if (hasCors) {
+    imports.push("import { cors } from 'hono/cors'");
+  }
+
   const hasValidation = allRoutes.some(
     (r) => r.validation && r.validation.length > 0,
   );
@@ -290,13 +330,21 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
       const relativePath = escapeStringLiteral(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
-      const validationMiddleware = generateValidationMiddleware(
-        route.validation,
-      );
 
-      if (validationMiddleware.length > 0) {
+      // Collect middleware: CORS first, then validation
+      const middleware: string[] = [];
+
+      // Method-level @Cors overrides class-level
+      const corsConfig = route.cors ?? ctrl.cors;
+      if (corsConfig !== undefined) {
+        middleware.push(corsConfig === true ? 'cors()' : `cors(${corsConfig})`);
+      }
+
+      middleware.push(...generateValidationMiddleware(route.validation));
+
+      if (middleware.length > 0) {
         lines.push(`    .${route.httpMethod}('${relativePath}',`);
-        for (const mw of validationMiddleware) {
+        for (const mw of middleware) {
           lines.push(`      ${mw},`);
         }
         lines.push('      async (c) => {');
