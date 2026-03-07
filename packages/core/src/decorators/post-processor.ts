@@ -1,10 +1,11 @@
-import { META, setMeta } from './metadata.js';
-
 /**
  * Marks a singleton bean as a BeanPostProcessor.
  *
  * The transformer will set `metadata.isBeanPostProcessor = true` on the
  * generated BeanDefinition, so the runtime discovers it automatically.
+ *
+ * **Compile-time only** — the decorator is a no-op marker at runtime.
+ * The transformer reads this decorator via AST inspection at build time.
  *
  * @example
  * @PostProcessor()
@@ -14,9 +15,7 @@ import { META, setMeta } from './metadata.js';
  * }
  */
 export function PostProcessor(): ClassDecorator_Stage3 {
-  return (_target, context) => {
-    setMeta(context.metadata!, META.POST_PROCESSOR, true);
-  };
+  return () => {};
 }
 
 type ClassDecorator_Stage3 = (

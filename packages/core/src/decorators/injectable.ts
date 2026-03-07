@@ -1,17 +1,15 @@
-import type { Scope } from '../types.js';
-import { META, setMeta } from './metadata.js';
-
 /**
  * Marks a class as injectable with prototype scope.
+ *
+ * **Compile-time only** — the decorator is a no-op marker at runtime.
+ * The transformer reads this decorator via AST inspection at build time.
  *
  * @example
  * @Injectable()
  * class UserRepository { ... }
  */
 export function Injectable(): ClassDecorator_Stage3 {
-  return (_target, context) => {
-    setMeta(context.metadata!, META.SCOPE, 'prototype' satisfies Scope);
-  };
+  return () => {};
 }
 
 type ClassDecorator_Stage3 = (

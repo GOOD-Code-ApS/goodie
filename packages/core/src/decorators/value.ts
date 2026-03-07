@@ -1,5 +1,3 @@
-import { META, pushMeta } from './metadata.js';
-
 /** Options for the @Value decorator. */
 export interface ValueOptions {
   /** Default value when the config key is missing. */
@@ -12,8 +10,11 @@ export interface ValueOptions {
  * The config source is a bean registered under the `__Goodie_Config` token,
  * which defaults to `process.env` and can be overridden via `createContext(config)`.
  *
- * @param key  The config key to inject (e.g. `'DB_URL'`)
- * @param options  Optional default value
+ * **Compile-time only** — the decorator is a no-op marker at runtime.
+ * The transformer reads this decorator via AST inspection at build time.
+ *
+ * @param _key  The config key to inject (e.g. `'DB_URL'`)
+ * @param _options  Optional default value
  *
  * @example
  * @Singleton()
@@ -23,20 +24,10 @@ export interface ValueOptions {
  * }
  */
 export function Value(
-  key: string,
-  options?: ValueOptions,
+  _key: string,
+  _options?: ValueOptions,
 ): FieldDecorator_Stage3 {
-  return (_target, context) => {
-    const meta: { fieldName: string | symbol; key: string; default?: unknown } =
-      {
-        fieldName: context.name,
-        key,
-      };
-    if (options?.default !== undefined) {
-      meta.default = options.default;
-    }
-    pushMeta(context.metadata!, META.VALUE, meta);
-  };
+  return () => {};
 }
 
 type FieldDecorator_Stage3 = (

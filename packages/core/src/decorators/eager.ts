@@ -1,8 +1,9 @@
-import { META, setMeta } from './metadata.js';
-
 /**
  * Marks a singleton bean for eager instantiation during context creation.
  * By default, singletons are lazy (created on first `get()`).
+ *
+ * **Compile-time only** — the decorator is a no-op marker at runtime.
+ * The transformer reads this decorator via AST inspection at build time.
  *
  * @example
  * @Eager()
@@ -10,9 +11,7 @@ import { META, setMeta } from './metadata.js';
  * class StartupService { ... }
  */
 export function Eager(): ClassDecorator_Stage3 {
-  return (_target, context) => {
-    setMeta(context.metadata!, META.EAGER, true);
-  };
+  return () => {};
 }
 
 type ClassDecorator_Stage3 = (
