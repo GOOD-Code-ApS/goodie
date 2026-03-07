@@ -42,6 +42,9 @@ export function Anonymous() { return (t: any, c: any) => {} }
 export function ConditionalOnEnv(envVar: string, value?: string) { return (t: any, c: any) => {} }
 export function ConditionalOnProperty(key: string, value?: string) { return (t: any, c: any) => {} }
 export function ConditionalOnMissingBean(token: any) { return (t: any, c: any) => {} }
+export function ApiOperation(opts: any) { return (t: any, c: any) => {} }
+export function ApiResponse(status: number, desc: string) { return (t: any, c: any) => {} }
+export function ApiTag(name: string) { return (t: any, c: any) => {} }
 `;
 
 /**
