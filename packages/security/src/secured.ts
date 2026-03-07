@@ -1,18 +1,20 @@
-import { SECURITY_META } from './metadata.js';
-
 /**
  * Mark a controller or method as requiring authentication.
  *
  * On a class: all routes require authentication (use `@Anonymous()` to exempt).
  * On a method: only that route requires authentication.
  *
- * For controllers, the `SecurityHttpFilter` reads this metadata from
- * `Symbol.metadata` at runtime to enforce authentication.
+ * For controllers, the `SecurityHttpFilter` reads compile-time
+ * `DecoratorMetadata` to enforce authentication.
  *
  * For service-layer beans, the `SecurityInterceptor` (AOP) checks
  * the `SecurityContext` (AsyncLocalStorage) for an authenticated principal.
  * AOP wiring is automatic — the transformer discovers the `Secured →
  * SecurityInterceptor` mapping from `beans.json` at build time.
+ *
+ * This decorator is a compile-time marker (no-op at runtime). The transformer
+ * records it in `IRBeanDefinition.decorators` / `methodDecorators` and the
+ * hono plugin passes it to `HttpFilterContext` for the security filter.
  *
  * @example
  * ```typescript
@@ -35,18 +37,5 @@ import { SECURITY_META } from './metadata.js';
  * ```
  */
 export function Secured(): (target: any, context: any) => void {
-  return (
-    _target: any,
-    context: ClassDecoratorContext | ClassMethodDecoratorContext,
-  ) => {
-    if (context.kind === 'class') {
-      context.metadata[SECURITY_META.SECURED] = true;
-    } else if (context.kind === 'method') {
-      const methods =
-        (context.metadata[SECURITY_META.SECURED_METHODS] as Set<string>) ??
-        new Set<string>();
-      methods.add(context.name as string);
-      context.metadata[SECURITY_META.SECURED_METHODS] = methods;
-    }
-  };
+  return () => {};
 }

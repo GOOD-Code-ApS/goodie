@@ -1,6 +1,6 @@
+import type { DecoratorEntry } from '@goodie-ts/core';
 import type { HttpFilterContext } from '@goodie-ts/http';
 import { describe, expect, it, vi } from 'vitest';
-import { SECURITY_META } from '../src/metadata.js';
 import type { Principal } from '../src/principal.js';
 import { SecurityContext } from '../src/security-context.js';
 import { SecurityHttpFilter } from '../src/security-http-filter.js';
@@ -18,10 +18,18 @@ function createMockHonoContext(headers: Record<string, string> = {}) {
 
 function createFilterContext(
   honoCtx: unknown,
-  routeMetadata: Record<symbol, unknown>,
-  methodName: string,
+  options: {
+    methodName: string;
+    classDecorators?: DecoratorEntry[];
+    methodDecorators?: DecoratorEntry[];
+  },
 ): HttpFilterContext {
-  return { request: honoCtx, routeMetadata, methodName };
+  return {
+    request: honoCtx,
+    methodName: options.methodName,
+    classDecorators: options.classDecorators ?? [],
+    methodDecorators: options.methodDecorators ?? [],
+  };
 }
 
 function createFilter(provider: SecurityProvider): SecurityHttpFilter {
@@ -33,6 +41,15 @@ function createFilter(provider: SecurityProvider): SecurityHttpFilter {
 }
 
 describe('SecurityHttpFilter', () => {
+  const SECURED_DEC: DecoratorEntry = {
+    name: 'Secured',
+    importPath: '/src/secured.ts',
+  };
+  const ANONYMOUS_DEC: DecoratorEntry = {
+    name: 'Anonymous',
+    importPath: '/src/anonymous.ts',
+  };
+
   it('allows unauthenticated access to non-secured routes', async () => {
     const provider: SecurityProvider = {
       authenticate: vi.fn().mockResolvedValue(null),
@@ -41,11 +58,9 @@ describe('SecurityHttpFilter', () => {
     const mw = filter.middleware();
 
     const next = vi.fn().mockResolvedValue(undefined);
-    const ctx = createFilterContext(
-      createMockHonoContext(),
-      {}, // no @Secured metadata
-      'publicEndpoint',
-    );
+    const ctx = createFilterContext(createMockHonoContext(), {
+      methodName: 'publicEndpoint',
+    });
 
     const result = await mw(ctx, next);
 
@@ -53,7 +68,7 @@ describe('SecurityHttpFilter', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('returns 401 for secured route without credentials', async () => {
+  it('returns 401 for class-level @Secured route without credentials', async () => {
     const provider: SecurityProvider = {
       authenticate: vi.fn().mockResolvedValue(null),
     };
@@ -61,11 +76,10 @@ describe('SecurityHttpFilter', () => {
     const mw = filter.middleware();
 
     const next = vi.fn();
-    const ctx = createFilterContext(
-      createMockHonoContext(),
-      { [SECURITY_META.SECURED]: true },
-      'listUsers',
-    );
+    const ctx = createFilterContext(createMockHonoContext(), {
+      methodName: 'listUsers',
+      classDecorators: [SECURED_DEC],
+    });
 
     const result = await mw(ctx, next);
 
@@ -88,8 +102,10 @@ describe('SecurityHttpFilter', () => {
     const next = vi.fn().mockResolvedValue(undefined);
     const ctx = createFilterContext(
       createMockHonoContext({ authorization: 'Bearer token123' }),
-      { [SECURITY_META.SECURED]: true },
-      'listUsers',
+      {
+        methodName: 'listUsers',
+        classDecorators: [SECURED_DEC],
+      },
     );
 
     const result = await mw(ctx, next);
@@ -106,14 +122,11 @@ describe('SecurityHttpFilter', () => {
     const mw = filter.middleware();
 
     const next = vi.fn().mockResolvedValue(undefined);
-    const ctx = createFilterContext(
-      createMockHonoContext(),
-      {
-        [SECURITY_META.SECURED]: true,
-        [SECURITY_META.ANONYMOUS_METHODS]: new Set(['health']),
-      },
-      'health',
-    );
+    const ctx = createFilterContext(createMockHonoContext(), {
+      methodName: 'health',
+      classDecorators: [SECURED_DEC],
+      methodDecorators: [ANONYMOUS_DEC],
+    });
 
     const result = await mw(ctx, next);
 
@@ -129,13 +142,10 @@ describe('SecurityHttpFilter', () => {
     const mw = filter.middleware();
 
     const next = vi.fn();
-    const ctx = createFilterContext(
-      createMockHonoContext(),
-      {
-        [SECURITY_META.SECURED_METHODS]: new Set(['getProfile']),
-      },
-      'getProfile',
-    );
+    const ctx = createFilterContext(createMockHonoContext(), {
+      methodName: 'getProfile',
+      methodDecorators: [SECURED_DEC],
+    });
 
     const result = await mw(ctx, next);
 
@@ -152,13 +162,10 @@ describe('SecurityHttpFilter', () => {
     const mw = filter.middleware();
 
     const next = vi.fn().mockResolvedValue(undefined);
-    const ctx = createFilterContext(
-      createMockHonoContext(),
-      {
-        [SECURITY_META.SECURED_METHODS]: new Set(['getProfile']),
-      },
-      'publicEndpoint',
-    );
+    // Class is not @Secured, only another method has @Secured
+    const ctx = createFilterContext(createMockHonoContext(), {
+      methodName: 'publicEndpoint',
+    });
 
     const result = await mw(ctx, next);
 
@@ -186,8 +193,7 @@ describe('SecurityHttpFilter', () => {
 
     const ctx = createFilterContext(
       createMockHonoContext({ authorization: 'Bearer token' }),
-      {},
-      'anyMethod',
+      { methodName: 'anyMethod' },
     );
 
     await mw(ctx, next);

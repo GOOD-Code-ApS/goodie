@@ -1,7 +1,6 @@
 import { Inject, Optional, Singleton } from '@goodie-ts/core';
 import type { HttpFilterContext } from '@goodie-ts/http';
 import { HttpFilter } from '@goodie-ts/http';
-import { SECURITY_META } from './metadata.js';
 import type { SecurityContext } from './security-context.js';
 import type { SecurityProvider, SecurityRequest } from './security-provider.js';
 import { SECURITY_PROVIDER } from './security-provider.js';
@@ -11,7 +10,7 @@ import { SECURITY_PROVIDER } from './security-provider.js';
  *
  * Runs early in the middleware chain (order = -1000):
  * 1. Extracts credentials via `SecurityProvider.authenticate()`
- * 2. Checks `@Secured`/`@Anonymous` metadata from `HttpFilterContext.routeMetadata`
+ * 2. Checks `@Secured`/`@Anonymous` from compile-time `DecoratorMetadata`
  * 3. Returns 401 if the route requires auth and no principal was resolved
  * 4. Stores the principal in `SecurityContext` (AsyncLocalStorage) for downstream use
  *
@@ -61,18 +60,16 @@ export class SecurityHttpFilter extends HttpFilter {
       // Authentication
       const principal = await provider.authenticate(request);
 
-      // Authorization — check if this route requires auth
-      const meta = ctx.routeMetadata;
-      const isClassSecured = meta[SECURITY_META.SECURED] === true;
-      const securedMethods = meta[SECURITY_META.SECURED_METHODS] as
-        | Set<string>
-        | undefined;
-      const anonymousMethods = meta[SECURITY_META.ANONYMOUS_METHODS] as
-        | Set<string>
-        | undefined;
-
-      const isMethodSecured = securedMethods?.has(ctx.methodName) ?? false;
-      const isAnonymous = anonymousMethods?.has(ctx.methodName) ?? false;
+      // Authorization — check if this route requires auth via DecoratorMetadata
+      const isClassSecured = ctx.classDecorators.some(
+        (d) => d.name === 'Secured',
+      );
+      const isMethodSecured = ctx.methodDecorators.some(
+        (d) => d.name === 'Secured',
+      );
+      const isAnonymous = ctx.methodDecorators.some(
+        (d) => d.name === 'Anonymous',
+      );
       const needsAuth = (isClassSecured || isMethodSecured) && !isAnonymous;
 
       if (needsAuth && !principal) {

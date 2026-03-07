@@ -72,6 +72,14 @@ export interface IRProvides {
   sourceLocation: SourceLocation;
 }
 
+/** A decorator found on a class or method, recorded by the scanner. */
+export interface IRDecoratorEntry {
+  /** Decorator function name (e.g. "Controller", "Secured"). */
+  name: string;
+  /** Resolved import path of the decorator (bare specifier or absolute). */
+  importPath: string;
+}
+
 /** Full intermediate representation of a single bean. */
 export interface IRBeanDefinition {
   tokenRef: TokenRef;
@@ -95,6 +103,10 @@ export interface IRBeanDefinition {
     | undefined;
   /** Base class tokens this bean should also be registered under. */
   baseTokenRefs?: ClassTokenRef[];
+  /** Decorators found on this class (for DecoratorMetadata queries). */
+  decorators?: IRDecoratorEntry[];
+  /** Decorators found on methods, keyed by method name. */
+  methodDecorators?: Record<string, IRDecoratorEntry[]>;
   metadata: Record<string, unknown>;
   sourceLocation: SourceLocation;
 }

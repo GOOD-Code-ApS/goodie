@@ -2,7 +2,6 @@ import type { InvocationContext } from '@goodie-ts/core';
 import { describe, expect, it } from 'vitest';
 import { Anonymous } from '../src/anonymous.js';
 import { UnauthorizedError } from '../src/errors.js';
-import { SECURITY_META } from '../src/metadata.js';
 import { Secured } from '../src/secured.js';
 import { SecurityContext } from '../src/security-context.js';
 import { SecurityInterceptor } from '../src/security-interceptor.js';
@@ -77,48 +76,15 @@ describe('SecurityInterceptor', () => {
   });
 });
 
-describe('@Secured / @Anonymous metadata', () => {
-  it('@Secured on class sets SECURED metadata', () => {
-    const metadata: Record<symbol, unknown> = {};
-    const context = {
-      kind: 'class' as const,
-      name: 'TestController',
-      metadata,
-    };
-
+describe('@Secured / @Anonymous decorators', () => {
+  it('@Secured is a no-op at runtime (compile-time marker)', () => {
     const decorator = Secured();
-    decorator(class {}, context as any);
-
-    expect(metadata[SECURITY_META.SECURED]).toBe(true);
+    // Should not throw — it's a no-op
+    expect(() => decorator(class {}, {} as any)).not.toThrow();
   });
 
-  it('@Secured on method adds to SECURED_METHODS', () => {
-    const metadata: Record<symbol, unknown> = {};
-    const context = {
-      kind: 'method' as const,
-      name: 'listUsers',
-      metadata,
-    };
-
-    const decorator = Secured();
-    decorator(() => {}, context as any);
-
-    const methods = metadata[SECURITY_META.SECURED_METHODS] as Set<string>;
-    expect(methods.has('listUsers')).toBe(true);
-  });
-
-  it('@Anonymous adds to ANONYMOUS_METHODS', () => {
-    const metadata: Record<symbol, unknown> = {};
-    const context = {
-      kind: 'method' as const,
-      name: 'health',
-      metadata,
-    };
-
+  it('@Anonymous is a no-op at runtime (compile-time marker)', () => {
     const decorator = Anonymous();
-    decorator(() => {}, context as any);
-
-    const methods = metadata[SECURITY_META.ANONYMOUS_METHODS] as Set<string>;
-    expect(methods.has('health')).toBe(true);
+    expect(() => decorator(() => {}, {} as any)).not.toThrow();
   });
 });

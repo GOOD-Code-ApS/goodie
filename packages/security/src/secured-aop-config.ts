@@ -6,9 +6,13 @@
  * parameter and writes the `Secured → SecurityInterceptor` mapping into
  * `beans.json`'s `aop` section.
  *
- * The actual runtime `@Secured()` decorator lives in `secured.ts` — it stores
- * `Symbol.metadata` for the `SecurityHttpFilter`. Both coexist: compile-time
- * AOP wiring from this file, runtime metadata from `secured.ts`.
+ * The actual `@Secured()` decorator lives in `secured.ts` — it's a compile-time
+ * no-op. The `SecurityHttpFilter` reads `DecoratorMetadata` (class/method
+ * decorators) from `HttpFilterContext` to enforce auth on controllers.
+ *
+ * On `@Controller` classes, both the `SecurityHttpFilter` (middleware) and
+ * `SecurityInterceptor` (AOP) are wired. The interceptor detects that the
+ * filter already handled auth via `SecurityContext` and becomes a no-op.
  *
  * This file is NOT exported from the package index.
  */

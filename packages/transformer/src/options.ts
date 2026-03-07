@@ -1,6 +1,6 @@
 import type { Scope } from '@goodie-ts/core';
 import type { ClassDeclaration, MethodDeclaration } from 'ts-morph';
-import type { IRBeanDefinition } from './ir.js';
+import type { IRBeanDefinition, IRDecoratorEntry } from './ir.js';
 
 /** Options for the compile-time transform pipeline. */
 export interface TransformOptions {
@@ -103,6 +103,8 @@ export interface ClassVisitorContext {
   className: string;
   /** Absolute path to the source file. */
   filePath: string;
+  /** All decorators found on this class with resolved import paths. */
+  decorators: IRDecoratorEntry[];
   /** Store arbitrary metadata that will be available in later hooks. */
   metadata: Record<string, unknown>;
   /**
@@ -129,6 +131,10 @@ export interface MethodVisitorContext {
   filePath: string;
   /** Metadata accumulated for this class (shared with visitClass). */
   classMetadata: Record<string, unknown>;
+  /** All decorators found on the owning class with resolved import paths. */
+  classDecorators: IRDecoratorEntry[];
+  /** All decorators found on this method with resolved import paths. */
+  decorators: IRDecoratorEntry[];
 }
 
 /** Contribution from a plugin's codegen hook. */

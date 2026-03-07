@@ -1,7 +1,6 @@
 export { Anonymous } from './anonymous.js';
 export { UnauthorizedError } from './errors.js';
 export { getPrincipal } from './get-principal.js';
-export { SECURITY_META } from './metadata.js';
 export type { Principal } from './principal.js';
 export { Secured } from './secured.js';
 export { SecurityContext } from './security-context.js';

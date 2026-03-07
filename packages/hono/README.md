@@ -10,27 +10,20 @@ pnpm add @goodie-ts/hono hono @hono/node-server
 
 ## Overview
 
-Provides `@Controller` and HTTP method decorators (`@Get`, `@Post`, etc.) that mark classes and methods for route registration. At build time, the hono transformer plugin scans controller metadata on beans and generates a `createRouter(ctx)` function that wires controllers from the DI container to Hono routes. No runtime scanning required.
+Hono-specific runtime integration for goodie-ts. Provides the transformer plugin for compile-time route wiring, `@Validate` for Zod-based request validation, `EmbeddedServer`, and `ServerConfig`.
+
+Generic HTTP decorators (`@Controller`, `@Get`, `@Post`, etc.) live in `@goodie-ts/http`. This package only provides Hono-specific functionality.
+
+The hono transformer plugin scans controller metadata on beans and generates a `createRouter(ctx)` function that wires controllers from the DI container to Hono routes. No runtime scanning required.
 
 `@Controller` implicitly registers the class as a singleton bean — no need to add `@Singleton`.
 
 The package also ships `ServerConfig` (configurable via `@ConfigurationProperties('server')`) and `EmbeddedServer` as library beans, auto-discovered at build time.
 
-## Decorators
-
-| Decorator | Target | Description |
-|-----------|--------|-------------|
-| `@Controller(basePath?)` | class | Marks a class as an HTTP controller (defaults to `'/'`) |
-| `@Get(path?)` | method | Registers a GET route (defaults to `'/'`) |
-| `@Post(path?)` | method | Registers a POST route |
-| `@Put(path?)` | method | Registers a PUT route |
-| `@Delete(path?)` | method | Registers a DELETE route |
-| `@Patch(path?)` | method | Registers a PATCH route |
-
 ## Usage
 
 ```typescript
-import { Controller, Get, Post, Delete } from '@goodie-ts/hono';
+import { Controller, Get, Post, Delete } from '@goodie-ts/http';
 import type { Context } from 'hono';
 
 @Controller('/api/todos')

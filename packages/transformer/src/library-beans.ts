@@ -60,6 +60,8 @@ function serializeBean(bean: IRBeanDefinition): Record<string, unknown> {
     factoryKind: bean.factoryKind,
     providesSource: bean.providesSource ?? null,
     baseTokenRefs: bean.baseTokenRefs ?? null,
+    decorators: bean.decorators ?? null,
+    methodDecorators: bean.methodDecorators ?? null,
     metadata: bean.metadata,
     sourceLocation: bean.sourceLocation,
   };
@@ -152,6 +154,10 @@ function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
             },
         )
       : undefined,
+    decorators: (raw.decorators as IRBeanDefinition['decorators']) ?? undefined,
+    methodDecorators:
+      (raw.methodDecorators as IRBeanDefinition['methodDecorators']) ??
+      undefined,
     metadata: (raw.metadata as Record<string, unknown>) ?? {},
     sourceLocation: raw.sourceLocation as IRBeanDefinition['sourceLocation'],
   };
@@ -304,6 +310,31 @@ export function rewriteImportPaths(
       sourceRoot,
       crossPackageDirs,
     ),
+    decorators: bean.decorators?.map((d) => ({
+      ...d,
+      importPath: rewritePlainPath(
+        d.importPath,
+        packageName,
+        sourceRoot,
+        crossPackageDirs,
+      ),
+    })),
+    methodDecorators: bean.methodDecorators
+      ? Object.fromEntries(
+          Object.entries(bean.methodDecorators).map(([method, decs]) => [
+            method,
+            decs.map((d) => ({
+              ...d,
+              importPath: rewritePlainPath(
+                d.importPath,
+                packageName,
+                sourceRoot,
+                crossPackageDirs,
+              ),
+            })),
+          ]),
+        )
+      : undefined,
     constructorDeps: bean.constructorDeps.map((dep) => ({
       ...dep,
       tokenRef: rewriteTokenRefPath(
@@ -344,6 +375,21 @@ export function rewriteImportPaths(
         : bean.sourceLocation.filePath,
     },
   }));
+}
+
+function rewritePlainPath(
+  importPath: string,
+  packageName: string,
+  sourceRoot: string,
+  crossPackageDirs?: Map<string, string>,
+): string {
+  if (importPath.startsWith(sourceRoot)) return packageName;
+  if (crossPackageDirs) {
+    for (const [dir, pkgName] of crossPackageDirs) {
+      if (importPath.startsWith(`${dir}/`)) return pkgName;
+    }
+  }
+  return importPath;
 }
 
 function rewriteTokenRefPath(

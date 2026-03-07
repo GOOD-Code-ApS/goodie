@@ -7,7 +7,7 @@ import {
   SyntaxKind,
   type Type,
 } from 'ts-morph';
-import type { ClassTokenRef, SourceLocation } from './ir.js';
+import type { ClassTokenRef, IRDecoratorEntry, SourceLocation } from './ir.js';
 import type {
   ClassVisitorContext,
   MethodVisitorContext,
@@ -68,6 +68,10 @@ export interface ScannedBean {
   isModule: boolean;
   /** @Provides methods defined on this class (any bean, not just @Module). */
   provides: ScannedProvides[];
+  /** All decorators found on this class with resolved import paths. */
+  decorators: IRDecoratorEntry[];
+  /** Decorators found on methods, keyed by method name. */
+  methodDecorators: Record<string, IRDecoratorEntry[]>;
   sourceLocation: SourceLocation;
 }
 
@@ -181,11 +185,13 @@ export function scan(
           const metadata: Record<string, unknown> = {};
           const metadataKey = `${filePath}:${className}`;
           pluginMetadata.set(metadataKey, metadata);
+          const classDecorators = resolveDecoratorImports(decorators);
 
           const classCtx: ClassVisitorContext = {
             classDeclaration: cls,
             className,
             filePath,
+            decorators: classDecorators,
             metadata,
             registerBean(options: { scope: Scope; decoratorName?: string }) {
               if (pluginBeanScope !== undefined) {
@@ -204,12 +210,15 @@ export function scan(
           }
 
           for (const method of cls.getMethods()) {
+            const methodDecs = resolveDecoratorImports(method.getDecorators());
             const methodCtx: MethodVisitorContext = {
               methodDeclaration: method,
               methodName: method.getName(),
               className,
               filePath,
               classMetadata: metadata,
+              classDecorators,
+              decorators: methodDecs,
             };
             for (const plugin of plugins!) {
               plugin.visitMethod?.(methodCtx);
@@ -321,6 +330,14 @@ function scanBean(
   const valueFields = scanValueFields(cls);
   const baseClasses = extractBaseClasses(cls);
   const provides = scanProvidesMethods(cls, sourceFile, cache);
+  const scannedDecorators = resolveDecoratorImports(decorators);
+  const methodDecorators: Record<string, IRDecoratorEntry[]> = {};
+  for (const method of cls.getMethods()) {
+    const methodDecs = resolveDecoratorImports(method.getDecorators());
+    if (methodDecs.length > 0) {
+      methodDecorators[method.getName()] = methodDecs;
+    }
+  }
 
   return {
     classDeclaration: cls,
@@ -341,6 +358,9 @@ function scanBean(
     baseClasses,
     isModule,
     provides,
+    decorators: scannedDecorators,
+    methodDecorators:
+      Object.keys(methodDecorators).length > 0 ? methodDecorators : {},
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
 }
@@ -727,6 +747,39 @@ function extractTypeArguments(
   });
   cache.typeArgs.set(cacheKey, result);
   return result;
+}
+
+// ── Decorator import resolution ──
+
+/**
+ * Resolve the import path of each decorator on a class.
+ * Traces the decorator call expression back to its declaration's source file.
+ */
+function resolveDecoratorImports(decorators: Decorator[]): IRDecoratorEntry[] {
+  const results: IRDecoratorEntry[] = [];
+
+  for (const dec of decorators) {
+    const name = dec.getName();
+    const callExpr = dec.getCallExpression();
+    if (!callExpr) {
+      // Decorator without call expression (bare @Foo) — rare, skip
+      continue;
+    }
+
+    const expr = callExpr.getExpression();
+    const symbol = expr.getSymbol();
+    if (!symbol) continue;
+
+    const declarations = symbol.getDeclarations();
+    if (declarations.length === 0) continue;
+
+    const declSourceFile = declarations[0].getSourceFile();
+    const filePath = declSourceFile.getFilePath();
+
+    results.push({ name, importPath: filePath });
+  }
+
+  return results;
 }
 
 // ── Decorator helpers ──

@@ -30,6 +30,7 @@ export type {
   ClassTokenRef,
   InjectionTokenRef,
   IRBeanDefinition,
+  IRDecoratorEntry,
   IRDependency,
   IRFieldInjection,
   IRProvides,

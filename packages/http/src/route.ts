@@ -1,23 +1,20 @@
-import { HTTP_META, type RouteMetadata } from './metadata.js';
-
 type MethodDecorator_Stage3 = (
   target: (...args: never) => unknown,
   context: ClassMethodDecoratorContext,
 ) => void;
 
-function createRouteDecorator(method: RouteMetadata['method']) {
-  return (path = '/'): MethodDecorator_Stage3 =>
-    (_target, context) => {
-      const methodName = String(context.name);
-      const existing: RouteMetadata[] =
-        (context.metadata[HTTP_META.ROUTES] as RouteMetadata[]) ?? [];
-      existing.push({ method, path, methodName });
-      context.metadata[HTTP_META.ROUTES] = existing;
-    };
+/**
+ * Create a route decorator factory. All route decorators are compile-time
+ * markers (no-ops at runtime). The hono transformer plugin extracts the
+ * HTTP method and path via AST scanning.
+ */
+function createRouteDecorator() {
+  return (_path = '/'): MethodDecorator_Stage3 =>
+    () => {};
 }
 
-export const Get = createRouteDecorator('get');
-export const Post = createRouteDecorator('post');
-export const Put = createRouteDecorator('put');
-export const Delete = createRouteDecorator('delete');
-export const Patch = createRouteDecorator('patch');
+export const Get = createRouteDecorator();
+export const Post = createRouteDecorator();
+export const Put = createRouteDecorator();
+export const Delete = createRouteDecorator();
+export const Patch = createRouteDecorator();

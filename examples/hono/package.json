@@ -12,6 +12,7 @@
     "@goodie-ts/core": "workspace:*",
     "@goodie-ts/health": "workspace:*",
     "@goodie-ts/hono": "workspace:*",
+    "@goodie-ts/http": "workspace:*",
     "@goodie-ts/cache": "workspace:*",
     "@goodie-ts/kysely": "workspace:*",
     "@goodie-ts/logging": "workspace:*",

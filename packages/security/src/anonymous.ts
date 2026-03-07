@@ -1,5 +1,3 @@
-import { SECURITY_META } from './metadata.js';
-
 type MethodDecorator_Stage3 = (
   target: (...args: never) => unknown,
   context: ClassMethodDecoratorContext,
@@ -10,6 +8,10 @@ type MethodDecorator_Stage3 = (
  *
  * Only meaningful on methods inside a `@Secured()` controller.
  * When used without class-level `@Secured`, this decorator has no effect.
+ *
+ * This decorator is a compile-time marker (no-op at runtime). The transformer
+ * records it in `IRBeanDefinition.methodDecorators` and the hono plugin passes
+ * it to `HttpFilterContext` for the security filter.
  *
  * @example
  * ```typescript
@@ -26,11 +28,5 @@ type MethodDecorator_Stage3 = (
  * ```
  */
 export function Anonymous(): MethodDecorator_Stage3 {
-  return (_target, context) => {
-    const methods =
-      (context.metadata[SECURITY_META.ANONYMOUS_METHODS] as Set<string>) ??
-      new Set<string>();
-    methods.add(context.name as string);
-    context.metadata[SECURITY_META.ANONYMOUS_METHODS] = methods;
-  };
+  return () => {};
 }

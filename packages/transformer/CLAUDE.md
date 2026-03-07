@@ -36,7 +36,8 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 ## IR Types (ir.ts)
 
 - **`TokenRef`** — union: `ClassTokenRef { kind: 'class', className, importPath }` or `InjectionTokenRef { kind: 'injection-token', tokenName, importPath?, typeAnnotation?, typeImports? }`
-- **`IRBeanDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, metadata, sourceLocation
+- **`IRDecoratorEntry`** — `{ name: string, importPath: string }` — a decorator recorded on a class or method
+- **`IRBeanDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, decorators, methodDecorators, metadata, sourceLocation
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
 - **`IRProvides`** — module factory method descriptor (used during resolver expansion)
 

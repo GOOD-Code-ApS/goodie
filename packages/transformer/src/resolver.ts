@@ -101,6 +101,11 @@ function resolveBean(
     providesSource: undefined,
     baseTokenRefs:
       scanned.baseClasses.length > 0 ? scanned.baseClasses : undefined,
+    decorators: scanned.decorators.length > 0 ? scanned.decorators : undefined,
+    methodDecorators:
+      Object.keys(scanned.methodDecorators).length > 0
+        ? scanned.methodDecorators
+        : undefined,
     metadata,
     sourceLocation: scanned.sourceLocation,
   };

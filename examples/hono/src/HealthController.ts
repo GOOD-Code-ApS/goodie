@@ -1,5 +1,5 @@
 import { HealthAggregator } from '@goodie-ts/health';
-import { Controller, Get } from '@goodie-ts/hono';
+import { Controller, Get } from '@goodie-ts/http';
 import type { Context } from 'hono';
 import type { DatabaseHealthIndicator } from './DatabaseHealthIndicator.js';
 import type { UptimeHealthIndicator } from './UptimeHealthIndicator.js';

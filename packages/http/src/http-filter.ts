@@ -1,23 +1,25 @@
+import type { DecoratorEntry } from '@goodie-ts/core';
+
 /**
  * Context passed to HTTP filter middleware.
  *
  * The runtime plugin (e.g. Hono) populates this with the framework-specific
- * request and the matched route's decorator metadata. Filters can read route
- * metadata to make per-route decisions (e.g. security checks) without coupling
- * to the specific decorator package.
+ * request and the matched route's compile-time decorator metadata. Filters can
+ * read decorator metadata to make per-route decisions (e.g. security checks)
+ * without coupling to the specific decorator package.
  */
 export interface HttpFilterContext {
   /** Framework-specific request/context object (e.g. Hono's `Context`). */
   request: unknown;
 
-  /**
-   * Decorator metadata from the matched controller class (`Symbol.metadata`).
-   * Contains entries written by any decorator on the controller or its methods.
-   */
-  routeMetadata: Record<symbol, unknown>;
-
   /** The name of the matched controller method. */
   methodName: string;
+
+  /** Decorators on the controller class (compile-time metadata). */
+  classDecorators: DecoratorEntry[];
+
+  /** Decorators on the matched method (compile-time metadata). */
+  methodDecorators: DecoratorEntry[];
 }
 
 /**
@@ -37,8 +39,8 @@ export interface HttpFilterContext {
  *
  *   middleware() {
  *     return async (ctx: HttpFilterContext, next: () => Promise<void>) => {
- *       // Read route metadata to check if auth is required
- *       const isSecured = ctx.routeMetadata[SECURITY_META.SECURED];
+ *       // Read decorator metadata to check if auth is required
+ *       const isSecured = ctx.classDecorators.some(d => d.name === 'Secured');
  *       // ...
  *       await next();
  *     };

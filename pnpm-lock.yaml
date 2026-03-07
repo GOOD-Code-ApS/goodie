@@ -72,6 +72,9 @@ importers:
       '@goodie-ts/hono':
         specifier: workspace:*
         version: link:../../packages/hono
+      '@goodie-ts/http':
+        specifier: workspace:*
+        version: link:../../packages/http
       '@goodie-ts/kysely':
         specifier: workspace:*
         version: link:../../packages/kysely
