@@ -1,3 +1,5 @@
+import type { DescribeRouteOptions } from './openapi-types.js';
+
 type MethodDecorator_Stage3 = (
   target: (...args: never) => unknown,
   context: ClassMethodDecoratorContext,
@@ -6,10 +8,13 @@ type MethodDecorator_Stage3 = (
 /**
  * Create a route decorator factory. All route decorators are compile-time
  * markers (no-ops at runtime). The hono transformer plugin extracts the
- * HTTP method and path via AST scanning.
+ * HTTP method, path, and optional OpenAPI options via AST scanning.
  */
 function createRouteDecorator() {
-  return (_path = '/'): MethodDecorator_Stage3 =>
+  return (
+    _path = '/',
+    _options?: DescribeRouteOptions,
+  ): MethodDecorator_Stage3 =>
     () => {};
 }
 
