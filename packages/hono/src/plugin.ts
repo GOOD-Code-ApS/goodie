@@ -323,16 +323,6 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
-  // Helper: wraps HttpFilter[] into per-route Hono middleware with route metadata
-  lines.push(
-    'function __applyFilters(filters: { middleware(): (ctx: any, next: () => Promise<void>) => Promise<Response | undefined> }[], routeMeta: Record<symbol, unknown>, methodName: string) {',
-  );
-  lines.push(
-    '  return filters.map(f => { const mw = f.middleware(); return async (c: any, next: any) => { const res = await mw({ request: c, routeMetadata: routeMeta, methodName }, next); if (res) return res } })',
-  );
-  lines.push('}');
-  lines.push('');
-
   // Per-controller route factory functions (top-level for type extraction)
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
@@ -344,19 +334,26 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     lines.push(
       `  const __meta = (${ctrl.className} as any)[Symbol.metadata] || {}`,
     );
-    lines.push('  return new Hono()');
+    lines.push('  const __app = new Hono()');
+
+    // Register per-route filter middleware via .use() with path matching
+    for (const route of ctrl.routes) {
+      const relativePath = escapeStringLiteral(
+        route.path.startsWith('/') ? route.path : `/${route.path}`,
+      );
+      lines.push(
+        `  for (const __f of __filters) { const __mw = __f.middleware(); __app.use('${relativePath}', async (c, next) => { const __res = await __mw({ request: c, routeMetadata: __meta, methodName: '${escapeStringLiteral(route.methodName)}' }, next); if (__res) return __res }) }`,
+      );
+    }
+
+    lines.push('  return __app');
     for (const route of ctrl.routes) {
       const relativePath = escapeStringLiteral(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
 
-      // Collect middleware: filters first, then CORS, then validation
+      // Collect middleware: CORS, then validation
       const middleware: string[] = [];
-
-      // Per-route HttpFilter middleware with route metadata
-      middleware.push(
-        `...__applyFilters(__filters, __meta, '${escapeStringLiteral(route.methodName)}')`,
-      );
 
       // Method-level @Cors overrides class-level
       const corsConfig = route.cors ?? ctrl.cors;
@@ -366,11 +363,17 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
 
       middleware.push(...generateValidationMiddleware(route.validation));
 
-      lines.push(`    .${route.httpMethod}('${relativePath}',`);
-      for (const mw of middleware) {
-        lines.push(`      ${mw},`);
+      if (middleware.length > 0) {
+        lines.push(`    .${route.httpMethod}('${relativePath}',`);
+        for (const mw of middleware) {
+          lines.push(`      ${mw},`);
+        }
+        lines.push('      async (c) => {');
+      } else {
+        lines.push(
+          `    .${route.httpMethod}('${relativePath}', async (c) => {`,
+        );
       }
-      lines.push('      async (c) => {');
       lines.push(
         `      const result = await ${varName}.${route.methodName}(c)`,
       );
