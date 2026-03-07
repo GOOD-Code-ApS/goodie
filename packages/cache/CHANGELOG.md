@@ -1,5 +1,13 @@
 # @goodie-ts/cache
 
+## 0.6.4
+
+### Patch Changes
+
+- Updated dependencies [5190bce]
+- Updated dependencies [5694dd0]
+  - @goodie-ts/core@0.10.0
+
 ## 0.6.3
 
 ### Patch Changes
