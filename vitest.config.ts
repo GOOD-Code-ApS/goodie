@@ -55,6 +55,14 @@ export default defineConfig({
         __dirname,
         'packages/scheduler/src/index.ts',
       ),
+      '@goodie-ts/openapi-hono/plugin': path.resolve(
+        __dirname,
+        'packages/openapi-hono/src/plugin.ts',
+      ),
+      '@goodie-ts/openapi-hono': path.resolve(
+        __dirname,
+        'packages/openapi-hono/src/index.ts',
+      ),
     },
   },
   test: {
