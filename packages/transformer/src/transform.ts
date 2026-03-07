@@ -607,7 +607,7 @@ function mergePluginMetadata(
  * Scans `node_modules/@goodie-ts/` under the library base dir for sibling packages.
  * Returns a map of real directory path → bare package name. This enables
  * `rewriteImportPaths` to convert absolute cross-package references
- * (e.g. `HttpFilter` from `@goodie-ts/http`) to bare specifiers in `beans.json`.
+ * (e.g. `ServerConfig` from `@goodie-ts/hono`) to bare specifiers in `beans.json`.
  */
 function discoverCrossPackageDirs(
   libBaseDir: string,

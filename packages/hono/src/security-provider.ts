@@ -5,8 +5,9 @@ import type { Principal } from './principal.js';
  * Pluggable authentication provider. Implement this as a `@Singleton` bean
  * to enable authentication for `@Secured` routes.
  *
- * The framework calls `authenticate()` for every request that hits a secured
- * route. Return a `Principal` if credentials are valid, or `null` to reject.
+ * The generated security middleware calls `authenticate()` for every request
+ * that hits a secured route. Return a `Principal` if credentials are valid,
+ * or `null` to reject.
  *
  * @example
  * ```typescript
@@ -30,7 +31,7 @@ export interface SecurityProvider<P extends Principal = Principal> {
 
 /**
  * Minimal request abstraction for authentication.
- * Framework-agnostic — the Hono plugin adapts Hono's `Context` to this interface.
+ * The generated Hono middleware adapts Hono's `Context` to this interface.
  */
 export interface SecurityRequest {
   /** Request headers. */

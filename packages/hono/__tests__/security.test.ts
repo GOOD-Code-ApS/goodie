@@ -1,10 +1,9 @@
-import type { InvocationContext } from '@goodie-ts/core';
 import { describe, expect, it } from 'vitest';
 import { Anonymous } from '../src/anonymous.js';
 import { UnauthorizedError } from '../src/errors.js';
+import { getPrincipal } from '../src/get-principal.js';
 import { Secured } from '../src/secured.js';
 import { SecurityContext } from '../src/security-context.js';
-import { SecurityInterceptor } from '../src/security-interceptor.js';
 
 describe('SecurityContext', () => {
   it('returns null when no principal is set', () => {
@@ -41,38 +40,31 @@ describe('SecurityContext', () => {
   });
 });
 
-describe('SecurityInterceptor', () => {
-  it('proceeds when principal is present', () => {
-    const securityContext = new SecurityContext();
-    const interceptor = new SecurityInterceptor(securityContext);
+describe('getPrincipal', () => {
+  it('returns principal when set', () => {
+    const ctx = new SecurityContext();
     const principal = { name: 'alice', attributes: {} };
 
-    const result = securityContext.run(principal, () => {
-      return interceptor.intercept({
-        className: 'TestService',
-        methodName: 'doSomething',
-        args: [],
-        target: {},
-        proceed: () => 'success',
-      } as InvocationContext);
-    });
-
-    expect(result).toBe('success');
+    const result = ctx.run(principal, () => getPrincipal(ctx));
+    expect(result).toEqual(principal);
   });
 
-  it('throws UnauthorizedError when no principal', () => {
-    const securityContext = new SecurityContext();
-    const interceptor = new SecurityInterceptor(securityContext);
+  it('throws when no principal is set', () => {
+    const ctx = new SecurityContext();
+    expect(() => getPrincipal(ctx)).toThrow('No principal in security context');
+  });
+});
 
-    expect(() =>
-      interceptor.intercept({
-        className: 'TestService',
-        methodName: 'doSomething',
-        args: [],
-        target: {},
-        proceed: () => 'success',
-      } as InvocationContext),
-    ).toThrow(UnauthorizedError);
+describe('UnauthorizedError', () => {
+  it('has correct name and default message', () => {
+    const error = new UnauthorizedError();
+    expect(error.name).toBe('UnauthorizedError');
+    expect(error.message).toBe('Authentication required');
+  });
+
+  it('accepts custom message', () => {
+    const error = new UnauthorizedError('Custom message');
+    expect(error.message).toBe('Custom message');
   });
 });
 

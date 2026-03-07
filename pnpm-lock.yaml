@@ -72,9 +72,6 @@ importers:
       '@goodie-ts/hono':
         specifier: workspace:*
         version: link:../../packages/hono
-      '@goodie-ts/http':
-        specifier: workspace:*
-        version: link:../../packages/http
       '@goodie-ts/kysely':
         specifier: workspace:*
         version: link:../../packages/kysely
@@ -84,9 +81,6 @@ importers:
       '@goodie-ts/resilience':
         specifier: workspace:*
         version: link:../../packages/resilience
-      '@goodie-ts/security':
-        specifier: workspace:*
-        version: link:../../packages/security
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.9(hono@4.12.2)
@@ -215,9 +209,6 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:^
         version: link:../core
-      '@goodie-ts/http':
-        specifier: workspace:^
-        version: link:../http
       '@hono/node-server':
         specifier: '>=1.0.0'
         version: 1.19.9(hono@4.12.2)
@@ -243,16 +234,6 @@ importers:
       ts-morph:
         specifier: ^24.0.0
         version: 24.0.0
-
-  packages/http:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.11
 
   packages/kysely:
     dependencies:
@@ -338,28 +319,6 @@ importers:
         specifier: ^9.0.0
         version: 9.1.0
     devDependencies:
-      '@goodie-ts/transformer':
-        specifier: workspace:*
-        version: link:../transformer
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.11
-      ts-morph:
-        specifier: ^24.0.0
-        version: 24.0.0
-
-  packages/security:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
-      '@goodie-ts/http':
-        specifier: workspace:^
-        version: link:../http
-    devDependencies:
-      '@goodie-ts/cli':
-        specifier: workspace:*
-        version: link:../cli
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer

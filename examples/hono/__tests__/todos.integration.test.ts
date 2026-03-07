@@ -1,6 +1,6 @@
 import type { ApplicationContext, BeanDefinition } from '@goodie-ts/core';
+import type { SecurityProvider, SecurityRequest } from '@goodie-ts/hono';
 import { TransactionManager } from '@goodie-ts/kysely';
-import type { SecurityProvider, SecurityRequest } from '@goodie-ts/security';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
   PostgreSqlContainer,

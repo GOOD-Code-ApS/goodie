@@ -48,7 +48,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain('hc<AppType>(baseUrl, options)');
   });
 
-  it('imports Hono, hc, EmbeddedServer, and HttpFilter', () => {
+  it('imports Hono, hc, and EmbeddedServer', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
@@ -65,9 +65,22 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain(
       "import { EmbeddedServer } from '@goodie-ts/hono'",
     );
-    expect(result.code).toContain(
-      "import { HttpFilter } from '@goodie-ts/http'",
-    );
+  });
+
+  it('does not import security types when no @Secured is used', () => {
+    const result = createProject({
+      '/src/UserController.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api/users')
+        class UserController {
+          @Get('/')
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).not.toContain('SecurityContext');
+    expect(result.code).not.toContain('SECURITY_PROVIDER');
   });
 
   it('wires routes in createRouter', () => {
@@ -445,6 +458,194 @@ describe('Hono Plugin — @Cors', () => {
   });
 });
 
+describe('Hono Plugin — @Secured / @Anonymous', () => {
+  it('imports security types when @Secured is used', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Secured } from './decorators.js'
+        @Controller('/api')
+        @Secured()
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      "import { SecurityContext, SECURITY_PROVIDER } from '@goodie-ts/hono'",
+    );
+    expect(result.code).toContain(
+      "import type { SecurityProvider } from '@goodie-ts/hono'",
+    );
+  });
+
+  it('generates security middleware for @Secured controller routes', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Secured } from './decorators.js'
+        @Controller('/api')
+        @Secured()
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    // Should check for authentication
+    expect(result.code).toContain('__securityProvider.authenticate');
+    // Should return 401 on failure
+    expect(result.code).toContain("c.json({ error: 'Unauthorized' }, 401)");
+    // Should wrap in SecurityContext.run
+    expect(result.code).toContain('__securityContext.run(__principal');
+  });
+
+  it('resolves SecurityContext and SecurityProvider in createRouter', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Secured } from './decorators.js'
+        @Controller('/api')
+        @Secured()
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('ctx.get(SecurityContext)');
+    expect(result.code).toContain('ctx.getAll(SECURITY_PROVIDER)');
+  });
+
+  it('passes security args to route factory for secured controllers', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Secured } from './decorators.js'
+        @Controller('/api')
+        @Secured()
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('__securityContext: SecurityContext');
+    expect(result.code).toContain(
+      '__securityProvider: SecurityProvider | undefined',
+    );
+  });
+
+  it('does not pass security args to route factory for non-secured controllers', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).not.toContain('__securityContext');
+    expect(result.code).not.toContain('__securityProvider');
+  });
+
+  it('@Anonymous skips auth enforcement in @Secured controller', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Secured, Anonymous } from './decorators.js'
+        @Controller('/api')
+        @Secured()
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+
+          @Get('/health')
+          @Anonymous()
+          health() {}
+        }
+      `,
+    });
+
+    // Both secured and anonymous routes exist
+    // The anonymous route should still set SecurityContext but not reject
+    // Count occurrences of authenticate to verify both routes handle auth
+    const authMatches = result.code.match(/__securityProvider\.authenticate/g);
+    expect(authMatches).toHaveLength(2);
+
+    // The secured route rejects with 401 if no principal
+    // The anonymous route does not reject
+    const unauthorizedMatches = result.code.match(
+      /if \(!__principal\) return c\.json/g,
+    );
+    // Only the secured route has the rejection
+    expect(unauthorizedMatches).toHaveLength(1);
+  });
+
+  it('handles method-level @Secured without class-level', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post, Secured } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/public')
+          publicRoute() {}
+
+          @Post('/admin')
+          @Secured()
+          adminRoute() {}
+        }
+      `,
+    });
+
+    // Should import security types
+    expect(result.code).toContain('SecurityContext');
+    // Only admin route should have security middleware
+    const authMatches = result.code.match(/__securityProvider\.authenticate/g);
+    expect(authMatches).toHaveLength(1);
+  });
+
+  it('mixes secured and non-secured controllers', () => {
+    const result = createProject({
+      '/src/PublicCtrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/public')
+        class PublicCtrl {
+          @Get('/') list() {}
+        }
+      `,
+      '/src/AdminCtrl.ts': `
+        import { Controller, Get, Secured } from './decorators.js'
+        @Controller('/admin')
+        @Secured()
+        class AdminCtrl {
+          @Get('/') list() {}
+        }
+      `,
+    });
+
+    // PublicCtrl factory should not have security params
+    expect(result.code).toContain(
+      'function __createPublicCtrlRoutes(publicCtrl: PublicCtrl)',
+    );
+    // AdminCtrl factory should have security params
+    expect(result.code).toContain(
+      '__createAdminCtrlRoutes(adminCtrl: AdminCtrl, __securityContext: SecurityContext',
+    );
+    // createRouter should pass security args only to AdminCtrl
+    expect(result.code).toContain(
+      '__createAdminCtrlRoutes(ctx.get(AdminCtrl), __securityContext, __securityProvider)',
+    );
+    // But not to PublicCtrl
+    expect(result.code).toMatch(
+      /__createPublicCtrlRoutes\(ctx\.get\(PublicCtrl\)\)/,
+    );
+  });
+});
+
 describe('Hono Plugin — RPC Client', () => {
   it('exports AppType as ReturnType of createRouter', () => {
     const result = createProject({
@@ -496,9 +697,7 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     // Per-controller route factory function
-    expect(result.code).toContain(
-      'function __createCtrlRoutes(ctrl: Ctrl, __filters:',
-    );
+    expect(result.code).toContain('function __createCtrlRoutes(ctrl: Ctrl)');
     expect(result.code).toContain(".get('/items'");
     expect(result.code).toContain(".post('/items'");
     // Per-controller type and client
@@ -586,7 +785,7 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     expect(result.code).toContain(
-      'function __createRootControllerRoutes(rootController: RootController, __filters:',
+      'function __createRootControllerRoutes(rootController: RootController)',
     );
     expect(result.code).toContain(".route('/'");
     expect(result.code).toContain(".get('/health'");

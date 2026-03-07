@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Patch, Post, Put } from '@goodie-ts/http';
+import { Controller, Delete, Get, Patch, Post, Put } from '@goodie-ts/hono';
 import { describe, expect, it } from 'vitest';
 
 describe('@Controller()', () => {

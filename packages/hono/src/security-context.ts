@@ -5,12 +5,12 @@ import type { Principal } from './principal.js';
 /**
  * Stores the authenticated principal for the current async context.
  *
- * The `SecurityHttpFilter` calls `run()` to set the principal for the
- * duration of an HTTP request. The `SecurityInterceptor` reads it via
- * `getPrincipal()` to enforce `@Secured`.
+ * The generated security middleware calls `run()` to set the principal for
+ * the duration of an HTTP request. Downstream code can read the principal
+ * via `getPrincipal()`.
  *
  * Uses `AsyncLocalStorage` so the principal propagates through the entire
- * call chain (controller → service → repository) without explicit passing.
+ * call chain (controller -> service -> repository) without explicit passing.
  */
 @Singleton()
 export class SecurityContext {

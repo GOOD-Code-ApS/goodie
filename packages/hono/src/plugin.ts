@@ -48,6 +48,8 @@ interface ControllerMeta {
   routes: RouteDefinition[];
   /** Class-level CORS config source text, or true for @Cors() with no args. */
   cors?: string | true;
+  /** Whether the class has @Secured. */
+  secured?: boolean;
 }
 
 /** Extracted controller bean for codegen. */
@@ -57,15 +59,15 @@ interface ControllerBean {
   basePath: string;
   routes: RouteDefinition[];
   cors?: string | true;
-  /** Compile-time class decorators for filter metadata. */
-  classDecorators: IRDecoratorEntry[];
-  /** Compile-time method decorators, keyed by method name. */
-  methodDecorators: Record<string, IRDecoratorEntry[]>;
+  secured?: boolean;
 }
 
 /**
  * Transformer plugin that scans `@Controller` classes and `@Get`/`@Post`/etc.
  * route methods, then generates `createRouter()` and `startServer()`.
+ *
+ * Security (`@Secured`/`@Anonymous`) is handled by generating Hono-native
+ * middleware directly — no `HttpFilter` abstraction.
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
@@ -99,11 +101,15 @@ export default function createHonoPlugin(): TransformerPlugin {
       // Scan class-level @Cors
       const classCors = scanCorsDecorator(decorators);
 
+      // Scan class-level @Secured
+      const classSecured = decorators.some((d) => d.getName() === 'Secured');
+
       // Initialize controller metadata — routes populated by visitMethod
       metadata.controller = {
         basePath,
         routes: [],
         ...(classCors !== undefined ? { cors: classCors } : {}),
+        ...(classSecured ? { secured: true } : {}),
       } satisfies ControllerMeta;
     },
 
@@ -145,12 +151,20 @@ export default function createHonoPlugin(): TransformerPlugin {
       // Scan method-level @Cors
       const methodCors = scanCorsDecorator(decorators);
 
+      // Scan method-level @Secured and @Anonymous
+      const methodSecured = decorators.some((d) => d.getName() === 'Secured');
+      const methodAnonymous = decorators.some(
+        (d) => d.getName() === 'Anonymous',
+      );
+
       controller.routes.push({
         methodName,
         httpMethod,
         path,
         ...(validation.length > 0 ? { validation } : {}),
         ...(methodCors !== undefined ? { cors: methodCors } : {}),
+        ...(methodSecured ? { secured: true } : {}),
+        ...(methodAnonymous ? { anonymous: true } : {}),
       });
     },
 
@@ -158,9 +172,13 @@ export default function createHonoPlugin(): TransformerPlugin {
       const controllerBeans = extractControllerBeans(beans);
       if (controllerBeans.length === 0) return {};
 
-      const imports = buildImports(controllerBeans);
+      const hasSecurity = controllerBeans.some(
+        (c) => c.secured || c.routes.some((r) => r.secured),
+      );
+
+      const imports = buildImports(controllerBeans, hasSecurity);
       const code = [
-        ...generateCreateRouter(controllerBeans),
+        ...generateCreateRouter(controllerBeans, hasSecurity),
         '',
         'export async function startServer(options?: { port?: number; host?: string }) {',
         '  const ctx = await app.start()',
@@ -289,19 +307,27 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
       basePath: ctrl.basePath,
       routes: ctrl.routes,
       ...(ctrl.cors !== undefined ? { cors: ctrl.cors } : {}),
-      classDecorators: bean.decorators ?? [],
-      methodDecorators: bean.methodDecorators ?? {},
+      ...(ctrl.secured ? { secured: true } : {}),
     });
   }
   return result;
 }
 
-function buildImports(controllers: ControllerBean[]): string[] {
+function buildImports(
+  controllers: ControllerBean[],
+  hasSecurity: boolean,
+): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
   imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
-  imports.push("import { HttpFilter } from '@goodie-ts/http'");
+
+  if (hasSecurity) {
+    imports.push(
+      "import { SecurityContext, SECURITY_PROVIDER } from '@goodie-ts/hono'",
+    );
+    imports.push("import type { SecurityProvider } from '@goodie-ts/hono'");
+  }
 
   const allRoutes = controllers.flatMap((c) => c.routes);
 
@@ -327,7 +353,10 @@ function buildImports(controllers: ControllerBean[]): string[] {
   return imports;
 }
 
-function generateCreateRouter(controllers: ControllerBean[]): string[] {
+function generateCreateRouter(
+  controllers: ControllerBean[],
+  hasSecurity: boolean,
+): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
@@ -335,30 +364,44 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     const factoryName = `__create${ctrl.className}Routes`;
+    const ctrlHasSecurity = ctrl.secured || ctrl.routes.some((r) => r.secured);
 
-    lines.push(
-      `function ${factoryName}(${varName}: ${ctrl.className}, __filters: { middleware(): (ctx: any, next: () => Promise<void>) => Promise<Response | undefined> }[]) {`,
-    );
-    lines.push(
-      `  const __classDecs = ${serializeDecoratorEntries(ctrl.classDecorators)}`,
-    );
+    const params = [
+      `${varName}: ${ctrl.className}`,
+      ...(ctrlHasSecurity
+        ? [
+            '__securityContext: SecurityContext',
+            '__securityProvider: SecurityProvider | undefined',
+          ]
+        : []),
+    ];
+
+    lines.push(`function ${factoryName}(${params.join(', ')}) {`);
     lines.push('  return new Hono()');
     for (const route of ctrl.routes) {
       const relativePath = escapeStringLiteral(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
-      const methodNameEscaped = escapeStringLiteral(route.methodName);
 
-      // Collect middleware: filter wrapper, CORS, then validation
+      // Collect middleware: security, CORS, then validation
       const middleware: string[] = [];
 
-      // HttpFilter middleware — chains filters; each filter's next advances the chain
-      const methodDecsLiteral = serializeDecoratorEntries(
-        ctrl.methodDecorators[route.methodName] ?? [],
-      );
-      middleware.push(
-        `async (c: any, next: any) => { let __res: Response | undefined; let __i = 0; const __next = async (): Promise<void> => { if (__i < __filters.length) { const __mw = __filters[__i++].middleware(); const __r = await __mw({ request: c, methodName: '${methodNameEscaped}', classDecorators: __classDecs, methodDecorators: ${methodDecsLiteral} }, __next); if (__r) __res = __r } else { await next() } }; await __next(); if (__res) return __res }`,
-      );
+      // Determine if this route needs security middleware
+      const routeNeedsAuth =
+        (ctrl.secured || route.secured) && !route.anonymous;
+      const routeInSecuredController = ctrl.secured && !routeNeedsAuth;
+
+      if (routeNeedsAuth) {
+        // Secured route: authenticate, reject if no principal, wrap in SecurityContext
+        middleware.push(
+          `async (c: any, next: any) => { if (!__securityProvider) return c.json({ error: 'Unauthorized' }, 401); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (!__principal) return c.json({ error: 'Unauthorized' }, 401); return __securityContext.run(__principal, () => next()) }`,
+        );
+      } else if (routeInSecuredController) {
+        // @Anonymous route in a @Secured controller: authenticate if possible, set context, but don't reject
+        middleware.push(
+          `async (c: any, next: any) => { if (!__securityProvider) return next(); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); return __securityContext.run(__principal, () => next()) }`,
+        );
+      }
 
       // Method-level @Cors overrides class-level
       const corsConfig = route.cors ?? ctrl.cors;
@@ -397,17 +440,24 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     lines.push('');
   }
 
-  // createRouter composes all sub-apps with per-route HttpFilter middleware
+  // createRouter composes all sub-apps
   lines.push('export function createRouter(ctx: ApplicationContext) {');
-  lines.push(
-    '  const __filters = (ctx.getAll(HttpFilter) as HttpFilter[]).sort((a, b) => a.order - b.order)',
-  );
+  if (hasSecurity) {
+    lines.push('  const __securityContext = ctx.get(SecurityContext)');
+    lines.push(
+      '  const __securityProvider = ctx.getAll(SECURITY_PROVIDER)[0] as SecurityProvider | undefined',
+    );
+  }
   lines.push('  return new Hono()');
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
+    const ctrlHasSecurity = ctrl.secured || ctrl.routes.some((r) => r.secured);
+    const securityArgs = ctrlHasSecurity
+      ? ', __securityContext, __securityProvider'
+      : '';
     lines.push(
-      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className}), __filters))`,
+      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})${securityArgs}))`,
     );
   }
   lines.push('}');
@@ -460,16 +510,6 @@ function generateValidationMiddleware(
     (v) =>
       `zValidator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.issues.map((i: any) => ({ path: i.path, message: i.message })) }, 400) })`,
   );
-}
-
-/** Serialize decorator entries to a JS array literal for codegen. */
-function serializeDecoratorEntries(entries: IRDecoratorEntry[]): string {
-  if (entries.length === 0) return '[]';
-  const items = entries.map(
-    (d) =>
-      `{ name: '${escapeStringLiteral(d.name)}', importPath: '${escapeStringLiteral(d.importPath)}' }`,
-  );
-  return `[${items.join(', ')}]`;
 }
 
 function collectSchemaImports(
