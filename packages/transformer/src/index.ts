@@ -11,6 +11,8 @@ export type { ScannedAopDecorator } from './aop-scanner.js';
 export { scanAopDecoratorDefinitions } from './aop-scanner.js';
 // Built-in plugins
 export { createAopPlugin } from './builtin-aop-plugin.js';
+export type { ConditionalRule } from './builtin-conditional-plugin.js';
+export { createConditionalPlugin } from './builtin-conditional-plugin.js';
 export { createConfigPlugin } from './builtin-config-plugin.js';
 export type { CodegenOptions } from './codegen.js';
 // Code Generator
@@ -22,7 +24,7 @@ export {
   discoverPlugins,
   mergePlugins,
 } from './discover-plugins.js';
-export type { GraphResult } from './graph-builder.js';
+export type { GraphBuildOptions, GraphResult } from './graph-builder.js';
 // Graph Builder
 export { buildGraph } from './graph-builder.js';
 // IR types
