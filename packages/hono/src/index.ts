@@ -21,5 +21,6 @@ export type {
   SecurityRequest,
 } from './security-provider.js';
 export { SECURITY_PROVIDER } from './security-provider.js';
+export type { ServerRuntime } from './server-config.js';
 export { ServerConfig } from './server-config.js';
 export { Validate } from './validate.js';

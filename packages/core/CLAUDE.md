@@ -11,6 +11,7 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 | `src/injection-token.ts` | `InjectionToken<T>` — typed token with phantom type field |
 | `src/goodie.ts` | `Goodie.build(defs)` → `GoodieBuilder` → `.start()` bootstrap |
 | `src/topo-sort.ts` | DFS topological sort with cycle detection |
+| `src/runtime-bindings.ts` | `RuntimeBindings` — AsyncLocalStorage-based store for per-request platform bindings (e.g. CF Workers env) |
 | `src/errors.ts` | `DIError` hierarchy |
 | `src/aop-types.ts` | AOP types: `MethodInterceptor`, `InvocationContext`, `BeforeAdvice`, `AfterAdvice`, `InterceptorRef`, `InterceptedMethodDescriptor` |
 | `src/interceptor-chain.ts` | `buildInterceptorChain()` — chains interceptors with proceed/original-method fallback |

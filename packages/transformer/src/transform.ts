@@ -181,19 +181,27 @@ export async function transform(
     }
   }
 
-  // 9. Collect codegen contributions
+  // 9. Inline config at build time (read JSON files, embed as literal)
+  let inlinedConfig: Record<string, string> | undefined;
+  if (resolvedConfigDir) {
+    inlinedConfig = readAndFlattenConfigFiles(resolvedConfigDir);
+  }
+
+  // 10. Collect codegen contributions (pass build-time config to plugins)
+  const codegenContext = { config: inlinedConfig ?? {} };
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
-      contributions.push(plugin.codegen(finalBeans));
+      contributions.push(plugin.codegen(finalBeans, codegenContext));
     }
   }
 
-  // 10. Check IR hash — skip codegen + write if DI graph unchanged
+  // 11. Check IR hash — skip codegen + write if DI graph unchanged
   const codegenOptions = {
     outputPath: options.outputPath,
     version: PKG_VERSION,
     configDir: resolvedConfigDir,
+    inlinedConfig,
   };
   const currentHash = computeIRHash(finalBeans, codegenOptions, contributions);
 
@@ -249,7 +257,7 @@ export function transformInMemory(
   plugins?: TransformerPlugin[],
   libraryBeans?: IRBeanDefinition[],
   aopMappings?: ResolvedAopMapping[],
-  options?: { configDir?: string },
+  options?: { configDir?: string; inlinedConfig?: Record<string, string> },
 ): TransformResult {
   const aopPlugins =
     aopMappings && aopMappings.length > 0
@@ -320,18 +328,25 @@ export function transformInMemory(
     }
   }
 
-  // 8. Collect codegen contributions
+  // 8. Collect codegen contributions (pass build-time config to plugins)
+  const codegenCtx = { config: options?.inlinedConfig ?? {} };
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
-      contributions.push(plugin.codegen(finalBeans));
+      contributions.push(plugin.codegen(finalBeans, codegenCtx));
     }
   }
 
   // 9. Generate code
   const code = generateCode(
     finalBeans,
-    { outputPath, version: PKG_VERSION },
+    {
+      outputPath,
+      version: PKG_VERSION,
+      ...(options?.inlinedConfig
+        ? { inlinedConfig: options.inlinedConfig }
+        : {}),
+    },
     contributions,
   );
 
@@ -640,4 +655,42 @@ function discoverCrossPackageDirs(
   }
 
   return result.size > 0 ? result : undefined;
+}
+
+/**
+ * Read and flatten JSON config files at build time.
+ * Mirrors `loadConfigFiles()` from core but runs during transformation,
+ * so the values can be inlined in the generated code.
+ */
+function readAndFlattenConfigFiles(dir: string): Record<string, string> {
+  const result: Record<string, string> = {};
+
+  const defaultFile = path.join(dir, 'default.json');
+  if (fs.existsSync(defaultFile)) {
+    Object.assign(
+      result,
+      flattenObject(JSON.parse(fs.readFileSync(defaultFile, 'utf-8'))),
+    );
+  }
+
+  return result;
+}
+
+function flattenObject(
+  obj: Record<string, unknown>,
+  prefix = '',
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      Object.assign(
+        result,
+        flattenObject(value as Record<string, unknown>, fullKey),
+      );
+    } else {
+      result[fullKey] = String(value);
+    }
+  }
+  return result;
 }

@@ -145,6 +145,12 @@ export interface CodegenContribution {
   code?: string[];
 }
 
+/** Context passed to plugin codegen hooks. */
+export interface CodegenContext {
+  /** Flattened config values read from config files at build time (e.g. `{ 'server.runtime': 'cloudflare' }`). */
+  config: Record<string, string>;
+}
+
 /** Plugin interface for extending the transformer pipeline. */
 export interface TransformerPlugin {
   /** Unique plugin name. */
@@ -200,5 +206,8 @@ export interface TransformerPlugin {
    * Called during code generation. Duplicate imports across plugins are
    * automatically deduplicated.
    */
-  codegen?(beans: IRBeanDefinition[]): CodegenContribution;
+  codegen?(
+    beans: IRBeanDefinition[],
+    context?: CodegenContext,
+  ): CodegenContribution;
 }

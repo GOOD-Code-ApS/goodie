@@ -52,6 +52,7 @@ export {
 // Options
 export type {
   ClassVisitorContext,
+  CodegenContext,
   CodegenContribution,
   MethodVisitorContext,
   TransformerPlugin,

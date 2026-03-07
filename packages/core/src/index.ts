@@ -55,6 +55,7 @@ export {
 export { Goodie, GoodieBuilder } from './goodie.js';
 export { InjectionToken } from './injection-token.js';
 export { buildInterceptorChain } from './interceptor-chain.js';
+export { RuntimeBindings } from './runtime-bindings.js';
 export { StartupMetrics } from './startup-metrics.js';
 export { topoSort } from './topo-sort.js';
 export type {

@@ -1,5 +1,6 @@
 import {
   type ClassVisitorContext,
+  type CodegenContext,
   type CodegenContribution,
   InvalidDecoratorUsageError,
   type IRBeanDefinition,
@@ -84,6 +85,10 @@ interface ControllerBean {
  * When route decorators include a second argument with OpenAPI options,
  * generates `describeRoute()` middleware from `hono-openapi` and mounts
  * `openAPIRouteHandler()` to serve the OpenAPI spec.
+ *
+ * Reads `server.runtime` from build-time config to determine the entry point:
+ * - `'node'` (default) / `'bun'` / `'deno'` → generates `startServer()` with `EmbeddedServer`
+ * - `'cloudflare'` → generates `export default` entry point with `RuntimeBindings` middleware
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
@@ -198,7 +203,10 @@ export default function createHonoPlugin(): TransformerPlugin {
       });
     },
 
-    codegen(beans: IRBeanDefinition[]): CodegenContribution {
+    codegen(
+      beans: IRBeanDefinition[],
+      context?: CodegenContext,
+    ): CodegenContribution {
       const controllerBeans = extractControllerBeans(beans);
       if (controllerBeans.length === 0) return {};
 
@@ -209,16 +217,19 @@ export default function createHonoPlugin(): TransformerPlugin {
         c.routes.some((r) => r.openapi),
       );
 
-      const imports = buildImports(controllerBeans, hasSecurity, hasOpenApi);
+      const runtime = context?.config['server.runtime'] ?? 'node';
+      const isCloudflare = runtime === 'cloudflare';
+
+      const imports = buildImports(
+        controllerBeans,
+        hasSecurity,
+        hasOpenApi,
+        isCloudflare,
+      );
       const code = [
         ...generateCreateRouter(controllerBeans, hasSecurity, hasOpenApi),
         '',
-        'export async function startServer(options?: { port?: number; host?: string }) {',
-        '  const ctx = await app.start()',
-        '  const router = createRouter(ctx)',
-        '  ctx.get(EmbeddedServer).listen(router, options)',
-        '  return ctx',
-        '}',
+        ...generateEntryPoint(isCloudflare),
         '',
         'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
         '  return hc<AppType>(baseUrl, options)',
@@ -439,15 +450,43 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
   return result;
 }
 
+function generateEntryPoint(isCloudflare: boolean): string[] {
+  if (isCloudflare) {
+    return [
+      'const __ctx = await createContext()',
+      'const __router = createRouter(__ctx)',
+      '',
+      'export default {',
+      '  async fetch(request: Request, env: Record<string, unknown>, executionCtx: any) {',
+      '    return RuntimeBindings.run(env, () => __router.fetch(request, env, executionCtx))',
+      '  },',
+      '}',
+    ];
+  }
+  return [
+    'export async function startServer(options?: { port?: number; host?: string }) {',
+    '  const ctx = await app.start()',
+    '  const router = createRouter(ctx)',
+    '  await ctx.get(EmbeddedServer).listen(router, options)',
+    '  return ctx',
+    '}',
+  ];
+}
+
 function buildImports(
   controllers: ControllerBean[],
   hasSecurity: boolean,
   hasOpenApi: boolean,
+  isCloudflare: boolean,
 ): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
-  imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  if (isCloudflare) {
+    imports.push("import { RuntimeBindings } from '@goodie-ts/core'");
+  } else {
+    imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  }
 
   if (hasSecurity) {
     imports.push("import { SECURITY_PROVIDER } from '@goodie-ts/hono'");

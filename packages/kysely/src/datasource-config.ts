@@ -3,7 +3,7 @@ import {
   PostConstruct,
   Singleton,
 } from '@goodie-ts/core';
-import { validateDialect } from './dialect.js';
+import { DIALECTS, validateDialect } from './dialect.js';
 
 /**
  * Connection pool configuration, bound from `datasource.pool.*` keys.
@@ -36,6 +36,12 @@ export class PoolConfig {
 export class DatasourceConfig {
   url = '';
   dialect = '';
+  /**
+   * Runtime binding name for dialects that use platform bindings instead of
+   * connection strings (e.g. Cloudflare D1). The binding is resolved at
+   * request time via `RuntimeBindings.get(binding)`.
+   */
+  binding = '';
 
   constructor(readonly pool: PoolConfig) {}
 
@@ -43,12 +49,20 @@ export class DatasourceConfig {
   validate() {
     if (!this.dialect) {
       throw new Error(
-        "DatasourceConfig: 'datasource.dialect' is required. Supported dialects: postgres, mysql, sqlite",
+        `DatasourceConfig: 'datasource.dialect' is required. Supported dialects: ${DIALECTS.join(', ')}`,
       );
     }
     validateDialect(this.dialect);
 
-    if (!this.url) {
+    const needsBinding = this.dialect === 'd1';
+    if (needsBinding) {
+      if (!this.binding) {
+        throw new Error(
+          "DatasourceConfig: 'datasource.binding' is required for the 'd1' dialect. " +
+            "Set it to your D1 binding name (e.g. 'DB').",
+        );
+      }
+    } else if (!this.url) {
       throw new Error(
         "DatasourceConfig: 'datasource.url' is required. Example: postgres://localhost:5432/mydb",
       );

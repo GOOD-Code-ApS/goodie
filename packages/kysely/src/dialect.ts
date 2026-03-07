@@ -5,28 +5,43 @@
  * and by `TransactionManager` to determine dialect capabilities
  * like `RETURNING` clause support.
  */
-export type Dialect = 'postgres' | 'mysql' | 'sqlite';
+export type Dialect =
+  | 'postgres'
+  | 'mysql'
+  | 'sqlite'
+  | 'neon'
+  | 'planetscale'
+  | 'd1'
+  | 'libsql';
 
 /** All valid dialect values. Used for validation at config injection time. */
 export const DIALECTS: readonly Dialect[] = [
   'postgres',
   'mysql',
   'sqlite',
+  'neon',
+  'planetscale',
+  'd1',
+  'libsql',
 ] as const;
 
 /**
  * Whether the given dialect supports `RETURNING` clauses natively.
  *
- * - **postgres**: `INSERT/UPDATE/DELETE ... RETURNING *`
- * - **sqlite**: `INSERT/UPDATE/DELETE ... RETURNING *` (since 3.35)
- * - **mysql**: No native support — falls back to INSERT + SELECT
+ * - **postgres / neon**: `INSERT/UPDATE/DELETE ... RETURNING *`
+ * - **sqlite / d1 / libsql**: `INSERT/UPDATE/DELETE ... RETURNING *` (since 3.35)
+ * - **mysql / planetscale**: No native support — falls back to INSERT + SELECT
  */
 export function supportsReturning(dialect: Dialect): boolean {
   switch (dialect) {
     case 'postgres':
+    case 'neon':
     case 'sqlite':
+    case 'd1':
+    case 'libsql':
       return true;
     case 'mysql':
+    case 'planetscale':
       return false;
   }
 }

@@ -5,14 +5,12 @@ HTTP controller routing decorators for [goodie-ts](https://github.com/GOOD-Code-
 ## Install
 
 ```bash
-pnpm add @goodie-ts/hono hono @hono/node-server
+pnpm add @goodie-ts/hono hono
 ```
 
 ## Overview
 
-Hono-specific runtime integration for goodie-ts. Provides the transformer plugin for compile-time route wiring, `@Validate` for Zod-based request validation, `EmbeddedServer`, and `ServerConfig`.
-
-Generic HTTP decorators (`@Controller`, `@Get`, `@Post`, etc.) live in `@goodie-ts/http`. This package only provides Hono-specific functionality.
+Hono HTTP integration for goodie-ts. Provides route decorators (`@Controller`, `@Get`, `@Post`, etc.), security (`@Secured`, `@Anonymous`), OpenAPI support via `hono-openapi`, the transformer plugin for compile-time route wiring, `@Validate` for request validation, and multi-runtime `EmbeddedServer`.
 
 The hono transformer plugin scans controller metadata on beans and generates a `createRouter(ctx)` function that wires controllers from the DI container to Hono routes. No runtime scanning required.
 
@@ -23,7 +21,7 @@ The package also ships `ServerConfig` (configurable via `@ConfigurationPropertie
 ## Usage
 
 ```typescript
-import { Controller, Get, Post, Delete } from '@goodie-ts/http';
+import { Controller, Get, Post, Delete } from '@goodie-ts/hono';
 import type { Context } from 'hono';
 
 @Controller('/api/todos')
@@ -102,8 +100,21 @@ import type { TodoControllerRoutes } from './AppContext.generated.js';
 
 ```json
 // config/default.json
-{ "server": { "host": "localhost", "port": 3000 } }
+{ "server": { "host": "localhost", "port": 3000, "runtime": "node" } }
 ```
+
+### Multi-Runtime Support
+
+`EmbeddedServer` supports multiple runtimes via `server.runtime`:
+
+| Runtime | Serve API | Package |
+|---------|-----------|---------|
+| `node` (default) | `@hono/node-server` | `@hono/node-server` |
+| `bun` | `Bun.serve()` | Built-in |
+| `deno` | `Deno.serve()` | Built-in |
+| `cloudflare` | `export default` entry point | N/A |
+
+For `cloudflare`, the plugin generates a Workers-compatible `export default` entry point with `RuntimeBindings` middleware instead of `startServer()`.
 
 Or override at startup:
 
@@ -122,8 +133,7 @@ await startServer({ port: 8080 });
 ## Peer Dependencies
 
 - `hono` >= 4.0.0
-- `@hono/node-server` >= 1.0.0 (optional — only needed for `EmbeddedServer`)
-- `@hono/zod-validator` >= 0.4.0 (optional — only needed for `@Validate`)
+- `@hono/node-server` >= 1.0.0 (optional — only needed for `runtime: 'node'`)
 - `zod` >= 3.0.0 (optional — only needed for `@Validate`)
 
 ## License

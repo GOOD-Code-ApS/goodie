@@ -21,6 +21,7 @@ This package provides the runtime container that resolves pre-built `BeanDefinit
 - **`buildInterceptorChain`** — AOP runtime: chains `MethodInterceptor` instances around a method
 - **`wrapBeforeAdvice` / `wrapAfterAdvice`** — Adapt `BeforeAdvice` / `AfterAdvice` into `MethodInterceptor`
 - **`MethodInterceptor`, `InvocationContext`** — AOP type contracts for interceptors
+- **`RuntimeBindings`** — Request-scoped store for platform environment bindings (e.g. Cloudflare Workers `env`)
 
 ## Usage
 

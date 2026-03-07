@@ -15,7 +15,11 @@ Scanner → Resolver → GraphBuilder → Codegen
 | GraphBuilder | `src/graph-builder.ts` | `ResolveResult` → `GraphResult` (validated, topo-sorted) |
 | Codegen | `src/codegen.ts` | `IRBeanDefinition[]` → generated TypeScript string |
 
-Entry points: `transform(options)` for file-based, `transformInMemory(project, outputPath)` for tests.
+Entry points: `transform(options)` for file-based, `transformInMemory(project, outputPath, options?)` for tests.
+
+## Config Inlining
+
+When `configDir` is set, the transformer reads JSON config files at build time and inlines flattened values into the generated `ConfigSource` factory. This removes the runtime dependency on `node:fs` / `loadConfigFiles()`. Values are embedded as `{ 'key.path': 'value' }` with `process.env` overrides applied at runtime. The inlined config is also passed to plugins via `CodegenContext`.
 
 `scan()` accepts an optional `plugins` parameter — plugin `visitClass`/`visitMethod` hooks run inline during the scan loop (single AST pass). Returns `pluginMetadata` in `ScanResult`.
 
@@ -60,7 +64,7 @@ Plugins can register classes as beans via `ctx.registerBean({ scope })` in their
 
 External packages can contribute codegen via the `TransformerPlugin` interface:
 - `visitClass` / `visitMethod` — scan hooks called during the single AST pass
-- `codegen(beans)` — returns `CodegenContribution` (`{ imports, code }`) appended to generated output
+- `codegen(beans, context?)` — receives `CodegenContext` with build-time config (`context.config` is a flattened `Record<string, string>` from JSON config files). Returns `CodegenContribution` (`{ imports, code }`) appended to generated output
 
 Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, config) are always active.
 
