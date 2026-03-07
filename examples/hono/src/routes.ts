@@ -17,7 +17,14 @@ import type { TodoService } from './TodoService.js';
 export class TodoController {
   constructor(private todoService: TodoService) {}
 
-  @Get('/')
+  @Get('/', {
+    summary: 'List all todos',
+    description: 'Returns all todo items',
+    tags: ['Todos'],
+    responses: {
+      200: { description: 'List of todos' },
+    },
+  })
   @Anonymous()
   async getAll(c: Context) {
     const todos = await this.todoService.findAll();
