@@ -27,6 +27,16 @@ interface RouteValidation {
   importPath: string;
 }
 
+/** Parsed OpenAPI options from the second argument of a route decorator. */
+interface RouteOpenApiOptions {
+  summary?: string;
+  description?: string;
+  deprecated?: boolean;
+  tags?: string[];
+  /** Raw source text of the responses object literal. */
+  responsesRaw?: string;
+}
+
 /** A route method on a controller. */
 interface RouteDefinition {
   methodName: string;
@@ -39,6 +49,8 @@ interface RouteDefinition {
   secured?: boolean;
   /** Whether this route is explicitly anonymous (overrides class-level @Secured). */
   anonymous?: boolean;
+  /** OpenAPI options from the second argument of the route decorator. */
+  openapi?: RouteOpenApiOptions;
 }
 
 /** Controller metadata stored on bean metadata by visitClass. */
@@ -65,8 +77,9 @@ interface ControllerBean {
  * Transformer plugin that scans `@Controller` classes and `@Get`/`@Post`/etc.
  * route methods, then generates `createRouter()` and `startServer()`.
  *
- * Security (`@Secured`/`@Anonymous`) is handled by generating Hono-native
- * middleware directly — no `HttpFilter` abstraction.
+ * When route decorators include a second argument with OpenAPI options,
+ * generates `describeRoute()` middleware from `hono-openapi` and mounts
+ * `openAPIRouteHandler()` to serve the OpenAPI spec.
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
@@ -124,6 +137,7 @@ export default function createHonoPlugin(): TransformerPlugin {
       // Find a route decorator (@Get, @Post, etc.)
       let httpMethod: HttpMethod | undefined;
       let path = '/';
+      let openapi: RouteOpenApiOptions | undefined;
       for (const dec of decorators) {
         const matched = ROUTE_DECORATOR_MAP[dec.getName()];
         if (!matched) continue;
@@ -139,6 +153,17 @@ export default function createHonoPlugin(): TransformerPlugin {
             path = argText.slice(1, -1);
           }
         }
+
+        // Parse optional second argument (OpenAPI options)
+        if (args.length > 1) {
+          const openapiArg = args[1];
+          if (openapiArg.getKind() === SyntaxKind.ObjectLiteralExpression) {
+            openapi = parseOpenApiOptions(
+              openapiArg.asKindOrThrow(SyntaxKind.ObjectLiteralExpression),
+            );
+          }
+        }
+
         break;
       }
 
@@ -164,6 +189,7 @@ export default function createHonoPlugin(): TransformerPlugin {
         ...(methodCors !== undefined ? { cors: methodCors } : {}),
         ...(methodSecured ? { secured: true } : {}),
         ...(methodAnonymous ? { anonymous: true } : {}),
+        ...(openapi ? { openapi } : {}),
       });
     },
 
@@ -174,10 +200,13 @@ export default function createHonoPlugin(): TransformerPlugin {
       const hasSecurity = controllerBeans.some(
         (c) => c.secured || c.routes.some((r) => r.secured),
       );
+      const hasOpenApi = controllerBeans.some((c) =>
+        c.routes.some((r) => r.openapi),
+      );
 
-      const imports = buildImports(controllerBeans, hasSecurity);
+      const imports = buildImports(controllerBeans, hasSecurity, hasOpenApi);
       const code = [
-        ...generateCreateRouter(controllerBeans, hasSecurity),
+        ...generateCreateRouter(controllerBeans, hasSecurity, hasOpenApi),
         '',
         'export async function startServer(options?: { port?: number; host?: string }) {',
         '  const ctx = await app.start()',
@@ -194,6 +223,51 @@ export default function createHonoPlugin(): TransformerPlugin {
       return { imports, code };
     },
   };
+}
+
+/** Parse the second argument of a route decorator into structured OpenAPI options. */
+function parseOpenApiOptions(
+  objLiteral: import('ts-morph').ObjectLiteralExpression,
+): RouteOpenApiOptions {
+  const result: RouteOpenApiOptions = {};
+
+  for (const prop of objLiteral.getProperties()) {
+    if (prop.getKind() !== SyntaxKind.PropertyAssignment) continue;
+    const propAssign = prop.asKindOrThrow(SyntaxKind.PropertyAssignment);
+    const name = propAssign.getName();
+    const initializer = propAssign.getInitializer();
+    if (!initializer) continue;
+
+    if (name === 'summary' || name === 'description') {
+      result[name] = extractStringLiteral(initializer.getText());
+    } else if (name === 'deprecated') {
+      result.deprecated = initializer.getText() === 'true';
+    } else if (name === 'tags') {
+      if (initializer.getKind() === SyntaxKind.ArrayLiteralExpression) {
+        const arr = initializer.asKindOrThrow(
+          SyntaxKind.ArrayLiteralExpression,
+        );
+        result.tags = arr
+          .getElements()
+          .map((e) => extractStringLiteral(e.getText()));
+      }
+    } else if (name === 'responses') {
+      // Store the raw source text — it may contain resolver() calls
+      result.responsesRaw = initializer.getText();
+    }
+  }
+
+  return result;
+}
+
+function extractStringLiteral(text: string): string {
+  if (
+    (text.startsWith("'") && text.endsWith("'")) ||
+    (text.startsWith('"') && text.endsWith('"'))
+  ) {
+    return text.slice(1, -1);
+  }
+  return text;
 }
 
 /** Extract @Validate({ json: schema, query: schema, param: schema }) from method decorators. */
@@ -315,6 +389,7 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
 function buildImports(
   controllers: ControllerBean[],
   hasSecurity: boolean,
+  hasOpenApi: boolean,
 ): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
@@ -340,11 +415,17 @@ function buildImports(
     (r) => r.validation && r.validation.length > 0,
   );
   if (hasValidation) {
-    imports.push("import { zValidator } from '@hono/zod-validator'");
+    imports.push("import { validator } from 'hono-openapi'");
     const schemaImports = collectSchemaImports(controllers);
     for (const [schemaRef, importPath] of schemaImports) {
       imports.push(`import { ${schemaRef} } from '${importPath}'`);
     }
+  }
+
+  if (hasOpenApi) {
+    imports.push("import { describeRoute } from 'hono-openapi'");
+    imports.push("import { openAPIRouteHandler } from 'hono-openapi'");
+    imports.push("import { OpenApiConfig } from '@goodie-ts/hono'");
   }
 
   return imports;
@@ -353,6 +434,7 @@ function buildImports(
 function generateCreateRouter(
   controllers: ControllerBean[],
   hasSecurity: boolean,
+  hasOpenApi: boolean,
 ): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
@@ -377,8 +459,13 @@ function generateCreateRouter(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
 
-      // Collect middleware: security, CORS, then validation
+      // Collect middleware: describeRoute, security, CORS, then validation
       const middleware: string[] = [];
+
+      // OpenAPI describeRoute middleware (before other middleware)
+      if (route.openapi) {
+        middleware.push(generateDescribeRoute(route));
+      }
 
       // Determine if this route needs security middleware
       const routeNeedsAuth =
@@ -386,12 +473,10 @@ function generateCreateRouter(
       const routeInSecuredController = ctrl.secured && !routeNeedsAuth;
 
       if (routeNeedsAuth) {
-        // Secured route: authenticate, reject if no principal, set on Hono context
         middleware.push(
           `async (c: any, next: any) => { if (!__securityProvider) return c.json({ error: 'Unauthorized' }, 401); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (!__principal) return c.json({ error: 'Unauthorized' }, 401); c.set('principal', __principal); return next() }`,
         );
       } else if (routeInSecuredController) {
-        // @Anonymous route in a @Secured controller: authenticate if possible, set on context, but don't reject
         middleware.push(
           `async (c: any, next: any) => { if (!__securityProvider) return next(); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (__principal) c.set('principal', __principal); return next() }`,
         );
@@ -441,7 +526,7 @@ function generateCreateRouter(
       '  const __securityProvider = ctx.getAll(SECURITY_PROVIDER)[0] as SecurityProvider | undefined',
     );
   }
-  lines.push('  return new Hono()');
+  lines.push('  const __router = new Hono()');
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
@@ -451,11 +536,45 @@ function generateCreateRouter(
       `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})${securityArgs}))`,
     );
   }
+
+  // Mount openAPIRouteHandler if any route has OpenAPI options
+  if (hasOpenApi) {
+    lines.push('  const __openApiConfig = ctx.get(OpenApiConfig)');
+    lines.push(
+      "  __router.get('/openapi.json', openAPIRouteHandler(__router, { documentation: { info: { title: __openApiConfig.title, version: __openApiConfig.version, ...((__openApiConfig.description) ? { description: __openApiConfig.description } : {}) } } }))",
+    );
+  }
+
+  lines.push('  return __router');
   lines.push('}');
   lines.push('');
   lines.push('export type AppType = ReturnType<typeof createRouter>');
 
   return lines;
+}
+
+/** Generate a describeRoute() middleware call from parsed OpenAPI options. */
+function generateDescribeRoute(route: RouteDefinition): string {
+  const opts = route.openapi!;
+  const parts: string[] = [];
+
+  if (opts.summary) {
+    parts.push(`summary: ${JSON.stringify(opts.summary)}`);
+  }
+  if (opts.description) {
+    parts.push(`description: ${JSON.stringify(opts.description)}`);
+  }
+  if (opts.deprecated) {
+    parts.push('deprecated: true');
+  }
+  if (opts.tags && opts.tags.length > 0) {
+    parts.push(`tags: ${JSON.stringify(opts.tags)}`);
+  }
+  if (opts.responsesRaw) {
+    parts.push(`responses: ${opts.responsesRaw}`);
+  }
+
+  return `describeRoute({ ${parts.join(', ')} })`;
 }
 
 function buildControllerVarNames(
@@ -499,7 +618,7 @@ function generateValidationMiddleware(
   if (!validation || validation.length === 0) return [];
   return validation.map(
     (v) =>
-      `zValidator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.issues.map((i: any) => ({ path: i.path, message: i.message })) }, 400) })`,
+      `validator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.map((i: any) => ({ path: i.path, message: i.message })) }, 400) })`,
   );
 }
 

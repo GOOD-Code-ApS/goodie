@@ -1,14 +1,16 @@
 # @goodie-ts/hono
 
-Hono HTTP integration for goodie-ts. Provides route decorators, security, the transformer plugin for compile-time route wiring, `@Validate`, `@Cors`, `EmbeddedServer`, and `ServerConfig`.
+Hono HTTP integration for goodie-ts. Provides route decorators, security, OpenAPI support via `hono-openapi`, the transformer plugin for compile-time route wiring, `@Validate`, `@Cors`, `EmbeddedServer`, `ServerConfig`, and `OpenApiConfig`.
 
 ## Key Files
 
 | File | Role |
 |------|------|
-| `src/plugin.ts` | Transformer plugin — generates `createRouter()`, `startServer()`, security middleware, RPC clients from controller metadata |
+| `src/plugin.ts` | Transformer plugin — generates `createRouter()`, `startServer()`, security middleware, OpenAPI middleware, RPC clients from controller metadata |
 | `src/controller.ts` | `@Controller(basePath?)` — marks class as HTTP controller (compile-time no-op) |
-| `src/route.ts` | `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` — method decorators (compile-time no-ops) |
+| `src/route.ts` | `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` — method decorators with optional OpenAPI options (compile-time no-ops) |
+| `src/openapi-types.ts` | `DescribeRouteOptions` — typed OpenAPI options for route decorators |
+| `src/openapi-config.ts` | `OpenApiConfig` — `@ConfigurationProperties('openapi')` bean (title, version, description) |
 | `src/secured.ts` | `@Secured()` — marks controller/method as requiring authentication (compile-time no-op) |
 | `src/anonymous.ts` | `@Anonymous()` — exempts method from class-level `@Secured` (compile-time no-op) |
 | `src/security-provider.ts` | `SecurityProvider` interface + `SECURITY_PROVIDER` injection token |
@@ -18,7 +20,7 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, the tr
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` wrapping `@hono/node-server` |
 | `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean |
 | `src/cors.ts` | `@Cors(options?)` — Hono-specific CORS marker (generates `hono/cors` middleware) |
-| `src/validate.ts` | `@Validate` — Hono-specific validation decorator (tied to `@hono/zod-validator`) |
+| `src/validate.ts` | `@Validate` — Hono-specific validation decorator |
 | `src/metadata.ts` | `ValidateMetadata`, `ValidationTarget` types |
 | `src/index.ts` | Public exports |
 
@@ -27,8 +29,30 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, the tr
 The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
 
 - **`visitClass`** — detects `@Controller(basePath)`, `@Secured`, `@Cors`, registers bean as singleton
-- **`visitMethod`** — detects `@Get`/`@Post`/etc, `@Validate`, `@Cors`, `@Secured`, `@Anonymous`
-- **`codegen`** — generates per-controller route factories, `createRouter(ctx)`, `startServer()`, RPC types/clients
+- **`visitMethod`** — detects `@Get`/`@Post`/etc (with optional OpenAPI options as second arg), `@Validate`, `@Cors`, `@Secured`, `@Anonymous`
+- **`codegen`** — generates per-controller route factories, `createRouter(ctx)`, `startServer()`, RPC types/clients, and OpenAPI middleware when routes have OpenAPI options
+
+### OpenAPI Support
+
+Route decorators accept an optional second argument with OpenAPI options:
+
+```typescript
+@Get('/', {
+  summary: 'List all items',
+  description: 'Returns all items',
+  tags: ['items'],
+  responses: {
+    200: { description: 'Success', content: { 'application/json': { schema: resolver(itemSchema) } } }
+  }
+})
+```
+
+When any route has OpenAPI options, the plugin:
+1. Generates `describeRoute()` middleware (from `hono-openapi`) per annotated route
+2. Mounts `openAPIRouteHandler(router, { documentation })` on `/openapi.json`
+3. Resolves `OpenApiConfig` from the DI context for the documentation info
+
+Validation always uses `validator()` from `hono-openapi` (replaces `@hono/zod-validator`).
 
 ### Security Middleware Generation
 
@@ -45,21 +69,20 @@ When `@Secured` is used on any controller, the plugin generates Hono-native secu
 ```typescript
 function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | undefined) {
   return new Hono()
-    .get('/secured',
+    .get('/items',
+      describeRoute({ summary: 'List items', responses: { ... } }),
       async (c, next) => { /* security middleware */ },
-      async (c) => { return ctrl.method(c) }
-    )
-    .get('/public',
-      async (c) => { return ctrl.publicMethod(c) }
+      async (c) => { return ctrl.list(c) }
     )
 }
 ```
 
 ## Library Beans (beans.json)
 
-2 singleton beans:
+3 singleton beans:
 - **ServerConfig** — `@ConfigurationProperties('server')` with host/port
 - **EmbeddedServer** — wraps `@hono/node-server`, depends on `ServerConfig`
+- **OpenApiConfig** — `@ConfigurationProperties('openapi')` with title/version/description
 
 ## Design Decisions
 
@@ -68,10 +91,13 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 - **`@Secured` is HTTP-only** — no service-layer AOP interceptor. The framework is Hono-first.
 - **`SecurityProvider` is user-provided** — registered with `SECURITY_PROVIDER` injection token. Optional — if missing, secured routes return 401.
 - **Principal via Hono context** — `c.set('principal', ...)` / `c.get('principal')` using `GoodieEnv` type for type safety. No `AsyncLocalStorage` — works on edge runtimes.
+- **OpenAPI via `hono-openapi`** — middleware-based approach. `describeRoute()` per route, `openAPIRouteHandler()` for spec. Only generated when routes have OpenAPI options.
+- **Validation via `hono-openapi`** — `validator()` replaces `@hono/zod-validator`. Always used (even without OpenAPI options) so validation schemas automatically feed into the spec when OpenAPI is enabled.
 
 ## Gotchas
 
 - `@Anonymous` only makes sense on methods inside a `@Secured` controller
 - Route decorators are matched by name only (no import source verification)
-- `@Validate` generates `zValidator()` middleware — requires `@hono/zod-validator` and `zod` as peer deps
+- `@Validate` generates `validator()` middleware from `hono-openapi` — requires `zod` as peer dep
 - `SecurityProvider` must be registered by the user — it's not auto-discovered
+- OpenAPI spec is only served when at least one route has the second argument with OpenAPI options

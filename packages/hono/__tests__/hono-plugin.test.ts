@@ -266,11 +266,8 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain(
-      "import { zValidator } from '@hono/zod-validator'",
-    );
-    expect(result.code).toContain("zValidator('json', createTodoSchema");
-    expect(result.code).toContain('Validation failed');
+    expect(result.code).toContain("import { validator } from 'hono-openapi'");
+    expect(result.code).toContain("validator('json', createTodoSchema");
 
     // Schema import should use a relative path, not an absolute one
     expect(result.code).toMatch(
@@ -453,7 +450,7 @@ describe('Hono Plugin — @Cors', () => {
     });
 
     const corsIdx = result.code.indexOf('cors(');
-    const validatorIdx = result.code.indexOf('zValidator(');
+    const validatorIdx = result.code.indexOf('validator(');
     expect(corsIdx).toBeLessThan(validatorIdx);
   });
 });
@@ -795,5 +792,180 @@ describe('Hono Plugin — RPC Client', () => {
     expect(result.code).toContain(
       'export function createRootControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
     );
+  });
+});
+
+describe('Hono Plugin — OpenAPI (describeRoute)', () => {
+  it('generates describeRoute middleware when route has OpenAPI options', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/', { summary: 'List items', description: 'Returns all items' })
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      "import { describeRoute } from 'hono-openapi'",
+    );
+    expect(result.code).toContain(
+      'describeRoute({ summary: "List items", description: "Returns all items" })',
+    );
+  });
+
+  it('generates describeRoute with tags', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/', { tags: ['items', 'public'] })
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('tags: ["items","public"]');
+  });
+
+  it('generates describeRoute with deprecated flag', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/old', { deprecated: true })
+          oldEndpoint() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('deprecated: true');
+  });
+
+  it('passes responses raw to describeRoute', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/', {
+            responses: {
+              200: { description: 'Success', content: { 'application/json': { schema: resolver(itemSchema) } } }
+            }
+          })
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('describeRoute({');
+    expect(result.code).toContain('responses: {');
+    expect(result.code).toContain("200: { description: 'Success'");
+    expect(result.code).toContain('resolver(itemSchema)');
+  });
+
+  it('does not generate describeRoute when no route has OpenAPI options', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/')
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).not.toContain('describeRoute');
+    expect(result.code).not.toContain('openAPIRouteHandler');
+    expect(result.code).not.toContain('OpenApiConfig');
+  });
+
+  it('generates openAPIRouteHandler when any route has OpenAPI options', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/', { summary: 'List' })
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain(
+      "import { openAPIRouteHandler } from 'hono-openapi'",
+    );
+    expect(result.code).toContain(
+      "import { OpenApiConfig } from '@goodie-ts/hono'",
+    );
+    expect(result.code).toContain('ctx.get(OpenApiConfig)');
+    expect(result.code).toContain(
+      'openAPIRouteHandler(__router, { documentation: { info: {',
+    );
+    expect(result.code).toContain('title: __openApiConfig.title');
+    expect(result.code).toContain('version: __openApiConfig.version');
+  });
+
+  it('mounts openAPIRouteHandler on /openapi.json', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/', { summary: 'List' })
+          list() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain("__router.get('/openapi.json'");
+  });
+
+  it('describeRoute appears before other middleware', () => {
+    const result = createProject({
+      '/src/schema.ts': `export const bodySchema = {}`,
+      '/src/Ctrl.ts': `
+        import { Controller, Post, Validate, Secured } from './decorators.js'
+        import { bodySchema } from './schema.js'
+        @Controller('/api')
+        @Secured()
+        class Ctrl {
+          @Post('/', { summary: 'Create item' })
+          @Validate({ json: bodySchema })
+          create() {}
+        }
+      `,
+    });
+
+    const describeIdx = result.code.indexOf('describeRoute(');
+    const securityIdx = result.code.indexOf('__securityProvider.authenticate');
+    const validatorIdx = result.code.indexOf("validator('json'");
+    expect(describeIdx).toBeLessThan(securityIdx);
+    expect(securityIdx).toBeLessThan(validatorIdx);
+  });
+
+  it('only annotated routes get describeRoute, others do not', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/', { summary: 'List' })
+          list() {}
+
+          @Get('/health')
+          health() {}
+        }
+      `,
+    });
+
+    // describeRoute should appear once (for list), not for health
+    const matches = result.code.match(/describeRoute\(/g);
+    expect(matches).toHaveLength(1);
   });
 });
