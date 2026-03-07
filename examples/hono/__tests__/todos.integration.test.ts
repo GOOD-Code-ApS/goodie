@@ -29,7 +29,7 @@ const testSecurityProvider: SecurityProvider = {
 
 /** Bean definition that registers the test SecurityProvider. */
 const securityProviderBean: BeanDefinition<SecurityProvider> = {
-  token: SECURITY_PROVIDER_Token,
+  token: SECURITY_PROVIDER_Token as BeanDefinition<SecurityProvider>['token'],
   scope: 'singleton',
   dependencies: [],
   factory: () => testSecurityProvider,
