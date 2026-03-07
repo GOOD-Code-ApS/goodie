@@ -79,6 +79,13 @@ export function createConditionalPlugin(): TransformerPlugin {
             }
           }
 
+          if (!importPath) {
+            console.warn(
+              `[goodie] @ConditionalOnMissingBean(${className}): could not resolve import path for token class. ` +
+                `The condition may not match correctly. Ensure the class is imported and resolvable.`,
+            );
+          }
+
           rules.push({
             type: 'onMissingBean',
             tokenClassName: className,

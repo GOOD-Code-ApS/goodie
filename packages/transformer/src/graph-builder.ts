@@ -124,6 +124,8 @@ function filterConditionalBeans(
         }
         const propValue = getNestedProperty(configProperties, rule.key!);
         if (rule.expectedValue !== undefined) {
+          // String coercion: false → 'false', 0 → '0', null → 'null'.
+          // Both sides are compared as strings since decorator args are string literals.
           if (String(propValue) !== rule.expectedValue) {
             recordFiltered(
               bean,
@@ -149,10 +151,7 @@ function filterConditionalBeans(
   });
 
   // Phase 2: filter by onMissingBean (evaluated against remaining beans)
-  const registeredKeys = new Set<string>();
-  for (const bean of remaining) {
-    registeredKeys.add(tokenRefKey(bean.tokenRef));
-  }
+  const registeredKeys = new Set(remaining.map((b) => tokenRefKey(b.tokenRef)));
 
   remaining = remaining.filter((bean) => {
     const rules = bean.metadata.conditionalRules as
@@ -164,16 +163,10 @@ function filterConditionalBeans(
       if (rule.type !== 'onMissingBean') continue;
 
       const targetKey = `class:${rule.tokenImportPath}:${rule.tokenClassName}`;
+      const ownKey = tokenRefKey(bean.tokenRef);
 
       // Check if any remaining bean (other than this one) provides the target token
-      let found = false;
-      for (const other of remaining) {
-        if (other === bean) continue;
-        if (tokenRefKey(other.tokenRef) === targetKey) {
-          found = true;
-          break;
-        }
-      }
+      const found = registeredKeys.has(targetKey) && targetKey !== ownKey;
 
       if (found) {
         recordFiltered(

@@ -5,6 +5,9 @@
  * config property at `key` equals `value`. When `value` is omitted,
  * the bean is registered if the property exists (is not undefined).
  *
+ * Note: non-string property values are coerced via `String()` for comparison
+ * (e.g. `false` → `'false'`, `0` → `'0'`, `null` → `'null'`).
+ *
  * Configuration is loaded from the `configDir` (default.json + {env}.json).
  *
  * This decorator is a compile-time no-op -- the transformer scans it

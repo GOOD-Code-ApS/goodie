@@ -249,6 +249,7 @@ export function transformInMemory(
   plugins?: TransformerPlugin[],
   libraryBeans?: IRBeanDefinition[],
   aopMappings?: ResolvedAopMapping[],
+  options?: { configDir?: string },
 ): TransformResult {
   const aopPlugins =
     aopMappings && aopMappings.length > 0
@@ -306,7 +307,10 @@ export function transformInMemory(
   }
 
   // 6. Build graph (validate + topo sort)
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph(
+    { ...resolveResult, beans },
+    options?.configDir ? { configDir: options.configDir } : undefined,
+  );
 
   // 7. beforeCodegen hook
   let finalBeans = graphResult.beans;

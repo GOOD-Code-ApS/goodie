@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { Project } from 'ts-morph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { transformInMemory } from '../src/transform.js';
@@ -7,6 +10,7 @@ import { DECORATOR_STUBS } from './helpers.js';
 function createTestProject(
   files: Record<string, string>,
   outputPath = '/out/AppContext.generated.ts',
+  options?: { configDir?: string },
 ) {
   const project = new Project({ useInMemoryFileSystem: true });
 
@@ -18,7 +22,14 @@ function createTestProject(
     project.createSourceFile(filePath, content);
   }
 
-  return transformInMemory(project, outputPath);
+  return transformInMemory(
+    project,
+    outputPath,
+    undefined,
+    undefined,
+    undefined,
+    options,
+  );
 }
 
 describe('Conditional Bean Registration', () => {
@@ -187,26 +198,7 @@ describe('Conditional Bean Registration', () => {
     it('should throw MissingProviderError with hint when required dep was filtered out', () => {
       process.env.NODE_ENV = 'development';
 
-      expect(() =>
-        createTestProject({
-          '/src/ProdService.ts': `
-            import { Singleton, ConditionalOnEnv } from './decorators.js'
-
-            @Singleton()
-            @ConditionalOnEnv('NODE_ENV', 'production')
-            export class ProdService {}
-          `,
-          '/src/Consumer.ts': `
-            import { Singleton } from './decorators.js'
-            import { ProdService } from './ProdService.js'
-
-            @Singleton()
-            export class Consumer {
-              constructor(private prodService: ProdService) {}
-            }
-          `,
-        }),
-      ).toThrow(MissingProviderError);
+      expect.assertions(3);
 
       try {
         createTestProject({
@@ -327,6 +319,156 @@ describe('Conditional Bean Registration', () => {
           b.tokenRef.className === 'EmptyEnvService',
       );
       // Empty string is defined, so bean should be included
+      expect(bean).toBeDefined();
+    });
+  });
+
+  describe('@ConditionalOnProperty', () => {
+    let configDir: string;
+
+    beforeEach(() => {
+      configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'goodie-test-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(configDir, { recursive: true, force: true });
+    });
+
+    it('should include bean when property matches expected value', () => {
+      fs.writeFileSync(
+        path.join(configDir, 'default.json'),
+        JSON.stringify({ feature: { enabled: 'true' } }),
+      );
+
+      const result = createTestProject(
+        {
+          '/src/FeatureService.ts': `
+            import { Singleton, ConditionalOnProperty } from './decorators.js'
+
+            @Singleton()
+            @ConditionalOnProperty('feature.enabled', 'true')
+            export class FeatureService {}
+          `,
+        },
+        '/out/AppContext.generated.ts',
+        { configDir },
+      );
+
+      const bean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'FeatureService',
+      );
+      expect(bean).toBeDefined();
+    });
+
+    it('should exclude bean when property does not match expected value', () => {
+      fs.writeFileSync(
+        path.join(configDir, 'default.json'),
+        JSON.stringify({ feature: { enabled: 'false' } }),
+      );
+
+      const result = createTestProject(
+        {
+          '/src/FeatureService.ts': `
+            import { Singleton, ConditionalOnProperty } from './decorators.js'
+
+            @Singleton()
+            @ConditionalOnProperty('feature.enabled', 'true')
+            export class FeatureService {}
+          `,
+        },
+        '/out/AppContext.generated.ts',
+        { configDir },
+      );
+
+      const bean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'FeatureService',
+      );
+      expect(bean).toBeUndefined();
+    });
+
+    it('should include bean when property exists (no value check)', () => {
+      fs.writeFileSync(
+        path.join(configDir, 'default.json'),
+        JSON.stringify({ datasource: { url: 'postgres://localhost' } }),
+      );
+
+      const result = createTestProject(
+        {
+          '/src/DbService.ts': `
+            import { Singleton, ConditionalOnProperty } from './decorators.js'
+
+            @Singleton()
+            @ConditionalOnProperty('datasource.url')
+            export class DbService {}
+          `,
+        },
+        '/out/AppContext.generated.ts',
+        { configDir },
+      );
+
+      const bean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'DbService',
+      );
+      expect(bean).toBeDefined();
+    });
+
+    it('should exclude bean when property is absent', () => {
+      fs.writeFileSync(
+        path.join(configDir, 'default.json'),
+        JSON.stringify({}),
+      );
+
+      const result = createTestProject(
+        {
+          '/src/DbService.ts': `
+            import { Singleton, ConditionalOnProperty } from './decorators.js'
+
+            @Singleton()
+            @ConditionalOnProperty('datasource.url')
+            export class DbService {}
+          `,
+        },
+        '/out/AppContext.generated.ts',
+        { configDir },
+      );
+
+      const bean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'DbService',
+      );
+      expect(bean).toBeUndefined();
+    });
+
+    it('should coerce non-string property values with String() for comparison', () => {
+      fs.writeFileSync(
+        path.join(configDir, 'default.json'),
+        JSON.stringify({ feature: { retries: 3 } }),
+      );
+
+      const result = createTestProject(
+        {
+          '/src/RetryService.ts': `
+            import { Singleton, ConditionalOnProperty } from './decorators.js'
+
+            @Singleton()
+            @ConditionalOnProperty('feature.retries', '3')
+            export class RetryService {}
+          `,
+        },
+        '/out/AppContext.generated.ts',
+        { configDir },
+      );
+
+      const bean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' &&
+          b.tokenRef.className === 'RetryService',
+      );
       expect(bean).toBeDefined();
     });
   });
