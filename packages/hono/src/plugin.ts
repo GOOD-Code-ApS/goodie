@@ -35,6 +35,10 @@ interface RouteOpenApiOptions {
   tags?: string[];
   /** Raw source text of the responses object literal. */
   responsesRaw?: string;
+  /** Whether responsesRaw contains resolver() calls. */
+  usesResolver?: boolean;
+  /** Schema references found inside responses (need importing). */
+  schemaRefs?: RouteValidation[];
 }
 
 /** A route method on a controller. */
@@ -160,6 +164,7 @@ export default function createHonoPlugin(): TransformerPlugin {
           if (openapiArg.getKind() === SyntaxKind.ObjectLiteralExpression) {
             openapi = parseOpenApiOptions(
               openapiArg.asKindOrThrow(SyntaxKind.ObjectLiteralExpression),
+              methodDeclaration,
             );
           }
         }
@@ -228,6 +233,7 @@ export default function createHonoPlugin(): TransformerPlugin {
 /** Parse the second argument of a route decorator into structured OpenAPI options. */
 function parseOpenApiOptions(
   objLiteral: import('ts-morph').ObjectLiteralExpression,
+  method: import('ts-morph').MethodDeclaration,
 ): RouteOpenApiOptions {
   const result: RouteOpenApiOptions = {};
 
@@ -254,10 +260,57 @@ function parseOpenApiOptions(
     } else if (name === 'responses') {
       // Store the raw source text — it may contain resolver() calls
       result.responsesRaw = initializer.getText();
+
+      // Scan for resolver() calls and extract schema identifiers
+      const schemaRefs = scanResponseSchemaRefs(initializer, method);
+      if (schemaRefs.length > 0) {
+        result.schemaRefs = schemaRefs;
+      }
+      if (initializer.getText().includes('resolver(')) {
+        result.usesResolver = true;
+      }
     }
   }
 
   return result;
+}
+
+/** Scan a responses object literal for schema references inside resolver() calls. */
+function scanResponseSchemaRefs(
+  node: import('ts-morph').Node,
+  method: import('ts-morph').MethodDeclaration,
+): RouteValidation[] {
+  const refs: RouteValidation[] = [];
+  const seen = new Set<string>();
+
+  // Find all CallExpression nodes named "resolver"
+  node.forEachDescendant((descendant) => {
+    if (descendant.getKind() !== SyntaxKind.CallExpression) return;
+    const call = descendant.asKindOrThrow(SyntaxKind.CallExpression);
+    const expr = call.getExpression();
+    if (expr.getText() !== 'resolver') return;
+
+    const args = call.getArguments();
+    if (args.length === 0) return;
+
+    const schemaArg = args[0];
+    const kind = schemaArg.getKind();
+    if (
+      kind !== SyntaxKind.Identifier &&
+      kind !== SyntaxKind.PropertyAccessExpression
+    ) {
+      return;
+    }
+
+    const schemaRef = schemaArg.getText();
+    if (seen.has(schemaRef)) return;
+    seen.add(schemaRef);
+
+    const importPath = resolveSchemaImportPath(schemaArg, method);
+    refs.push({ target: 'json', schemaRef, importPath });
+  });
+
+  return refs;
 }
 
 function extractStringLiteral(text: string): string {
@@ -411,12 +464,13 @@ function buildImports(
     imports.push("import { cors } from 'hono/cors'");
   }
 
+  const schemaImports = collectSchemaImports(controllers);
+
   const hasValidation = allRoutes.some(
     (r) => r.validation && r.validation.length > 0,
   );
   if (hasValidation) {
     imports.push("import { validator } from 'hono-openapi'");
-    const schemaImports = collectSchemaImports(controllers);
     for (const [schemaRef, importPath] of schemaImports) {
       imports.push(`import { ${schemaRef} } from '${importPath}'`);
     }
@@ -426,6 +480,20 @@ function buildImports(
     imports.push("import { describeRoute } from 'hono-openapi'");
     imports.push("import { openAPIRouteHandler } from 'hono-openapi'");
     imports.push("import { OpenApiConfig } from '@goodie-ts/hono'");
+
+    // Import resolver if any route uses it in responses
+    const usesResolver = allRoutes.some((r) => r.openapi?.usesResolver);
+    if (usesResolver) {
+      imports.push("import { resolver } from 'hono-openapi'");
+    }
+
+    // Import schema refs used inside resolver() calls in responses
+    const responseSchemaImports = collectResponseSchemaImports(controllers);
+    for (const [schemaRef, importPath] of responseSchemaImports) {
+      if (!schemaImports.has(schemaRef)) {
+        imports.push(`import { ${schemaRef} } from '${importPath}'`);
+      }
+    }
   }
 
   return imports;
@@ -630,6 +698,23 @@ function collectSchemaImports(
     for (const route of ctrl.routes) {
       if (!route.validation) continue;
       for (const v of route.validation) {
+        if (!imports.has(v.schemaRef)) {
+          imports.set(v.schemaRef, v.importPath);
+        }
+      }
+    }
+  }
+  return imports;
+}
+
+function collectResponseSchemaImports(
+  controllers: ControllerBean[],
+): Map<string, string> {
+  const imports = new Map<string, string>();
+  for (const ctrl of controllers) {
+    for (const route of ctrl.routes) {
+      if (!route.openapi?.schemaRefs) continue;
+      for (const v of route.openapi.schemaRefs) {
         if (!imports.has(v.schemaRef)) {
           imports.set(v.schemaRef, v.importPath);
         }

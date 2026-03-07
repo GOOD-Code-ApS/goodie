@@ -846,10 +846,14 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
     expect(result.code).toContain('deprecated: true');
   });
 
-  it('passes responses raw to describeRoute', () => {
+  it('passes responses raw to describeRoute and imports resolver + schemas', () => {
     const result = createProject({
+      '/src/schema.ts': `
+        export const itemSchema = {}
+      `,
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
+        import { itemSchema } from './schema.js'
         @Controller('/api')
         class Ctrl {
           @Get('/', {
@@ -866,6 +870,10 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
     expect(result.code).toContain('responses: {');
     expect(result.code).toContain("200: { description: 'Success'");
     expect(result.code).toContain('resolver(itemSchema)');
+    // Should import resolver from hono-openapi
+    expect(result.code).toContain("import { resolver } from 'hono-openapi'");
+    // Should import the schema used inside resolver()
+    expect(result.code).toContain('import { itemSchema }');
   });
 
   it('does not generate describeRoute when no route has OpenAPI options', () => {
