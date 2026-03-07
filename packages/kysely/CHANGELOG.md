@@ -1,5 +1,23 @@
 # @goodie-ts/kysely
 
+## 0.7.0
+
+### Minor Changes
+
+- 5694dd0: Remove all runtime `Symbol.metadata` usage from decorators. All core decorators (`@Singleton`, `@Injectable`, `@Named`, `@Eager`, `@Module`, `@Provides`, `@Inject`, `@Optional`, `@PostConstruct`, `@PreDestroy`, `@PostProcessor`, `@Value`) are now compile-time no-ops. The `Symbol.metadata` polyfill is removed.
+
+  **Breaking:** `META`, `setMeta`, `pushMeta`, `getClassMetadata` exports removed from `@goodie-ts/core`.
+
+  `@Migration` now stores the migration name as a static property (`__migrationName`) instead of `Symbol.metadata`. `getMigrationName()` reads from the static property.
+
+  `@MockDefinition` now stores its target as a static property (`__mockTarget`) instead of `Symbol.metadata`.
+
+### Patch Changes
+
+- Updated dependencies [5190bce]
+- Updated dependencies [5694dd0]
+  - @goodie-ts/core@0.10.0
+
 ## 0.6.1
 
 ### Patch Changes
