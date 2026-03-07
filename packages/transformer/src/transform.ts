@@ -223,12 +223,23 @@ export async function transform(
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(options.outputPath, code, 'utf-8');
 
+  // 13. Write additional files from plugin contributions
+  const additionalFiles = collectAdditionalFiles(contributions, outputDir);
+  for (const [absPath, content] of Object.entries(additionalFiles)) {
+    const dir = path.dirname(absPath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(absPath, content, 'utf-8');
+  }
+
   return {
     code,
     outputPath: options.outputPath,
     beans: finalBeans,
     warnings: graphResult.warnings,
     discoveryCache: discovery,
+    ...(Object.keys(additionalFiles).length > 0
+      ? { files: additionalFiles }
+      : {}),
   };
 }
 
@@ -320,11 +331,18 @@ export function transformInMemory(
     contributions,
   );
 
+  // 10. Collect additional files from plugin contributions
+  const outputDir = path.dirname(outputPath);
+  const additionalFiles = collectAdditionalFiles(contributions, outputDir);
+
   return {
     code,
     outputPath,
     beans: finalBeans,
     warnings: graphResult.warnings,
+    ...(Object.keys(additionalFiles).length > 0
+      ? { files: additionalFiles }
+      : {}),
   };
 }
 
@@ -580,6 +598,25 @@ function mergePluginMetadata(
       }
     }
   }
+}
+
+/**
+ * Collect additional files from plugin codegen contributions.
+ * Resolves relative filenames against the output directory.
+ */
+function collectAdditionalFiles(
+  contributions: CodegenContribution[],
+  outputDir: string,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const contribution of contributions) {
+    if (!contribution.files) continue;
+    for (const [filename, content] of Object.entries(contribution.files)) {
+      const absPath = path.resolve(outputDir, filename);
+      result[absPath] = content;
+    }
+  }
+  return result;
 }
 
 /**

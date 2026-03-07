@@ -93,6 +93,8 @@ export interface TransformResult {
   skipped?: boolean;
   /** Discovery result that can be passed as `discoveryCache` on subsequent runs. */
   discoveryCache?: import('./discover-plugins.js').DiscoverAllResult;
+  /** Additional files written by plugins, keyed by absolute path. */
+  files?: Record<string, string>;
 }
 
 /** Context passed to visitClass hook. */
@@ -143,6 +145,8 @@ export interface CodegenContribution {
   imports?: string[];
   /** Code lines to add after the bean definitions. */
   code?: string[];
+  /** Additional files to write, keyed by filename (relative to output dir). */
+  files?: Record<string, string>;
 }
 
 /** Plugin interface for extending the transformer pipeline. */
