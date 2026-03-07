@@ -1,5 +1,9 @@
 import type { ApplicationContext, BeanDefinition } from '@goodie-ts/core';
-import type { SecurityProvider, SecurityRequest } from '@goodie-ts/hono';
+import {
+  SECURITY_PROVIDER,
+  type SecurityProvider,
+  type SecurityRequest,
+} from '@goodie-ts/hono';
 import { TransactionManager } from '@goodie-ts/kysely';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
@@ -8,11 +12,7 @@ import {
 } from '@testcontainers/postgresql';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
-import {
-  buildDefinitions,
-  createRouter,
-  SECURITY_PROVIDER_Token,
-} from '../src/AppContext.generated.js';
+import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
 
 /**
  * A test SecurityProvider that authenticates requests with a Bearer token.
@@ -29,7 +29,7 @@ const testSecurityProvider: SecurityProvider = {
 
 /** Bean definition that registers the test SecurityProvider. */
 const securityProviderBean: BeanDefinition<SecurityProvider> = {
-  token: SECURITY_PROVIDER_Token,
+  token: SECURITY_PROVIDER,
   scope: 'singleton',
   dependencies: [],
   factory: () => testSecurityProvider,
