@@ -23,6 +23,7 @@ export function Migration(name: string): ClassDecorator_Stage3 {
     Object.defineProperty(target, '__migrationName', {
       value: name,
       enumerable: false,
+      configurable: true,
     });
   };
 }

@@ -42,6 +42,7 @@ export function MockDefinition(target: MockTarget) {
     Object.defineProperty(value, '__mockTarget', {
       value: target,
       enumerable: false,
+      configurable: true,
     });
   };
 }
