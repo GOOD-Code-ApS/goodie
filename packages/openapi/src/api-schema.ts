@@ -46,6 +46,8 @@ export interface OpenApiPropertySpec {
   type: string;
   format?: string;
   description?: string;
+  properties?: Record<string, OpenApiPropertySpec>;
+  required?: string[];
   items?: OpenApiPropertySpec;
   enum?: (string | number)[];
 }
