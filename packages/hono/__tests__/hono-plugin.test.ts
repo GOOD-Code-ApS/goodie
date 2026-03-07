@@ -65,6 +65,9 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain(
       "import { EmbeddedServer } from '@goodie-ts/hono'",
     );
+    expect(result.code).toContain(
+      "import { HttpFilter } from '@goodie-ts/http'",
+    );
   });
 
   it('wires routes in createRouter', () => {
