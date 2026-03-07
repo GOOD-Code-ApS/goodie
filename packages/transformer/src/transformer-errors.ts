@@ -26,11 +26,13 @@ export class MissingProviderError extends TransformerError {
     readonly tokenDescription: string,
     readonly requiredBy: string,
     sourceLocation: SourceLocation,
+    customHint?: string,
   ) {
     super(
       `No provider found for "${tokenDescription}" (required by ${requiredBy})`,
       sourceLocation,
-      'Ensure the dependency is decorated with @Injectable(), @Singleton(), or provided by a @Module.',
+      customHint ??
+        'Ensure the dependency is decorated with @Injectable(), @Singleton(), or provided by a @Module.',
     );
     this.name = 'MissingProviderError';
   }

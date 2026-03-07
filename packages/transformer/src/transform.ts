@@ -9,6 +9,7 @@ import type {
 import { createDeclarativeAopPlugin } from './aop-plugin.js';
 import { scanAopDecoratorDefinitions } from './aop-scanner.js';
 import { createAopPlugin } from './builtin-aop-plugin.js';
+import { createConditionalPlugin } from './builtin-conditional-plugin.js';
 import { createConfigPlugin } from './builtin-config-plugin.js';
 import { computeIRHash, extractIRHash, generateCode } from './codegen.js';
 import {
@@ -100,7 +101,11 @@ export async function transform(
     aopMappings.length > 0 ? [createDeclarativeAopPlugin(aopMappings)] : [];
 
   // Built-in plugins always active; declarative AOP comes next; then discovered + user plugins
-  const builtinPlugins = [createAopPlugin(), createConfigPlugin()];
+  const builtinPlugins = [
+    createAopPlugin(),
+    createConfigPlugin(),
+    createConditionalPlugin(),
+  ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discoveredPlugins],
     options.plugins ?? [],
@@ -157,7 +162,16 @@ export async function transform(
   }
 
   // 7. Build graph (validate + topo sort)
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  // Resolve configDir early so conditional plugin can use it
+  const resolvedConfigDir = options.configDir
+    ? path.isAbsolute(options.configDir)
+      ? options.configDir
+      : path.resolve(baseDir, options.configDir)
+    : undefined;
+  const graphResult = buildGraph(
+    { ...resolveResult, beans },
+    { configDir: resolvedConfigDir },
+  );
 
   // 8. beforeCodegen hook
   let finalBeans = graphResult.beans;
@@ -176,13 +190,6 @@ export async function transform(
   }
 
   // 10. Check IR hash — skip codegen + write if DI graph unchanged
-  // Resolve configDir relative to tsconfig directory (not CWD) so the baked-in
-  // absolute path is correct regardless of where the build command runs from.
-  const resolvedConfigDir = options.configDir
-    ? path.isAbsolute(options.configDir)
-      ? options.configDir
-      : path.resolve(baseDir, options.configDir)
-    : undefined;
   const codegenOptions = {
     outputPath: options.outputPath,
     version: PKG_VERSION,
@@ -242,12 +249,17 @@ export function transformInMemory(
   plugins?: TransformerPlugin[],
   libraryBeans?: IRBeanDefinition[],
   aopMappings?: ResolvedAopMapping[],
+  options?: { configDir?: string },
 ): TransformResult {
   const aopPlugins =
     aopMappings && aopMappings.length > 0
       ? [createDeclarativeAopPlugin(aopMappings)]
       : [];
-  const builtinPlugins = [createAopPlugin(), createConfigPlugin()];
+  const builtinPlugins = [
+    createAopPlugin(),
+    createConfigPlugin(),
+    createConditionalPlugin(),
+  ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins],
     plugins ?? [],
@@ -295,7 +307,10 @@ export function transformInMemory(
   }
 
   // 6. Build graph (validate + topo sort)
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph(
+    { ...resolveResult, beans },
+    options?.configDir ? { configDir: options.configDir } : undefined,
+  );
 
   // 7. beforeCodegen hook
   let finalBeans = graphResult.beans;
@@ -365,7 +380,11 @@ export async function transformLibrary(
   const aopPlugins =
     aopMappings.length > 0 ? [createDeclarativeAopPlugin(aopMappings)] : [];
 
-  const builtinPlugins = [createAopPlugin(), createConfigPlugin()];
+  const builtinPlugins = [
+    createAopPlugin(),
+    createConfigPlugin(),
+    createConditionalPlugin(),
+  ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discovered],
     options.plugins ?? [],
