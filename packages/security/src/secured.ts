@@ -1,15 +1,5 @@
 import { SECURITY_META } from './metadata.js';
 
-type Decorator_Stage3 =
-  | ((
-      target: new (...args: any[]) => any,
-      context: ClassDecoratorContext,
-    ) => void)
-  | ((
-      target: (...args: never) => unknown,
-      context: ClassMethodDecoratorContext,
-    ) => void);
-
 /**
  * Mark a controller or method as requiring authentication.
  *
@@ -19,8 +9,10 @@ type Decorator_Stage3 =
  * For controllers, the `SecurityHttpFilter` reads this metadata from
  * `Symbol.metadata` at runtime to enforce authentication.
  *
- * For service-layer beans, the `SecurityInterceptor` (AOP) reads
- * the security context set by the filter.
+ * For service-layer beans, the `SecurityInterceptor` (AOP) checks
+ * the `SecurityContext` (AsyncLocalStorage) for an authenticated principal.
+ * AOP wiring is automatic — the transformer discovers the `Secured →
+ * SecurityInterceptor` mapping from `beans.json` at build time.
  *
  * @example
  * ```typescript
@@ -34,9 +26,15 @@ type Decorator_Stage3 =
  *   @Anonymous()
  *   health(c: Context) { ... }     // public
  * }
+ *
+ * @Singleton()
+ * class OrderService {
+ *   @Secured()
+ *   async placeOrder() { ... }     // requires auth (AOP)
+ * }
  * ```
  */
-export function Secured(): Decorator_Stage3 {
+export function Secured(): (target: any, context: any) => void {
   return (
     _target: any,
     context: ClassDecoratorContext | ClassMethodDecoratorContext,

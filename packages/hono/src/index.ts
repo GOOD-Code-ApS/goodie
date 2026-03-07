@@ -1,5 +1,5 @@
-export type { HttpFilter, HttpFilterContext } from '@goodie-ts/http';
-export { HTTP_FILTER } from '@goodie-ts/http';
+export type { HttpFilterContext } from '@goodie-ts/http';
+export { HttpFilter } from '@goodie-ts/http';
 export { Controller } from './controller.js';
 export type { CorsOptions } from './cors.js';
 export { Cors } from './cors.js';

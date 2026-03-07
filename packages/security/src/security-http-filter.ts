@@ -1,5 +1,6 @@
 import { Inject, Optional, Singleton } from '@goodie-ts/core';
-import type { HttpFilter, HttpFilterContext } from '@goodie-ts/http';
+import type { HttpFilterContext } from '@goodie-ts/http';
+import { HttpFilter } from '@goodie-ts/http';
 import { SECURITY_META } from './metadata.js';
 import type { SecurityContext } from './security-context.js';
 import type { SecurityProvider, SecurityRequest } from './security-provider.js';
@@ -18,14 +19,16 @@ import { SECURITY_PROVIDER } from './security-provider.js';
  * the principal from `SecurityContext`.
  */
 @Singleton()
-export class SecurityHttpFilter implements HttpFilter {
+export class SecurityHttpFilter extends HttpFilter {
   order = -1000;
 
   @Inject(SECURITY_PROVIDER)
   @Optional()
   accessor securityProvider: SecurityProvider | undefined;
 
-  constructor(private readonly securityContext: SecurityContext) {}
+  constructor(private readonly securityContext: SecurityContext) {
+    super();
+  }
 
   middleware() {
     const provider = this.securityProvider;

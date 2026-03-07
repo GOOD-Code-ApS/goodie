@@ -6,15 +6,18 @@ import {
   Post,
   Validate,
 } from '@goodie-ts/hono';
+import { Anonymous, Secured } from '@goodie-ts/security';
 import type { Context } from 'hono';
 import { createTodoSchema, updateTodoSchema } from './schemas.js';
 import type { TodoService } from './TodoService.js';
 
 @Controller('/api/todos')
+@Secured()
 export class TodoController {
   constructor(private todoService: TodoService) {}
 
   @Get('/')
+  @Anonymous()
   async getAll(c: Context) {
     const todos = await this.todoService.findAll();
     return c.json(todos);

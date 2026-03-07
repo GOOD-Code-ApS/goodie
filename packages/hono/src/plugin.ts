@@ -293,7 +293,8 @@ function buildImports(controllers: ControllerBean[]): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
-  imports.push("import { EmbeddedServer, HTTP_FILTER } from '@goodie-ts/hono'");
+  imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  imports.push("import { HttpFilter } from '@goodie-ts/http'"); // also imported by baseTokenRefs — deduped by codegen
 
   const allRoutes = controllers.flatMap((c) => c.routes);
 
@@ -334,26 +335,20 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     lines.push(
       `  const __meta = (${ctrl.className} as any)[Symbol.metadata] || {}`,
     );
-    lines.push('  const __app = new Hono()');
-
-    // Register per-route filter middleware via .use() with path matching
+    lines.push('  return new Hono()');
     for (const route of ctrl.routes) {
       const relativePath = escapeStringLiteral(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
-      lines.push(
-        `  for (const __f of __filters) { const __mw = __f.middleware(); __app.use('${relativePath}', async (c, next) => { const __res = await __mw({ request: c, routeMetadata: __meta, methodName: '${escapeStringLiteral(route.methodName)}' }, next); if (__res) return __res }) }`,
-      );
-    }
+      const methodNameEscaped = escapeStringLiteral(route.methodName);
 
-    lines.push('  return __app');
-    for (const route of ctrl.routes) {
-      const relativePath = escapeStringLiteral(
-        route.path.startsWith('/') ? route.path : `/${route.path}`,
-      );
-
-      // Collect middleware: CORS, then validation
+      // Collect middleware: filter wrapper, CORS, then validation
       const middleware: string[] = [];
+
+      // HttpFilter middleware — chains filters; each filter's next advances the chain
+      middleware.push(
+        `async (c: any, next: any) => { let __res: Response | undefined; let __i = 0; const __next = async (): Promise<void> => { if (__i < __filters.length) { const __mw = __filters[__i++].middleware(); const __r = await __mw({ request: c, routeMetadata: __meta, methodName: '${methodNameEscaped}' }, __next); if (__r) __res = __r } else { await next() } }; await __next(); if (__res) return __res }`,
+      );
 
       // Method-level @Cors overrides class-level
       const corsConfig = route.cors ?? ctrl.cors;
@@ -363,17 +358,11 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
 
       middleware.push(...generateValidationMiddleware(route.validation));
 
-      if (middleware.length > 0) {
-        lines.push(`    .${route.httpMethod}('${relativePath}',`);
-        for (const mw of middleware) {
-          lines.push(`      ${mw},`);
-        }
-        lines.push('      async (c) => {');
-      } else {
-        lines.push(
-          `    .${route.httpMethod}('${relativePath}', async (c) => {`,
-        );
+      lines.push(`    .${route.httpMethod}('${relativePath}',`);
+      for (const mw of middleware) {
+        lines.push(`      ${mw},`);
       }
+      lines.push('      async (c) => {');
       lines.push(
         `      const result = await ${varName}.${route.methodName}(c)`,
       );
@@ -401,7 +390,7 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   // createRouter composes all sub-apps with per-route HttpFilter middleware
   lines.push('export function createRouter(ctx: ApplicationContext) {');
   lines.push(
-    '  const __filters = ctx.getAll(HTTP_FILTER).sort((a, b) => a.order - b.order)',
+    '  const __filters = ctx.getAll(HttpFilter).sort((a, b) => a.order - b.order)',
   );
   lines.push('  return new Hono()');
   for (const ctrl of controllers) {

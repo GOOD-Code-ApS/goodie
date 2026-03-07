@@ -1,5 +1,3 @@
-import { InjectionToken } from '@goodie-ts/core';
-
 /**
  * Context passed to HTTP filter middleware.
  *
@@ -25,16 +23,16 @@ export interface HttpFilterContext {
 /**
  * An HTTP filter that contributes middleware to the generated router.
  *
- * Library packages (security, logging, etc.) can register `HttpFilter` beans
- * with `baseTokens: [HTTP_FILTER]`. The HTTP runtime plugin (e.g. Hono) discovers
- * all `HttpFilter` beans and applies them as middleware, sorted by `order`.
+ * Library packages (security, logging, etc.) extend this abstract class.
+ * The scanner automatically tracks the class hierarchy via `baseTokenRefs`,
+ * enabling `ctx.getAll(HttpFilter)` to discover all filter beans.
  *
  * Lower `order` values run first.
  *
  * @example
  * ```typescript
  * @Singleton()
- * class SecurityHttpFilter implements HttpFilter {
+ * class SecurityHttpFilter extends HttpFilter {
  *   order = -1000;
  *
  *   middleware() {
@@ -48,16 +46,13 @@ export interface HttpFilterContext {
  * }
  * ```
  */
-export interface HttpFilter {
+export abstract class HttpFilter {
   /** Ordering priority. Lower values run first. */
-  order: number;
+  abstract order: number;
 
   /** Returns a middleware handler function. */
-  middleware(): (
+  abstract middleware(): (
     ctx: HttpFilterContext,
     next: () => Promise<void>,
   ) => Promise<Response | undefined>;
 }
-
-/** Injection token for discovering all registered HttpFilter beans. */
-export const HTTP_FILTER = new InjectionToken<HttpFilter>('HttpFilter');

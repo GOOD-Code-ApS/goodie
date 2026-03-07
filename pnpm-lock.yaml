@@ -81,6 +81,9 @@ importers:
       '@goodie-ts/resilience':
         specifier: workspace:*
         version: link:../../packages/resilience
+      '@goodie-ts/security':
+        specifier: workspace:*
+        version: link:../../packages/security
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.9(hono@4.12.2)
