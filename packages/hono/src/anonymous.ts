@@ -9,9 +9,8 @@ type MethodDecorator_Stage3 = (
  * Only meaningful on methods inside a `@Secured()` controller.
  * When used without class-level `@Secured`, this decorator has no effect.
  *
- * This decorator is a compile-time marker (no-op at runtime). The transformer
- * records it in `IRBeanDefinition.methodDecorators` and the hono plugin passes
- * it to `HttpFilterContext` for the security filter.
+ * This decorator is a compile-time marker (no-op at runtime). The hono plugin
+ * uses it to skip auth enforcement on specific routes.
  *
  * @example
  * ```typescript

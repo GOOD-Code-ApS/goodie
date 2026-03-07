@@ -1,81 +1,77 @@
 # @goodie-ts/hono
 
-Hono-specific runtime integration for goodie-ts. Provides the transformer plugin for compile-time route wiring, `@Validate` (Hono-specific), `EmbeddedServer`, and `ServerConfig`. Generic HTTP decorators live in `@goodie-ts/http`.
+Hono HTTP integration for goodie-ts. Provides route decorators, security, the transformer plugin for compile-time route wiring, `@Validate`, `@Cors`, `EmbeddedServer`, and `ServerConfig`.
 
 ## Key Files
 
 | File | Role |
 |------|------|
-| `src/plugin.ts` | Transformer plugin — generates `createRouter()`, `startServer()`, RPC clients from controller metadata |
-| `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` that wraps `@hono/node-server`, uses `ServerConfig` for defaults |
-| `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host` and `port` defaults |
-| `src/index.ts` | Public exports — Hono-specific only (`EmbeddedServer`, `ServerConfig`, `Validate`, `ValidateMetadata`, `ValidationTarget`) |
-| `src/cors.ts` | `@Cors(options?)` — Hono-specific CORS marker decorator (generates `hono/cors` middleware) |
-| `src/validate.ts` | `@Validate` — Hono-specific decorator (tied to `@hono/zod-validator`) |
+| `src/plugin.ts` | Transformer plugin — generates `createRouter()`, `startServer()`, security middleware, RPC clients from controller metadata |
+| `src/controller.ts` | `@Controller(basePath?)` — marks class as HTTP controller (compile-time no-op) |
+| `src/route.ts` | `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` — method decorators (compile-time no-ops) |
+| `src/secured.ts` | `@Secured()` — marks controller/method as requiring authentication (compile-time no-op) |
+| `src/anonymous.ts` | `@Anonymous()` — exempts method from class-level `@Secured` (compile-time no-op) |
+| `src/security-provider.ts` | `SecurityProvider` interface + `SECURITY_PROVIDER` injection token |
+| `src/goodie-env.ts` | `GoodieEnv` — Hono env type for typed `c.get('principal')` access |
+| `src/principal.ts` | `Principal` type — `{ name, attributes }` |
+| `src/errors.ts` | `UnauthorizedError` |
+| `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` wrapping `@hono/node-server` |
+| `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean |
+| `src/cors.ts` | `@Cors(options?)` — Hono-specific CORS marker (generates `hono/cors` middleware) |
+| `src/validate.ts` | `@Validate` — Hono-specific validation decorator (tied to `@hono/zod-validator`) |
 | `src/metadata.ts` | `ValidateMetadata`, `ValidationTarget` types |
-
-## Package Relationship
-
-```
-@goodie-ts/http    (abstractions: decorators, HttpFilter)
-      ↑
-@goodie-ts/hono    (runtime: EmbeddedServer, Validate, Cors, Hono codegen plugin)
-```
-
-Users depend on both `@goodie-ts/http` (for generic HTTP decorators) and `@goodie-ts/hono` (for Hono-specific runtime). Other library packages (security, logging) depend on `@goodie-ts/http` alone for the abstractions without pulling in Hono.
+| `src/index.ts` | Public exports |
 
 ## Transformer Plugin (`src/plugin.ts`)
 
-The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. It handles all controller-related scanning and code generation:
+The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
 
-- **`visitClass`** — detects `@Controller(basePath)`, calls `ctx.registerBean({ scope: 'singleton' })` to register the class as a bean, and initializes controller metadata
-- **`visitMethod`** — detects `@Get`/`@Post`/`@Put`/`@Delete`/`@Patch` route decorators, `@Validate`, and `@Cors` on methods, accumulates route definitions
-- **`codegen`** — reads `bean.metadata.controller` and generates per-controller route factories, `createRouter(ctx)`, `startServer(options?)`, per-controller `XxxRoutes` types + `createXxxClient()` factories, and the full `AppType` + `createClient()`. Route factories include static `classDecorators` and per-route `methodDecorators` arrays (from `IRBeanDefinition`) passed to `HttpFilterContext` — no runtime `Symbol.metadata`.
+- **`visitClass`** — detects `@Controller(basePath)`, `@Secured`, `@Cors`, registers bean as singleton
+- **`visitMethod`** — detects `@Get`/`@Post`/etc, `@Validate`, `@Cors`, `@Secured`, `@Anonymous`
+- **`codegen`** — generates per-controller route factories, `createRouter(ctx)`, `startServer()`, RPC types/clients
 
-### HttpFilter Discovery
+### Security Middleware Generation
 
-When beans with `baseTokenRefs` containing `HttpFilter` exist, the plugin generates middleware wiring in `createRouter`:
+When `@Secured` is used on any controller, the plugin generates Hono-native security middleware directly in the route factory — no `HttpFilter` abstraction. The generated middleware:
+
+1. Resolves `SecurityProvider` from the DI context
+2. For secured routes: authenticates via `SecurityProvider`, returns 401 if no principal, sets principal on Hono context via `c.set('principal', ...)`
+3. For `@Anonymous` routes in a `@Secured` controller: authenticates if possible, sets principal on context, but never rejects
+
+`SecurityProvider` is optional — if not registered, secured routes return 401.
+
+### Route Factory Pattern
 
 ```typescript
-const __filters = ctx.getAll(HTTP_FILTER).sort((a, b) => a.order - b.order)
-const __app = new Hono()
-for (const f of __filters) __app.use(f.middleware())
-return __app.route(...)
+function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | undefined) {
+  return new Hono()
+    .get('/secured',
+      async (c, next) => { /* security middleware */ },
+      async (c) => { return ctrl.method(c) }
+    )
+    .get('/public',
+      async (c) => { return ctrl.publicMethod(c) }
+    )
+}
 ```
 
-This enables security, logging, and other packages to contribute middleware without the Hono plugin knowing about them.
+## Library Beans (beans.json)
 
-## ServerConfig + EmbeddedServer
-
-`ServerConfig` is a library bean shipped via `beans.json`. It uses `@ConfigurationProperties('server')` to bind from JSON config files or env vars:
-
-```json
-{ "server": { "host": "localhost", "port": 3000 } }
-```
-
-`EmbeddedServer` is a `@Singleton` that takes `ServerConfig` as a constructor dependency. The generated `startServer()` calls `EmbeddedServer.listen(router, options)` — options override config defaults.
+2 singleton beans:
+- **ServerConfig** — `@ConfigurationProperties('server')` with host/port
+- **EmbeddedServer** — wraps `@hono/node-server`, depends on `ServerConfig`
 
 ## Design Decisions
 
-- **Decorators live in `@goodie-ts/http`** — framework-agnostic abstractions. Users import them from `@goodie-ts/http` directly. Only Hono-specific decorators (`@Validate`) live in this package.
-- **`@Controller` registers as singleton via plugin** — the hono plugin calls `ctx.registerBean({ scope: 'singleton' })`, so `@Controller` alone is sufficient for bean registration
-- **RPC support** — each controller gets its own route factory function, exported `XxxRoutes` type, and `createXxxClient(baseUrl)` factory. `createRouter` composes them via `.route()`. Full `AppType` and `createClient(baseUrl)` are also exported.
-- **Methods receive Hono `Context` directly** — no parameter decorator magic (Stage 3 has no param decorators)
-- **Return value conventions**: `Response` passthrough, `undefined`/`null` returns 204, everything else is `c.json(result)`
-- **Plugin-based codegen** — route wiring is generated by this package's plugin, not by the transformer core
-- **Controller metadata on beans** — the hono plugin stores controller route data on `bean.metadata.controller` via `visitClass`/`visitMethod` hooks. The transformer core has zero knowledge of routes or HTTP methods.
-
-## Testing
-
-- **Transformer tests** (`packages/transformer/__tests__/controller-pipeline.test.ts`) — verify `@Controller` registers as a singleton bean (the only thing the transformer core does)
-- **Hono tests** (`packages/hono/__tests__/hono-plugin.test.ts`) — verify the full plugin pipeline: scanning `@Controller`/`@Get`/`@Post` via `visitClass`/`visitMethod`, metadata population, and `createRouter`/`startServer` codegen
-- No cross-package test dependencies
+- **All decorators are compile-time no-ops** — everything is AST-scanned by the plugin
+- **No `HttpFilter` abstraction** — security middleware is generated natively using Hono's API (`c.json()`, `c.req`)
+- **`@Secured` is HTTP-only** — no service-layer AOP interceptor. The framework is Hono-first.
+- **`SecurityProvider` is user-provided** — registered with `SECURITY_PROVIDER` injection token. Optional — if missing, secured routes return 401.
+- **Principal via Hono context** — `c.set('principal', ...)` / `c.get('principal')` using `GoodieEnv` type for type safety. No `AsyncLocalStorage` — works on edge runtimes.
 
 ## Gotchas
 
-- `@Cors()` at class level applies to all routes; method-level `@Cors` overrides class-level for that route
-- `@Cors` is compile-time-only (no-op at runtime), same pattern as `@Validate`
-- Route decorators are matched by name only (no import source verification), but only scanned on `@Controller` classes
-- Controller variable names in generated code use collision-safe naming (`className:importPath` keying)
+- `@Anonymous` only makes sense on methods inside a `@Secured` controller
+- Route decorators are matched by name only (no import source verification)
 - `@Validate` generates `zValidator()` middleware — requires `@hono/zod-validator` and `zod` as peer deps
-- **Variable references in `@Cors` and `@Validate` config are not auto-imported** — `scanCorsDecorator` and `scanValidateDecorator` use raw AST text (`getText()`). Only literal values and inline expressions work reliably.
+- `SecurityProvider` must be registered by the user — it's not auto-discovered

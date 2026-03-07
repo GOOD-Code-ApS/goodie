@@ -4,17 +4,12 @@
  * On a class: all routes require authentication (use `@Anonymous()` to exempt).
  * On a method: only that route requires authentication.
  *
- * For controllers, the `SecurityHttpFilter` reads compile-time
- * `DecoratorMetadata` to enforce authentication.
- *
- * For service-layer beans, the `SecurityInterceptor` (AOP) checks
- * the `SecurityContext` (AsyncLocalStorage) for an authenticated principal.
- * AOP wiring is automatic — the transformer discovers the `Secured →
- * SecurityInterceptor` mapping from `beans.json` at build time.
+ * The hono plugin generates security middleware directly in the route factory
+ * to enforce authentication via the user-provided `SecurityProvider`.
  *
  * This decorator is a compile-time marker (no-op at runtime). The transformer
  * records it in `IRBeanDefinition.decorators` / `methodDecorators` and the
- * hono plugin passes it to `HttpFilterContext` for the security filter.
+ * hono plugin uses it to decide which routes need auth middleware.
  *
  * @example
  * ```typescript
@@ -27,12 +22,6 @@
  *   @Get('/health')
  *   @Anonymous()
  *   health(c: Context) { ... }     // public
- * }
- *
- * @Singleton()
- * class OrderService {
- *   @Secured()
- *   async placeOrder() { ... }     // requires auth (AOP)
  * }
  * ```
  */
