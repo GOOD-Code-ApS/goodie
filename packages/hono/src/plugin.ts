@@ -3,7 +3,6 @@ import {
   type CodegenContribution,
   InvalidDecoratorUsageError,
   type IRBeanDefinition,
-  type IRDecoratorEntry,
   type MethodVisitorContext,
   type TransformerPlugin,
 } from '@goodie-ts/transformer';
