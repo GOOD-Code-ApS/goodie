@@ -42,6 +42,7 @@ export function Anonymous() { return (t: any, c: any) => {} }
 export function ApiResponse(status: number, description: string, opts?: any) { return (t: any, c: any) => {} }
 export function ApiOperation(opts: any) { return (t: any, c: any) => {} }
 export function ApiTag(name: string) { return (t: any, c: any) => {} }
+export function ApiSchema<T>(schema: T, _spec: any): T { return schema; }
 `;
 
 /**

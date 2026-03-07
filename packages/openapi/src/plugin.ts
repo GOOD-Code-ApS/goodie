@@ -6,6 +6,12 @@ import type {
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
+import {
+  type Node,
+  type ObjectLiteralExpression,
+  type Project,
+  SyntaxKind,
+} from 'ts-morph';
 
 /** HTTP method for a route. */
 type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
@@ -66,7 +72,7 @@ interface OpenApiSpec {
   info: { title: string; version: string };
   paths: Record<string, Record<string, OpenApiOperation>>;
   components: {
-    schemas: Record<string, OpenApiSchemaRef>;
+    schemas: Record<string, OpenApiSchemaDefinition>;
     securitySchemes?: Record<string, OpenApiSecurityScheme>;
   };
 }
@@ -93,9 +99,7 @@ interface OpenApiParameter {
   schema: { type: string };
 }
 
-interface OpenApiSchemaRef {
-  type: string;
-}
+type OpenApiSchemaDefinition = Record<string, unknown>;
 
 interface OpenApiResponse {
   description: string;
@@ -114,10 +118,20 @@ interface OpenApiSecurityScheme {
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
 export default function createOpenApiPlugin(): TransformerPlugin {
+  // Schema definitions extracted from ApiSchema() calls, keyed by variable name.
+  // Lazily populated on first visitClass invocation.
+  let schemaDefinitions: Map<string, OpenApiSchemaDefinition> | undefined;
+
   return {
     name: 'openapi',
 
     visitClass(ctx: ClassVisitorContext): void {
+      // Lazy-init: scan all source files for ApiSchema() calls
+      if (!schemaDefinitions) {
+        const project = ctx.classDeclaration.getSourceFile().getProject();
+        schemaDefinitions = scanApiSchemas(project);
+      }
+
       const decorators = ctx.classDeclaration.getDecorators();
       const tagDec = decorators.find((d) => d.getName() === 'ApiTag');
 
@@ -183,7 +197,10 @@ export default function createOpenApiPlugin(): TransformerPlugin {
       const controllers = extractControllers(beans);
       if (controllers.length === 0) return {};
 
-      const spec = buildOpenApiSpec(controllers);
+      const spec = buildOpenApiSpec(
+        controllers,
+        schemaDefinitions ?? new Map(),
+      );
 
       return {
         files: {
@@ -221,9 +238,12 @@ function extractControllers(beans: IRBeanDefinition[]): ControllerInfo[] {
   return result;
 }
 
-function buildOpenApiSpec(controllers: ControllerInfo[]): OpenApiSpec {
+function buildOpenApiSpec(
+  controllers: ControllerInfo[],
+  schemaDefinitions: Map<string, OpenApiSchemaDefinition>,
+): OpenApiSpec {
   const paths: Record<string, Record<string, OpenApiOperation>> = {};
-  const schemas: Record<string, OpenApiSchemaRef> = {};
+  const schemas: Record<string, OpenApiSchemaDefinition> = {};
   let hasSecured = false;
 
   for (const ctrl of controllers) {
@@ -247,6 +267,7 @@ function buildOpenApiSpec(controllers: ControllerInfo[]): OpenApiSpec {
         route,
         methodOpenApi?.responses,
         schemas,
+        schemaDefinitions,
       );
 
       const operation: OpenApiOperation = {
@@ -284,7 +305,7 @@ function buildOpenApiSpec(controllers: ControllerInfo[]): OpenApiSpec {
                 },
               },
             };
-            schemas[v.schemaRef] = { type: 'object' };
+            registerSchema(schemas, v.schemaRef, schemaDefinitions);
           } else if (v.target === 'query') {
             parameters.push({
               name: v.schemaRef,
@@ -293,7 +314,7 @@ function buildOpenApiSpec(controllers: ControllerInfo[]): OpenApiSpec {
               schema: { type: 'object' },
             });
           } else if (v.target === 'param') {
-            schemas[v.schemaRef] = { type: 'object' };
+            registerSchema(schemas, v.schemaRef, schemaDefinitions);
           }
         }
       }
@@ -352,7 +373,8 @@ function buildOpenApiSpec(controllers: ControllerInfo[]): OpenApiSpec {
 function buildResponses(
   route: RouteDefinition,
   explicitResponses: ApiResponseMeta[] | undefined,
-  schemas: Record<string, OpenApiSchemaRef>,
+  schemas: Record<string, OpenApiSchemaDefinition>,
+  schemaDefinitions: Map<string, OpenApiSchemaDefinition>,
 ): Record<string, OpenApiResponse> {
   const responses: Record<string, OpenApiResponse> = {};
 
@@ -384,7 +406,7 @@ function buildResponses(
             schema: { $ref: `#/components/schemas/${r.schemaRef}` },
           },
         };
-        schemas[r.schemaRef] = { type: 'object' };
+        registerSchema(schemas, r.schemaRef, schemaDefinitions);
       }
       responses[String(r.status)] = response;
     }
@@ -449,4 +471,110 @@ function extractObjectLiteral(text: string): ApiOperationMeta {
 function extractSchemaRef(text: string): string | undefined {
   const match = text.match(/schema\s*:\s*([a-zA-Z_$][a-zA-Z0-9_$]*)/);
   return match ? match[1] : undefined;
+}
+
+/**
+ * Register a schema in the components.schemas map.
+ * Uses the ApiSchema definition if available, falls back to `{ type: 'object' }`.
+ */
+function registerSchema(
+  schemas: Record<string, OpenApiSchemaDefinition>,
+  name: string,
+  schemaDefinitions: Map<string, OpenApiSchemaDefinition>,
+): void {
+  schemas[name] = schemaDefinitions.get(name) ?? { type: 'object' };
+}
+
+/**
+ * Scan all source files for `ApiSchema(schema, spec)` calls.
+ * Returns a map of variable name → OpenAPI schema definition.
+ */
+function scanApiSchemas(
+  project: Project,
+): Map<string, OpenApiSchemaDefinition> {
+  const result = new Map<string, OpenApiSchemaDefinition>();
+
+  for (const sourceFile of project.getSourceFiles()) {
+    const filePath = sourceFile.getFilePath();
+    if (filePath.includes('node_modules') || filePath.endsWith('.d.ts'))
+      continue;
+
+    for (const varDecl of sourceFile.getVariableDeclarations()) {
+      const initializer = varDecl.getInitializer();
+      if (!initializer) continue;
+      if (initializer.getKind() !== SyntaxKind.CallExpression) continue;
+
+      const call = initializer.asKindOrThrow(SyntaxKind.CallExpression);
+      const callee = call.getExpression();
+      if (callee.getText() !== 'ApiSchema') continue;
+
+      const args = call.getArguments();
+      if (args.length < 2) continue;
+
+      const specArg = args[1];
+      if (specArg.getKind() !== SyntaxKind.ObjectLiteralExpression) continue;
+
+      const specObj = parseObjectLiteralNode(
+        specArg.asKindOrThrow(SyntaxKind.ObjectLiteralExpression),
+      );
+      if (specObj) {
+        result.set(varDecl.getName(), specObj);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Recursively parse an ObjectLiteralExpression node into a plain JS object.
+ * Handles string, number, boolean, array, and nested object literals.
+ */
+function parseObjectLiteralNode(
+  node: ObjectLiteralExpression,
+): OpenApiSchemaDefinition {
+  const result: Record<string, unknown> = {};
+
+  for (const prop of node.getProperties()) {
+    if (prop.getKind() !== SyntaxKind.PropertyAssignment) continue;
+    const propAssign = prop.asKindOrThrow(SyntaxKind.PropertyAssignment);
+    const key = propAssign.getName();
+    const init = propAssign.getInitializer();
+    if (!init) continue;
+
+    result[key] = parseValueNode(init);
+  }
+
+  return result;
+}
+
+/** Parse a single value node into a JS value. */
+function parseValueNode(node: Node): unknown {
+  const kind = node.getKind();
+
+  if (kind === SyntaxKind.StringLiteral) {
+    const text = node.getText();
+    return text.slice(1, -1);
+  }
+
+  if (kind === SyntaxKind.NumericLiteral) {
+    return Number(node.getText());
+  }
+
+  if (kind === SyntaxKind.TrueKeyword) return true;
+  if (kind === SyntaxKind.FalseKeyword) return false;
+
+  if (kind === SyntaxKind.ArrayLiteralExpression) {
+    const arr = node.asKindOrThrow(SyntaxKind.ArrayLiteralExpression);
+    return arr.getElements().map((el) => parseValueNode(el));
+  }
+
+  if (kind === SyntaxKind.ObjectLiteralExpression) {
+    return parseObjectLiteralNode(
+      node.asKindOrThrow(SyntaxKind.ObjectLiteralExpression),
+    );
+  }
+
+  // Fallback: return raw text for unhandled node types
+  return node.getText();
 }

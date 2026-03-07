@@ -5,9 +5,6 @@ import createHonoPlugin from '../../hono/src/plugin.js';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
 import createOpenApiPlugin from '../src/plugin.js';
 
-const honoPlugin = createHonoPlugin();
-const openApiPlugin = createOpenApiPlugin();
-
 function createProject(files: Record<string, string>) {
   const project = new Project({ useInMemoryFileSystem: true });
   project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
@@ -15,8 +12,8 @@ function createProject(files: Record<string, string>) {
     project.createSourceFile(filePath, content);
   }
   return transformInMemory(project, '/out/AppContext.generated.ts', [
-    honoPlugin,
-    openApiPlugin,
+    createHonoPlugin(),
+    createOpenApiPlugin(),
   ]);
 }
 
@@ -336,6 +333,129 @@ describe('OpenAPI Plugin', () => {
     const op = spec.paths['/api/todos/'].get;
     expect(op.responses['200'].description).toBe('List of todos');
     expect(op.responses['200'].content).toBeUndefined();
+  });
+
+  // ── ApiSchema function ──
+
+  it('ApiSchema provides full schema definition in components.schemas', () => {
+    const result = createProject({
+      '/src/schema.ts': `
+        import { ApiSchema } from './decorators.js'
+        export const todoSchema = ApiSchema({}, {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            title: { type: 'string' },
+            completed: { type: 'boolean' },
+          },
+          required: ['id', 'title', 'completed'],
+        })
+      `,
+      '/src/TodoController.ts': `
+        import { Controller, Get, ApiResponse } from './decorators.js'
+        import { todoSchema } from './schema.js'
+        @Controller('/api/todos')
+        class TodoController {
+          @Get('/:id')
+          @ApiResponse(200, 'The todo', { schema: todoSchema })
+          getById() {}
+        }
+      `,
+    });
+
+    const spec = parseOpenApiSpec(result);
+    expect(spec.components.schemas.todoSchema).toEqual({
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        title: { type: 'string' },
+        completed: { type: 'boolean' },
+      },
+      required: ['id', 'title', 'completed'],
+    });
+  });
+
+  it('ApiSchema works with @Validate request body schemas', () => {
+    const result = createProject({
+      '/src/schema.ts': `
+        import { ApiSchema } from './decorators.js'
+        export const createTodoSchema = ApiSchema({}, {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+          },
+          required: ['title'],
+        })
+      `,
+      '/src/TodoController.ts': `
+        import { Controller, Post, Validate } from './decorators.js'
+        import { createTodoSchema } from './schema.js'
+        @Controller('/api/todos')
+        class TodoController {
+          @Post('/')
+          @Validate({ json: createTodoSchema })
+          create() {}
+        }
+      `,
+    });
+
+    const spec = parseOpenApiSpec(result);
+    expect(spec.components.schemas.createTodoSchema).toEqual({
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+      },
+      required: ['title'],
+    });
+  });
+
+  it('falls back to { type: "object" } for schemas without ApiSchema', () => {
+    const result = createProject({
+      '/src/schema.ts': `
+        export const plainSchema = {}
+      `,
+      '/src/TodoController.ts': `
+        import { Controller, Get, ApiResponse } from './decorators.js'
+        import { plainSchema } from './schema.js'
+        @Controller('/api/todos')
+        class TodoController {
+          @Get('/')
+          @ApiResponse(200, 'Success', { schema: plainSchema })
+          list() {}
+        }
+      `,
+    });
+
+    const spec = parseOpenApiSpec(result);
+    expect(spec.components.schemas.plainSchema).toEqual({ type: 'object' });
+  });
+
+  it('ApiSchema with nested objects and arrays', () => {
+    const result = createProject({
+      '/src/schema.ts': `
+        import { ApiSchema } from './decorators.js'
+        export const todoListSchema = ApiSchema({}, {
+          type: 'array',
+          items: { type: 'object', properties: { id: { type: 'string' } } },
+        })
+      `,
+      '/src/TodoController.ts': `
+        import { Controller, Get, ApiResponse } from './decorators.js'
+        import { todoListSchema } from './schema.js'
+        @Controller('/api/todos')
+        class TodoController {
+          @Get('/')
+          @ApiResponse(200, 'List', { schema: todoListSchema })
+          list() {}
+        }
+      `,
+    });
+
+    const spec = parseOpenApiSpec(result);
+    expect(spec.components.schemas.todoListSchema).toEqual({
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' } } },
+    });
   });
 
   // ── @ApiOperation decorator ──
