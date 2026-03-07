@@ -39,6 +39,9 @@ export function Validate(targets: any) { return (t: any, c: any) => {} }
 export function Cors(opts?: any) { return (t: any, c: any) => {} }
 export function Secured() { return (t: any, c: any) => {} }
 export function Anonymous() { return (t: any, c: any) => {} }
+export function ApiResponse(status: number, description: string, opts?: any) { return (t: any, c: any) => {} }
+export function ApiOperation(opts: any) { return (t: any, c: any) => {} }
+export function ApiTag(name: string) { return (t: any, c: any) => {} }
 `;
 
 /**

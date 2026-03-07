@@ -16,6 +16,7 @@
     "@goodie-ts/cache": "workspace:*",
     "@goodie-ts/kysely": "workspace:*",
     "@goodie-ts/logging": "workspace:*",
+    "@goodie-ts/openapi": "workspace:*",
     "@goodie-ts/resilience": "workspace:*",
     "@goodie-ts/security": "workspace:*",
     "hono": "^4.7.0",
@@ -27,7 +28,6 @@
   },
   "devDependencies": {
     "@goodie-ts/cli": "workspace:*",
-    "@goodie-ts/openapi": "workspace:*",
     "@goodie-ts/testing": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@goodie-ts/vite-plugin": "workspace:*",

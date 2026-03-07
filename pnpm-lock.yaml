@@ -81,6 +81,9 @@ importers:
       '@goodie-ts/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@goodie-ts/openapi':
+        specifier: workspace:*
+        version: link:../../packages/openapi
       '@goodie-ts/resilience':
         specifier: workspace:*
         version: link:../../packages/resilience
@@ -109,9 +112,6 @@ importers:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../../packages/cli
-      '@goodie-ts/openapi':
-        specifier: workspace:*
-        version: link:../../packages/openapi
       '@goodie-ts/testing':
         specifier: workspace:*
         version: link:../../packages/testing
