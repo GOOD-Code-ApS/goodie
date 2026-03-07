@@ -4,9 +4,6 @@ import {
   type InjectionToken,
 } from '@goodie-ts/core';
 
-/** Well-known metadata key for @MockDefinition target. */
-const MOCK_TARGET = Symbol('goodie:mock-target');
-
 /** The types accepted by @MockDefinition as the target to override. */
 type MockTarget = Constructor | InjectionToken<unknown> | string;
 
@@ -23,6 +20,9 @@ export class MockDefinitionError extends DIError {
 /**
  * Class decorator that marks a mock class with the production bean it replaces.
  *
+ * Stores the target as a non-enumerable static property `__mockTarget` on
+ * the decorated class. No Symbol.metadata is used.
+ *
  * @param target - The Constructor, InjectionToken, or string description to override
  *
  * @example
@@ -36,10 +36,14 @@ export class MockDefinitionError extends DIError {
  */
 export function MockDefinition(target: MockTarget) {
   return (
-    _value: new (...args: any[]) => any,
-    context: ClassDecoratorContext,
+    value: new (...args: any[]) => any,
+    _context: ClassDecoratorContext,
   ) => {
-    (context.metadata as Record<PropertyKey, unknown>)[MOCK_TARGET] = target;
+    Object.defineProperty(value, '__mockTarget', {
+      value: target,
+      enumerable: false,
+      configurable: true,
+    });
   };
 }
 
@@ -48,8 +52,5 @@ export function MockDefinition(target: MockTarget) {
  * Returns `undefined` if the class has no @MockDefinition annotation.
  */
 export function getMockTarget(cls: Constructor): MockTarget | undefined {
-  const metadata = (
-    cls as unknown as { [Symbol.metadata]?: Record<PropertyKey, unknown> }
-  )[Symbol.metadata];
-  return metadata?.[MOCK_TARGET] as MockTarget | undefined;
+  return (cls as any).__mockTarget as MockTarget | undefined;
 }

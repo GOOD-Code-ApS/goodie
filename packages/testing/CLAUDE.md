@@ -38,7 +38,7 @@ class MockUserRepository extends Repository<User> {
 
 - `.mock(MockClass)` reads metadata, resolves target, registers as zero-dep singleton override
 - Target can be a class, `InjectionToken`, or string (matched by token description)
-- Metadata stored under `Symbol('goodie:mock-target')`
+- Metadata stored as `__mockTarget` static property on the class
 
 ## Gotchas
 

@@ -1,5 +1,3 @@
-import './polyfills.js';
-
 // AOP runtime
 export { wrapAfterAdvice, wrapBeforeAdvice } from './advice-wrappers.js';
 export type {
@@ -34,10 +32,8 @@ export {
   ConfigurationProperties,
   createAopDecorator,
   Eager,
-  getClassMetadata,
   Inject,
   Injectable,
-  META,
   Module,
   Named,
   Optional,
@@ -45,9 +41,7 @@ export {
   PostProcessor,
   PreDestroy,
   Provides,
-  pushMeta,
   Singleton,
-  setMeta,
   Value,
 } from './decorators/index.js';
 export {

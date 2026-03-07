@@ -1,10 +1,11 @@
-import { META, pushMeta } from './metadata.js';
-
 /**
  * Marks a method to be called after the bean is fully constructed and
  * `beforeInit` post-processors have run, but before `afterInit` post-processors.
  *
  * Only effective on `@Singleton` / `@Injectable` classes.
+ *
+ * **Compile-time only** — the decorator is a no-op marker at runtime.
+ * The transformer reads this decorator via AST inspection at build time.
  *
  * @example
  * @Singleton()
@@ -16,11 +17,7 @@ import { META, pushMeta } from './metadata.js';
  * }
  */
 export function PostConstruct(): MethodDecorator_Stage3 {
-  return (_target, context) => {
-    pushMeta(context.metadata!, META.POST_CONSTRUCT, {
-      methodName: context.name,
-    });
-  };
+  return () => {};
 }
 
 type MethodDecorator_Stage3 = (

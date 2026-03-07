@@ -1,5 +1,3 @@
-import { META, setMeta } from './metadata.js';
-
 export interface ModuleOptions {
   /** Other modules to import (compose). */
   imports?: Array<new (...args: any[]) => any>;
@@ -9,6 +7,9 @@ export interface ModuleOptions {
  * Marks a class as a DI module. Modules group `@Provides()` factory methods
  * and can import other modules.
  *
+ * **Compile-time only** — the decorator is a no-op marker at runtime.
+ * The transformer reads this decorator via AST inspection at build time.
+ *
  * @example
  * @Module({ imports: [DatabaseModule] })
  * class AppModule {
@@ -16,12 +17,8 @@ export interface ModuleOptions {
  *   dbUrl(): string { return process.env.DATABASE_URL! }
  * }
  */
-export function Module(options: ModuleOptions = {}): ClassDecorator_Stage3 {
-  return (_target, context) => {
-    setMeta(context.metadata!, META.MODULE, {
-      imports: options.imports ?? [],
-    });
-  };
+export function Module(_options: ModuleOptions = {}): ClassDecorator_Stage3 {
+  return () => {};
 }
 
 type ClassDecorator_Stage3 = (
