@@ -48,7 +48,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain('hc<AppType>(baseUrl, options)');
   });
 
-  it('imports Hono, hc, EmbeddedServer, and HTTP_FILTER', () => {
+  it('imports Hono, hc, EmbeddedServer, and HttpFilter', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
@@ -63,7 +63,10 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain("import { Hono } from 'hono'");
     expect(result.code).toContain("import { hc } from 'hono/client'");
     expect(result.code).toContain(
-      "import { EmbeddedServer, HTTP_FILTER } from '@goodie-ts/hono'",
+      "import { EmbeddedServer } from '@goodie-ts/hono'",
+    );
+    expect(result.code).toContain(
+      "import { HttpFilter } from '@goodie-ts/http'",
     );
   });
 
@@ -493,7 +496,9 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     // Per-controller route factory function
-    expect(result.code).toContain('function __createCtrlRoutes(ctrl: Ctrl)');
+    expect(result.code).toContain(
+      'function __createCtrlRoutes(ctrl: Ctrl, __filters:',
+    );
     expect(result.code).toContain(".get('/items'");
     expect(result.code).toContain(".post('/items'");
     // Per-controller type and client
@@ -581,7 +586,7 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     expect(result.code).toContain(
-      'function __createRootControllerRoutes(rootController: RootController)',
+      'function __createRootControllerRoutes(rootController: RootController, __filters:',
     );
     expect(result.code).toContain(".route('/'");
     expect(result.code).toContain(".get('/health'");

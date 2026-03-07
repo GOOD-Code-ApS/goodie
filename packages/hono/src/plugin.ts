@@ -3,6 +3,7 @@ import {
   type CodegenContribution,
   InvalidDecoratorUsageError,
   type IRBeanDefinition,
+  type IRDecoratorEntry,
   type MethodVisitorContext,
   type TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -35,6 +36,10 @@ interface RouteDefinition {
   validation?: RouteValidation[];
   /** Raw CORS config source text from @Cors(), or true for @Cors() with no args. */
   cors?: string | true;
+  /** Whether this route requires authentication. */
+  secured?: boolean;
+  /** Whether this route is explicitly anonymous (overrides class-level @Secured). */
+  anonymous?: boolean;
 }
 
 /** Controller metadata stored on bean metadata by visitClass. */
@@ -52,6 +57,10 @@ interface ControllerBean {
   basePath: string;
   routes: RouteDefinition[];
   cors?: string | true;
+  /** Compile-time class decorators for filter metadata. */
+  classDecorators: IRDecoratorEntry[];
+  /** Compile-time method decorators, keyed by method name. */
+  methodDecorators: Record<string, IRDecoratorEntry[]>;
 }
 
 /**
@@ -280,6 +289,8 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
       basePath: ctrl.basePath,
       routes: ctrl.routes,
       ...(ctrl.cors !== undefined ? { cors: ctrl.cors } : {}),
+      classDecorators: bean.decorators ?? [],
+      methodDecorators: bean.methodDecorators ?? {},
     });
   }
   return result;
@@ -289,7 +300,8 @@ function buildImports(controllers: ControllerBean[]): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
-  imports.push("import { EmbeddedServer, HTTP_FILTER } from '@goodie-ts/hono'");
+  imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  imports.push("import { HttpFilter } from '@goodie-ts/http'");
 
   const allRoutes = controllers.flatMap((c) => c.routes);
 
@@ -324,15 +336,29 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     const factoryName = `__create${ctrl.className}Routes`;
 
-    lines.push(`function ${factoryName}(${varName}: ${ctrl.className}) {`);
+    lines.push(
+      `function ${factoryName}(${varName}: ${ctrl.className}, __filters: { middleware(): (ctx: any, next: () => Promise<void>) => Promise<Response | undefined> }[]) {`,
+    );
+    lines.push(
+      `  const __classDecs = ${serializeDecoratorEntries(ctrl.classDecorators)}`,
+    );
     lines.push('  return new Hono()');
     for (const route of ctrl.routes) {
       const relativePath = escapeStringLiteral(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
+      const methodNameEscaped = escapeStringLiteral(route.methodName);
 
-      // Collect middleware: CORS first, then validation
+      // Collect middleware: filter wrapper, CORS, then validation
       const middleware: string[] = [];
+
+      // HttpFilter middleware — chains filters; each filter's next advances the chain
+      const methodDecsLiteral = serializeDecoratorEntries(
+        ctrl.methodDecorators[route.methodName] ?? [],
+      );
+      middleware.push(
+        `async (c: any, next: any) => { let __res: Response | undefined; let __i = 0; const __next = async (): Promise<void> => { if (__i < __filters.length) { const __mw = __filters[__i++].middleware(); const __r = await __mw({ request: c, methodName: '${methodNameEscaped}', classDecorators: __classDecs, methodDecorators: ${methodDecsLiteral} }, __next); if (__r) __res = __r } else { await next() } }; await __next(); if (__res) return __res }`,
+      );
 
       // Method-level @Cors overrides class-level
       const corsConfig = route.cors ?? ctrl.cors;
@@ -342,17 +368,11 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
 
       middleware.push(...generateValidationMiddleware(route.validation));
 
-      if (middleware.length > 0) {
-        lines.push(`    .${route.httpMethod}('${relativePath}',`);
-        for (const mw of middleware) {
-          lines.push(`      ${mw},`);
-        }
-        lines.push('      async (c) => {');
-      } else {
-        lines.push(
-          `    .${route.httpMethod}('${relativePath}', async (c) => {`,
-        );
+      lines.push(`    .${route.httpMethod}('${relativePath}',`);
+      for (const mw of middleware) {
+        lines.push(`      ${mw},`);
       }
+      lines.push('      async (c) => {');
       lines.push(
         `      const result = await ${varName}.${route.methodName}(c)`,
       );
@@ -377,22 +397,17 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     lines.push('');
   }
 
-  // createRouter composes all sub-apps with HttpFilter middleware
+  // createRouter composes all sub-apps with per-route HttpFilter middleware
   lines.push('export function createRouter(ctx: ApplicationContext) {');
   lines.push(
-    '  const __filters = ctx.getAll(HTTP_FILTER).sort((a, b) => a.order - b.order)',
+    '  const __filters = (ctx.getAll(HttpFilter) as HttpFilter[]).sort((a, b) => a.order - b.order)',
   );
-  lines.push('  const __app = new Hono()');
-  lines.push(
-    '  // as any: HttpFilter.middleware() uses `unknown` context for framework-agnosticism',
-  );
-  lines.push('  for (const f of __filters) __app.use(f.middleware() as any)');
-  lines.push('  return __app');
+  lines.push('  return new Hono()');
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
     lines.push(
-      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})))`,
+      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className}), __filters))`,
     );
   }
   lines.push('}');
@@ -445,6 +460,16 @@ function generateValidationMiddleware(
     (v) =>
       `zValidator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.issues.map((i: any) => ({ path: i.path, message: i.message })) }, 400) })`,
   );
+}
+
+/** Serialize decorator entries to a JS array literal for codegen. */
+function serializeDecoratorEntries(entries: IRDecoratorEntry[]): string {
+  if (entries.length === 0) return '[]';
+  const items = entries.map(
+    (d) =>
+      `{ name: '${escapeStringLiteral(d.name)}', importPath: '${escapeStringLiteral(d.importPath)}' }`,
+  );
+  return `[${items.join(', ')}]`;
 }
 
 function collectSchemaImports(

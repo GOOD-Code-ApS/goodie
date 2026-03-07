@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/http",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "description": "Framework-agnostic HTTP abstractions for goodie-ts — @Controller, route decorators, HttpFilter",
   "license": "MIT",
   "type": "module",
@@ -12,6 +12,7 @@
   "publishConfig": {
     "access": "public"
   },
+  "goodie": {},
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

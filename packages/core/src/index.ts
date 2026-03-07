@@ -60,4 +60,9 @@ export { InjectionToken } from './injection-token.js';
 export { buildInterceptorChain } from './interceptor-chain.js';
 export { StartupMetrics } from './startup-metrics.js';
 export { topoSort } from './topo-sort.js';
-export type { AbstractConstructor, Constructor, Scope } from './types.js';
+export type {
+  AbstractConstructor,
+  Constructor,
+  DecoratorEntry,
+  Scope,
+} from './types.js';

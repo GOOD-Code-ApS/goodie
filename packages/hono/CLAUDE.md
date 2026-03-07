@@ -1,6 +1,6 @@
 # @goodie-ts/hono
 
-Hono HTTP runtime integration for goodie-ts. Provides the transformer plugin for compile-time route wiring, `EmbeddedServer`, and `ServerConfig`. Re-exports all decorators from `@goodie-ts/http` for convenience.
+Hono-specific runtime integration for goodie-ts. Provides the transformer plugin for compile-time route wiring, `@Validate` (Hono-specific), `EmbeddedServer`, and `ServerConfig`. Generic HTTP decorators live in `@goodie-ts/http`.
 
 ## Key Files
 
@@ -9,22 +9,20 @@ Hono HTTP runtime integration for goodie-ts. Provides the transformer plugin for
 | `src/plugin.ts` | Transformer plugin — generates `createRouter()`, `startServer()`, RPC clients from controller metadata |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` that wraps `@hono/node-server`, uses `ServerConfig` for defaults |
 | `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host` and `port` defaults |
-| `src/index.ts` | Public exports (re-exports all `@goodie-ts/http` decorators + Hono-specific types) |
-| `src/controller.ts` | Re-export of `@Controller` from `@goodie-ts/http` |
-| `src/route.ts` | Re-export of `@Get`, `@Post`, etc. from `@goodie-ts/http` |
-| `src/cors.ts` | Re-export of `@Cors` from `@goodie-ts/http` |
-| `src/validate.ts` | Re-export of `@Validate` from `@goodie-ts/http` |
-| `src/metadata.ts` | Re-export of `HTTP_META` (aliased as `HONO_META`) from `@goodie-ts/http` |
+| `src/index.ts` | Public exports — Hono-specific only (`EmbeddedServer`, `ServerConfig`, `Validate`, `ValidateMetadata`, `ValidationTarget`) |
+| `src/cors.ts` | `@Cors(options?)` — Hono-specific CORS marker decorator (generates `hono/cors` middleware) |
+| `src/validate.ts` | `@Validate` — Hono-specific decorator (tied to `@hono/zod-validator`) |
+| `src/metadata.ts` | `ValidateMetadata`, `ValidationTarget` types |
 
 ## Package Relationship
 
 ```
-@goodie-ts/http    (abstractions: decorators, HttpFilter, metadata)
+@goodie-ts/http    (abstractions: decorators, HttpFilter)
       ↑
-@goodie-ts/hono    (runtime: EmbeddedServer, Hono codegen plugin)
+@goodie-ts/hono    (runtime: EmbeddedServer, Validate, Cors, Hono codegen plugin)
 ```
 
-Users depend only on `@goodie-ts/hono`. It pulls in `@goodie-ts/http` transitively and re-exports everything. Other library packages (security, logging) can depend on `@goodie-ts/http` alone for the abstractions without pulling in Hono.
+Users depend on both `@goodie-ts/http` (for generic HTTP decorators) and `@goodie-ts/hono` (for Hono-specific runtime). Other library packages (security, logging) depend on `@goodie-ts/http` alone for the abstractions without pulling in Hono.
 
 ## Transformer Plugin (`src/plugin.ts`)
 
@@ -32,7 +30,7 @@ The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dis
 
 - **`visitClass`** — detects `@Controller(basePath)`, calls `ctx.registerBean({ scope: 'singleton' })` to register the class as a bean, and initializes controller metadata
 - **`visitMethod`** — detects `@Get`/`@Post`/`@Put`/`@Delete`/`@Patch` route decorators, `@Validate`, and `@Cors` on methods, accumulates route definitions
-- **`codegen`** — reads `bean.metadata.controller` and generates per-controller route factories, `createRouter(ctx)`, `startServer(options?)`, per-controller `XxxRoutes` types + `createXxxClient()` factories, and the full `AppType` + `createClient()`
+- **`codegen`** — reads `bean.metadata.controller` and generates per-controller route factories, `createRouter(ctx)`, `startServer(options?)`, per-controller `XxxRoutes` types + `createXxxClient()` factories, and the full `AppType` + `createClient()`. Route factories include static `classDecorators` and per-route `methodDecorators` arrays (from `IRBeanDefinition`) passed to `HttpFilterContext` — no runtime `Symbol.metadata`.
 
 ### HttpFilter Discovery
 
@@ -59,7 +57,7 @@ This enables security, logging, and other packages to contribute middleware with
 
 ## Design Decisions
 
-- **Decorators live in `@goodie-ts/http`** — framework-agnostic abstractions. This package re-exports them so users don't need both packages.
+- **Decorators live in `@goodie-ts/http`** — framework-agnostic abstractions. Users import them from `@goodie-ts/http` directly. Only Hono-specific decorators (`@Validate`) live in this package.
 - **`@Controller` registers as singleton via plugin** — the hono plugin calls `ctx.registerBean({ scope: 'singleton' })`, so `@Controller` alone is sufficient for bean registration
 - **RPC support** — each controller gets its own route factory function, exported `XxxRoutes` type, and `createXxxClient(baseUrl)` factory. `createRouter` composes them via `.route()`. Full `AppType` and `createClient(baseUrl)` are also exported.
 - **Methods receive Hono `Context` directly** — no parameter decorator magic (Stage 3 has no param decorators)

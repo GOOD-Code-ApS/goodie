@@ -1,5 +1,6 @@
-import type { ApplicationContext } from '@goodie-ts/core';
+import type { ApplicationContext, BeanDefinition } from '@goodie-ts/core';
 import { TransactionManager } from '@goodie-ts/kysely';
+import type { SecurityProvider, SecurityRequest } from '@goodie-ts/security';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
   PostgreSqlContainer,
@@ -7,7 +8,34 @@ import {
 } from '@testcontainers/postgresql';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
+import {
+  buildDefinitions,
+  createRouter,
+  SECURITY_PROVIDER_Token,
+} from '../src/AppContext.generated.js';
+
+/**
+ * A test SecurityProvider that authenticates requests with a Bearer token.
+ * Any request with "Authorization: Bearer <token>" is authenticated.
+ */
+const testSecurityProvider: SecurityProvider = {
+  async authenticate(request: SecurityRequest) {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) return null;
+    const token = authHeader.slice(7);
+    return { name: token, attributes: {} };
+  },
+};
+
+/** Bean definition that registers the test SecurityProvider. */
+const securityProviderBean: BeanDefinition<SecurityProvider> = {
+  token: SECURITY_PROVIDER_Token,
+  scope: 'singleton',
+  dependencies: [],
+  factory: () => testSecurityProvider,
+  eager: false,
+  metadata: {},
+};
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
@@ -20,13 +48,15 @@ describe('Hono + PostgreSQL Todo API', () => {
     await container?.stop();
   });
 
-  const test = createGoodieTest(buildDefinitions(), {
+  const test = createGoodieTest([...buildDefinitions(), securityProviderBean], {
     config: () => ({
       'datasource.url': container.getConnectionUri(),
       'datasource.dialect': 'postgres',
     }),
     transactional: TransactionManager,
   });
+
+  const AUTH_HEADERS = { Authorization: 'Bearer test-user' };
 
   function app(ctx: ApplicationContext): Hono {
     return createRouter(ctx);
@@ -35,7 +65,7 @@ describe('Hono + PostgreSQL Todo API', () => {
   async function createTodo(honoApp: Hono, title: string) {
     const res = await honoApp.request('/api/todos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ title }),
     });
     return res.json();
@@ -46,7 +76,7 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await honoApp.request('/api/todos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ title: 'Buy groceries' }),
     });
 
@@ -77,7 +107,9 @@ describe('Hono + PostgreSQL Todo API', () => {
     const honoApp = app(ctx);
     const created = await createTodo(honoApp, 'Specific todo');
 
-    const res = await honoApp.request(`/api/todos/${created.id}`);
+    const res = await honoApp.request(`/api/todos/${created.id}`, {
+      headers: AUTH_HEADERS,
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -91,7 +123,7 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await honoApp.request(`/api/todos/${created.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ completed: true }),
     });
 
@@ -107,6 +139,7 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await honoApp.request(`/api/todos/${created.id}`, {
       method: 'DELETE',
+      headers: AUTH_HEADERS,
     });
 
     expect(res.status).toBe(200);
@@ -118,7 +151,9 @@ describe('Hono + PostgreSQL Todo API', () => {
     const honoApp = app(ctx);
     const fakeId = '00000000-0000-0000-0000-000000000000';
 
-    const res = await honoApp.request(`/api/todos/${fakeId}`);
+    const res = await honoApp.request(`/api/todos/${fakeId}`, {
+      headers: AUTH_HEADERS,
+    });
 
     expect(res.status).toBe(404);
     const body = await res.json();
@@ -130,7 +165,7 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await honoApp.request('/api/todos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({}),
     });
 
@@ -149,7 +184,7 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await honoApp.request('/api/todos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ title: '' }),
     });
 
@@ -167,12 +202,41 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await honoApp.request(`/api/todos/${created.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ completed: 'not-a-boolean' }),
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Validation failed');
+  });
+
+  test('POST /api/todos returns 401 without auth header', async ({ ctx }) => {
+    const honoApp = app(ctx);
+
+    const res = await honoApp.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Should fail' }),
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
+  });
+
+  test('DELETE /api/todos/:id returns 401 without auth header', async ({
+    ctx,
+  }) => {
+    const honoApp = app(ctx);
+    const created = await createTodo(honoApp, 'Auth required');
+
+    const res = await honoApp.request(`/api/todos/${created.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
   });
 });

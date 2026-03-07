@@ -60,6 +60,8 @@ function serializeBean(bean: IRBeanDefinition): Record<string, unknown> {
     factoryKind: bean.factoryKind,
     providesSource: bean.providesSource ?? null,
     baseTokenRefs: bean.baseTokenRefs ?? null,
+    decorators: bean.decorators ?? null,
+    methodDecorators: bean.methodDecorators ?? null,
     metadata: bean.metadata,
     sourceLocation: bean.sourceLocation,
   };
@@ -152,6 +154,10 @@ function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
             },
         )
       : undefined,
+    decorators: (raw.decorators as IRBeanDefinition['decorators']) ?? undefined,
+    methodDecorators:
+      (raw.methodDecorators as IRBeanDefinition['methodDecorators']) ??
+      undefined,
     metadata: (raw.metadata as Record<string, unknown>) ?? {},
     sourceLocation: raw.sourceLocation as IRBeanDefinition['sourceLocation'],
   };
@@ -288,18 +294,55 @@ export async function discoverLibraryBeans(
  * @param beans - Bean definitions with absolute import paths.
  * @param packageName - npm package name to use as import path.
  * @param sourceRoot - Absolute path prefix to match and replace.
+ * @param crossPackageDirs - Additional root→packageName mappings for cross-package refs.
  */
 export function rewriteImportPaths(
   beans: IRBeanDefinition[],
   packageName: string,
   sourceRoot: string,
+  crossPackageDirs?: Map<string, string>,
 ): IRBeanDefinition[] {
   return beans.map((bean) => ({
     ...bean,
-    tokenRef: rewriteTokenRefPath(bean.tokenRef, packageName, sourceRoot),
+    tokenRef: rewriteTokenRefPath(
+      bean.tokenRef,
+      packageName,
+      sourceRoot,
+      crossPackageDirs,
+    ),
+    decorators: bean.decorators?.map((d) => ({
+      ...d,
+      importPath: rewritePlainPath(
+        d.importPath,
+        packageName,
+        sourceRoot,
+        crossPackageDirs,
+      ),
+    })),
+    methodDecorators: bean.methodDecorators
+      ? Object.fromEntries(
+          Object.entries(bean.methodDecorators).map(([method, decs]) => [
+            method,
+            decs.map((d) => ({
+              ...d,
+              importPath: rewritePlainPath(
+                d.importPath,
+                packageName,
+                sourceRoot,
+                crossPackageDirs,
+              ),
+            })),
+          ]),
+        )
+      : undefined,
     constructorDeps: bean.constructorDeps.map((dep) => ({
       ...dep,
-      tokenRef: rewriteTokenRefPath(dep.tokenRef, packageName, sourceRoot),
+      tokenRef: rewriteTokenRefPath(
+        dep.tokenRef,
+        packageName,
+        sourceRoot,
+        crossPackageDirs,
+      ),
       sourceLocation: {
         ...dep.sourceLocation,
         filePath: dep.sourceLocation.filePath.startsWith(sourceRoot)
@@ -309,10 +352,21 @@ export function rewriteImportPaths(
     })),
     fieldDeps: bean.fieldDeps.map((dep) => ({
       ...dep,
-      tokenRef: rewriteTokenRefPath(dep.tokenRef, packageName, sourceRoot),
+      tokenRef: rewriteTokenRefPath(
+        dep.tokenRef,
+        packageName,
+        sourceRoot,
+        crossPackageDirs,
+      ),
     })),
     baseTokenRefs: bean.baseTokenRefs?.map(
-      (ref) => rewriteTokenRefPath(ref, packageName, sourceRoot) as typeof ref,
+      (ref) =>
+        rewriteTokenRefPath(
+          ref,
+          packageName,
+          sourceRoot,
+          crossPackageDirs,
+        ) as typeof ref,
     ),
     sourceLocation: {
       ...bean.sourceLocation,
@@ -323,10 +377,26 @@ export function rewriteImportPaths(
   }));
 }
 
+function rewritePlainPath(
+  importPath: string,
+  packageName: string,
+  sourceRoot: string,
+  crossPackageDirs?: Map<string, string>,
+): string {
+  if (importPath.startsWith(sourceRoot)) return packageName;
+  if (crossPackageDirs) {
+    for (const [dir, pkgName] of crossPackageDirs) {
+      if (importPath.startsWith(`${dir}/`)) return pkgName;
+    }
+  }
+  return importPath;
+}
+
 function rewriteTokenRefPath(
   tokenRef: IRBeanDefinition['tokenRef'],
   packageName: string,
   sourceRoot: string,
+  crossPackageDirs?: Map<string, string>,
 ): IRBeanDefinition['tokenRef'] {
   if (tokenRef.kind === 'class' && tokenRef.importPath.startsWith(sourceRoot)) {
     return { ...tokenRef, importPath: packageName };
@@ -336,6 +406,14 @@ function rewriteTokenRefPath(
     tokenRef.importPath?.startsWith(sourceRoot)
   ) {
     return { ...tokenRef, importPath: packageName };
+  }
+  // Cross-package fallback: match absolute paths from workspace dependencies
+  if (crossPackageDirs && tokenRef.kind === 'class') {
+    for (const [dir, pkgName] of crossPackageDirs) {
+      if (tokenRef.importPath.startsWith(`${dir}/`)) {
+        return { ...tokenRef, importPath: pkgName };
+      }
+    }
   }
   return tokenRef;
 }

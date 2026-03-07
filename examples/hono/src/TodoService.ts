@@ -3,6 +3,7 @@ import { Singleton } from '@goodie-ts/core';
 import { Transactional } from '@goodie-ts/kysely';
 import { LoggerFactory } from '@goodie-ts/logging';
 import { Timeout } from '@goodie-ts/resilience';
+import { Secured } from '@goodie-ts/security';
 import type { TodoRepository } from './TodoRepository.js';
 
 @Singleton()
@@ -22,6 +23,7 @@ export class TodoService {
     return this.todoRepository.findById(id);
   }
 
+  @Secured()
   @Timeout(5000)
   @CacheEvict('todos')
   @Transactional()

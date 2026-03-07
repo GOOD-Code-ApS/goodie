@@ -446,11 +446,15 @@ export async function transformLibrary(
     }
   }
 
+  // 11c. Build cross-package directory map for workspace dependencies
+  const crossPackageDirs = discoverCrossPackageDirs(libBaseDir);
+
   // 12. Rewrite import paths from absolute to bare package specifier
   const rewrittenBeans = rewriteImportPaths(
     finalBeans,
     options.packageName,
     sourceRoot,
+    crossPackageDirs,
   );
 
   // 13. Serialize to manifest
@@ -576,4 +580,45 @@ function mergePluginMetadata(
       }
     }
   }
+}
+
+/**
+ * Discover workspace dependency directories for cross-package import path rewriting.
+ *
+ * Scans `node_modules/@goodie-ts/` under the library base dir for sibling packages.
+ * Returns a map of real directory path → bare package name. This enables
+ * `rewriteImportPaths` to convert absolute cross-package references
+ * (e.g. `HttpFilter` from `@goodie-ts/http`) to bare specifiers in `beans.json`.
+ */
+function discoverCrossPackageDirs(
+  libBaseDir: string,
+): Map<string, string> | undefined {
+  const result = new Map<string, string>();
+  const scopes = ['@goodie-ts'];
+
+  for (const scope of scopes) {
+    const scopeDir = path.join(libBaseDir, 'node_modules', scope);
+
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(scopeDir);
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const pkgJsonPath = path.join(scopeDir, entry, 'package.json');
+      try {
+        const raw = fs.readFileSync(pkgJsonPath, 'utf-8');
+        const pkgJson = JSON.parse(raw);
+        const pkgName = pkgJson.name as string | undefined;
+        if (!pkgName) continue;
+
+        const realDir = fs.realpathSync(path.join(scopeDir, entry));
+        result.set(realDir, pkgName);
+      } catch {}
+    }
+  }
+
+  return result.size > 0 ? result : undefined;
 }
