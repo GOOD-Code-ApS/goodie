@@ -1,4 +1,4 @@
-export type { HttpFilter } from '@goodie-ts/http';
+export type { HttpFilter, HttpFilterContext } from '@goodie-ts/http';
 export { HTTP_FILTER } from '@goodie-ts/http';
 export { Controller } from './controller.js';
 export type { CorsOptions } from './cors.js';

@@ -493,7 +493,9 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     // Per-controller route factory function
-    expect(result.code).toContain('function __createCtrlRoutes(ctrl: Ctrl)');
+    expect(result.code).toContain(
+      'function __createCtrlRoutes(ctrl: Ctrl, __filters:',
+    );
     expect(result.code).toContain(".get('/items'");
     expect(result.code).toContain(".post('/items'");
     // Per-controller type and client
@@ -581,7 +583,7 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     expect(result.code).toContain(
-      'function __createRootControllerRoutes(rootController: RootController)',
+      'function __createRootControllerRoutes(rootController: RootController, __filters:',
     );
     expect(result.code).toContain(".route('/'");
     expect(result.code).toContain(".get('/health'");

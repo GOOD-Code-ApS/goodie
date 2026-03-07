@@ -35,6 +35,10 @@ interface RouteDefinition {
   validation?: RouteValidation[];
   /** Raw CORS config source text from @Cors(), or true for @Cors() with no args. */
   cors?: string | true;
+  /** Whether this route requires authentication. */
+  secured?: boolean;
+  /** Whether this route is explicitly anonymous (overrides class-level @Secured). */
+  anonymous?: boolean;
 }
 
 /** Controller metadata stored on bean metadata by visitClass. */
@@ -319,20 +323,40 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
 
+  // Helper: wraps HttpFilter[] into per-route Hono middleware with route metadata
+  lines.push(
+    'function __applyFilters(filters: { middleware(): (ctx: any, next: () => Promise<void>) => Promise<Response | undefined> }[], routeMeta: Record<symbol, unknown>, methodName: string) {',
+  );
+  lines.push(
+    '  return filters.map(f => { const mw = f.middleware(); return async (c: any, next: any) => { const res = await mw({ request: c, routeMetadata: routeMeta, methodName }, next); if (res) return res } })',
+  );
+  lines.push('}');
+  lines.push('');
+
   // Per-controller route factory functions (top-level for type extraction)
   for (const ctrl of controllers) {
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     const factoryName = `__create${ctrl.className}Routes`;
 
-    lines.push(`function ${factoryName}(${varName}: ${ctrl.className}) {`);
+    lines.push(
+      `function ${factoryName}(${varName}: ${ctrl.className}, __filters: { middleware(): (ctx: any, next: () => Promise<void>) => Promise<Response | undefined> }[]) {`,
+    );
+    lines.push(
+      `  const __meta = (${ctrl.className} as any)[Symbol.metadata] || {}`,
+    );
     lines.push('  return new Hono()');
     for (const route of ctrl.routes) {
       const relativePath = escapeStringLiteral(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
 
-      // Collect middleware: CORS first, then validation
+      // Collect middleware: filters first, then CORS, then validation
       const middleware: string[] = [];
+
+      // Per-route HttpFilter middleware with route metadata
+      middleware.push(
+        `...__applyFilters(__filters, __meta, '${escapeStringLiteral(route.methodName)}')`,
+      );
 
       // Method-level @Cors overrides class-level
       const corsConfig = route.cors ?? ctrl.cors;
@@ -342,17 +366,11 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
 
       middleware.push(...generateValidationMiddleware(route.validation));
 
-      if (middleware.length > 0) {
-        lines.push(`    .${route.httpMethod}('${relativePath}',`);
-        for (const mw of middleware) {
-          lines.push(`      ${mw},`);
-        }
-        lines.push('      async (c) => {');
-      } else {
-        lines.push(
-          `    .${route.httpMethod}('${relativePath}', async (c) => {`,
-        );
+      lines.push(`    .${route.httpMethod}('${relativePath}',`);
+      for (const mw of middleware) {
+        lines.push(`      ${mw},`);
       }
+      lines.push('      async (c) => {');
       lines.push(
         `      const result = await ${varName}.${route.methodName}(c)`,
       );
@@ -377,22 +395,17 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     lines.push('');
   }
 
-  // createRouter composes all sub-apps with HttpFilter middleware
+  // createRouter composes all sub-apps with per-route HttpFilter middleware
   lines.push('export function createRouter(ctx: ApplicationContext) {');
   lines.push(
     '  const __filters = ctx.getAll(HTTP_FILTER).sort((a, b) => a.order - b.order)',
   );
-  lines.push('  const __app = new Hono()');
-  lines.push(
-    '  // as any: HttpFilter.middleware() uses `unknown` context for framework-agnosticism',
-  );
-  lines.push('  for (const f of __filters) __app.use(f.middleware() as any)');
-  lines.push('  return __app');
+  lines.push('  return new Hono()');
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
     lines.push(
-      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})))`,
+      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className}), __filters))`,
     );
   }
   lines.push('}');
