@@ -210,4 +210,33 @@ describe('Hono + PostgreSQL Todo API', () => {
     const body = await res.json();
     expect(body.error).toBe('Validation failed');
   });
+
+  test('POST /api/todos returns 401 without auth header', async ({ ctx }) => {
+    const honoApp = app(ctx);
+
+    const res = await honoApp.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Should fail' }),
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
+  });
+
+  test('DELETE /api/todos/:id returns 401 without auth header', async ({
+    ctx,
+  }) => {
+    const honoApp = app(ctx);
+    const created = await createTodo(honoApp, 'Auth required');
+
+    const res = await honoApp.request(`/api/todos/${created.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
+  });
 });

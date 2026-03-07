@@ -103,9 +103,13 @@ export interface IRBeanDefinition {
     | undefined;
   /** Base class tokens this bean should also be registered under. */
   baseTokenRefs?: ClassTokenRef[];
-  /** Decorators found on this class (for DecoratorMetadata queries). */
+  /** Decorators found on this class (for DecoratorMetadata queries).
+   * Optional because beans from @Provides methods or library beans without
+   * decorators don't have any — omitted to keep serialized beans.json compact. */
   decorators?: IRDecoratorEntry[];
-  /** Decorators found on methods, keyed by method name. */
+  /** Decorators found on methods, keyed by method name.
+   * Optional for the same reason as `decorators` — most beans have no
+   * decorated methods (only controllers with @Get/@Post/etc. do). */
   methodDecorators?: Record<string, IRDecoratorEntry[]>;
   metadata: Record<string, unknown>;
   sourceLocation: SourceLocation;

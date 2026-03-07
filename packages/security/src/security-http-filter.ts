@@ -25,15 +25,24 @@ export class SecurityHttpFilter extends HttpFilter {
   @Optional()
   accessor securityProvider: SecurityProvider | undefined;
 
+  private cachedMiddleware:
+    | ((
+        ctx: HttpFilterContext,
+        next: () => Promise<void>,
+      ) => Promise<Response | undefined>)
+    | undefined;
+
   constructor(private readonly securityContext: SecurityContext) {
     super();
   }
 
   middleware() {
+    if (this.cachedMiddleware) return this.cachedMiddleware;
+
     const provider = this.securityProvider;
     const context = this.securityContext;
 
-    return async (
+    this.cachedMiddleware = async (
       ctx: HttpFilterContext,
       next: () => Promise<void>,
     ): Promise<Response | undefined> => {
@@ -83,5 +92,6 @@ export class SecurityHttpFilter extends HttpFilter {
       await context.run(principal, () => next());
       return undefined;
     };
+    return this.cachedMiddleware;
   }
 }
