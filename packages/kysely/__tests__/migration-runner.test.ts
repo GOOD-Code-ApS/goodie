@@ -3,9 +3,6 @@ import { AbstractMigration } from '../src/abstract-migration.js';
 import { Migration } from '../src/decorators/migration.js';
 import { MigrationRunner } from '../src/migration-runner.js';
 
-// Polyfill for test environment
-Symbol.metadata ??= Symbol('Symbol.metadata');
-
 // Mock the Migrator class from kysely
 vi.mock('kysely', () => ({
   Migrator: vi.fn(),
@@ -46,7 +43,7 @@ describe('MigrationRunner', () => {
     expect(migrateToLatest).toHaveBeenCalled();
   });
 
-  it('should build migration map from @Migration metadata', async () => {
+  it('should build migration map from @Migration static property', async () => {
     let capturedProvider: any;
     const migrateToLatest = vi.fn().mockResolvedValue({ results: [] });
     vi.mocked(Migrator).mockImplementation((opts: any) => {

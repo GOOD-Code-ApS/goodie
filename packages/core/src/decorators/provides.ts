@@ -1,7 +1,8 @@
-import { META, pushMeta } from './metadata.js';
-
 /**
  * Marks a method inside a `@Module()` class as a bean factory.
+ *
+ * **Compile-time only** — the decorator is a no-op marker at runtime.
+ * The transformer reads this decorator via AST inspection at build time.
  *
  * @example
  * @Module()
@@ -11,11 +12,7 @@ import { META, pushMeta } from './metadata.js';
  * }
  */
 export function Provides(): MethodDecorator_Stage3 {
-  return (_target, context) => {
-    pushMeta(context.metadata!, META.PROVIDES, {
-      methodName: context.name,
-    });
-  };
+  return () => {};
 }
 
 type MethodDecorator_Stage3 = (
