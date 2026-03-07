@@ -314,7 +314,14 @@ importers:
         version: 24.0.0
 
   packages/openapi:
+    dependencies:
+      '@goodie-ts/core':
+        specifier: workspace:^
+        version: link:../core
     devDependencies:
+      '@goodie-ts/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer

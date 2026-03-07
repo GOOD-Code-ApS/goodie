@@ -7,4 +7,4 @@ export { ApiResponse } from './api-response.js';
 export type { OpenApiPropertySpec, OpenApiSchemaSpec } from './api-schema.js';
 export { ApiSchema } from './api-schema.js';
 export { ApiTag } from './api-tag.js';
-export type { OpenApiConfig } from './types.js';
+export { OpenApiConfig } from './openapi-config.js';

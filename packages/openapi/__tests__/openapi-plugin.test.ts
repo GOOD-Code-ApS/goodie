@@ -18,12 +18,13 @@ function createProject(files: Record<string, string>) {
 }
 
 function parseOpenApiSpec(result: ReturnType<typeof createProject>) {
-  expect(result.files).toBeDefined();
-  const specPath = Object.keys(result.files!).find((p) =>
-    p.endsWith('openapi.json'),
-  );
-  expect(specPath).toBeDefined();
-  return JSON.parse(result.files![specPath!]);
+  const code = result.code;
+  expect(code).toBeDefined();
+  // Extract the __openapi_spec constant from generated code
+  const match = code.match(/const __openapi_spec = ({[\s\S]*?});?\n\n/);
+  expect(match).toBeDefined();
+  // Use Function constructor to evaluate the object literal safely
+  return new Function(`return ${match![1]}`)();
 }
 
 describe('OpenAPI Plugin', () => {
@@ -134,7 +135,7 @@ describe('OpenAPI Plugin', () => {
       `,
     });
 
-    expect(result.files).toBeUndefined();
+    expect(result.code).not.toContain('__openapi_spec');
   });
 
   // ── Auto-inferred responses ──

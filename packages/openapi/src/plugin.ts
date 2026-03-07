@@ -202,10 +202,50 @@ export default function createOpenApiPlugin(): TransformerPlugin {
         schemaDefinitions ?? new Map(),
       );
 
+      // Emit the compile-time spec as a constant, plus runtime functions
+      // that merge with OpenApiConfig from the DI context.
+      const specJson = JSON.stringify(spec, null, 2);
+
       return {
-        files: {
-          'openapi.json': JSON.stringify(spec, null, 2),
-        },
+        imports: [
+          `import { OpenApiConfig } from '@goodie-ts/openapi';`,
+          `import { writeFileSync, mkdirSync } from 'node:fs';`,
+          `import { dirname, resolve } from 'node:path';`,
+        ],
+        code: [
+          ``,
+          `/** Compile-time OpenAPI spec data (routes, schemas, security). */`,
+          `const __openapi_spec = ${specJson};`,
+          ``,
+          `/**`,
+          ` * Get the full OpenAPI spec, merging compile-time route data with`,
+          ` * runtime config from OpenApiConfig (@ConfigurationProperties('openapi')).`,
+          ` */`,
+          `export function getOpenApiSpec(ctx: import('@goodie-ts/core').ApplicationContext): Record<string, unknown> {`,
+          `  const config = ctx.get(OpenApiConfig);`,
+          `  return {`,
+          `    ...__openapi_spec,`,
+          `    info: {`,
+          `      title: config.title,`,
+          `      version: config.version,`,
+          `      ...(config.description ? { description: config.description } : {}),`,
+          `    },`,
+          `  };`,
+          `}`,
+          ``,
+          `/**`,
+          ` * Write the OpenAPI spec to disk at the path configured in OpenApiConfig.`,
+          ` * Defaults to './openapi.json'. Call during bootstrap (e.g. after startServer).`,
+          ` */`,
+          `export function writeOpenApiSpec(ctx: import('@goodie-ts/core').ApplicationContext): string {`,
+          `  const config = ctx.get(OpenApiConfig);`,
+          `  const spec = getOpenApiSpec(ctx);`,
+          `  const outputPath = resolve(config.path);`,
+          `  mkdirSync(dirname(outputPath), { recursive: true });`,
+          `  writeFileSync(outputPath, JSON.stringify(spec, null, 2), 'utf-8');`,
+          `  return outputPath;`,
+          `}`,
+        ],
       };
     },
   };

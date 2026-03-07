@@ -10,5 +10,11 @@
       "min": 2,
       "max": 10
     }
+  },
+  "openapi": {
+    "title": "Todo API",
+    "version": "1.0.0",
+    "description": "A simple todo management API",
+    "path": "./openapi.json"
   }
 }
