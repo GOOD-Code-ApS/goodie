@@ -1,6 +1,5 @@
 import { Inject, Optional, Singleton } from '@goodie-ts/core';
 import type { HttpFilter, HttpFilterContext } from '@goodie-ts/http';
-import { UnauthorizedError } from './errors.js';
 import { SECURITY_META } from './metadata.js';
 import type { SecurityContext } from './security-context.js';
 import type { SecurityProvider, SecurityRequest } from './security-provider.js';
