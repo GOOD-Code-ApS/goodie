@@ -209,6 +209,9 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:^
         version: link:../core
+      '@goodie-ts/http':
+        specifier: workspace:^
+        version: link:../http
       '@hono/node-server':
         specifier: '>=1.0.0'
         version: 1.19.9(hono@4.12.2)
@@ -234,6 +237,16 @@ importers:
       ts-morph:
         specifier: ^24.0.0
         version: 24.0.0
+
+  packages/http:
+    dependencies:
+      '@goodie-ts/core':
+        specifier: workspace:^
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
 
   packages/kysely:
     dependencies:

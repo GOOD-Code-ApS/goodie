@@ -22,6 +22,7 @@ export default defineConfig({
         'packages/testing/src/index.ts',
       ),
       '@goodie-ts/cli': path.resolve(__dirname, 'packages/cli/src/index.ts'),
+      '@goodie-ts/http': path.resolve(__dirname, 'packages/http/src/index.ts'),
       '@goodie-ts/hono/plugin': path.resolve(
         __dirname,
         'packages/hono/src/plugin.ts',

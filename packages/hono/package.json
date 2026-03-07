@@ -39,7 +39,8 @@
     "ts-morph": "^24.0.0"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:^"
+    "@goodie-ts/core": "workspace:^",
+    "@goodie-ts/http": "workspace:^"
   },
   "peerDependencies": {
     "@hono/node-server": ">=1.0.0",

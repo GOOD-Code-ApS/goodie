@@ -289,7 +289,7 @@ function buildImports(controllers: ControllerBean[]): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
-  imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  imports.push("import { EmbeddedServer, HTTP_FILTER } from '@goodie-ts/hono'");
 
   const allRoutes = controllers.flatMap((c) => c.routes);
 
@@ -377,9 +377,17 @@ function generateCreateRouter(controllers: ControllerBean[]): string[] {
     lines.push('');
   }
 
-  // createRouter composes all sub-apps
+  // createRouter composes all sub-apps with HttpFilter middleware
   lines.push('export function createRouter(ctx: ApplicationContext) {');
-  lines.push('  return new Hono()');
+  lines.push(
+    '  const __filters = ctx.getAll(HTTP_FILTER).sort((a, b) => a.order - b.order)',
+  );
+  lines.push('  const __app = new Hono()');
+  lines.push(
+    '  // as any: HttpFilter.middleware() uses `unknown` context for framework-agnosticism',
+  );
+  lines.push('  for (const f of __filters) __app.use(f.middleware() as any)');
+  lines.push('  return __app');
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
