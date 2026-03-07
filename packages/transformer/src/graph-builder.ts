@@ -6,6 +6,7 @@ import type { ResolveResult } from './resolver.js';
 import {
   AmbiguousProviderError,
   CircularDependencyError,
+  findSimilarTokens,
   InvalidDecoratorUsageError,
   MissingProviderError,
 } from './transformer-errors.js';
@@ -312,12 +313,25 @@ function validateProviders(
   filteredOut: Map<string, FilteredBeanInfo>,
 ): void {
   const registered = new Set<string>();
+  const registeredNames: string[] = [];
   for (const bean of beans) {
     registered.add(tokenRefKey(bean.tokenRef));
+    registeredNames.push(tokenRefDisplayName(bean.tokenRef));
   }
 
   // Well-known tokens always available at runtime (self-registered by ApplicationContext)
   registered.add('class:@goodie-ts/core:ApplicationContext');
+  registeredNames.push('ApplicationContext');
+
+  function buildHint(depKey: string, depName: string): string | undefined {
+    const filteredHint = buildFilteredHint(depKey, filteredOut);
+    if (filteredHint) return filteredHint;
+    const similar = findSimilarTokens(depName, registeredNames);
+    if (similar.length > 0) {
+      return `Did you mean: ${similar.join(', ')}?`;
+    }
+    return undefined;
+  }
 
   // Validate all required deps have providers
   for (const bean of beans) {
@@ -338,7 +352,7 @@ function validateProviders(
           depName,
           ownerName,
           dep.sourceLocation,
-          buildFilteredHint(key, filteredOut),
+          buildHint(key, depName),
         );
       }
     }
@@ -355,7 +369,7 @@ function validateProviders(
           depName,
           ownerName,
           bean.sourceLocation,
-          buildFilteredHint(key, filteredOut),
+          buildHint(key, depName),
         );
       }
     }
@@ -372,7 +386,7 @@ function validateProviders(
           depName,
           ownerName,
           bean.sourceLocation,
-          buildFilteredHint(key, filteredOut),
+          buildHint(key, depName),
         );
       }
     }

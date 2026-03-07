@@ -4,6 +4,45 @@ function formatLocation(loc: SourceLocation): string {
   return `${loc.filePath}:${loc.line}:${loc.column}`;
 }
 
+/**
+ * Find similar token names using Levenshtein distance.
+ * Returns up to 3 suggestions within a threshold of max(3, name.length / 3).
+ */
+export function findSimilarTokens(
+  name: string,
+  candidates: string[],
+  maxResults = 3,
+): string[] {
+  const threshold = Math.max(3, Math.ceil(name.length / 2));
+  const scored = candidates
+    .map((c) => ({
+      name: c,
+      dist: levenshtein(name.toLowerCase(), c.toLowerCase()),
+    }))
+    .filter((s) => s.dist <= threshold && s.dist > 0)
+    .sort((a, b) => a.dist - b.dist);
+  return scored.slice(0, maxResults).map((s) => s.name);
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    Array(n + 1).fill(0),
+  );
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
 /** Base error for all compile-time transformer failures. */
 export class TransformerError extends Error {
   constructor(

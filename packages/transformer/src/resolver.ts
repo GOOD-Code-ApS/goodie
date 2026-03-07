@@ -217,7 +217,7 @@ function resolveProvidesParams(
   return params.map((param) => {
     if (!param.typeName) {
       throw new UnresolvableTypeError(
-        `parameter "${param.paramName}" of ${ownerName}`,
+        `parameter "${param.paramName}" of ${ownerName} — type could not be inferred. Add an explicit type annotation.`,
         param.sourceLocation,
       );
     }
@@ -228,7 +228,7 @@ function resolveProvidesParams(
 
       if (!candidates || candidates.length === 0) {
         throw new UnresolvableTypeError(
-          `${param.typeName} (parameter "${param.paramName}" of ${ownerName})`,
+          `${param.typeName} (parameter "${param.paramName}" of ${ownerName}) — no @Provides method returns this type. Use an InjectionToken or add a @Provides method that returns ${param.typeName}.`,
           param.sourceLocation,
         );
       }
@@ -339,7 +339,7 @@ function resolveConstructorParam(
 ): IRDependency {
   if (!param.typeName) {
     throw new UnresolvableTypeError(
-      `parameter "${param.paramName}" of ${ownerName}`,
+      `parameter "${param.paramName}" of ${ownerName} — type could not be inferred. Add an explicit type annotation.`,
       param.sourceLocation,
     );
   }
@@ -371,7 +371,7 @@ function resolveConstructorParam(
 
   if (isPrimitiveType(param.typeName)) {
     throw new UnresolvableTypeError(
-      `${param.typeName} (parameter "${param.paramName}" of ${ownerName})`,
+      `${param.typeName} (parameter "${param.paramName}" of ${ownerName}) — primitive types cannot be auto-wired. Use an InjectionToken<${param.typeName}> or @Value('key') instead.`,
       param.sourceLocation,
     );
   }
@@ -422,8 +422,11 @@ function resolveFieldInjection(
       field.sourceLocation,
     );
   } else {
+    const typeInfo = field.typeName
+      ? ` (type: ${field.typeName}) — primitive types cannot be auto-wired. Use @Inject(token) on an accessor field.`
+      : ' — type could not be inferred. Add an explicit type annotation or use @Inject(token).';
     throw new UnresolvableTypeError(
-      `field "${field.fieldName}" of ${ownerName}`,
+      `field "${field.fieldName}" of ${ownerName}${typeInfo}`,
       field.sourceLocation,
     );
   }

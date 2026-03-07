@@ -129,7 +129,7 @@ export class ApplicationContext {
     this.assertOpen();
     const def = this.primaryDef.get(token as Token);
     if (!def) {
-      throw new MissingDependencyError(tokenName(token as Token));
+      throw this.missingDependencyWithSuggestions(token as Token);
     }
 
     if (def.scope === 'singleton') {
@@ -158,7 +158,7 @@ export class ApplicationContext {
     this.assertOpen();
     const def = this.primaryDef.get(token as Token);
     if (!def) {
-      throw new MissingDependencyError(tokenName(token as Token));
+      throw this.missingDependencyWithSuggestions(token as Token);
     }
 
     if (def.scope === 'singleton') {
@@ -274,7 +274,14 @@ export class ApplicationContext {
         try {
           await (instance as Record<string, () => unknown>)[methodName]();
         } catch (err) {
-          errors.push(err instanceof Error ? err : new Error(String(err)));
+          const name = tokenName(def.token);
+          const original = err instanceof Error ? err.message : String(err);
+          errors.push(
+            new Error(
+              `Failed to execute @PreDestroy on ${name}.${methodName}(): ${original}`,
+              { cause: err },
+            ),
+          );
         }
       }
     }
@@ -336,7 +343,10 @@ export class ApplicationContext {
     }
   }
 
-  private resolveDepsSync(deps: Dependency[]): unknown[] {
+  private resolveDepsSync(
+    deps: Dependency[],
+    parentDef?: BeanDefinition,
+  ): unknown[] {
     return deps.map((dep) => {
       if (dep.collection) {
         return this.getAll(dep.token);
@@ -344,7 +354,10 @@ export class ApplicationContext {
       const depDef = this.primaryDef.get(dep.token);
       if (!depDef) {
         if (dep.optional) return undefined;
-        throw new MissingDependencyError(tokenName(dep.token));
+        throw new MissingDependencyError(
+          tokenName(dep.token),
+          parentDef ? tokenName(parentDef.token) : undefined,
+        );
       }
       if (depDef.scope === 'singleton') {
         const cached = this.singletonCache.get(dep.token);
@@ -354,7 +367,10 @@ export class ApplicationContext {
     });
   }
 
-  private async resolveDepsAsync(deps: Dependency[]): Promise<unknown[]> {
+  private async resolveDepsAsync(
+    deps: Dependency[],
+    parentDef?: BeanDefinition,
+  ): Promise<unknown[]> {
     const resolved: unknown[] = [];
     for (const dep of deps) {
       if (dep.collection) {
@@ -367,7 +383,10 @@ export class ApplicationContext {
           resolved.push(undefined);
           continue;
         }
-        throw new MissingDependencyError(tokenName(dep.token));
+        throw new MissingDependencyError(
+          tokenName(dep.token),
+          parentDef ? tokenName(parentDef.token) : undefined,
+        );
       }
       if (depDef.scope === 'singleton') {
         const cached = this.singletonCache.get(dep.token);
@@ -382,7 +401,7 @@ export class ApplicationContext {
   }
 
   private resolveSync<T>(def: BeanDefinition): T {
-    const deps = this.resolveDepsSync(def.dependencies);
+    const deps = this.resolveDepsSync(def.dependencies, def);
     const raw = def.factory(...deps);
     if (raw instanceof Promise) {
       // Mark as unresolved so sync get() knows to throw
@@ -415,7 +434,7 @@ export class ApplicationContext {
       if (cached !== undefined && cached !== UNRESOLVED) return cached;
     }
 
-    const deps = await this.resolveDepsAsync(def.dependencies);
+    const deps = await this.resolveDepsAsync(def.dependencies, def);
     let instance = await def.factory(...deps);
 
     if (!skipPostProcessors) {
@@ -446,7 +465,17 @@ export class ApplicationContext {
       | undefined;
     if (postConstructMethods) {
       for (const methodName of postConstructMethods) {
-        const result = (current as Record<string, () => unknown>)[methodName]();
+        let result: unknown;
+        try {
+          result = (current as Record<string, () => unknown>)[methodName]();
+        } catch (err) {
+          const name = tokenName(def.token);
+          const original = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `Failed to execute @PostConstruct on ${name}.${methodName}(): ${original}`,
+            { cause: err },
+          );
+        }
         if (result instanceof Promise) {
           result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
@@ -482,7 +511,16 @@ export class ApplicationContext {
       | undefined;
     if (postConstructMethods) {
       for (const methodName of postConstructMethods) {
-        await (current as Record<string, () => unknown>)[methodName]();
+        try {
+          await (current as Record<string, () => unknown>)[methodName]();
+        } catch (err) {
+          const name = tokenName(def.token);
+          const original = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `Failed to execute @PostConstruct on ${name}.${methodName}(): ${original}`,
+            { cause: err },
+          );
+        }
       }
     }
     for (const pp of this.postProcessors) {
@@ -492,6 +530,20 @@ export class ApplicationContext {
     }
     return current;
   }
+
+  private missingDependencyWithSuggestions(
+    token: Token,
+  ): MissingDependencyError {
+    const name = tokenName(token);
+    const registered = Array.from(this.primaryDef.keys()).map(tokenName);
+    const similar = findSimilar(name, registered);
+    if (similar.length > 0) {
+      return new MissingDependencyError(
+        `${name}. Did you mean: ${similar.join(', ')}?`,
+      );
+    }
+    return new MissingDependencyError(name);
+  }
 }
 
 function tokenName(token: Token): string {
@@ -499,4 +551,37 @@ function tokenName(token: Token): string {
     return token.name || 'Anonymous';
   }
   return token.description;
+}
+
+function findSimilar(
+  name: string,
+  candidates: string[],
+  maxResults = 3,
+): string[] {
+  const threshold = Math.max(3, Math.ceil(name.length / 2));
+  const lower = name.toLowerCase();
+  const scored = candidates
+    .map((c) => ({ name: c, dist: levenshtein(lower, c.toLowerCase()) }))
+    .filter((s) => s.dist <= threshold && s.dist > 0)
+    .sort((a, b) => a.dist - b.dist);
+  return scored.slice(0, maxResults).map((s) => s.name);
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    Array(n + 1).fill(0),
+  );
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
 }

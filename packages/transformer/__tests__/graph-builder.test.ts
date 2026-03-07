@@ -396,6 +396,36 @@ describe('Graph Builder', () => {
         }),
       ).toThrow(MissingProviderError);
     });
+
+    it('should suggest similar token names in MissingProviderError', () => {
+      try {
+        pipeline({
+          '/src/decorators.ts': decoratorsFile,
+          '/src/UserRepo.ts': `
+            import { Singleton } from './decorators.js'
+            @Singleton()
+            export class UserRepo {}
+          `,
+          '/src/UserRep.ts': `
+            export class UserRep {}
+          `,
+          '/src/Service.ts': `
+            import { Singleton } from './decorators.js'
+            import { UserRep } from './UserRep.js'
+
+            @Singleton()
+            export class Service {
+              constructor(private repo: UserRep) {}
+            }
+          `,
+        });
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(MissingProviderError);
+        expect((err as Error).message).toContain('Did you mean');
+        expect((err as Error).message).toContain('UserRepo');
+      }
+    });
   });
 
   describe('collection injection', () => {
