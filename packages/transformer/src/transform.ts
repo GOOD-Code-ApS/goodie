@@ -673,6 +673,18 @@ function readAndFlattenConfigFiles(dir: string): Record<string, string> {
     );
   }
 
+  // Also read {NODE_ENV}.json (e.g. production.json) to match runtime behavior
+  const env = process.env.NODE_ENV;
+  if (env) {
+    const envFile = path.join(dir, `${env}.json`);
+    if (fs.existsSync(envFile)) {
+      Object.assign(
+        result,
+        flattenObject(JSON.parse(fs.readFileSync(envFile, 'utf-8'))),
+      );
+    }
+  }
+
   return result;
 }
 

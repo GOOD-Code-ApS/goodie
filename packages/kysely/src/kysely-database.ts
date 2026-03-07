@@ -13,7 +13,7 @@ import type { Dialect } from './dialect.js';
  * - `sqlite` → `better-sqlite3` + `SqliteDialect`
  * - `neon` → `kysely-neon` + `NeonDialect`
  * - `planetscale` → `kysely-planetscale` + `PlanetScaleDialect`
- * - `d1` → `kysely-d1` + `D1Dialect` (deferred init — binding available at request time)
+ * - `d1` → `kysely-d1` + `D1Dialect` (per-request — binding resolved via RuntimeBindings)
  * - `libsql` → `@libsql/kysely-libsql` + `LibsqlDialect`
  *
  * Non-generic (`Kysely<any>`) by design. Users bridge to their schema
@@ -36,6 +36,7 @@ import type { Dialect } from './dialect.js';
 export class KyselyDatabase {
   private _kysely?: Kysely<any>;
   private _initPromise?: Promise<void>;
+  private _d1Factory?: () => Promise<Kysely<any>>;
 
   constructor(private readonly config: DatasourceConfig) {}
 
@@ -44,7 +45,7 @@ export class KyselyDatabase {
       throw new Error(
         'KyselyDatabase: not initialized. ' +
           (this.config.dialect === 'd1'
-            ? 'D1 dialect requires a request context — call ensureInitialized() first.'
+            ? 'D1 dialect is per-request — use getD1Instance() within a RuntimeBindings.run() scope.'
             : 'Wait for @PostConstruct init() to complete.'),
       );
     }
@@ -57,26 +58,38 @@ export class KyselyDatabase {
 
   @PostConstruct()
   async init() {
-    // D1 dialect defers initialization — the D1 binding is only available
-    // at request time via RuntimeBindings, not at startup.
-    if (this.config.dialect === 'd1') return;
+    if (this.config.dialect === 'd1') {
+      // D1 is per-request — preload the factory but don't create an instance.
+      // Each request gets a fresh Kysely instance via getD1Instance().
+      const { default: createDialect } = await import('./dialect-factory.js');
+      const { Kysely } = await import('kysely');
+      this._d1Factory = async () => {
+        const dialect = await createDialect(this.config);
+        return new Kysely({ dialect });
+      };
+      return;
+    }
 
     await this._createKyselyInstance();
   }
 
   /**
-   * Ensure the Kysely instance is created. For most dialects this is a no-op
-   * (already initialized by @PostConstruct). For D1, this creates the instance
-   * on first call using the D1 binding from the current request context.
+   * Get a per-request Kysely instance for D1 dialect.
+   * Must be called within a `RuntimeBindings.run()` scope.
+   * Each call creates a new Kysely instance bound to the current request's D1 binding.
+   *
+   * For non-D1 dialects, returns the shared singleton instance.
    */
-  async ensureInitialized(): Promise<void> {
-    if (this._kysely) return;
-    if (this._initPromise) {
-      await this._initPromise;
-      return;
+  async getD1Instance(): Promise<Kysely<any>> {
+    if (this.config.dialect !== 'd1') {
+      return this.kysely;
     }
-    this._initPromise = this._createKyselyInstance();
-    await this._initPromise;
+    if (!this._d1Factory) {
+      throw new Error(
+        'KyselyDatabase: D1 factory not initialized. Ensure @PostConstruct has completed.',
+      );
+    }
+    return this._d1Factory();
   }
 
   @PreDestroy()
