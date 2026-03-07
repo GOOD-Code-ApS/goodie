@@ -9,12 +9,11 @@ export { Cors } from './cors.js';
 export { EmbeddedServer } from './embedded-server.js';
 // Security runtime
 export { UnauthorizedError } from './errors.js';
-export { getPrincipal } from './get-principal.js';
+export type { GoodieEnv } from './goodie-env.js';
 export type { ValidateMetadata, ValidationTarget } from './metadata.js';
 export type { Principal } from './principal.js';
 export { Delete, Get, Patch, Post, Put } from './route.js';
 export { Secured } from './secured.js';
-export { SecurityContext } from './security-context.js';
 export type {
   SecurityProvider,
   SecurityRequest,

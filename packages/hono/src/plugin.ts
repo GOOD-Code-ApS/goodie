@@ -322,9 +322,7 @@ function buildImports(
   imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
 
   if (hasSecurity) {
-    imports.push(
-      "import { SecurityContext, SECURITY_PROVIDER } from '@goodie-ts/hono'",
-    );
+    imports.push("import { SECURITY_PROVIDER } from '@goodie-ts/hono'");
     imports.push("import type { SecurityProvider } from '@goodie-ts/hono'");
   }
 
@@ -368,10 +366,7 @@ function generateCreateRouter(
     const params = [
       `${varName}: ${ctrl.className}`,
       ...(ctrlHasSecurity
-        ? [
-            '__securityContext: SecurityContext',
-            '__securityProvider: SecurityProvider | undefined',
-          ]
+        ? ['__securityProvider: SecurityProvider | undefined']
         : []),
     ];
 
@@ -391,14 +386,14 @@ function generateCreateRouter(
       const routeInSecuredController = ctrl.secured && !routeNeedsAuth;
 
       if (routeNeedsAuth) {
-        // Secured route: authenticate, reject if no principal, wrap in SecurityContext
+        // Secured route: authenticate, reject if no principal, set on Hono context
         middleware.push(
-          `async (c: any, next: any) => { if (!__securityProvider) return c.json({ error: 'Unauthorized' }, 401); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (!__principal) return c.json({ error: 'Unauthorized' }, 401); return __securityContext.run(__principal, () => next()) }`,
+          `async (c: any, next: any) => { if (!__securityProvider) return c.json({ error: 'Unauthorized' }, 401); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (!__principal) return c.json({ error: 'Unauthorized' }, 401); c.set('principal', __principal); return next() }`,
         );
       } else if (routeInSecuredController) {
-        // @Anonymous route in a @Secured controller: authenticate if possible, set context, but don't reject
+        // @Anonymous route in a @Secured controller: authenticate if possible, set on context, but don't reject
         middleware.push(
-          `async (c: any, next: any) => { if (!__securityProvider) return next(); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); return __securityContext.run(__principal, () => next()) }`,
+          `async (c: any, next: any) => { if (!__securityProvider) return next(); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (__principal) c.set('principal', __principal); return next() }`,
         );
       }
 
@@ -442,7 +437,6 @@ function generateCreateRouter(
   // createRouter composes all sub-apps
   lines.push('export function createRouter(ctx: ApplicationContext) {');
   if (hasSecurity) {
-    lines.push('  const __securityContext = ctx.get(SecurityContext)');
     lines.push(
       '  const __securityProvider = ctx.getAll(SECURITY_PROVIDER)[0] as SecurityProvider | undefined',
     );
@@ -452,9 +446,7 @@ function generateCreateRouter(
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
     const ctrlHasSecurity = ctrl.secured || ctrl.routes.some((r) => r.secured);
-    const securityArgs = ctrlHasSecurity
-      ? ', __securityContext, __securityProvider'
-      : '';
+    const securityArgs = ctrlHasSecurity ? ', __securityProvider' : '';
     lines.push(
       `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})${securityArgs}))`,
     );

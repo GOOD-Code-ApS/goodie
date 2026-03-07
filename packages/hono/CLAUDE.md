@@ -12,8 +12,7 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, the tr
 | `src/secured.ts` | `@Secured()` — marks controller/method as requiring authentication (compile-time no-op) |
 | `src/anonymous.ts` | `@Anonymous()` — exempts method from class-level `@Secured` (compile-time no-op) |
 | `src/security-provider.ts` | `SecurityProvider` interface + `SECURITY_PROVIDER` injection token |
-| `src/security-context.ts` | `SecurityContext` — `@Singleton`, `AsyncLocalStorage`-based principal propagation |
-| `src/get-principal.ts` | `getPrincipal(securityContext)` — convenience function |
+| `src/goodie-env.ts` | `GoodieEnv` — Hono env type for typed `c.get('principal')` access |
 | `src/principal.ts` | `Principal` type — `{ name, attributes }` |
 | `src/errors.ts` | `UnauthorizedError` |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` wrapping `@hono/node-server` |
@@ -35,16 +34,16 @@ The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dis
 
 When `@Secured` is used on any controller, the plugin generates Hono-native security middleware directly in the route factory — no `HttpFilter` abstraction. The generated middleware:
 
-1. Resolves `SecurityContext` and `SecurityProvider` from the DI context
-2. For secured routes: authenticates via `SecurityProvider`, returns 401 if no principal, wraps in `SecurityContext.run()`
-3. For `@Anonymous` routes in a `@Secured` controller: authenticates if possible, sets context, but never rejects
+1. Resolves `SecurityProvider` from the DI context
+2. For secured routes: authenticates via `SecurityProvider`, returns 401 if no principal, sets principal on Hono context via `c.set('principal', ...)`
+3. For `@Anonymous` routes in a `@Secured` controller: authenticates if possible, sets principal on context, but never rejects
 
 `SecurityProvider` is optional — if not registered, secured routes return 401.
 
 ### Route Factory Pattern
 
 ```typescript
-function __createCtrlRoutes(ctrl: Ctrl, __securityContext: SecurityContext, __securityProvider: SecurityProvider | undefined) {
+function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | undefined) {
   return new Hono()
     .get('/secured',
       async (c, next) => { /* security middleware */ },
@@ -58,10 +57,9 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityContext: SecurityContext, __se
 
 ## Library Beans (beans.json)
 
-3 singleton beans:
+2 singleton beans:
 - **ServerConfig** — `@ConfigurationProperties('server')` with host/port
 - **EmbeddedServer** — wraps `@hono/node-server`, depends on `ServerConfig`
-- **SecurityContext** — `AsyncLocalStorage`-based principal storage
 
 ## Design Decisions
 
@@ -69,7 +67,7 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityContext: SecurityContext, __se
 - **No `HttpFilter` abstraction** — security middleware is generated natively using Hono's API (`c.json()`, `c.req`)
 - **`@Secured` is HTTP-only** — no service-layer AOP interceptor. The framework is Hono-first.
 - **`SecurityProvider` is user-provided** — registered with `SECURITY_PROVIDER` injection token. Optional — if missing, secured routes return 401.
-- **`SecurityContext` propagates principal** — via `AsyncLocalStorage`, accessible to downstream services via `getPrincipal()`
+- **Principal via Hono context** — `c.set('principal', ...)` / `c.get('principal')` using `GoodieEnv` type for type safety. No `AsyncLocalStorage` — works on edge runtimes.
 
 ## Gotchas
 

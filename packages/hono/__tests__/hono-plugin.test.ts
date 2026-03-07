@@ -473,11 +473,12 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
     });
 
     expect(result.code).toContain(
-      "import { SecurityContext, SECURITY_PROVIDER } from '@goodie-ts/hono'",
+      "import { SECURITY_PROVIDER } from '@goodie-ts/hono'",
     );
     expect(result.code).toContain(
       "import type { SecurityProvider } from '@goodie-ts/hono'",
     );
+    expect(result.code).not.toContain('SecurityContext');
   });
 
   it('generates security middleware for @Secured controller routes', () => {
@@ -497,11 +498,11 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
     expect(result.code).toContain('__securityProvider.authenticate');
     // Should return 401 on failure
     expect(result.code).toContain("c.json({ error: 'Unauthorized' }, 401)");
-    // Should wrap in SecurityContext.run
-    expect(result.code).toContain('__securityContext.run(__principal');
+    // Should set principal on Hono context
+    expect(result.code).toContain("c.set('principal', __principal)");
   });
 
-  it('resolves SecurityContext and SecurityProvider in createRouter', () => {
+  it('resolves SecurityProvider in createRouter', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get, Secured } from './decorators.js'
@@ -514,7 +515,7 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
       `,
     });
 
-    expect(result.code).toContain('ctx.get(SecurityContext)');
+    expect(result.code).not.toContain('ctx.get(SecurityContext)');
     expect(result.code).toContain('ctx.getAll(SECURITY_PROVIDER)');
   });
 
@@ -531,7 +532,7 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
       `,
     });
 
-    expect(result.code).toContain('__securityContext: SecurityContext');
+    expect(result.code).not.toContain('__securityContext');
     expect(result.code).toContain(
       '__securityProvider: SecurityProvider | undefined',
     );
@@ -571,7 +572,7 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
     });
 
     // Both secured and anonymous routes exist
-    // The anonymous route should still set SecurityContext but not reject
+    // The anonymous route should still authenticate and set principal but not reject
     // Count occurrences of authenticate to verify both routes handle auth
     const authMatches = result.code.match(/__securityProvider\.authenticate/g);
     expect(authMatches).toHaveLength(2);
@@ -602,7 +603,7 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
     });
 
     // Should import security types
-    expect(result.code).toContain('SecurityContext');
+    expect(result.code).toContain('SECURITY_PROVIDER');
     // Only admin route should have security middleware
     const authMatches = result.code.match(/__securityProvider\.authenticate/g);
     expect(authMatches).toHaveLength(1);
@@ -633,11 +634,11 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
     );
     // AdminCtrl factory should have security params
     expect(result.code).toContain(
-      '__createAdminCtrlRoutes(adminCtrl: AdminCtrl, __securityContext: SecurityContext',
+      '__createAdminCtrlRoutes(adminCtrl: AdminCtrl, __securityProvider: SecurityProvider',
     );
     // createRouter should pass security args only to AdminCtrl
     expect(result.code).toContain(
-      '__createAdminCtrlRoutes(ctx.get(AdminCtrl), __securityContext, __securityProvider)',
+      '__createAdminCtrlRoutes(ctx.get(AdminCtrl), __securityProvider)',
     );
     // But not to PublicCtrl
     expect(result.code).toMatch(
