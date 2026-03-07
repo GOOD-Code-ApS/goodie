@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@goodie-ts/cli": "workspace:*",
+    "@goodie-ts/openapi": "workspace:*",
     "@goodie-ts/testing": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@goodie-ts/vite-plugin": "workspace:*",

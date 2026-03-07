@@ -109,6 +109,9 @@ importers:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@goodie-ts/openapi':
+        specifier: workspace:*
+        version: link:../../packages/openapi
       '@goodie-ts/testing':
         specifier: workspace:*
         version: link:../../packages/testing

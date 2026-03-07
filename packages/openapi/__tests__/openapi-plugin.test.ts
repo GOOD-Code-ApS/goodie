@@ -125,6 +125,31 @@ describe('OpenAPI Plugin', () => {
     expect(publicOp.security).toBeUndefined();
   });
 
+  it('adds security for method-level @Secured without class-level @Secured', () => {
+    const result = createProject({
+      '/src/MixedController.ts': `
+        import { Controller, Get, Secured } from './decorators.js'
+        @Controller('/api/mixed')
+        class MixedController {
+          @Get('/public')
+          publicRoute() {}
+
+          @Secured()
+          @Get('/admin')
+          adminRoute() {}
+        }
+      `,
+    });
+
+    const spec = parseOpenApiSpec(result);
+    const publicOp = spec.paths['/api/mixed/public'].get;
+    expect(publicOp.security).toBeUndefined();
+
+    const adminOp = spec.paths['/api/mixed/admin'].get;
+    expect(adminOp.security).toEqual([{ bearerAuth: [] }]);
+    expect(spec.components.securitySchemes).toBeDefined();
+  });
+
   it('adds requestBody for routes with @Validate({ json: schema })', () => {
     const result = createProject({
       '/src/schema.ts': `

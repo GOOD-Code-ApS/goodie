@@ -194,11 +194,16 @@ function buildOpenApiSpec(controllers: ControllerInfo[]): OpenApiSpec {
 
       // Security
       const methodDecorators = ctrl.methodDecorators[route.methodName] ?? [];
+      const isMethodSecured = methodDecorators.some(
+        (d) => d.name === 'Secured',
+      );
       const isMethodAnonymous = methodDecorators.some(
         (d) => d.name === 'Anonymous',
       );
 
-      if (isClassSecured && !isMethodAnonymous) {
+      const isSecured =
+        (isClassSecured || isMethodSecured) && !isMethodAnonymous;
+      if (isSecured) {
         operation.security = [{ bearerAuth: [] }];
         hasSecured = true;
       }
