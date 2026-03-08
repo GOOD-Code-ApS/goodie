@@ -240,14 +240,14 @@ export default function createHonoPlugin(): TransformerPlugin {
           hasRequestScoped,
         ),
         '',
-        ...(isServerless ? [] : generateOnStartHook()),
-        '',
         'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
         '  return hc<AppType>(baseUrl, options)',
         '}',
       ];
 
-      return { imports, code };
+      const onStart = isServerless ? undefined : generateOnStartHook();
+
+      return { imports, code, onStart };
     },
   };
 }
@@ -463,10 +463,8 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
 
 function generateOnStartHook(): string[] {
   return [
-    'app.onStart(async (ctx) => {',
-    '  const router = createRouter(ctx)',
-    '  await ctx.get(EmbeddedServer).listen(router)',
-    '})',
+    'const router = createRouter(ctx)',
+    'await ctx.get(EmbeddedServer).listen(router)',
   ];
 }
 

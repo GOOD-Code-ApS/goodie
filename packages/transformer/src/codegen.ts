@@ -325,15 +325,25 @@ export function generateCode(
   lines.push('export const app = Goodie.build(buildDefinitions())');
   lines.push('');
 
-  // Plugin contribution code
+  // Plugin contributions
   if (contributions && contributions.length > 0) {
     const codeLines: string[] = [];
+    const onStartLines: string[] = [];
     for (const contrib of contributions) {
       if (contrib.code) codeLines.push(...contrib.code);
+      if (contrib.onStart) onStartLines.push(...contrib.onStart);
     }
     if (codeLines.length > 0) {
       lines.push('// Plugin contributions');
       lines.push(...codeLines);
+      lines.push('');
+    }
+    if (onStartLines.length > 0) {
+      lines.push('app.onStart(async (ctx) => {');
+      for (const line of onStartLines) {
+        lines.push(`  ${line}`);
+      }
+      lines.push('})');
       lines.push('');
     }
   }
