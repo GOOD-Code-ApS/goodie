@@ -76,29 +76,6 @@ interface TestTransactionManagerLike {
   startTestTransaction(): Promise<() => Promise<void>>;
 }
 
-/** Build vitest fixture entries from user-provided fixture factories. */
-function buildFixtureEntries(
-  fixtures: Record<string, (ctx: ApplicationContext) => unknown>,
-): Record<
-  string,
-  (
-    deps: { ctx: ApplicationContext },
-    use: (value: unknown) => Promise<void>,
-  ) => Promise<void>
-> {
-  return Object.fromEntries(
-    Object.entries(fixtures).map(([name, factory]) => [
-      name,
-      async (
-        { ctx }: { ctx: ApplicationContext },
-        use: (value: unknown) => Promise<void>,
-      ) => {
-        await use(factory(ctx));
-      },
-    ]),
-  );
-}
-
 /**
  * Create a vitest-native `test` function with Playwright-style fixtures
  * that provide a built `ApplicationContext`, a `resolve` helper, and
@@ -163,9 +140,27 @@ export function createGoodieTest<
     return cachedDefs;
   }
 
-  const extended = base.extend<GoodieFixtures & TFixtures>({
-    // biome-ignore lint/correctness/noEmptyPattern: vitest requires destructuring pattern
-    ctx: async ({}, use) => {
+  // Build fixture entries from user-provided fixture factories.
+  // Each fixture depends on `ctx` and is exposed as a test fixture.
+  function buildCustomFixtures(): Record<string, unknown> {
+    if (!options?.fixtures) return {};
+    const entries: Record<string, unknown> = {};
+    for (const [name, factory] of Object.entries(options.fixtures)) {
+      entries[name] = async (
+        { ctx }: { ctx: ApplicationContext },
+        use: (value: unknown) => Promise<void>,
+      ) => {
+        await use((factory as (ctx: ApplicationContext) => unknown)(ctx));
+      };
+    }
+    return entries;
+  }
+
+  const baseFixtures: Record<string, unknown> = {
+    ctx: async (
+      _deps: Record<string, never>,
+      use: (value: ApplicationContext) => Promise<void>,
+    ) => {
       const defs = resolveDefinitions();
       let builder: TestContextBuilder = TestContext.from(defs);
 
@@ -187,31 +182,45 @@ export function createGoodieTest<
       await ctx.close();
     },
 
-    resolve: async ({ ctx }, use) => {
+    resolve: async (
+      { ctx }: { ctx: ApplicationContext },
+      use: (
+        value: <T>(
+          token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+        ) => T,
+      ) => Promise<void>,
+    ) => {
       await use(
         <T>(
           token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
         ) => ctx.get(token),
       );
     },
+  };
 
-    // When not using transactional mode, register custom fixtures here.
-    // When using transactional mode, they're registered after _rollback
-    // so they run inside the transaction scope.
-    ...(!transactional && options?.fixtures
-      ? buildFixtureEntries(options.fixtures)
-      : {}),
-  } as any);
+  // Vitest's Fixtures type uses complex mapped types that don't play well with
+  // dynamic fixture objects. We use `as any` at the `.extend()` boundary — the
+  // return type cast to `TestAPI<GoodieFixtures & TFixtures>` ensures callers
+  // get full type safety on the fixtures they declared.
 
-  if (!transactional || !rollback) return extended;
+  // When not using transactional mode, include custom fixtures directly.
+  if (!transactional || !rollback) {
+    return base.extend({
+      ...baseFixtures,
+      ...buildCustomFixtures(),
+    } as any) as TestAPI<GoodieFixtures & TFixtures>;
+  }
 
+  // With transactional mode: first extend with base fixtures, then extend again
+  // with _rollback (auto) + custom fixtures so they run inside the transaction.
   const transactionalToken = transactional;
 
-  // _rollback is auto:true, then custom fixtures run after (inside the transaction).
-  // biome-ignore lint/suspicious/noConfusingVoidType: vitest auto-fixture provides no value
-  return extended.extend<{ _rollback: void } & TFixtures>({
+  return base.extend(baseFixtures as any).extend({
     _rollback: [
-      async ({ ctx }, use) => {
+      async (
+        { ctx }: { ctx: ApplicationContext },
+        use: () => Promise<void>,
+      ) => {
         const tm = ctx.get(transactionalToken) as TestTransactionManagerLike;
         const rollbackFn = await tm.startTestTransaction();
         try {
@@ -222,7 +231,6 @@ export function createGoodieTest<
       },
       { auto: true },
     ],
-    // Custom fixtures registered here run after _rollback starts the transaction
-    ...(options?.fixtures ? buildFixtureEntries(options.fixtures) : {}),
-  } as any);
+    ...buildCustomFixtures(),
+  } as any) as TestAPI<GoodieFixtures & TFixtures>;
 }
