@@ -6,7 +6,7 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, OpenAP
 
 | File | Role |
 |------|------|
-| `src/plugin.ts` | Transformer plugin — generates `createRouter()`, `startServer()`, security middleware, OpenAPI middleware, RPC clients from controller metadata |
+| `src/plugin.ts` | Transformer plugin — generates `createRouter()`, `app.onStart()` hook, security middleware, OpenAPI middleware, RPC clients from controller metadata |
 | `src/controller.ts` | `@Controller(basePath?)` — marks class as HTTP controller (compile-time no-op) |
 | `src/route.ts` | `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` — method decorators with optional OpenAPI options (compile-time no-ops) |
 | `src/openapi-types.ts` | `DescribeRouteOptions` — typed OpenAPI options for route decorators |
@@ -30,7 +30,7 @@ The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dis
 
 - **`visitClass`** — detects `@Controller(basePath)`, `@Secured`, `@Cors`, registers bean as singleton
 - **`visitMethod`** — detects `@Get`/`@Post`/etc (with optional OpenAPI options as second arg), `@Validate`, `@Cors`, `@Secured`, `@Anonymous`
-- **`codegen`** — receives `CodegenContext` with build-time config. Generates per-controller route factories, `createRouter(ctx)`, `startServer()` (skipped for serverless runtimes like `cloudflare`), RPC types/clients, and OpenAPI middleware when routes have OpenAPI options
+- **`codegen`** — receives `CodegenContext` with build-time config. Generates per-controller route factories, `createRouter(ctx)`, `app.onStart()` hook (skipped for serverless runtimes like `cloudflare`), RPC types/clients, and OpenAPI middleware when routes have OpenAPI options
 
 ### OpenAPI Support
 
@@ -102,8 +102,8 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 - **`deno`** — `Deno.serve()` via `globalThis.Deno`
 
 The plugin reads `server.runtime` from `CodegenContext.config` at build time:
-- `'node'` (default) / `'bun'` / `'deno'` → generates `startServer()` with `EmbeddedServer`
-- `'cloudflare'` → serverless: skips `startServer()` and `EmbeddedServer` import (use `createRouter()` directly)
+- `'node'` (default) / `'bun'` / `'deno'` → generates `app.onStart()` hook with `EmbeddedServer`
+- `'cloudflare'` → serverless: skips the hook and `EmbeddedServer` import (use `createRouter()` directly)
 
 ## Gotchas
 
