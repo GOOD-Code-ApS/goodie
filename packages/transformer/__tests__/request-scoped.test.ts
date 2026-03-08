@@ -53,4 +53,76 @@ describe('@RequestScoped', () => {
     expect(result.code).toContain("scope: 'request'");
     expect(result.code).toContain('token: DepService');
   });
+
+  it('should generate a compile-time scoped proxy factory for request-scoped beans with getters', () => {
+    const result = createTestProject({
+      '/src/my-service.ts': `
+        import { RequestScoped } from './decorators.js'
+
+        @RequestScoped()
+        export class MyService {
+          get value(): string { return 'hello' }
+          greet(): string { return this.value }
+        }
+      `,
+    });
+
+    // Should generate a proxy factory function
+    expect(result.code).toContain(
+      'function __MyService$scopedProxy(resolve: () => any)',
+    );
+    expect(result.code).toContain('Object.create(MyService.prototype');
+    // Getter delegation
+    expect(result.code).toContain(
+      'value: { get() { return resolve().value }, configurable: true }',
+    );
+    // Method delegation with bind
+    expect(result.code).toContain(
+      'greet: { get() { const t = resolve(); return t.greet.bind(t) }, configurable: true }',
+    );
+    // Proxy factory wired into metadata
+    expect(result.code).toContain(
+      'scopedProxyFactory: __MyService$scopedProxy',
+    );
+  });
+
+  it('should not generate scoped proxy for request-scoped beans with no public members', () => {
+    const result = createTestProject({
+      '/src/my-service.ts': `
+        import { RequestScoped } from './decorators.js'
+
+        @RequestScoped()
+        export class MyService {
+          private _value = 'hello'
+        }
+      `,
+    });
+
+    expect(result.code).not.toContain('$scopedProxy');
+  });
+
+  it('should extract members from parent class for scoped proxy', () => {
+    const result = createTestProject({
+      '/src/base.ts': `
+        export abstract class BaseService {
+          abstract get name(): string
+          describe(): string { return this.name }
+        }
+      `,
+      '/src/my-service.ts': `
+        import { RequestScoped } from './decorators.js'
+        import { BaseService } from './base.js'
+
+        @RequestScoped()
+        export class MyService extends BaseService {
+          get name(): string { return 'test' }
+        }
+      `,
+    });
+
+    expect(result.code).toContain('function __MyService$scopedProxy');
+    // Should include both own getter and inherited method
+    expect(result.code).toContain('name:');
+    expect(result.code).toContain('describe:');
+  });
 });

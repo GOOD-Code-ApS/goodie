@@ -46,6 +46,12 @@ const DECORATOR_NAMES = {
   Value: 'Value',
 } as const;
 
+/** A public member of a @RequestScoped bean, used for compile-time scoped proxy generation. */
+export interface ScannedPublicMember {
+  name: string;
+  kind: 'getter' | 'method' | 'property';
+}
+
 /** A class decorated with @Injectable, @Singleton, or @Module. */
 export interface ScannedBean {
   classDeclaration: ClassDeclaration;
@@ -73,6 +79,8 @@ export interface ScannedBean {
   decorators: IRDecoratorEntry[];
   /** Decorators found on methods, keyed by method name. */
   methodDecorators: Record<string, IRDecoratorEntry[]>;
+  /** Public members for compile-time scoped proxy generation (only for request-scoped beans). */
+  publicMembers?: ScannedPublicMember[];
   sourceLocation: SourceLocation;
 }
 
@@ -353,6 +361,10 @@ function scanBean(
     }
   }
 
+  // Extract public members for request-scoped beans (used for compile-time scoped proxy)
+  const publicMembers =
+    scope === 'request' ? extractPublicMembers(cls, lifecycle) : undefined;
+
   return {
     classDeclaration: cls,
     classTokenRef: {
@@ -375,6 +387,7 @@ function scanBean(
     decorators: scannedDecorators,
     methodDecorators:
       Object.keys(methodDecorators).length > 0 ? methodDecorators : {},
+    publicMembers,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
 }
@@ -573,6 +586,72 @@ function scanProvidesMethods(
   }
 
   return results;
+}
+
+// ── Public member extraction (for scoped proxy generation) ──
+
+/**
+ * Extract all public non-lifecycle members from a class and its parent chain.
+ * Walks up the inheritance hierarchy (stopping at node_modules boundaries)
+ * and collects getters, methods, and properties, skipping private/protected,
+ * constructors, and lifecycle methods (@PostConstruct, @PreDestroy).
+ */
+function extractPublicMembers(
+  cls: ClassDeclaration,
+  lifecycle: { preDestroy: string[]; postConstruct: string[] },
+): ScannedPublicMember[] {
+  const members: ScannedPublicMember[] = [];
+  const seen = new Set<string>();
+  const lifecycleMethods = new Set([
+    ...lifecycle.preDestroy,
+    ...lifecycle.postConstruct,
+  ]);
+
+  let current: ClassDeclaration | undefined = cls;
+  while (current) {
+    // Getters
+    for (const getter of current.getGetAccessors()) {
+      const name = getter.getName();
+      if (seen.has(name)) continue;
+      if (getter.getScope() === 'private' || getter.getScope() === 'protected')
+        continue;
+      seen.add(name);
+      members.push({ name, kind: 'getter' });
+    }
+
+    // Methods (excluding lifecycle)
+    for (const method of current.getMethods()) {
+      const name = method.getName();
+      if (seen.has(name)) continue;
+      if (method.getScope() === 'private' || method.getScope() === 'protected')
+        continue;
+      if (lifecycleMethods.has(name)) continue;
+      seen.add(name);
+      members.push({ name, kind: 'method' });
+    }
+
+    // Properties (non-accessor, non-private)
+    for (const prop of current.getProperties()) {
+      const name = String(prop.getName());
+      if (seen.has(name)) continue;
+      if (prop.getScope() === 'private' || prop.getScope() === 'protected')
+        continue;
+      // Skip constructor parameter properties (they're implementation details)
+      if (prop.hasAccessorKeyword?.()) {
+        seen.add(name);
+        members.push({ name, kind: 'property' });
+      }
+    }
+
+    // Walk up inheritance chain
+    const baseClass = current.getBaseClass();
+    if (!baseClass) break;
+    const filePath = baseClass.getSourceFile().getFilePath();
+    if (filePath.includes('node_modules') || filePath.includes('/lib.')) break;
+    current = baseClass;
+  }
+
+  return members;
 }
 
 // ── Lifecycle method scanning (@PreDestroy + @PostConstruct in one pass) ──

@@ -531,33 +531,23 @@ export class ApplicationContext {
   }
 
   /**
-   * Create a proxy that delegates to the current request scope's instance.
-   * Used when a singleton depends on a request-scoped bean.
+   * Create a scoped proxy that delegates to the current request scope's instance.
+   * Uses a compile-time generated proxy factory (from the transformer) when available.
+   * The factory creates an Object.create-based delegation object with the correct
+   * prototype chain — no runtime Proxy or reflection needed.
    */
   private createRequestScopeProxy(def: BeanDefinition): unknown {
-    const resolve = () => this.getRequestScopedInstance(def) as object;
-    return new Proxy(Object.create(null), {
-      get(_, prop) {
-        const target = resolve();
-        return Reflect.get(target, prop, target);
-      },
-      set(_, prop, value) {
-        const target = resolve();
-        return Reflect.set(target, prop, value, target);
-      },
-      has(_, prop) {
-        return Reflect.has(resolve(), prop);
-      },
-      ownKeys() {
-        return Reflect.ownKeys(resolve());
-      },
-      getOwnPropertyDescriptor(_, prop) {
-        return Reflect.getOwnPropertyDescriptor(resolve(), prop);
-      },
-      getPrototypeOf() {
-        return Reflect.getPrototypeOf(resolve());
-      },
-    });
+    const resolve = () => this.getRequestScopedInstance(def);
+    const factory = def.metadata.scopedProxyFactory as
+      | ((resolve: () => unknown) => unknown)
+      | undefined;
+    if (factory) {
+      return factory(resolve);
+    }
+    throw new Error(
+      `No scoped proxy factory for request-scoped bean '${tokenName(def.token)}'. ` +
+        `Ensure the transformer generated a scopedProxyFactory in the bean metadata.`,
+    );
   }
 
   private applyPostProcessorsSync<T>(bean: T, def: BeanDefinition): T {

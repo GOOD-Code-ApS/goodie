@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import type { IRBeanDefinition, TokenRef } from './ir.js';
+import type { IRBeanDefinition, IRPublicMember, TokenRef } from './ir.js';
 import type { CodegenContribution } from './options.js';
 
 /** Info about an auto-generated InjectionToken. */
@@ -220,6 +220,25 @@ export function generateCode(
     lines.push('');
   }
 
+  // Scoped proxy factories for request-scoped beans
+  const scopedProxyBeans = beans.filter(
+    (b) =>
+      b.scope === 'request' && b.publicMembers && b.publicMembers.length > 0,
+  );
+  const scopedProxyNames = new Map<IRBeanDefinition, string>();
+  for (const bean of scopedProxyBeans) {
+    const className =
+      bean.tokenRef.kind === 'class'
+        ? bean.tokenRef.className
+        : bean.tokenRef.tokenName;
+    const fnName = `__${className}$scopedProxy`;
+    scopedProxyNames.set(bean, fnName);
+    lines.push(
+      ...generateScopedProxyFactory(fnName, className, bean.publicMembers!),
+    );
+    lines.push('');
+  }
+
   // Bean definitions array
   if (needsConfigBean) {
     lines.push(
@@ -262,7 +281,8 @@ export function generateCode(
     );
     lines.push(`    factory: ${factoryToCode(bean, interceptorDepsPerBean)},`);
     lines.push(`    eager: ${bean.eager},`);
-    lines.push(`    metadata: ${metadataToCode(bean.metadata)},`);
+    const proxyFnName = scopedProxyNames.get(bean);
+    lines.push(`    metadata: ${metadataToCode(bean.metadata, proxyFnName)},`);
     if (bean.baseTokenRefs && bean.baseTokenRefs.length > 0) {
       const baseTokensList = bean.baseTokenRefs
         .map((ref) => ref.className)
@@ -738,11 +758,17 @@ function providesFactoryToCode(bean: IRBeanDefinition): string {
   return `(${paramList}) => (dep0 as ${moduleTokenRef.className}).${methodName}(${argList})`;
 }
 
-function metadataToCode(metadata: Record<string, unknown>): string {
+function metadataToCode(
+  metadata: Record<string, unknown>,
+  scopedProxyFnName?: string,
+): string {
   const entries = Object.entries(metadata);
-  if (entries.length === 0) return '{}';
-
   const items = entries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+  // scopedProxyFactory is a function reference, not JSON — must be emitted as an identifier
+  if (scopedProxyFnName) {
+    items.push(`scopedProxyFactory: ${scopedProxyFnName}`);
+  }
+  if (items.length === 0) return '{}';
   return `{ ${items.join(', ')} }`;
 }
 
@@ -811,4 +837,34 @@ function escapeStringLiteral(value: string): string {
     .replace(/'/g, "\\'")
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r');
+}
+
+/**
+ * Generate a compile-time scoped proxy factory function for a request-scoped bean.
+ * Uses Object.create to build a delegation object with the correct prototype chain.
+ * Getters/properties delegate via get(); methods delegate via get() + bind().
+ */
+function generateScopedProxyFactory(
+  fnName: string,
+  className: string,
+  members: IRPublicMember[],
+): string[] {
+  const lines: string[] = [];
+  lines.push(`function ${fnName}(resolve: () => any) {`);
+  lines.push(`  return Object.create(${className}.prototype, {`);
+  for (const member of members) {
+    if (member.kind === 'method') {
+      lines.push(
+        `    ${member.name}: { get() { const t = resolve(); return t.${member.name}.bind(t) }, configurable: true },`,
+      );
+    } else {
+      // getter or property — delegate read access
+      lines.push(
+        `    ${member.name}: { get() { return resolve().${member.name} }, configurable: true },`,
+      );
+    }
+  }
+  lines.push('  })');
+  lines.push('}');
+  return lines;
 }

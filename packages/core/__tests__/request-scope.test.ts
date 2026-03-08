@@ -8,6 +8,9 @@ import type { Scope } from '../src/types.js';
 
 class RequestService {
   value = 'default';
+  getValue() {
+    return this.value;
+  }
 }
 
 class AsyncRequestService {
@@ -23,6 +26,38 @@ class SingletonService {
 
 function dep(token: Dependency['token'], optional = false): Dependency {
   return { token, optional, collection: false };
+}
+
+/**
+ * Build a compile-time scoped proxy factory (mimics what the transformer generates).
+ * Uses Object.create with property descriptors — no runtime Proxy.
+ */
+function buildScopedProxyFactory(
+  proto: object,
+  members: Array<{ name: string; kind: 'getter' | 'method' | 'property' }>,
+): (resolve: () => any) => any {
+  return (resolve: () => any) => {
+    const descriptors: PropertyDescriptorMap = {};
+    for (const member of members) {
+      if (member.kind === 'method') {
+        descriptors[member.name] = {
+          get() {
+            const t = resolve();
+            return t[member.name].bind(t);
+          },
+          configurable: true,
+        };
+      } else {
+        descriptors[member.name] = {
+          get() {
+            return resolve()[member.name];
+          },
+          configurable: true,
+        };
+      }
+    }
+    return Object.create(proto, descriptors);
+  };
 }
 
 function makeDef<T>(
@@ -84,11 +119,17 @@ describe('Request-scoped beans', () => {
     expect(() => ctx.get(RequestService)).toThrow('No active request scope');
   });
 
-  it('should inject a proxy when a singleton depends on request-scoped bean', async () => {
+  it('should inject a compile-time scoped proxy when a singleton depends on request-scoped bean', async () => {
+    const proxyFactory = buildScopedProxyFactory(RequestService.prototype, [
+      { name: 'value', kind: 'property' },
+      { name: 'getValue', kind: 'method' },
+    ]);
+
     const ctx = await ApplicationContext.create([
       makeDef(RequestService, {
         scope: 'request',
         factory: () => new RequestService(),
+        metadata: { scopedProxyFactory: proxyFactory },
       }),
       makeDef(SingletonService, {
         scope: 'singleton',
@@ -117,11 +158,17 @@ describe('Request-scoped beans', () => {
     });
   });
 
-  it('should support instanceof and prototype checks on proxy', async () => {
+  it('should support instanceof on compile-time scoped proxy', async () => {
+    const proxyFactory = buildScopedProxyFactory(RequestService.prototype, [
+      { name: 'value', kind: 'property' },
+      { name: 'getValue', kind: 'method' },
+    ]);
+
     const ctx = await ApplicationContext.create([
       makeDef(RequestService, {
         scope: 'request',
         factory: () => new RequestService(),
+        metadata: { scopedProxyFactory: proxyFactory },
       }),
       makeDef(SingletonService, {
         scope: 'singleton',
@@ -132,12 +179,30 @@ describe('Request-scoped beans', () => {
 
     const singleton = ctx.get(SingletonService);
 
+    // instanceof works because Object.create uses the real prototype
+    expect(singleton.requestService instanceof RequestService).toBe(true);
+
     await RequestScopeManager.run(() => {
-      // The proxy's prototype matches the real instance
       expect(singleton.requestService instanceof RequestService).toBe(true);
-      // `in` operator works
-      expect('value' in singleton.requestService).toBe(true);
+      expect(singleton.requestService.value).toBe('default');
     });
+  });
+
+  it('should throw when no scopedProxyFactory is provided', async () => {
+    const ctx = await ApplicationContext.create([
+      makeDef(RequestService, {
+        scope: 'request',
+        factory: () => new RequestService(),
+        // No scopedProxyFactory in metadata
+      }),
+      makeDef(SingletonService, {
+        scope: 'singleton',
+        deps: [dep(RequestService)],
+        factory: (rs: unknown) => new SingletonService(rs as RequestService),
+      }),
+    ]);
+
+    expect(() => ctx.get(SingletonService)).toThrow('No scoped proxy factory');
   });
 
   it('should pass env bindings through RequestScopeManager', async () => {

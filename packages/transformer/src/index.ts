@@ -36,6 +36,7 @@ export type {
   IRDependency,
   IRFieldInjection,
   IRProvides,
+  IRPublicMember,
   SourceLocation,
   TokenRef,
 } from './ir.js';
