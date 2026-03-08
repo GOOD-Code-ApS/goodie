@@ -18,7 +18,7 @@ import type { SecurityProvider } from './security-provider.js';
 /** Convert a controller method's return value to a Hono Response. */
 export function handleResult(c: Context, result: unknown): Response {
   if (result instanceof Response) return result;
-  if (result === undefined) return c.body(null, 204);
+  if (result === undefined || result === null) return c.body(null, 204);
   return c.json(result as object);
 }
 
