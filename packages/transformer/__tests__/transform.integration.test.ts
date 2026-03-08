@@ -1262,7 +1262,7 @@ describe('Transform Pipeline (Integration)', () => {
       );
     });
 
-    it('should export definitions and createContext', () => {
+    it('should export createContext and app', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
           import { Injectable } from './decorators.js'
@@ -1271,22 +1271,12 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.code).toContain('export { definitions }');
       expect(result.code).toContain('export async function createContext()');
-    });
-
-    it('should export Goodie app builder', () => {
-      const result = createTestProject({
-        '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
-          export class Repo {}
-        `,
-      });
-
       expect(result.code).toContain(
         'export const app = Goodie.build(definitions)',
       );
+      expect(result.code).not.toContain('export { definitions }');
+      expect(result.code).not.toContain('export function createApp');
     });
   });
 });

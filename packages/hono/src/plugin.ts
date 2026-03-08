@@ -80,15 +80,16 @@ interface ControllerBean {
 
 /**
  * Transformer plugin that scans `@Controller` classes and `@Get`/`@Post`/etc.
- * route methods, then generates `createRouter()` and `startServer()`.
+ * route methods, then generates `createRouter()` and an `app.onStart()` hook
+ * that wires the router to `EmbeddedServer`.
  *
  * When route decorators include a second argument with OpenAPI options,
  * generates `describeRoute()` middleware from `hono-openapi` and mounts
  * `openAPIRouteHandler()` to serve the OpenAPI spec.
  *
  * Reads `server.runtime` from build-time config to determine the entry point:
- * - `'node'` (default) / `'bun'` / `'deno'` → generates `startServer()` with `EmbeddedServer`
- * - `'cloudflare'` → serverless: skips `startServer()` and `EmbeddedServer` import (use `createRouter()` directly)
+ * - `'node'` (default) / `'bun'` / `'deno'` → generates `app.onStart()` hook with `EmbeddedServer`
+ * - `'cloudflare'` → serverless: skips the hook and `EmbeddedServer` import (use `createRouter()` directly)
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
@@ -239,7 +240,7 @@ export default function createHonoPlugin(): TransformerPlugin {
           hasRequestScoped,
         ),
         '',
-        ...(isServerless ? [] : generateEntryPoint()),
+        ...(isServerless ? [] : generateOnStartHook()),
         '',
         'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
         '  return hc<AppType>(baseUrl, options)',
@@ -460,14 +461,12 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
   return result;
 }
 
-function generateEntryPoint(): string[] {
+function generateOnStartHook(): string[] {
   return [
-    'export async function startServer(options?: { port?: number; host?: string }) {',
-    '  const ctx = await app.start()',
+    'app.onStart(async (ctx) => {',
     '  const router = createRouter(ctx)',
-    '  await ctx.get(EmbeddedServer).listen(router, options)',
-    '  return ctx',
-    '}',
+    '  await ctx.get(EmbeddedServer).listen(router)',
+    '})',
   ];
 }
 

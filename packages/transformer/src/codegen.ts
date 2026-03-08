@@ -302,7 +302,7 @@ export function generateCode(
   }
   lines.push('');
 
-  // createContext function
+  // createContext — for testing and advanced use (supports config overrides)
   if (needsConfigBean) {
     lines.push(
       'export async function createContext(config?: Record<string, unknown>): Promise<ApplicationContext> {',
@@ -321,18 +321,9 @@ export function generateCode(
     lines.push('}');
   }
   lines.push('');
-  lines.push('export { definitions }');
-  lines.push('');
 
-  if (needsConfigBean) {
-    lines.push('export function createApp(config?: Record<string, unknown>) {');
-    lines.push('  return Goodie.build(buildDefinitions(config))');
-    lines.push('}');
-    lines.push('');
-    lines.push('export const app = createApp()');
-  } else {
-    lines.push('export const app = Goodie.build(definitions)');
-  }
+  // app — the main entry point: `await app.start()`
+  lines.push('export const app = Goodie.build(definitions)');
   lines.push('');
 
   // Plugin contribution code

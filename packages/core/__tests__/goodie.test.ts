@@ -108,4 +108,27 @@ describe('Goodie Builder', () => {
     expect(ctx.get(Config).port).toBe(3000);
     await ctx.close();
   });
+
+  it('runs onStart hooks after context is created', async () => {
+    class Service {
+      started = false;
+    }
+
+    const hookCalls: string[] = [];
+    const ctx = await Goodie.build([
+      makeDef(Service, { factory: () => new Service() }),
+    ])
+      .onStart(async (ctx) => {
+        hookCalls.push('hook1');
+        ctx.get(Service).started = true;
+      })
+      .onStart(async () => {
+        hookCalls.push('hook2');
+      })
+      .start();
+
+    expect(ctx.get(Service).started).toBe(true);
+    expect(hookCalls).toEqual(['hook1', 'hook2']);
+    await ctx.close();
+  });
 });

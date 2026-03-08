@@ -31,7 +31,7 @@ function createProject(
 }
 
 describe('Hono Plugin Codegen', () => {
-  it('generates createRouter and startServer when @Controller classes exist', () => {
+  it('generates createRouter and onStart hook when @Controller classes exist', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
@@ -46,8 +46,9 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain(
       'export function createRouter(ctx: ApplicationContext)',
     );
-    expect(result.code).toContain('export async function startServer');
+    expect(result.code).toContain('app.onStart(async (ctx) => {');
     expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
+    expect(result.code).not.toContain('export async function startServer');
     expect(result.code).toContain(
       'export type AppType = ReturnType<typeof createRouter>',
     );
@@ -129,7 +130,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain('ctx.get(UserController)');
   });
 
-  it('does not generate createRouter or startServer when no controllers exist', () => {
+  it('does not generate createRouter or onStart hook when no controllers exist', () => {
     const result = createProject({
       '/src/MyService.ts': `
         import { Singleton } from './decorators.js'
@@ -139,7 +140,7 @@ describe('Hono Plugin Codegen', () => {
     });
 
     expect(result.code).not.toContain('EmbeddedServer');
-    expect(result.code).not.toContain('startServer');
+    expect(result.code).not.toContain('app.onStart');
     expect(result.code).not.toContain('Hono');
     expect(result.code).not.toContain('createRouter');
     expect(result.code).not.toContain('AppType');
@@ -997,10 +998,10 @@ describe('Multi-runtime codegen', () => {
     }
   `;
 
-  it('generates startServer with EmbeddedServer for node runtime (default)', () => {
+  it('generates onStart hook with EmbeddedServer for node runtime (default)', () => {
     const result = createProject({ '/src/UserController.ts': controllerFile });
 
-    expect(result.code).toContain('export async function startServer');
+    expect(result.code).toContain('app.onStart(async (ctx) => {');
     expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
     expect(result.code).toContain(
       "import { EmbeddedServer } from '@goodie-ts/hono'",
@@ -1009,7 +1010,7 @@ describe('Multi-runtime codegen', () => {
     expect(result.code).not.toContain('export default');
   });
 
-  it('skips startServer and EmbeddedServer for cloudflare runtime', () => {
+  it('skips onStart hook and EmbeddedServer for cloudflare runtime', () => {
     const result = createProject(
       { '/src/UserController.ts': controllerFile },
       '/out/AppContext.generated.ts',
@@ -1017,7 +1018,7 @@ describe('Multi-runtime codegen', () => {
       { 'server.runtime': 'cloudflare' },
     );
 
-    expect(result.code).not.toContain('startServer');
+    expect(result.code).not.toContain('app.onStart');
     expect(result.code).not.toContain('EmbeddedServer');
     expect(result.code).toContain(
       'export function createRouter(ctx: ApplicationContext)',
