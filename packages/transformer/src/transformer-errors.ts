@@ -6,7 +6,10 @@ function formatLocation(loc: SourceLocation): string {
 
 /**
  * Find similar token names using Levenshtein distance.
- * Returns up to 3 suggestions within a threshold of max(3, name.length / 3).
+ * Returns up to 3 suggestions within a threshold of max(3, ceil(name.length / 2)).
+ *
+ * NOTE: levenshtein/findSimilar are duplicated in packages/core/src/application-context.ts
+ * (separate packages, no shared util). Keep threshold logic in sync.
  */
 export function findSimilarTokens(
   name: string,

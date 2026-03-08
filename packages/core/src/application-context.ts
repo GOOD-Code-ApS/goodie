@@ -537,12 +537,9 @@ export class ApplicationContext {
     const name = tokenName(token);
     const registered = Array.from(this.primaryDef.keys()).map(tokenName);
     const similar = findSimilar(name, registered);
-    if (similar.length > 0) {
-      return new MissingDependencyError(
-        `${name}. Did you mean: ${similar.join(', ')}?`,
-      );
-    }
-    return new MissingDependencyError(name);
+    const hint =
+      similar.length > 0 ? `Did you mean: ${similar.join(', ')}?` : undefined;
+    return new MissingDependencyError(name, undefined, hint);
   }
 }
 
@@ -553,6 +550,8 @@ function tokenName(token: Token): string {
   return token.description;
 }
 
+// NOTE: findSimilar/levenshtein are duplicated in packages/transformer/src/transformer-errors.ts
+// (separate packages, no shared util). Keep threshold logic in sync.
 function findSimilar(
   name: string,
   candidates: string[],

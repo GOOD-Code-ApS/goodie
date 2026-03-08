@@ -59,6 +59,7 @@ function runPluginHook<T>(
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(
       `Error in plugin '${pluginName}' during ${hookName}: ${message}`,
+      { cause: err },
     );
   }
 }
