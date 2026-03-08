@@ -149,6 +149,20 @@ describe('createGoodieTest()', () => {
     });
   });
 
+  // ── setup with provide() ────────────────────────────────────────
+
+  describe('setup with provide()', () => {
+    const AUTH_TOKEN = new InjectionToken<{ user: string }>('Auth');
+
+    const test = createGoodieTest([greeterDef], {
+      setup: (builder) => builder.provide(AUTH_TOKEN, { user: 'test-user' }),
+    });
+
+    test('resolves provided bean from setup', ({ ctx }) => {
+      expect(ctx.get(AUTH_TOKEN).user).toBe('test-user');
+    });
+  });
+
   // ── resolve() with InjectionToken ────────────────────────────────
 
   describe('resolve() with InjectionToken', () => {

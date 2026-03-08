@@ -193,6 +193,11 @@ export class TestContextBuilder {
     token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
     value: T,
   ): TestContextBuilder {
+    if (this.tokenSet.has(token as Token)) {
+      throw new OverrideError(
+        `${tokenName(token as Token)} already exists in base definitions — use override() instead`,
+      );
+    }
     const def: BeanDefinition = {
       token: token as BeanDefinition['token'],
       scope: 'singleton',
