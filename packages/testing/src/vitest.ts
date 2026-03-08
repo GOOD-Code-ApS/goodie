@@ -121,18 +121,18 @@ export function createGoodieTest<
   // Resolve definitions once (lazily on first test) and reuse across all tests.
   // This ensures all tests share the same BeanDefinition[] reference, which is
   // critical for transactional rollback — tests must share the same connection pool.
-  // Note: config() is also evaluated once here and frozen for all tests.
+  // When definitions is a factory, config() is evaluated once here and frozen for all tests.
+  // When definitions is a raw array, config is applied per-test via builder.withConfig().
   let cachedDefs: BeanDefinition[] | undefined;
   function resolveDefinitions(): BeanDefinition[] {
     if (cachedDefs) return cachedDefs;
 
-    const configValue = options?.config
-      ? typeof options.config === 'function'
-        ? options.config()
-        : options.config
-      : undefined;
-
     if (typeof definitions === 'function') {
+      const configValue = options?.config
+        ? typeof options.config === 'function'
+          ? options.config()
+          : options.config
+        : undefined;
       cachedDefs = definitions(configValue);
     } else {
       cachedDefs = definitions;

@@ -139,4 +139,27 @@ describe('Goodie Builder', () => {
 
     await expect(builder.start()).rejects.toThrow('hook failed');
   });
+
+  it('closes context when an onStart hook throws', async () => {
+    let destroyed = false;
+
+    class Resource {
+      destroy() {
+        destroyed = true;
+      }
+    }
+
+    const builder = Goodie.build([
+      makeDef(Resource, {
+        factory: () => new Resource(),
+        eager: true,
+        metadata: { preDestroyMethods: ['destroy'] },
+      }),
+    ]).onStart(async () => {
+      throw new Error('hook failed');
+    });
+
+    await expect(builder.start()).rejects.toThrow('hook failed');
+    expect(destroyed).toBe(true);
+  });
 });

@@ -454,7 +454,7 @@ describe('Code Generator', () => {
       'return ApplicationContext.create(buildDefinitions(), { preSorted: true })',
     );
     expect(code).toContain(
-      'export function buildDefinitions(): BeanDefinition[]',
+      'export function buildDefinitions(_config?: Record<string, unknown>): BeanDefinition[]',
     );
     expect(code).toContain(
       'export const app = Goodie.build(buildDefinitions())',
@@ -818,7 +818,7 @@ describe('Code Generator', () => {
     expect(code).toContain('export function buildDefinitions(');
   });
 
-  it('should generate buildDefinitions without config param when no @Value fields exist', () => {
+  it('should generate buildDefinitions without config bean when no @Value fields exist', () => {
     const beans: IRBeanDefinition[] = [
       {
         tokenRef: {
@@ -843,9 +843,9 @@ describe('Code Generator', () => {
     });
 
     expect(code).toContain(
-      'export function buildDefinitions(): BeanDefinition[]',
+      'export function buildDefinitions(_config?: Record<string, unknown>): BeanDefinition[]',
     );
-    expect(code).not.toContain('config?');
+    expect(code).not.toContain('__Goodie_Config');
   });
 
   it('should always generate collection field in dependency output', () => {

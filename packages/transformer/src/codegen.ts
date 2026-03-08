@@ -269,7 +269,9 @@ export function generateCode(
     lines.push('      metadata: {},');
     lines.push('    },');
   } else {
-    lines.push('export function buildDefinitions(): BeanDefinition[] {');
+    lines.push(
+      'export function buildDefinitions(_config?: Record<string, unknown>): BeanDefinition[] {',
+    );
     lines.push('  return [');
   }
 

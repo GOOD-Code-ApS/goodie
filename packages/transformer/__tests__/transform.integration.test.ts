@@ -906,9 +906,8 @@ describe('Transform Pipeline (Integration)', () => {
 
       expect(result.code).not.toContain('__Goodie_Config');
       expect(result.code).toContain(
-        'export function buildDefinitions(): BeanDefinition[]',
+        'export function buildDefinitions(_config?: Record<string, unknown>): BeanDefinition[]',
       );
-      expect(result.code).not.toContain('config?');
     });
 
     it('should add config token as dependency only for beans with @Value', () => {
@@ -1278,7 +1277,7 @@ describe('Transform Pipeline (Integration)', () => {
         'export const app = Goodie.build(buildDefinitions())',
       );
       expect(result.code).toContain(
-        'export function buildDefinitions(): BeanDefinition[]',
+        'export function buildDefinitions(_config?: Record<string, unknown>): BeanDefinition[]',
       );
       expect(result.code).not.toContain('export function createApp');
     });

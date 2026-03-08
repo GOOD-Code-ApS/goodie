@@ -32,8 +32,13 @@ export class GoodieBuilder {
   /** Build and start the ApplicationContext, then run all onStart hooks. */
   async start(): Promise<ApplicationContext> {
     const ctx = await ApplicationContext.create(this.definitions);
-    for (const hook of this.hooks) {
-      await hook(ctx);
+    try {
+      for (const hook of this.hooks) {
+        await hook(ctx);
+      }
+    } catch (err) {
+      await ctx.close().catch(() => {});
+      throw err;
     }
     return ctx;
   }
