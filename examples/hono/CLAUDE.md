@@ -34,7 +34,7 @@ Library beans: PostgresKyselyDatabase(@Singleton, conditional on dialect=postgre
 @Controller('/api/todos') TodoController(todoService) → Hono routes via decorators
 │
 Generated: createRouter(ctx) → wires controllers to Hono app
-Generated: startServer()     → starts context + calls EmbeddedServer.listen(router)
+Generated: app.onStart()     → hook that starts EmbeddedServer with the router
 │
 Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer(@Singleton)
   └── config/default.json: { "server": { "host": "localhost", "port": 3000 } }
@@ -50,7 +50,7 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 | `src/TodoRepository.ts` | `@Singleton` repository injecting `Kysely<Database>` directly |
 | `src/TodoService.ts` | `@Singleton` business logic delegating to repository |
 | `src/TodoController.ts` | `@Controller('/api/todos')` with `@Get`, `@Post`, `@Patch`, `@Delete` routes |
-| `src/main.ts` | Bootstrap: `startServer()` from generated file |
+| `src/main.ts` | Bootstrap: `await app.start()` from generated file |
 | `config/default.json` | JSON config file for server, datasource, and pool settings |
 | `vite.config.ts` | Vite config with `diPlugin({ configDir: 'config' })` |
 | `src/AppContext.generated.ts` | **Generated** — gitignored, created by transformer + hono plugin |
@@ -60,26 +60,25 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 `AppContext.generated.ts` exports:
 - `__Goodie_Config` — `InjectionToken<Record<string, unknown>>` for config map
 - `buildDefinitions(config?)` — factory that returns `BeanDefinition[]` with optional config overrides
-- `definitions` — `buildDefinitions()` with defaults (loads `config/default.json` + `process.env`)
-- `createContext(config?)` — async factory
-- `createApp(config?)` — returns `Goodie.build()`
-- `app` — `createApp()` ready to `.start()`
+- `createContext(config?)` — async factory for testing with config overrides
+- `app` — `Goodie.build(definitions)` with `onStart` hook that starts the HTTP server
 - `createRouter(ctx)` — wires `@Controller` beans to Hono routes (contributed by hono plugin)
-- `startServer(options?)` — starts context and calls `EmbeddedServer.listen(router)` (contributed by hono plugin)
 
-## Test Pattern — createRouter(ctx) + TestContainers
+## Test Pattern — createGoodieTest + TestContainers
 
 ```typescript
 const container = await new PostgreSqlContainer('postgres:17-alpine').start();
 
-const test = createGoodieTest(buildDefinitions(), {
+const test = createGoodieTest(buildDefinitions, {
   config: () => ({ 'datasource.url': container.getConnectionUri() }),
   transactional: TransactionManager,
+  fixtures: {
+    app: (ctx) => createRouter(ctx),
+  },
 });
 
-test('POST /api/todos creates a todo', async ({ ctx }) => {
-  const honoApp = createRouter(ctx);
-  const res = await honoApp.request('/api/todos', {
+test('POST /api/todos creates a todo', async ({ app }) => {
+  const res = await app.request('/api/todos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: 'Buy groceries' }),
@@ -88,7 +87,7 @@ test('POST /api/todos creates a todo', async ({ ctx }) => {
 });
 ```
 
-Tests use `createRouter(ctx)` to get a Hono app wired to the test DI context. `honoApp.request()` invokes routes in-process without HTTP overhead.
+`createGoodieTest` accepts `buildDefinitions` (the function, not the result) so config flows through before bean construction. Custom fixtures like `app` are derived from the ApplicationContext. `app.request()` invokes routes in-process without HTTP overhead.
 
 ## Running
 

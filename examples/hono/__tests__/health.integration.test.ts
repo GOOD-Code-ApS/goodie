@@ -1,11 +1,9 @@
-import type { ApplicationContext } from '@goodie-ts/core';
 import { TransactionManager } from '@goodie-ts/kysely';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
-import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
 
@@ -20,22 +18,19 @@ describe('Health API', () => {
     await container?.stop();
   });
 
-  const test = createGoodieTest(buildDefinitions(), {
+  const test = createGoodieTest(buildDefinitions, {
     config: () => ({
       'datasource.url': container.getConnectionUri(),
       'datasource.dialect': 'postgres',
     }),
+    fixtures: {
+      app: (ctx) => createRouter(ctx),
+    },
     transactional: TransactionManager,
   });
 
-  function app(ctx: ApplicationContext): Hono {
-    return createRouter(ctx);
-  }
-
-  test('GET /health returns UP with indicators', async ({ ctx }) => {
-    const honoApp = app(ctx);
-
-    const res = await honoApp.request('/health');
+  test('GET /health returns UP with indicators', async ({ app }) => {
+    const res = await app.request('/health');
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -47,11 +42,9 @@ describe('Health API', () => {
   });
 
   test('GET /health includes database indicator with live connection', async ({
-    ctx,
+    app,
   }) => {
-    const honoApp = app(ctx);
-
-    const res = await honoApp.request('/health');
+    const res = await app.request('/health');
 
     const body = await res.json();
     expect(body.indicators.database).toEqual({ status: 'UP' });

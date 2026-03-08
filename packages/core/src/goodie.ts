@@ -5,14 +5,42 @@ import type { BeanDefinition } from './bean-definition.js';
  * Fluent builder for bootstrapping an ApplicationContext.
  *
  * Obtained via `Goodie.build(definitions)`. Call `.start()` to create
- * and initialize the context.
+ * and initialize the context. Plugins (e.g. hono) register `onStart`
+ * hooks to perform additional wiring (e.g. starting an HTTP server).
+ *
+ * Usage:
+ * ```ts
+ * import { app } from './AppContext.generated.js'
+ * await app.start()
+ * ```
  */
 export class GoodieBuilder {
+  private readonly hooks: Array<(ctx: ApplicationContext) => Promise<void>> =
+    [];
+
   constructor(private readonly definitions: BeanDefinition[]) {}
 
-  /** Build and start the ApplicationContext. */
+  /**
+   * Register a hook that runs after the ApplicationContext is created.
+   * Used by generated code to wire plugin behaviour (e.g. starting an HTTP server).
+   */
+  onStart(hook: (ctx: ApplicationContext) => Promise<void>): this {
+    this.hooks.push(hook);
+    return this;
+  }
+
+  /** Build and start the ApplicationContext, then run all onStart hooks. */
   async start(): Promise<ApplicationContext> {
-    return ApplicationContext.create(this.definitions);
+    const ctx = await ApplicationContext.create(this.definitions);
+    try {
+      for (const hook of this.hooks) {
+        await hook(ctx);
+      }
+    } catch (err) {
+      await ctx.close().catch(() => {});
+      throw err;
+    }
+    return ctx;
   }
 }
 

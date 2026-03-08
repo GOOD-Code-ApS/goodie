@@ -8,6 +8,31 @@ Test utilities for overriding beans in `ApplicationContext` during tests.
 |------|------|
 | `src/test-context.ts` | `TestContext.from()` → `TestContextBuilder` with fluent override API |
 | `src/mock-definition.ts` | `@MockDefinition(target)` decorator and `getMockTarget()` |
+| `src/vitest.ts` | `createGoodieTest()` — Vitest-native fixtures with `ctx`, `resolve`, custom fixtures, transactional rollback |
+
+## createGoodieTest() (Vitest Fixtures)
+
+```typescript
+const test = createGoodieTest(buildDefinitions, {
+  config: () => ({ 'datasource.url': container.getConnectionUri() }),
+  fixtures: {
+    app: (ctx) => createRouter(ctx),
+  },
+  transactional: TransactionManager,
+  setup: (b) => b.provide(SECURITY_PROVIDER, testSecurityProvider),
+});
+
+test('GET /todos', async ({ app, resolve }) => {
+  const res = await app.request('/api/todos');
+  expect(res.status).toBe(200);
+});
+```
+
+- Accepts `DefinitionsFactory | BeanDefinition[]` — when a function, config is passed through before bean construction
+- `fixtures` option: custom fixtures derived from the ApplicationContext (e.g. `app: (ctx) => createRouter(ctx)`)
+- `setup` option: customise the builder (`.override()`, `.mock()`, `.provide()`)
+- `transactional` option: wrap each test in a rollback transaction
+- Built-in fixtures: `ctx` (ApplicationContext, fresh per test), `resolve` (shorthand for `ctx.get()`)
 
 ## TestContext API
 
@@ -16,12 +41,16 @@ const ctx = await TestContext.from(definitions)   // or from(existingContext)
   .override(SomeToken).withValue(mockInstance)     // fixed value
   .override(OtherToken).with(MockClass)            // zero-dep class
   .override(ThirdToken).withFactory(() => new T())  // custom factory
+  .override(FourthToken).withDeps((dep) => ...)     // replace factory, keep deps
+  .provide(NewToken, value)                         // add a new test-only bean
   .mock(MockUserRepo, MockOrderRepo)               // @MockDefinition classes
+  .withConfig({ key: 'value' })                     // override config keys
   .build();                                         // → Promise<ApplicationContext>
 ```
 
-- `override(token)` returns `OverrideBuilder<T>` with `.withValue()`, `.with()`, `.withFactory()`
-- Throws `OverrideError` if the token doesn't exist in the base definitions
+- `override(token)` returns `OverrideBuilder<T>` with `.withValue()`, `.with()`, `.withFactory()`, `.withDeps()`
+- `provide(token, value)` adds a new bean (doesn't require the token to exist)
+- Throws `OverrideError` if `override()` target doesn't exist in the base definitions
 - Each `.build()` creates a fully isolated `ApplicationContext`
 
 ## @MockDefinition Pattern
@@ -43,5 +72,6 @@ class MockUserRepository extends Repository<User> {
 ## Gotchas
 
 - All overrides produce zero-dependency singleton beans (the override replaces the full factory)
-- `override()` validates the token exists — you can't add new beans, only replace existing ones
+- `override()` validates the token exists — you can't add new beans, only replace existing ones (use `provide()` for that)
 - Each `build()` is independent — overrides in one builder don't affect others
+- When `createGoodieTest` receives a `DefinitionsFactory`, config is passed to the factory directly — `withConfig()` is only used for the raw `BeanDefinition[]` path

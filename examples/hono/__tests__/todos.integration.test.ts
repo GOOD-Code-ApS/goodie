@@ -1,4 +1,3 @@
-import type { ApplicationContext, BeanDefinition } from '@goodie-ts/core';
 import {
   SECURITY_PROVIDER,
   type SecurityProvider,
@@ -10,7 +9,6 @@ import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
-import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
 
@@ -27,16 +25,6 @@ const testSecurityProvider: SecurityProvider = {
   },
 };
 
-/** Bean definition that registers the test SecurityProvider. */
-const securityProviderBean: BeanDefinition<SecurityProvider> = {
-  token: SECURITY_PROVIDER,
-  scope: 'singleton',
-  dependencies: [],
-  factory: () => testSecurityProvider,
-  eager: false,
-  metadata: {},
-};
-
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
 
@@ -48,22 +36,25 @@ describe('Hono + PostgreSQL Todo API', () => {
     await container?.stop();
   });
 
-  const test = createGoodieTest([...buildDefinitions(), securityProviderBean], {
+  const test = createGoodieTest(buildDefinitions, {
     config: () => ({
       'datasource.url': container.getConnectionUri(),
       'datasource.dialect': 'postgres',
     }),
+    fixtures: {
+      app: (ctx) => createRouter(ctx),
+    },
+    setup: (b) => b.provide(SECURITY_PROVIDER, testSecurityProvider),
     transactional: TransactionManager,
   });
 
   const AUTH_HEADERS = { Authorization: 'Bearer test-user' };
 
-  function app(ctx: ApplicationContext): Hono {
-    return createRouter(ctx);
-  }
-
-  async function createTodo(honoApp: Hono, title: string) {
-    const res = await honoApp.request('/api/todos', {
+  async function createTodo(
+    app: ReturnType<typeof createRouter>,
+    title: string,
+  ) {
+    const res = await app.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ title }),
@@ -71,10 +62,8 @@ describe('Hono + PostgreSQL Todo API', () => {
     return res.json();
   }
 
-  test('POST /api/todos creates a todo and returns 201', async ({ ctx }) => {
-    const honoApp = app(ctx);
-
-    const res = await honoApp.request('/api/todos', {
+  test('POST /api/todos creates a todo and returns 201', async ({ app }) => {
+    const res = await app.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ title: 'Buy groceries' }),
@@ -87,12 +76,11 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.id).toBeDefined();
   });
 
-  test('GET /api/todos lists all todos', async ({ ctx }) => {
-    const honoApp = app(ctx);
-    await createTodo(honoApp, 'First item');
-    await createTodo(honoApp, 'Second item');
+  test('GET /api/todos lists all todos', async ({ app }) => {
+    await createTodo(app, 'First item');
+    await createTodo(app, 'Second item');
 
-    const res = await honoApp.request('/api/todos');
+    const res = await app.request('/api/todos');
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -103,11 +91,10 @@ describe('Hono + PostgreSQL Todo API', () => {
     ]);
   });
 
-  test('GET /api/todos/:id returns a specific todo', async ({ ctx }) => {
-    const honoApp = app(ctx);
-    const created = await createTodo(honoApp, 'Specific todo');
+  test('GET /api/todos/:id returns a specific todo', async ({ app }) => {
+    const created = await createTodo(app, 'Specific todo');
 
-    const res = await honoApp.request(`/api/todos/${created.id}`, {
+    const res = await app.request(`/api/todos/${created.id}`, {
       headers: AUTH_HEADERS,
     });
 
@@ -117,11 +104,10 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.title).toBe('Specific todo');
   });
 
-  test('PATCH /api/todos/:id updates a todo', async ({ ctx }) => {
-    const honoApp = app(ctx);
-    const created = await createTodo(honoApp, 'To be updated');
+  test('PATCH /api/todos/:id updates a todo', async ({ app }) => {
+    const created = await createTodo(app, 'To be updated');
 
-    const res = await honoApp.request(`/api/todos/${created.id}`, {
+    const res = await app.request(`/api/todos/${created.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ completed: true }),
@@ -133,11 +119,10 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.completed).toBe(true);
   });
 
-  test('DELETE /api/todos/:id removes a todo', async ({ ctx }) => {
-    const honoApp = app(ctx);
-    const created = await createTodo(honoApp, 'To be deleted');
+  test('DELETE /api/todos/:id removes a todo', async ({ app }) => {
+    const created = await createTodo(app, 'To be deleted');
 
-    const res = await honoApp.request(`/api/todos/${created.id}`, {
+    const res = await app.request(`/api/todos/${created.id}`, {
       method: 'DELETE',
       headers: AUTH_HEADERS,
     });
@@ -147,11 +132,10 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.id).toBe(created.id);
   });
 
-  test('GET /api/todos/:id returns 404 for missing todo', async ({ ctx }) => {
-    const honoApp = app(ctx);
+  test('GET /api/todos/:id returns 404 for missing todo', async ({ app }) => {
     const fakeId = '00000000-0000-0000-0000-000000000000';
 
-    const res = await honoApp.request(`/api/todos/${fakeId}`, {
+    const res = await app.request(`/api/todos/${fakeId}`, {
       headers: AUTH_HEADERS,
     });
 
@@ -160,10 +144,8 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.error).toBe('Todo not found');
   });
 
-  test('POST /api/todos returns 400 for missing title', async ({ ctx }) => {
-    const honoApp = app(ctx);
-
-    const res = await honoApp.request('/api/todos', {
+  test('POST /api/todos returns 400 for missing title', async ({ app }) => {
+    const res = await app.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({}),
@@ -179,10 +161,8 @@ describe('Hono + PostgreSQL Todo API', () => {
     );
   });
 
-  test('POST /api/todos returns 400 for empty title', async ({ ctx }) => {
-    const honoApp = app(ctx);
-
-    const res = await honoApp.request('/api/todos', {
+  test('POST /api/todos returns 400 for empty title', async ({ app }) => {
+    const res = await app.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ title: '' }),
@@ -195,12 +175,11 @@ describe('Hono + PostgreSQL Todo API', () => {
   });
 
   test('PATCH /api/todos/:id returns 400 for invalid completed field', async ({
-    ctx,
+    app,
   }) => {
-    const honoApp = app(ctx);
-    const created = await createTodo(honoApp, 'Valid todo');
+    const created = await createTodo(app, 'Valid todo');
 
-    const res = await honoApp.request(`/api/todos/${created.id}`, {
+    const res = await app.request(`/api/todos/${created.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
       body: JSON.stringify({ completed: 'not-a-boolean' }),
@@ -211,10 +190,8 @@ describe('Hono + PostgreSQL Todo API', () => {
     expect(body.error).toBe('Validation failed');
   });
 
-  test('POST /api/todos returns 401 without auth header', async ({ ctx }) => {
-    const honoApp = app(ctx);
-
-    const res = await honoApp.request('/api/todos', {
+  test('POST /api/todos returns 401 without auth header', async ({ app }) => {
+    const res = await app.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: 'Should fail' }),
@@ -226,12 +203,11 @@ describe('Hono + PostgreSQL Todo API', () => {
   });
 
   test('DELETE /api/todos/:id returns 401 without auth header', async ({
-    ctx,
+    app,
   }) => {
-    const honoApp = app(ctx);
-    const created = await createTodo(honoApp, 'Auth required');
+    const created = await createTodo(app, 'Auth required');
 
-    const res = await honoApp.request(`/api/todos/${created.id}`, {
+    const res = await app.request(`/api/todos/${created.id}`, {
       method: 'DELETE',
     });
 

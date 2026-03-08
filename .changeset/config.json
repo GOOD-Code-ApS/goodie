@@ -7,7 +7,7 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "minor",
-  "ignore": ["@goodie-ts/example-basic", "@goodie-ts/example-hono"],
+  "ignore": ["@goodie-ts/example-hono"],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
     "onlyUpdatePeerDependentsWhenOutOfRange": true
   }

@@ -4,7 +4,7 @@ import { ConfigurationProperties, Singleton } from '@goodie-ts/core';
  * Supported server runtimes.
  *
  * - `'node'` / `'bun'` / `'deno'` — `EmbeddedServer` starts a long-running server
- * - `'cloudflare'` — serverless: codegen skips `startServer()` and `EmbeddedServer` import
+ * - `'cloudflare'` — serverless: codegen skips `app.onStart()` hook and `EmbeddedServer` import
  */
 export type ServerRuntime = 'node' | 'bun' | 'deno' | 'cloudflare';
 

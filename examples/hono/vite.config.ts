@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [diPlugin({ scan: ['@goodie-ts'], configDir: 'config' })],
   esbuild: { target: 'es2022' },
   build: {
+    target: 'es2022',
     lib: {
       entry: 'src/main.ts',
       formats: ['es'],
