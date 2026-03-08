@@ -131,4 +131,12 @@ describe('Goodie Builder', () => {
     expect(hookCalls).toEqual(['hook1', 'hook2']);
     await ctx.close();
   });
+
+  it('propagates errors from onStart hooks', async () => {
+    const builder = Goodie.build([]).onStart(async () => {
+      throw new Error('hook failed');
+    });
+
+    await expect(builder.start()).rejects.toThrow('hook failed');
+  });
 });

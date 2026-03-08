@@ -1,6 +1,9 @@
+import { RequestScopeManager } from '@goodie-ts/core';
 import type { Context, Hono, Next } from 'hono';
 import { cors } from 'hono/cors';
+import type { DescribeRouteOptions } from 'hono-openapi';
 import { describeRoute, openAPIRouteHandler, validator } from 'hono-openapi';
+import type { GoodieEnv } from './goodie-env.js';
 import type { SecurityProvider } from './security-provider.js';
 
 /**
@@ -15,7 +18,7 @@ import type { SecurityProvider } from './security-provider.js';
 /** Convert a controller method's return value to a Hono Response. */
 export function handleResult(c: Context, result: unknown): Response {
   if (result instanceof Response) return result;
-  if (result === undefined || result === null) return c.body(null, 204);
+  if (result === undefined) return c.body(null, 204);
   return c.json(result as object);
 }
 
@@ -28,7 +31,7 @@ export function securityMiddleware(
   securityProvider: SecurityProvider | undefined,
   mode: 'required' | 'optional',
 ) {
-  return async (c: Context, next: Next) => {
+  return async (c: Context<GoodieEnv>, next: Next) => {
     if (!securityProvider) {
       if (mode === 'required') return c.json({ error: 'Unauthorized' }, 401);
       return next();
@@ -42,7 +45,7 @@ export function securityMiddleware(
     if (mode === 'required' && !principal) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    if (principal) c.set('principal' as never, principal as never);
+    if (principal) c.set('principal', principal);
     return next();
   };
 }
@@ -50,6 +53,8 @@ export function securityMiddleware(
 /** Create validation middleware for a request body/query/param. */
 export function validationMiddleware(
   target: 'json' | 'query' | 'param',
+  // Schema type is StandardSchemaV1 from @standard-schema/spec (transitive dep
+  // via hono-openapi), but not a direct dep — so we accept unknown here.
   schema: unknown,
 ) {
   return validator(
@@ -60,12 +65,12 @@ export function validationMiddleware(
         return c.json(
           {
             error: 'Validation failed',
-            issues: (
-              result.error as Array<{ path: string; message: string }>
-            ).map((i: { path: string; message: string }) => ({
-              path: i.path,
-              message: i.message,
-            })),
+            issues: result.error.map(
+              (i: { path: string; message: string }) => ({
+                path: i.path,
+                message: i.message,
+              }),
+            ),
           },
           400,
         );
@@ -75,8 +80,8 @@ export function validationMiddleware(
 }
 
 /** Create OpenAPI describeRoute middleware. */
-export function openApiMiddleware(options: Record<string, unknown>) {
-  return describeRoute(options as never);
+export function openApiMiddleware(options: DescribeRouteOptions) {
+  return describeRoute(options);
 }
 
 /** Mount the OpenAPI JSON spec handler on a router. */
@@ -84,9 +89,11 @@ export function mountOpenApiSpec(
   router: Hono,
   config: { title: string; version: string; description?: string },
 ) {
+  // Cast needed: router's generic schema type is built at compile time
+  // via route chaining — unknowable at this runtime abstraction layer.
   (router as any).get(
     '/openapi.json',
-    openAPIRouteHandler(router as never, {
+    openAPIRouteHandler(router as any, {
       documentation: {
         info: {
           title: config.title,
@@ -100,5 +107,13 @@ export function mountOpenApiSpec(
 
 /** Create CORS middleware. */
 export function corsMiddleware(options?: Record<string, unknown>) {
-  return options ? cors(options as never) : cors();
+  // Cast needed: hono/cors does not export CORSOptions type.
+  return options ? cors(options as any) : cors();
+}
+
+/** Create request scope middleware — wraps each request in a new RequestScopeManager scope. */
+export function requestScopeMiddleware() {
+  return async (_c: Context, next: Next) => {
+    await RequestScopeManager.run(next);
+  };
 }

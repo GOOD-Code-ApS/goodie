@@ -23,6 +23,7 @@ export {
   handleResult,
   mountOpenApiSpec,
   openApiMiddleware,
+  requestScopeMiddleware,
   securityMiddleware,
   validationMiddleware,
 } from './router-helpers.js';
