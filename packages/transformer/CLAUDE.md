@@ -15,7 +15,11 @@ Scanner → Resolver → GraphBuilder → Codegen
 | GraphBuilder | `src/graph-builder.ts` | `ResolveResult` → `GraphResult` (validated, topo-sorted) |
 | Codegen | `src/codegen.ts` | `IRBeanDefinition[]` → generated TypeScript string |
 
-Entry points: `transform(options)` for file-based, `transformInMemory(project, outputPath)` for tests.
+Entry points: `transform(options)` for file-based, `transformInMemory(project, outputPath, options?)` for tests.
+
+## Config Inlining
+
+When `configDir` is set, the transformer reads JSON config files at build time and inlines flattened values into the generated `ConfigSource` factory. This removes the runtime dependency on `node:fs` / `loadConfigFiles()`. Values are embedded as `{ 'key.path': 'value' }` with `process.env` overrides applied at runtime. The inlined config is also passed to plugins via `CodegenContext`.
 
 `scan()` accepts an optional `plugins` parameter — plugin `visitClass`/`visitMethod` hooks run inline during the scan loop (single AST pass). Returns `pluginMetadata` in `ScanResult`.
 
@@ -60,7 +64,7 @@ Plugins can register classes as beans via `ctx.registerBean({ scope })` in their
 
 External packages can contribute codegen via the `TransformerPlugin` interface:
 - `visitClass` / `visitMethod` — scan hooks called during the single AST pass
-- `codegen(beans)` — returns `CodegenContribution` (`{ imports, code }`) appended to generated output
+- `codegen(beans, context?)` — receives `CodegenContext` with build-time config (`context.config` is a flattened `Record<string, string>` from JSON config files). Returns `CodegenContribution` (`{ imports, code }`) appended to generated output
 
 Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, config) are always active.
 
@@ -70,6 +74,7 @@ Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in pa
 - Resolves `@Named()` qualifiers to match `@Inject('name')`
 - Topological sort for dependency ordering
 - Note: `@Provides` expansion now happens in the resolver stage, not the graph builder
+- Conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) pass through unfiltered — the conditional plugin records rules in `metadata.conditionalRules`, but evaluation happens at runtime in `ApplicationContext.create()`
 
 ## Library Import Path Reconciliation
 
@@ -80,7 +85,7 @@ Library beans use bare package specifiers (`@goodie-ts/kysely`) in their tokenRe
 
 ## Library Mode (`transformLibrary`)
 
-`transformLibrary()` scans library source, runs the full pipeline, then serializes beans to `beans.json`. It also:
+`transformLibrary()` scans library source, runs the full pipeline, then serializes all beans (including conditional ones) to `beans.json`. Conditional filtering is deferred to the consumer's `ApplicationContext` at runtime. It also:
 1. Runs `scanAopDecoratorDefinitions()` to find `createAopDecorator<{...}>()` calls
 2. Extracts AOP config from type parameters (interceptor class, order, metadata, argMapping, defaults)
 3. Includes the config in the manifest's `aop` section

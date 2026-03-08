@@ -18,6 +18,7 @@ export type {
   AopDecoratorConfig,
   AroundOptions,
   BeforeOptions,
+  ConditionalOnPropertyOptions,
   ModuleOptions,
   ValueOptions,
 } from './decorators/index.js';
@@ -41,6 +42,7 @@ export {
   PostProcessor,
   PreDestroy,
   Provides,
+  RequestScoped,
   Singleton,
   Value,
 } from './decorators/index.js';
@@ -55,6 +57,7 @@ export {
 export { Goodie, GoodieBuilder } from './goodie.js';
 export { InjectionToken } from './injection-token.js';
 export { buildInterceptorChain } from './interceptor-chain.js';
+export { RequestScopeManager } from './request-scope.js';
 export { StartupMetrics } from './startup-metrics.js';
 export { topoSort } from './topo-sort.js';
 export type {

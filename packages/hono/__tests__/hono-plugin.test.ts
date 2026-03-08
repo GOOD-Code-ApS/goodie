@@ -12,13 +12,22 @@ const honoPlugin = createHonoPlugin();
 function createProject(
   files: Record<string, string>,
   outputPath = '/out/AppContext.generated.ts',
+  plugins = [honoPlugin],
+  inlinedConfig?: Record<string, string>,
 ) {
   const project = new Project({ useInMemoryFileSystem: true });
   project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
   for (const [filePath, content] of Object.entries(files)) {
     project.createSourceFile(filePath, content);
   }
-  return transformInMemory(project, outputPath, [honoPlugin]);
+  return transformInMemory(
+    project,
+    outputPath,
+    plugins,
+    undefined,
+    undefined,
+    inlinedConfig ? { inlinedConfig } : undefined,
+  );
 }
 
 describe('Hono Plugin Codegen', () => {
@@ -975,5 +984,47 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
     // describeRoute should appear once (for list), not for health
     const matches = result.code.match(/describeRoute\(/g);
     expect(matches).toHaveLength(1);
+  });
+});
+
+describe('Multi-runtime codegen', () => {
+  const controllerFile = `
+    import { Controller, Get } from './decorators.js'
+    @Controller('/api/users')
+    class UserController {
+      @Get('/')
+      list() {}
+    }
+  `;
+
+  it('generates startServer with EmbeddedServer for node runtime (default)', () => {
+    const result = createProject({ '/src/UserController.ts': controllerFile });
+
+    expect(result.code).toContain('export async function startServer');
+    expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
+    expect(result.code).toContain(
+      "import { EmbeddedServer } from '@goodie-ts/hono'",
+    );
+    expect(result.code).not.toContain('RuntimeBindings');
+    expect(result.code).not.toContain('export default');
+  });
+
+  it('skips startServer and EmbeddedServer for cloudflare runtime', () => {
+    const result = createProject(
+      { '/src/UserController.ts': controllerFile },
+      '/out/AppContext.generated.ts',
+      [honoPlugin],
+      { 'server.runtime': 'cloudflare' },
+    );
+
+    expect(result.code).not.toContain('startServer');
+    expect(result.code).not.toContain('EmbeddedServer');
+    expect(result.code).toContain(
+      'export function createRouter(ctx: ApplicationContext)',
+    );
+    expect(result.code).toContain('export function createClient');
+    expect(result.code).toContain(
+      'export type AppType = ReturnType<typeof createRouter>',
+    );
   });
 });

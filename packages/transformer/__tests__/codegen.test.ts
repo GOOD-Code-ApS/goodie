@@ -1043,4 +1043,77 @@ describe('Code Generator', () => {
     );
     expect(code).toContain('token: __Goodie_Config,');
   });
+
+  it('should embed inlined config values instead of loadConfigFiles when inlinedConfig is set', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'MyService',
+          importPath: '/src/MyService.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [
+            { fieldName: 'port', key: 'server.port', default: '3000' },
+          ],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+      inlinedConfig: { 'server.port': '8080', 'server.host': 'localhost' },
+    });
+
+    expect(code).not.toContain('loadConfigFiles');
+    expect(code).toContain(
+      "import { ApplicationContext, Goodie } from '@goodie-ts/core'",
+    );
+    expect(code).toContain('"server.port":"8080"');
+    expect(code).toContain('"server.host":"localhost"');
+    expect(code).toContain('...process.env');
+    expect(code).toContain('...config');
+  });
+
+  it('should prefer inlinedConfig over configDir when both are set', () => {
+    const beans: IRBeanDefinition[] = [
+      {
+        tokenRef: {
+          kind: 'class',
+          className: 'MyService',
+          importPath: '/src/MyService.ts',
+        },
+        scope: 'singleton',
+        eager: false,
+        name: undefined,
+        constructorDeps: [],
+        fieldDeps: [],
+        factoryKind: 'constructor',
+        providesSource: undefined,
+        metadata: {
+          valueFields: [
+            { fieldName: 'port', key: 'server.port', default: '3000' },
+          ],
+        },
+        sourceLocation: loc,
+      },
+    ];
+
+    const code = generateCode(beans, {
+      outputPath: '/out/AppContext.generated.ts',
+      configDir: '/project/config',
+      inlinedConfig: { 'server.port': '8080' },
+    });
+
+    expect(code).not.toContain('loadConfigFiles');
+    expect(code).toContain('"server.port":"8080"');
+  });
 });

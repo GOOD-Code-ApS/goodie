@@ -1,3 +1,4 @@
+import { SyntaxKind } from 'ts-morph';
 import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 
 /** A single conditional rule extracted from a decorator. */
@@ -7,6 +8,8 @@ export interface ConditionalRule {
   envVar?: string;
   /** For onEnv/onProperty: the expected value (undefined means "exists"). */
   expectedValue?: string;
+  /** For onProperty: array of acceptable values (matched with OR logic). */
+  expectedValues?: string[];
   /** For onProperty: the config key. */
   key?: string;
   /** For onMissingBean: the class name to check. */
@@ -59,9 +62,62 @@ export function createConditionalPlugin(): TransformerPlugin {
           if (args.length === 0) continue;
           const keyText = args[0].getText();
           const key = stripStringLiteral(keyText);
-          const expectedValue =
-            args.length > 1 ? stripStringLiteral(args[1].getText()) : undefined;
-          rules.push({ type: 'onProperty', key, expectedValue });
+
+          if (args.length > 1) {
+            const secondArg = args[1];
+            if (secondArg.getKind() === SyntaxKind.ObjectLiteralExpression) {
+              // { havingValue: 'x' } or { havingValue: ['x', 'y'] }
+              const objLiteral = secondArg.asKindOrThrow(
+                SyntaxKind.ObjectLiteralExpression,
+              );
+              const havingValueProp = objLiteral
+                .getProperties()
+                .find(
+                  (p) =>
+                    p.getKind() === SyntaxKind.PropertyAssignment &&
+                    p.asKindOrThrow(SyntaxKind.PropertyAssignment).getName() ===
+                      'havingValue',
+                );
+              if (havingValueProp) {
+                const initializer = havingValueProp
+                  .asKindOrThrow(SyntaxKind.PropertyAssignment)
+                  .getInitializer();
+                if (
+                  initializer &&
+                  initializer.getKind() === SyntaxKind.ArrayLiteralExpression
+                ) {
+                  const arr = initializer.asKindOrThrow(
+                    SyntaxKind.ArrayLiteralExpression,
+                  );
+                  const values = arr
+                    .getElements()
+                    .map((e) => stripStringLiteral(e.getText()));
+                  rules.push({
+                    type: 'onProperty',
+                    key,
+                    expectedValues: values,
+                  });
+                } else if (initializer) {
+                  rules.push({
+                    type: 'onProperty',
+                    key,
+                    expectedValue: stripStringLiteral(initializer.getText()),
+                  });
+                }
+              } else {
+                rules.push({ type: 'onProperty', key });
+              }
+            } else {
+              // Legacy positional string: @ConditionalOnProperty('key', 'value')
+              rules.push({
+                type: 'onProperty',
+                key,
+                expectedValue: stripStringLiteral(secondArg.getText()),
+              });
+            }
+          } else {
+            rules.push({ type: 'onProperty', key });
+          }
         } else if (name === 'ConditionalOnMissingBean') {
           if (args.length === 0) continue;
           const tokenArg = args[0];

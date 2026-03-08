@@ -60,6 +60,10 @@ const handle = watchAndRebuild({
 // handle.close() to stop
 ```
 
+## Library Mode
+
+When using `--mode library`, the CLI runs `transformLibrary()` to serialize bean definitions to `beans.json`. If the generation produces beans but your `package.json` is missing the `"goodie": { "beans": "..." }` field, the CLI will warn you to add it so consumers can discover your library's beans.
+
 ## package.json integration
 
 ```json

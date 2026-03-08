@@ -20,7 +20,7 @@ function createMockKysely() {
 function createTm() {
   const { kysely, mockTransaction } = createMockKysely();
   const tm = new TransactionManager();
-  tm.configure(kysely as never, 'postgres');
+  tm.configure(kysely as never, true);
   return { tm, kysely, mockTransaction };
 }
 
@@ -67,7 +67,7 @@ describe('TransactionManager', () => {
         return fn({ ...mockTransaction, call: transactionCallCount });
       }),
     });
-    tm.configure(kysely as never, 'postgres');
+    tm.configure(kysely as never, true);
 
     let outerTrx: unknown;
     let innerTrx: unknown;
@@ -127,18 +127,13 @@ describe('TransactionManager', () => {
     ).rejects.toThrow('TransactionManager not configured');
   });
 
-  it('should accept Kysely and dialect in constructor', async () => {
-    const { kysely } = createMockKysely();
-    const tm = new TransactionManager(kysely as never, 'postgres');
-
-    const result = await tm.runInTransaction(async () => 'via constructor');
-    expect(result).toBe('via constructor');
-  });
-
   it('should accept a KyselyProvider (duck-typed object with .kysely) in constructor', async () => {
     const { kysely } = createMockKysely();
-    const provider = { kysely: kysely as never };
-    const tm = new TransactionManager(provider, 'postgres');
+    const provider = {
+      kysely: kysely as never,
+      supportsReturning: true,
+    };
+    const tm = new TransactionManager(provider);
 
     const result = await tm.runInTransaction(async () => 'via provider');
     expect(result).toBe('via provider');
@@ -146,8 +141,11 @@ describe('TransactionManager', () => {
 
   it('should use the .kysely property from a KyselyProvider, not the provider itself', () => {
     const { kysely } = createMockKysely();
-    const provider = { kysely: kysely as never };
-    const tm = new TransactionManager(provider, 'postgres');
+    const provider = {
+      kysely: kysely as never,
+      supportsReturning: true,
+    };
+    const tm = new TransactionManager(provider);
 
     // getConnection() should return the raw kysely, not the provider wrapper
     expect(tm.getConnection()).toBe(kysely);
@@ -155,8 +153,11 @@ describe('TransactionManager', () => {
 
   it('should make provider.kysely transaction-aware via property redefinition', async () => {
     const { kysely, mockTransaction } = createMockKysely();
-    const provider = { kysely: kysely as never };
-    const tm = new TransactionManager(provider, 'postgres');
+    const provider = {
+      kysely: kysely as never,
+      supportsReturning: true,
+    };
+    const tm = new TransactionManager(provider);
 
     // Outside a transaction: provider.kysely returns the raw Kysely
     expect(provider.kysely).toBe(kysely);
@@ -173,30 +174,38 @@ describe('TransactionManager', () => {
   it('should accept no args and fall back to configure()', async () => {
     const tm = new TransactionManager();
     const { kysely } = createMockKysely();
-    tm.configure(kysely as never, 'postgres');
+    tm.configure(kysely as never, true);
 
     const result = await tm.runInTransaction(async () => 'via configure');
     expect(result).toBe('via configure');
   });
 
-  it('should set supportsReturning from dialect at configure time', () => {
+  it('should set supportsReturning from provider at construction time', () => {
     const { kysely } = createMockKysely();
-    const tm = new TransactionManager();
-    tm.configure(kysely as never, 'postgres');
+    const provider = {
+      kysely: kysely as never,
+      supportsReturning: true,
+    };
+    const tm = new TransactionManager(provider);
 
     expect(tm.supportsReturning).toBe(true);
   });
 
-  it('should set supportsReturning to false for mysql dialect', () => {
+  it('should set supportsReturning to false from provider', () => {
     const { kysely } = createMockKysely();
-    const tm = new TransactionManager(kysely as never, 'mysql');
+    const provider = {
+      kysely: kysely as never,
+      supportsReturning: false,
+    };
+    const tm = new TransactionManager(provider);
 
     expect(tm.supportsReturning).toBe(false);
   });
 
-  it('should set supportsReturning to true for sqlite dialect', () => {
+  it('should set supportsReturning via configure()', () => {
     const { kysely } = createMockKysely();
-    const tm = new TransactionManager(kysely as never, 'sqlite');
+    const tm = new TransactionManager();
+    tm.configure(kysely as never, true);
 
     expect(tm.supportsReturning).toBe(true);
   });
@@ -208,17 +217,17 @@ describe('TransactionManager', () => {
     );
   });
 
-  it('should reset supportsReturning when configure() is called with a different dialect', () => {
+  it('should update supportsReturning when configure() is called again', () => {
     const { kysely: kysely1 } = createMockKysely();
     const { kysely: kysely2 } = createMockKysely();
 
     const tm = new TransactionManager();
-    tm.configure(kysely1 as never, 'postgres');
+    tm.configure(kysely1 as never, true);
 
     expect(tm.supportsReturning).toBe(true);
 
-    // Reconfigure with mysql dialect
-    tm.configure(kysely2 as never, 'mysql');
+    // Reconfigure with supportsReturning: false
+    tm.configure(kysely2 as never, false);
 
     expect(tm.supportsReturning).toBe(false);
   });

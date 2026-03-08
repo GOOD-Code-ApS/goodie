@@ -145,23 +145,32 @@ export function createKyselyPlugin(
 
       if (!needsInterceptor && !hasMigrations) return beans;
 
-      // Find KyselyDatabase from library beans for auto-wiring.
-      const kyselyDatabaseBean = beans.find(
+      // Check if any KyselyDatabase subclass exists (via baseTokenRefs).
+      // Wire deps using the abstract KyselyDatabase token — runtime resolves
+      // the concrete impl via baseTokenRefs after conditional filtering.
+      const hasKyselyDatabase = beans.some(
         (b) =>
           b.tokenRef.kind === 'class' &&
-          b.tokenRef.className === 'KyselyDatabase' &&
-          b.tokenRef.importPath === '@goodie-ts/kysely',
+          (b.baseTokenRefs?.some(
+            (ref) =>
+              ref.className === 'KyselyDatabase' &&
+              ref.importPath === '@goodie-ts/kysely',
+          ) ||
+            (b.tokenRef.className === 'KyselyDatabase' &&
+              b.tokenRef.importPath === '@goodie-ts/kysely')),
       );
 
+      const kyselyDatabaseTokenRef: IRBeanDefinition['tokenRef'] = {
+        kind: 'class',
+        className: 'KyselyDatabase',
+        importPath: '@goodie-ts/kysely',
+      };
+
       const kyselyProviderDep: IRBeanDefinition['constructorDeps'] =
-        kyselyDatabaseBean && kyselyDatabaseBean.tokenRef.kind === 'class'
+        hasKyselyDatabase
           ? [
               {
-                tokenRef: {
-                  kind: 'class',
-                  className: 'KyselyDatabase',
-                  importPath: '@goodie-ts/kysely',
-                },
+                tokenRef: kyselyDatabaseTokenRef,
                 optional: false,
                 collection: false,
                 sourceLocation: {

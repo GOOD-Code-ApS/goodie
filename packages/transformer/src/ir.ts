@@ -80,6 +80,12 @@ export interface IRDecoratorEntry {
   importPath: string;
 }
 
+/** A public member of a request-scoped bean for compile-time scoped proxy generation. */
+export interface IRPublicMember {
+  name: string;
+  kind: 'getter' | 'method' | 'property';
+}
+
 /** Full intermediate representation of a single bean. */
 export interface IRBeanDefinition {
   tokenRef: TokenRef;
@@ -111,6 +117,8 @@ export interface IRBeanDefinition {
    * Optional for the same reason as `decorators` — most beans have no
    * decorated methods (only controllers with @Get/@Post/etc. do). */
   methodDecorators?: Record<string, IRDecoratorEntry[]>;
+  /** Public members for compile-time scoped proxy (only for request-scoped beans). */
+  publicMembers?: IRPublicMember[];
   metadata: Record<string, unknown>;
   sourceLocation: SourceLocation;
 }

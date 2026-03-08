@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import type { ConditionalRule } from './builtin-conditional-plugin.js';
 import type { IRBeanDefinition, TokenRef } from './ir.js';
 import type { ResolveResult } from './resolver.js';
 import {
@@ -21,31 +18,13 @@ export interface GraphResult {
   warnings: string[];
 }
 
-/** Options for the graph builder. */
-export interface GraphBuildOptions {
-  /**
-   * Directory containing JSON config files (`default.json`, `{env}.json`).
-   * Used to evaluate @ConditionalOnProperty conditions.
-   */
-  configDir?: string;
-}
-
-/** Info about a bean that was filtered out by a conditional rule. */
-interface FilteredBeanInfo {
-  displayName: string;
-  reason: string;
-}
-
 /**
  * Build a full dependency graph from resolved IR,
  * validate, and return beans in topological order.
  */
-export function buildGraph(
-  resolveResult: ResolveResult,
-  options?: GraphBuildOptions,
-): GraphResult {
+export function buildGraph(resolveResult: ResolveResult): GraphResult {
   const warnings: string[] = [...resolveResult.warnings];
-  let allBeans: IRBeanDefinition[] = [...resolveResult.beans];
+  const allBeans: IRBeanDefinition[] = [...resolveResult.beans];
 
   // Guard: no user-defined bean may use the reserved config token name
   for (const bean of allBeans) {
@@ -61,205 +40,16 @@ export function buildGraph(
     }
   }
 
-  // Apply conditional bean filtering (env → property → missingBean)
-  const filteredOut = new Map<string, FilteredBeanInfo>();
-  allBeans = filterConditionalBeans(allBeans, filteredOut, options);
-
   // Build name-based lookup for @Named → @Inject('name') matching
   resolveNamedQualifiers(allBeans, warnings);
 
   // Validate: no missing providers (except optional)
-  validateProviders(allBeans, filteredOut);
+  validateProviders(allBeans);
 
   // Topological sort with cycle detection
   const sorted = topoSort(allBeans);
 
   return { beans: sorted, warnings };
-}
-
-/**
- * Filter beans based on conditional rules in metadata.
- * Order: onEnv → onProperty → onMissingBean (since missingBean depends on what remains).
- * All conditions on a single bean use AND logic.
- */
-function filterConditionalBeans(
-  beans: IRBeanDefinition[],
-  filteredOut: Map<string, FilteredBeanInfo>,
-  options?: GraphBuildOptions,
-): IRBeanDefinition[] {
-  // Load config for @ConditionalOnProperty evaluation
-  let configProperties: Record<string, unknown> | undefined;
-
-  // Phase 1: filter by onEnv and onProperty
-  let remaining = beans.filter((bean) => {
-    const rules = bean.metadata.conditionalRules as
-      | ConditionalRule[]
-      | undefined;
-    if (!rules || rules.length === 0) return true;
-
-    for (const rule of rules) {
-      if (rule.type === 'onEnv') {
-        const envValue = process.env[rule.envVar!];
-        if (rule.expectedValue !== undefined) {
-          if (envValue !== rule.expectedValue) {
-            recordFiltered(
-              bean,
-              filteredOut,
-              `@ConditionalOnEnv('${rule.envVar}', '${rule.expectedValue}') — env var is '${envValue ?? '<undefined>'}'`,
-            );
-            return false;
-          }
-        } else {
-          if (envValue === undefined) {
-            recordFiltered(
-              bean,
-              filteredOut,
-              `@ConditionalOnEnv('${rule.envVar}') — env var is not set`,
-            );
-            return false;
-          }
-        }
-      } else if (rule.type === 'onProperty') {
-        if (!configProperties) {
-          configProperties = loadConfigProperties(options?.configDir);
-        }
-        const propValue = getNestedProperty(configProperties, rule.key!);
-        if (rule.expectedValue !== undefined) {
-          // String coercion: false → 'false', 0 → '0', null → 'null'.
-          // Both sides are compared as strings since decorator args are string literals.
-          if (String(propValue) !== rule.expectedValue) {
-            recordFiltered(
-              bean,
-              filteredOut,
-              `@ConditionalOnProperty('${rule.key}', '${rule.expectedValue}') — property is '${propValue ?? '<undefined>'}'`,
-            );
-            return false;
-          }
-        } else {
-          if (propValue === undefined) {
-            recordFiltered(
-              bean,
-              filteredOut,
-              `@ConditionalOnProperty('${rule.key}') — property is not set`,
-            );
-            return false;
-          }
-        }
-      }
-      // onMissingBean is handled in phase 2
-    }
-    return true;
-  });
-
-  // Phase 2: filter by onMissingBean (evaluated against remaining beans)
-  const registeredKeys = new Set(remaining.map((b) => tokenRefKey(b.tokenRef)));
-
-  remaining = remaining.filter((bean) => {
-    const rules = bean.metadata.conditionalRules as
-      | ConditionalRule[]
-      | undefined;
-    if (!rules || rules.length === 0) return true;
-
-    for (const rule of rules) {
-      if (rule.type !== 'onMissingBean') continue;
-
-      const targetKey = `class:${rule.tokenImportPath}:${rule.tokenClassName}`;
-      const ownKey = tokenRefKey(bean.tokenRef);
-
-      // Check if any remaining bean (other than this one) provides the target token
-      const found = registeredKeys.has(targetKey) && targetKey !== ownKey;
-
-      if (found) {
-        recordFiltered(
-          bean,
-          filteredOut,
-          `@ConditionalOnMissingBean(${rule.tokenClassName}) — a provider already exists`,
-        );
-        return false;
-      }
-    }
-    return true;
-  });
-
-  return remaining;
-}
-
-function recordFiltered(
-  bean: IRBeanDefinition,
-  filteredOut: Map<string, FilteredBeanInfo>,
-  reason: string,
-): void {
-  const key = tokenRefKey(bean.tokenRef);
-  const displayName = tokenRefDisplayName(bean.tokenRef);
-  filteredOut.set(key, { displayName, reason });
-}
-
-/**
- * Load config properties from configDir for @ConditionalOnProperty evaluation.
- * Merges default.json + {NODE_ENV}.json.
- */
-function loadConfigProperties(
-  configDir: string | undefined,
-): Record<string, unknown> {
-  if (!configDir) return {};
-
-  const result: Record<string, unknown> = {};
-
-  // Load default.json
-  const defaultPath = path.join(configDir, 'default.json');
-  try {
-    const content = fs.readFileSync(defaultPath, 'utf-8');
-    Object.assign(result, flattenObject(JSON.parse(content)));
-  } catch {
-    // No default.json — that's fine
-  }
-
-  // Load {NODE_ENV}.json
-  const env = process.env.NODE_ENV;
-  if (env) {
-    const envPath = path.join(configDir, `${env}.json`);
-    try {
-      const content = fs.readFileSync(envPath, 'utf-8');
-      Object.assign(result, flattenObject(JSON.parse(content)));
-    } catch {
-      // No env-specific config — that's fine
-    }
-  }
-
-  return result;
-}
-
-/**
- * Flatten a nested object into dot-separated keys.
- * { a: { b: 1 } } → { 'a.b': 1 }
- */
-function flattenObject(
-  obj: Record<string, unknown>,
-  prefix = '',
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    const fullKey = prefix ? `${prefix}.${key}` : key;
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      Object.assign(
-        result,
-        flattenObject(value as Record<string, unknown>, fullKey),
-      );
-    } else {
-      result[fullKey] = value;
-    }
-  }
-  return result;
-}
-
-/**
- * Get a nested property value using dot-notation key from a flat config map.
- */
-function getNestedProperty(
-  config: Record<string, unknown>,
-  key: string,
-): unknown {
-  return config[key];
 }
 
 /**
@@ -308,24 +98,24 @@ function resolveNamedQualifiers(
 }
 
 /** Validate that all required dependencies have a registered provider. */
-function validateProviders(
-  beans: IRBeanDefinition[],
-  filteredOut: Map<string, FilteredBeanInfo>,
-): void {
+function validateProviders(beans: IRBeanDefinition[]): void {
   const registered = new Set<string>();
   const registeredNames: string[] = [];
   for (const bean of beans) {
     registered.add(tokenRefKey(bean.tokenRef));
     registeredNames.push(tokenRefDisplayName(bean.tokenRef));
+    if (bean.baseTokenRefs) {
+      for (const ref of bean.baseTokenRefs) {
+        registered.add(tokenRefKey(ref));
+      }
+    }
   }
 
   // Well-known tokens always available at runtime (self-registered by ApplicationContext)
   registered.add('class:@goodie-ts/core:ApplicationContext');
   registeredNames.push('ApplicationContext');
 
-  function buildHint(depKey: string, depName: string): string | undefined {
-    const filteredHint = buildFilteredHint(depKey, filteredOut);
-    if (filteredHint) return filteredHint;
+  function buildHint(_depKey: string, depName: string): string | undefined {
     const similar = findSimilarTokens(depName, registeredNames);
     if (similar.length > 0) {
       return `Did you mean: ${similar.join(', ')}?`;
@@ -391,19 +181,6 @@ function validateProviders(
       }
     }
   }
-}
-
-/**
- * Build a custom hint when a missing provider was filtered out by a condition.
- * Returns undefined if the provider was not filtered (falls back to default hint).
- */
-function buildFilteredHint(
-  depKey: string,
-  filteredOut: Map<string, FilteredBeanInfo>,
-): string | undefined {
-  const info = filteredOut.get(depKey);
-  if (!info) return undefined;
-  return `A provider for "${info.displayName}" exists but was excluded by a conditional rule: ${info.reason}`;
 }
 
 // ── Topological sort with source-location-enriched cycle errors ──
