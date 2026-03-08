@@ -101,7 +101,9 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 - **`bun`** — `Bun.serve()` via `globalThis.Bun`
 - **`deno`** — `Deno.serve()` via `globalThis.Deno`
 
-The plugin reads `server.runtime` from `CodegenContext.config` at build time (currently unused — always generates `startServer()`).
+The plugin reads `server.runtime` from `CodegenContext.config` at build time:
+- `'node'` (default) / `'bun'` / `'deno'` → generates `startServer()` with `EmbeddedServer`
+- `'cloudflare'` → serverless: skips `startServer()` and `EmbeddedServer` import (use `createRouter()` directly)
 
 ## Gotchas
 

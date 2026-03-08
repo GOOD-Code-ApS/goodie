@@ -86,7 +86,9 @@ interface ControllerBean {
  * generates `describeRoute()` middleware from `hono-openapi` and mounts
  * `openAPIRouteHandler()` to serve the OpenAPI spec.
  *
- * Reads `server.runtime` from build-time config (currently unused — always generates `startServer()`).
+ * Reads `server.runtime` from build-time config to determine the entry point:
+ * - `'node'` (default) / `'bun'` / `'deno'` → generates `startServer()` with `EmbeddedServer`
+ * - `'cloudflare'` → serverless: skips `startServer()` and `EmbeddedServer` import (use `createRouter()` directly)
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
@@ -215,11 +217,18 @@ export default function createHonoPlugin(): TransformerPlugin {
         c.routes.some((r) => r.openapi),
       );
 
-      const imports = buildImports(controllerBeans, hasSecurity, hasOpenApi);
+      const isServerless = context?.config['server.runtime'] === 'cloudflare';
+
+      const imports = buildImports(
+        controllerBeans,
+        hasSecurity,
+        hasOpenApi,
+        isServerless,
+      );
       const code = [
         ...generateCreateRouter(controllerBeans, hasSecurity, hasOpenApi),
         '',
-        ...generateEntryPoint(),
+        ...(isServerless ? [] : generateEntryPoint()),
         '',
         'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
         '  return hc<AppType>(baseUrl, options)',
@@ -455,11 +464,14 @@ function buildImports(
   controllers: ControllerBean[],
   hasSecurity: boolean,
   hasOpenApi: boolean,
+  isServerless: boolean,
 ): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
-  imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  if (!isServerless) {
+    imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  }
 
   if (hasSecurity) {
     imports.push("import { SECURITY_PROVIDER } from '@goodie-ts/hono'");

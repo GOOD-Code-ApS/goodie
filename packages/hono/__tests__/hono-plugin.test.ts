@@ -1008,4 +1008,23 @@ describe('Multi-runtime codegen', () => {
     expect(result.code).not.toContain('RuntimeBindings');
     expect(result.code).not.toContain('export default');
   });
+
+  it('skips startServer and EmbeddedServer for cloudflare runtime', () => {
+    const result = createProject(
+      { '/src/UserController.ts': controllerFile },
+      '/out/AppContext.generated.ts',
+      [honoPlugin],
+      { 'server.runtime': 'cloudflare' },
+    );
+
+    expect(result.code).not.toContain('startServer');
+    expect(result.code).not.toContain('EmbeddedServer');
+    expect(result.code).toContain(
+      'export function createRouter(ctx: ApplicationContext)',
+    );
+    expect(result.code).toContain('export function createClient');
+    expect(result.code).toContain(
+      'export type AppType = ReturnType<typeof createRouter>',
+    );
+  });
 });
