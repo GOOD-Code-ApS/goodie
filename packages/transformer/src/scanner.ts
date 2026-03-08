@@ -630,17 +630,14 @@ function extractPublicMembers(
       members.push({ name, kind: 'method' });
     }
 
-    // Properties (non-accessor, non-private)
+    // Properties (all public, including plain fields and accessor properties)
     for (const prop of current.getProperties()) {
       const name = String(prop.getName());
       if (seen.has(name)) continue;
       if (prop.getScope() === 'private' || prop.getScope() === 'protected')
         continue;
-      // Skip constructor parameter properties (they're implementation details)
-      if (prop.hasAccessorKeyword?.()) {
-        seen.add(name);
-        members.push({ name, kind: 'property' });
-      }
+      seen.add(name);
+      members.push({ name, kind: 'property' });
     }
 
     // Walk up inheritance chain

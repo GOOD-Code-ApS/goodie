@@ -13,20 +13,27 @@ interface RequestStore {
 let storage:
   | import('node:async_hooks').AsyncLocalStorage<RequestStore>
   | undefined;
+let storagePromise:
+  | Promise<import('node:async_hooks').AsyncLocalStorage<RequestStore>>
+  | undefined;
 
 async function getStorage() {
-  if (!storage) {
-    try {
-      const { AsyncLocalStorage } = await import('node:async_hooks');
-      storage = new AsyncLocalStorage<RequestStore>();
-    } catch {
-      throw new Error(
-        'RequestScopeManager requires AsyncLocalStorage from node:async_hooks. ' +
-          'On Cloudflare Workers, enable the nodejs_compat compatibility flag.',
-      );
-    }
+  if (storage) return storage;
+  if (!storagePromise) {
+    storagePromise = import('node:async_hooks')
+      .then(({ AsyncLocalStorage }) => {
+        storage = new AsyncLocalStorage<RequestStore>();
+        return storage;
+      })
+      .catch(() => {
+        storagePromise = undefined;
+        throw new Error(
+          'RequestScopeManager requires AsyncLocalStorage from node:async_hooks. ' +
+            'On Cloudflare Workers, enable the nodejs_compat compatibility flag.',
+        );
+      });
   }
-  return storage;
+  return storagePromise;
 }
 
 function getStorageSync() {

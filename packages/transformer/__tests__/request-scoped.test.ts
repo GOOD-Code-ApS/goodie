@@ -101,6 +101,32 @@ describe('@RequestScoped', () => {
     expect(result.code).not.toContain('$scopedProxy');
   });
 
+  it('should include plain public fields in scoped proxy', () => {
+    const result = createTestProject({
+      '/src/my-service.ts': `
+        import { RequestScoped } from './decorators.js'
+
+        @RequestScoped()
+        export class MyService {
+          value = 'default'
+          name = 'test'
+          private _internal = 'hidden'
+        }
+      `,
+    });
+
+    expect(result.code).toContain('function __MyService$scopedProxy');
+    // Plain public fields should be included as property delegation
+    expect(result.code).toContain(
+      'value: { get() { return resolve().value }, configurable: true }',
+    );
+    expect(result.code).toContain(
+      'name: { get() { return resolve().name }, configurable: true }',
+    );
+    // Private field should NOT be included
+    expect(result.code).not.toContain('_internal');
+  });
+
   it('should extract members from parent class for scoped proxy', () => {
     const result = createTestProject({
       '/src/base.ts': `
