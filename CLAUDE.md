@@ -54,7 +54,6 @@ pnpm clean          # Clean all dist/
 | `packages/kysely` | Kysely integration — abstract KyselyDatabase with per-dialect conditional implementations, @Transactional, @Migration |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
 | `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |
-| `examples/basic` | End-to-end example with generics, modules, testing |
 | `examples/hono` | Full-stack example with Hono, PostgreSQL, Kysely, TestContainers |
 
 ## Testing
