@@ -20,6 +20,7 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, OpenAP
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
 | `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host`, `port`, `runtime` |
 | `src/cors.ts` | `@Cors(options?)` — Hono-specific CORS marker (generates `hono/cors` middleware) |
+| `src/router-helpers.ts` | Runtime helpers (`handleResult`, `securityMiddleware`, `validationMiddleware`, `openApiMiddleware`, `mountOpenApiSpec`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate all Hono/hono-openapi API calls so generated code depends only on stable goodie-ts interfaces |
 | `src/validate.ts` | `@Validate` — Hono-specific validation decorator |
 | `src/metadata.ts` | `ValidateMetadata`, `ValidationTarget` types |
 | `src/index.ts` | Public exports |
@@ -54,13 +55,27 @@ When any route has OpenAPI options, the plugin:
 
 Validation always uses `validator()` from `hono-openapi` (replaces `@hono/zod-validator`).
 
-### Security Middleware Generation
+### Runtime Helpers (`src/router-helpers.ts`)
 
-When `@Secured` is used on any controller, the plugin generates Hono-native security middleware directly in the route factory — no `HttpFilter` abstraction. The generated middleware:
+Generated code never calls Hono or hono-openapi APIs directly. Instead it calls runtime helpers exported from `@goodie-ts/hono`:
+
+- `handleResult(c, result)` — converts controller return values to Hono Response (Response passthrough, undefined/null → 204, else JSON)
+- `securityMiddleware(provider, 'required' | 'optional')` — authenticates via SecurityProvider, sets principal on Hono context
+- `validationMiddleware('json' | 'query' | 'param', schema)` — wraps `validator()` from hono-openapi
+- `openApiMiddleware(options)` — wraps `describeRoute()` from hono-openapi
+- `mountOpenApiSpec(router, config)` — wraps `openAPIRouteHandler()` from hono-openapi
+- `corsMiddleware(options?)` — wraps `cors()` from hono/cors
+- `requestScopeMiddleware()` — wraps `RequestScopeManager.run()` from @goodie-ts/core
+
+This decouples generated code from Hono ecosystem internals — when hono-openapi changes its API, only `router-helpers.ts` needs updating.
+
+### Security Middleware
+
+When `@Secured` is used, the plugin generates calls to `securityMiddleware()`:
 
 1. Resolves `SecurityProvider` from the DI context
-2. For secured routes: authenticates via `SecurityProvider`, returns 401 if no principal, sets principal on Hono context via `c.set('principal', ...)`
-3. For `@Anonymous` routes in a `@Secured` controller: authenticates if possible, sets principal on context, but never rejects
+2. For secured routes: `securityMiddleware(__securityProvider, 'required')` — rejects with 401 if no principal
+3. For `@Anonymous` routes in a `@Secured` controller: `securityMiddleware(__securityProvider, 'optional')` — authenticates if possible but never rejects
 
 `SecurityProvider` is optional — if not registered, secured routes return 401.
 
@@ -70,10 +85,9 @@ When `@Secured` is used on any controller, the plugin generates Hono-native secu
 function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | undefined) {
   return new Hono()
     .get('/items',
-      describeRoute({ summary: 'List items', responses: { ... } }),
-      async (c, next) => { /* security middleware */ },
-      async (c) => { return ctrl.list(c) }
-    )
+      openApiMiddleware({ summary: 'List items', responses: { ... } }),
+      securityMiddleware(__securityProvider, 'required'),
+      async (c) => handleResult(c, await ctrl.list(c)))
 }
 ```
 
@@ -87,12 +101,13 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 ## Design Decisions
 
 - **All decorators are compile-time no-ops** — everything is AST-scanned by the plugin
-- **No `HttpFilter` abstraction** — security middleware is generated natively using Hono's API (`c.json()`, `c.req`)
+- **No `HttpFilter` abstraction** — security middleware delegated to `securityMiddleware()` runtime helper
 - **`@Secured` is HTTP-only** — no service-layer AOP interceptor. The framework is Hono-first.
 - **`SecurityProvider` is user-provided** — registered with `SECURITY_PROVIDER` injection token. Optional — if missing, secured routes return 401.
 - **Principal via Hono context** — `c.set('principal', ...)` / `c.get('principal')` using `GoodieEnv` type for type safety. No `AsyncLocalStorage` — works on edge runtimes.
-- **OpenAPI via `hono-openapi`** — middleware-based approach. `describeRoute()` per route, `openAPIRouteHandler()` for spec. Only generated when routes have OpenAPI options.
-- **Validation via `hono-openapi`** — `validator()` replaces `@hono/zod-validator`. Always used (even without OpenAPI options) so validation schemas automatically feed into the spec when OpenAPI is enabled.
+- **OpenAPI via `hono-openapi`** — wrapped by `openApiMiddleware()` and `mountOpenApiSpec()` runtime helpers. Only generated when routes have OpenAPI options.
+- **Validation via `hono-openapi`** — wrapped by `validationMiddleware()` runtime helper. Always used (even without OpenAPI options) so validation schemas automatically feed into the spec when OpenAPI is enabled.
+- **Generated code never imports Hono ecosystem directly** — all Hono/hono-openapi API calls are in `router-helpers.ts`. Generated code only imports from `hono` (for `Hono` and `hc`) and `@goodie-ts/hono` (for runtime helpers).
 
 ## Multi-Runtime Support
 
@@ -109,6 +124,6 @@ The plugin reads `server.runtime` from `CodegenContext.config` at build time:
 
 - `@Anonymous` only makes sense on methods inside a `@Secured` controller
 - Route decorators are matched by name only (no import source verification)
-- `@Validate` generates `validator()` middleware from `hono-openapi` — requires `zod` as peer dep
+- `@Validate` generates `validationMiddleware()` calls (which wrap `validator()` from `hono-openapi`) — requires `zod` as peer dep
 - `SecurityProvider` must be registered by the user — it's not auto-discovered
 - OpenAPI spec is only served when at least one route has the second argument with OpenAPI options
