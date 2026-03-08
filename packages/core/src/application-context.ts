@@ -39,6 +39,8 @@ export class ApplicationContext {
   private readonly singletonCache = new Map<Token, unknown>();
   private readonly asyncInFlight = new Map<Token, Promise<unknown>>();
   private readonly postProcessors: BeanPostProcessor[] = [];
+  /** Names of beans excluded by conditional rules, with reason strings. */
+  private readonly filteredOutBeans = new Map<string, string>();
   private closed = false;
   private startupMetrics: StartupMetrics | undefined;
 
@@ -84,7 +86,8 @@ export class ApplicationContext {
     const totalStart = metrics ? performance.now() : 0;
 
     // Evaluate conditional rules at runtime (env, config properties, missing beans)
-    const filtered = filterConditionalBeans(definitions);
+    const { beans: filtered, filteredOut } =
+      filterConditionalBeans(definitions);
 
     const sorted = metrics
       ? metrics.timeStageSync('topoSort', () =>
@@ -95,6 +98,9 @@ export class ApplicationContext {
         : topoSort(filtered);
 
     const ctx = new ApplicationContext(sorted);
+    for (const [name, reason] of filteredOut) {
+      ctx.filteredOutBeans.set(name, reason);
+    }
     ctx.startupMetrics = metrics;
 
     // Self-register so beans can inject ApplicationContext.
@@ -339,9 +345,11 @@ export class ApplicationContext {
           !dep.collection &&
           !this.primaryDef.has(dep.token)
         ) {
+          const depName = tokenName(dep.token);
           throw new MissingDependencyError(
-            tokenName(dep.token),
+            depName,
             tokenName(def.token),
+            this.buildSuggestionHint(depName),
           );
         }
       }
@@ -385,9 +393,11 @@ export class ApplicationContext {
       const depDef = this.primaryDef.get(dep.token);
       if (!depDef) {
         if (dep.optional) return undefined;
+        const depName = tokenName(dep.token);
         throw new MissingDependencyError(
-          tokenName(dep.token),
+          depName,
           parentDef ? tokenName(parentDef.token) : undefined,
+          this.buildSuggestionHint(depName),
         );
       }
       // Singleton depending on request-scoped bean → inject a proxy
@@ -423,9 +433,11 @@ export class ApplicationContext {
           resolved.push(undefined);
           continue;
         }
+        const depName = tokenName(dep.token);
         throw new MissingDependencyError(
-          tokenName(dep.token),
+          depName,
           parentDef ? tokenName(parentDef.token) : undefined,
+          this.buildSuggestionHint(depName),
         );
       }
       if (depDef.scope === 'request' && parentDef?.scope === 'singleton') {
@@ -654,11 +666,24 @@ export class ApplicationContext {
     token: Token,
   ): MissingDependencyError {
     const name = tokenName(token);
+    return new MissingDependencyError(
+      name,
+      undefined,
+      this.buildSuggestionHint(name),
+    );
+  }
+
+  private buildSuggestionHint(name: string): string | undefined {
+    // Check if the bean was excluded by a conditional rule
+    const conditionalReason = this.filteredOutBeans.get(name);
+    if (conditionalReason) {
+      return `A bean '${name}' exists but was excluded by: ${conditionalReason}`;
+    }
     const registered = Array.from(this.primaryDef.keys()).map(tokenName);
     const similar = findSimilar(name, registered);
-    const hint =
-      similar.length > 0 ? `Did you mean: ${similar.join(', ')}?` : undefined;
-    return new MissingDependencyError(name, undefined, hint);
+    return similar.length > 0
+      ? `Did you mean: ${similar.join(', ')}?`
+      : undefined;
   }
 }
 
@@ -712,16 +737,19 @@ function levenshtein(a: string, b: string): number {
  * Order: onEnv → onProperty → onMissingBean (since missingBean depends on what remains).
  * All conditions on a single bean use AND logic.
  */
-function filterConditionalBeans(
-  definitions: BeanDefinition[],
-): BeanDefinition[] {
+function filterConditionalBeans(definitions: BeanDefinition[]): {
+  beans: BeanDefinition[];
+  filteredOut: Map<string, string>;
+} {
+  const filteredOut = new Map<string, string>();
+
   // Quick exit if no beans have conditional rules
   const hasAnyRules = definitions.some(
     (d) =>
       d.metadata.conditionalRules &&
       (d.metadata.conditionalRules as ConditionalRule[]).length > 0,
   );
-  if (!hasAnyRules) return definitions;
+  if (!hasAnyRules) return { beans: definitions, filteredOut };
 
   // Lazily resolve config for @ConditionalOnProperty
   let config: Record<string, unknown> | undefined;
@@ -737,9 +765,21 @@ function filterConditionalBeans(
       if (rule.type === 'onEnv') {
         const envValue = process.env[rule.envVar!];
         if (rule.expectedValue !== undefined) {
-          if (envValue !== rule.expectedValue) return false;
+          if (envValue !== rule.expectedValue) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnEnv('${rule.envVar}', '${rule.expectedValue}') — env is '${envValue ?? '<undefined>'}'`,
+            );
+            return false;
+          }
         } else {
-          if (envValue === undefined) return false;
+          if (envValue === undefined) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnEnv('${rule.envVar}') — env var is not set`,
+            );
+            return false;
+          }
         }
       } else if (rule.type === 'onProperty') {
         if (!config) {
@@ -747,11 +787,29 @@ function filterConditionalBeans(
         }
         const propValue = config[rule.key!];
         if (rule.expectedValues !== undefined) {
-          if (!rule.expectedValues.includes(String(propValue))) return false;
+          if (!rule.expectedValues.includes(String(propValue))) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnProperty('${rule.key}', { havingValue: [${rule.expectedValues.map((v) => `'${v}'`).join(', ')}] }) — property is '${propValue ?? '<undefined>'}'`,
+            );
+            return false;
+          }
         } else if (rule.expectedValue !== undefined) {
-          if (String(propValue) !== rule.expectedValue) return false;
+          if (String(propValue) !== rule.expectedValue) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnProperty('${rule.key}', '${rule.expectedValue}') — property is '${propValue ?? '<undefined>'}'`,
+            );
+            return false;
+          }
         } else {
-          if (propValue === undefined) return false;
+          if (propValue === undefined) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnProperty('${rule.key}') — property is not set`,
+            );
+            return false;
+          }
         }
       }
       // onMissingBean handled in phase 2
@@ -786,13 +844,17 @@ function filterConditionalBeans(
         registeredNames.has(rule.tokenClassName!) &&
         rule.tokenClassName !== ownName
       ) {
+        filteredOut.set(
+          tokenName(def.token),
+          `@ConditionalOnMissingBean(${rule.tokenClassName}) — bean '${rule.tokenClassName}' is present`,
+        );
         return false;
       }
     }
     return true;
   });
 
-  return remaining;
+  return { beans: remaining, filteredOut };
 }
 
 /**

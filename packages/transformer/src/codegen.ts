@@ -743,8 +743,13 @@ ${body}
 }
 
 function providesFactoryToCode(bean: IRBeanDefinition): string {
-  if (!bean.providesSource)
-    return '() => { throw new Error("missing provides source") }';
+  if (!bean.providesSource) {
+    const tokenName =
+      bean.tokenRef.kind === 'class'
+        ? bean.tokenRef.className
+        : bean.tokenRef.tokenName;
+    return `() => { throw new Error("Bean '${tokenName}' is a @Provides bean but has no source module. This is a transformer bug.") }`;
+  }
 
   const { moduleTokenRef, methodName } = bean.providesSource;
 
