@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/logging",
-  "version": "0.6.4",
+  "version": "1.0.0",
   "description": "Logging support for goodie-ts — @Log decorator, MDC, and Logger interface",
   "license": "MIT",
   "type": "module",
