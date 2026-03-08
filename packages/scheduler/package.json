@@ -28,10 +28,13 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@goodie-ts/core": "workspace:^",
     "croner": "^9.0.0"
   },
+  "peerDependencies": {
+    "@goodie-ts/core": ">=1.0.0"
+  },
   "devDependencies": {
+    "@goodie-ts/core": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
     "ts-morph": "^24.0.0"

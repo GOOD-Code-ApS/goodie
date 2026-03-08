@@ -107,14 +107,13 @@ importers:
         version: 6.4.1(@types/node@22.19.11)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/cache:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../cli
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -145,11 +144,10 @@ importers:
         version: 22.19.11
 
   packages/events:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
     devDependencies:
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -161,14 +159,13 @@ importers:
         version: 24.0.0
 
   packages/health:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../cli
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -181,9 +178,6 @@ importers:
 
   packages/hono:
     dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
       '@hono/node-server':
         specifier: '>=1.0.0'
         version: 1.19.9(hono@4.12.2)
@@ -203,6 +197,9 @@ importers:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../cli
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -215,9 +212,6 @@ importers:
 
   packages/kysely:
     dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
       '@libsql/kysely-libsql':
         specifier: '>=0.4.0'
         version: 0.4.1(kysely@0.27.6)
@@ -234,6 +228,9 @@ importers:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../cli
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -263,14 +260,13 @@ importers:
         version: 24.0.0
 
   packages/logging:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../cli
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -282,14 +278,13 @@ importers:
         version: 24.0.0
 
   packages/resilience:
-    dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
     devDependencies:
       '@goodie-ts/cli':
         specifier: workspace:*
         version: link:../cli
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -302,13 +297,13 @@ importers:
 
   packages/scheduler:
     dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
       croner:
         specifier: ^9.0.0
         version: 9.1.0
     devDependencies:
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -321,12 +316,13 @@ importers:
 
   packages/testing:
     dependencies:
-      '@goodie-ts/core':
-        specifier: workspace:^
-        version: link:../core
       vitest:
         specifier: '>=3.0.0'
         version: 3.2.4(@types/node@22.19.11)(tsx@4.21.0)(yaml@2.8.2)
+    devDependencies:
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/transformer:
     dependencies:
