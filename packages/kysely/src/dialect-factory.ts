@@ -30,8 +30,8 @@ export default async function createDialect(config: DatasourceConfig) {
 }
 
 async function createPostgresDialect(config: DatasourceConfig) {
-  const { Pool } = await import('pg');
-  const { PostgresDialect } = await import('kysely');
+  const { Pool } = await importOptional('pg');
+  const { PostgresDialect } = await importOptional('kysely');
   return new PostgresDialect({
     pool: new Pool({
       connectionString: config.url,
@@ -42,8 +42,8 @@ async function createPostgresDialect(config: DatasourceConfig) {
 }
 
 async function createMysqlDialect(config: DatasourceConfig) {
-  const mysql2 = await import('mysql2/promise');
-  const { MysqlDialect } = await import('kysely');
+  const mysql2 = await importOptional('mysql2/promise');
+  const { MysqlDialect } = await importOptional('kysely');
   return new MysqlDialect({
     pool: mysql2.createPool({
       uri: config.url,
@@ -53,8 +53,8 @@ async function createMysqlDialect(config: DatasourceConfig) {
 }
 
 async function createSqliteDialect(config: DatasourceConfig) {
-  const BetterSqlite3 = await import('better-sqlite3');
-  const { SqliteDialect } = await import('kysely');
+  const BetterSqlite3 = await importOptional('better-sqlite3');
+  const { SqliteDialect } = await importOptional('kysely');
   return new SqliteDialect({
     database: new BetterSqlite3.default(config.url),
   });

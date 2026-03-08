@@ -30,7 +30,7 @@ The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dis
 
 - **`visitClass`** — detects `@Controller(basePath)`, `@Secured`, `@Cors`, registers bean as singleton
 - **`visitMethod`** — detects `@Get`/`@Post`/etc (with optional OpenAPI options as second arg), `@Validate`, `@Cors`, `@Secured`, `@Anonymous`
-- **`codegen`** — receives `CodegenContext` with build-time config. Generates per-controller route factories, `createRouter(ctx)`, `startServer()` (or `export default` for Cloudflare), RPC types/clients, and OpenAPI middleware when routes have OpenAPI options
+- **`codegen`** — receives `CodegenContext` with build-time config. Generates per-controller route factories, `createRouter(ctx)`, `startServer()` (skipped for serverless runtimes like `cloudflare`), RPC types/clients, and OpenAPI middleware when routes have OpenAPI options
 
 ### OpenAPI Support
 
@@ -81,7 +81,7 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 
 3 singleton beans:
 - **ServerConfig** — `@ConfigurationProperties('server')` with host/port/runtime (`ServerRuntime`: `'node' | 'bun' | 'deno'`)
-- **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`. Dispatches to `@hono/node-server` (Node), `Bun.serve()` (Bun), `Deno.serve()` (Deno). Throws for Cloudflare (uses generated `export default` instead).
+- **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`. Dispatches to `@hono/node-server` (Node), `Bun.serve()` (Bun), `Deno.serve()` (Deno). Not used for serverless runtimes (`cloudflare`).
 - **OpenApiConfig** — `@ConfigurationProperties('openapi')` with title/version/description
 
 ## Design Decisions

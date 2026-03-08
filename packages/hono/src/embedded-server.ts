@@ -54,6 +54,11 @@ async function startRuntime(
       return startBun(app, port, hostname);
     case 'deno':
       return startDeno(app, port, hostname);
+    case 'cloudflare':
+      throw new Error(
+        "EmbeddedServer does not support 'cloudflare' runtime. " +
+          'Use createRouter(ctx) directly in your Cloudflare Workers entry point.',
+      );
     default:
       throw new Error(
         `Unsupported server runtime: '${runtime}'. ` +
