@@ -249,6 +249,9 @@ importers:
       '@libsql/kysely-libsql':
         specifier: '>=0.4.0'
         version: 0.4.1(kysely@0.27.6)
+      kysely-d1:
+        specifier: '>=0.4.0'
+        version: 0.4.0(kysely@0.27.6)
       kysely-neon:
         specifier: '>=0.3.0'
         version: 2.0.2(@neondatabase/serverless@1.0.2)(kysely@0.27.6)
@@ -1825,6 +1828,11 @@ packages:
 
   jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
+
+  kysely-d1@0.4.0:
+    resolution: {integrity: sha512-wUcVvQNtm30OTfuo7Ad5vYJ1qHqPXOCZc+zWchVKNyuvqY3u8OuGw4gmUx1Ypdx2wRVFLHVQC9I7v0pTmF7Nkw==}
+    peerDependencies:
+      kysely: '*'
 
   kysely-neon@2.0.2:
     resolution: {integrity: sha512-LY7tm9wZKsc8ilFe4Yc5Nf/z3R58wFkxbt8xq6f7U27+5VzZr9vy/S8bVPG8RT3yd+0qhQBDRkCl8gJdRuXWzw==}
@@ -3960,6 +3968,10 @@ snapshots:
   jsonfile@4.0.0:
     optionalDependencies:
       graceful-fs: 4.2.11
+
+  kysely-d1@0.4.0(kysely@0.27.6):
+    dependencies:
+      kysely: 0.27.6
 
   kysely-neon@2.0.2(@neondatabase/serverless@1.0.2)(kysely@0.27.6):
     dependencies:

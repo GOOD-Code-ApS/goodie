@@ -39,7 +39,7 @@
     "kysely-neon": ">=0.3.0",
     "kysely-planetscale": ">=1.0.0",
     "@libsql/kysely-libsql": ">=0.4.0",
-    "kysely-d1": ">=0.11.0"
+    "kysely-d1": ">=0.4.0"
   },
   "peerDependenciesMeta": {
     "pg": {
