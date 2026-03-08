@@ -38,7 +38,6 @@
     "better-sqlite3": ">=9.0.0",
     "kysely-neon": ">=0.3.0",
     "kysely-planetscale": ">=1.0.0",
-    "kysely-d1": ">=0.3.0",
     "@libsql/kysely-libsql": ">=0.4.0"
   },
   "peerDependenciesMeta": {
@@ -55,9 +54,6 @@
       "optional": true
     },
     "kysely-planetscale": {
-      "optional": true
-    },
-    "kysely-d1": {
       "optional": true
     },
     "@libsql/kysely-libsql": {

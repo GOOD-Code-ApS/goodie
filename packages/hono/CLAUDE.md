@@ -80,7 +80,7 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 ## Library Beans (beans.json)
 
 3 singleton beans:
-- **ServerConfig** — `@ConfigurationProperties('server')` with host/port/runtime (`ServerRuntime`: `'node' | 'bun' | 'deno' | 'cloudflare'`)
+- **ServerConfig** — `@ConfigurationProperties('server')` with host/port/runtime (`ServerRuntime`: `'node' | 'bun' | 'deno'`)
 - **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`. Dispatches to `@hono/node-server` (Node), `Bun.serve()` (Bun), `Deno.serve()` (Deno). Throws for Cloudflare (uses generated `export default` instead).
 - **OpenApiConfig** — `@ConfigurationProperties('openapi')` with title/version/description
 
@@ -100,9 +100,8 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 - **`node`** (default) — dynamic `import('@hono/node-server')`, requires `@hono/node-server` peer dep
 - **`bun`** — `Bun.serve()` via `globalThis.Bun`
 - **`deno`** — `Deno.serve()` via `globalThis.Deno`
-- **`cloudflare`** — `EmbeddedServer` throws. Plugin generates `export default { fetch(request, env, executionCtx) { return RuntimeBindings.run(env, () => router.fetch(...)) } }` instead of `startServer()`. Uses `RuntimeBindings` from `@goodie-ts/core` to propagate CF Workers `env` per-request.
 
-The plugin reads `server.runtime` from `CodegenContext.config` at build time to decide which entry point shape to generate.
+The plugin reads `server.runtime` from `CodegenContext.config` at build time (currently unused — always generates `startServer()`).
 
 ## Gotchas
 

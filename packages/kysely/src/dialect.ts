@@ -11,7 +11,6 @@ export type Dialect =
   | 'sqlite'
   | 'neon'
   | 'planetscale'
-  | 'd1'
   | 'libsql';
 
 /** All valid dialect values. Used for validation at config injection time. */
@@ -21,7 +20,6 @@ export const DIALECTS: readonly Dialect[] = [
   'sqlite',
   'neon',
   'planetscale',
-  'd1',
   'libsql',
 ] as const;
 
@@ -29,7 +27,7 @@ export const DIALECTS: readonly Dialect[] = [
  * Whether the given dialect supports `RETURNING` clauses natively.
  *
  * - **postgres / neon**: `INSERT/UPDATE/DELETE ... RETURNING *`
- * - **sqlite / d1 / libsql**: `INSERT/UPDATE/DELETE ... RETURNING *` (since 3.35)
+ * - **sqlite / libsql**: `INSERT/UPDATE/DELETE ... RETURNING *` (since 3.35)
  * - **mysql / planetscale**: No native support — falls back to INSERT + SELECT
  */
 export function supportsReturning(dialect: Dialect): boolean {
@@ -37,7 +35,6 @@ export function supportsReturning(dialect: Dialect): boolean {
     case 'postgres':
     case 'neon':
     case 'sqlite':
-    case 'd1':
     case 'libsql':
       return true;
     case 'mysql':

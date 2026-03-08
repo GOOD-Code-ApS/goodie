@@ -20,8 +20,6 @@ export default async function createDialect(config: DatasourceConfig) {
       return createNeonDialect(config);
     case 'planetscale':
       return createPlanetscaleDialect(config);
-    case 'd1':
-      return createD1Dialect(config);
     case 'libsql':
       return createLibsqlDialect(config);
     default:
@@ -74,13 +72,6 @@ async function createPlanetscaleDialect(config: DatasourceConfig) {
   return new mod.PlanetScaleDialect({
     url: config.url,
   });
-}
-
-async function createD1Dialect(config: DatasourceConfig) {
-  const mod = await importOptional('kysely-d1');
-  const { RuntimeBindings } = await import('@goodie-ts/core');
-  const database = RuntimeBindings.get(config.binding);
-  return new mod.D1Dialect({ database });
 }
 
 async function createLibsqlDialect(config: DatasourceConfig) {

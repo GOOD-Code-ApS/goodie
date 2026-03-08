@@ -27,10 +27,6 @@ describe('Dialect', () => {
       expect(supportsReturning('planetscale')).toBe(false);
     });
 
-    it('returns true for d1 (sqlite-compatible)', () => {
-      expect(supportsReturning('d1')).toBe(true);
-    });
-
     it('returns true for libsql (sqlite-compatible)', () => {
       expect(supportsReturning('libsql')).toBe(true);
     });
@@ -51,7 +47,7 @@ describe('Dialect', () => {
 
     it('includes supported dialects in error message', () => {
       expect(() => validateDialect('mssql')).toThrow(
-        /postgres, mysql, sqlite, neon, planetscale, d1, libsql/,
+        /postgres, mysql, sqlite, neon, planetscale, libsql/,
       );
     });
   });
@@ -64,7 +60,6 @@ describe('Dialect', () => {
         'sqlite',
         'neon',
         'planetscale',
-        'd1',
         'libsql',
       ]);
     });

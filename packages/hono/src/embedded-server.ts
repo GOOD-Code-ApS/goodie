@@ -54,15 +54,10 @@ async function startRuntime(
       return startBun(app, port, hostname);
     case 'deno':
       return startDeno(app, port, hostname);
-    case 'cloudflare':
-      throw new Error(
-        'EmbeddedServer does not support Cloudflare Workers. ' +
-          'Use the generated default export instead.',
-      );
     default:
       throw new Error(
         `Unsupported server runtime: '${runtime}'. ` +
-          `Supported runtimes: node, bun, deno, cloudflare`,
+          `Supported runtimes: node, bun, deno`,
       );
   }
 }

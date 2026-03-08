@@ -1008,39 +1008,4 @@ describe('Multi-runtime codegen', () => {
     expect(result.code).not.toContain('RuntimeBindings');
     expect(result.code).not.toContain('export default');
   });
-
-  it('generates CF Workers entry point when server.runtime is cloudflare', () => {
-    const result = createProject(
-      { '/src/UserController.ts': controllerFile },
-      '/out/AppContext.generated.ts',
-      [honoPlugin],
-      { 'server.runtime': 'cloudflare' },
-    );
-
-    expect(result.code).toContain('export default {');
-    expect(result.code).toContain('RuntimeBindings.run(env');
-    expect(result.code).toContain('__router.fetch(request, env, executionCtx)');
-    expect(result.code).toContain(
-      "import { RuntimeBindings } from '@goodie-ts/core'",
-    );
-    expect(result.code).not.toContain('EmbeddedServer');
-    expect(result.code).not.toContain('startServer');
-  });
-
-  it('still generates createRouter and createClient for cloudflare', () => {
-    const result = createProject(
-      { '/src/UserController.ts': controllerFile },
-      '/out/AppContext.generated.ts',
-      [honoPlugin],
-      { 'server.runtime': 'cloudflare' },
-    );
-
-    expect(result.code).toContain(
-      'export function createRouter(ctx: ApplicationContext)',
-    );
-    expect(result.code).toContain('export function createClient');
-    expect(result.code).toContain(
-      'export type AppType = ReturnType<typeof createRouter>',
-    );
-  });
 });

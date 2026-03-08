@@ -112,9 +112,6 @@ import type { TodoControllerRoutes } from './AppContext.generated.js';
 | `node` (default) | `@hono/node-server` | `@hono/node-server` |
 | `bun` | `Bun.serve()` | Built-in |
 | `deno` | `Deno.serve()` | Built-in |
-| `cloudflare` | `export default` entry point | N/A |
-
-For `cloudflare`, the plugin generates a Workers-compatible `export default` entry point with `RuntimeBindings` middleware instead of `startServer()`.
 
 Or override at startup:
 

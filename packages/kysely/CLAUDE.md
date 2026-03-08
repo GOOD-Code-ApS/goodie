@@ -8,8 +8,8 @@ Kysely database integration for goodie-ts: `KyselyDatabase` library bean, `@Tran
 |------|------|
 | `src/kysely-database.ts` | `KyselyDatabase` — library-provided `@Singleton`, creates `Kysely<any>` from `DatasourceConfig` |
 | `src/datasource-config.ts` | `DatasourceConfig` + `PoolConfig` — `@ConfigurationProperties('datasource')` and `@ConfigurationProperties('datasource.pool')` |
-| `src/dialect.ts` | `Dialect` type (`'postgres' \| 'mysql' \| 'sqlite' \| 'neon' \| 'planetscale' \| 'd1' \| 'libsql'`) and `supportsReturning()` |
-| `src/dialect-factory.ts` | `createDialect()` — async factory using dynamic imports for dialect drivers (including edge: neon, planetscale, d1, libsql) |
+| `src/dialect.ts` | `Dialect` type (`'postgres' \| 'mysql' \| 'sqlite' \| 'neon' \| 'planetscale' \| 'libsql'`) and `supportsReturning()` |
+| `src/dialect-factory.ts` | `createDialect()` — async factory using dynamic imports for dialect drivers (including edge: neon, planetscale, libsql) |
 | `src/transaction-manager.ts` | `TransactionManager` — `AsyncLocalStorage`-based transaction propagation, `KyselyProvider` interface |
 | `src/transactional-interceptor.ts` | `TransactionalInterceptor` — AOP interceptor wrapping methods in transactions (order `-40`) |
 | `src/migration-runner.ts` | `MigrationRunner` — runs `@Migration` classes in sorted order via `@PostConstruct` |
@@ -49,9 +49,9 @@ class TodoRepository {
 ## DatasourceConfig + PoolConfig
 
 Two `@ConfigurationProperties` library beans for database configuration:
-- `DatasourceConfig` — `url`, `dialect`, `binding` (for D1) fields, prefix `datasource`
+- `DatasourceConfig` — `url`, `dialect` fields, prefix `datasource`
 - `PoolConfig` — `min` (default 2), `max` (default 10) fields, prefix `datasource.pool`
-- `DatasourceConfig` has a `@PostConstruct validate()` that checks `dialect` and `url` (D1 requires `binding` instead of `url`)
+- `DatasourceConfig` has a `@PostConstruct validate()` that checks `dialect` and `url`
 
 Config via `config/default.json`:
 ```json
@@ -66,14 +66,9 @@ Config via `config/default.json`:
 - `sqlite` → `better-sqlite3` (`BetterSqlite3Dialect`)
 - `neon` → `kysely-neon` (serverless Postgres, `supportsReturning: true`)
 - `planetscale` → `kysely-planetscale` (serverless MySQL, `supportsReturning: false`)
-- `d1` → `kysely-d1` (Cloudflare D1 via `RuntimeBindings`, `supportsReturning: true`)
 - `libsql` → `@libsql/kysely-libsql` (Turso/libSQL, `supportsReturning: true`)
 
-The `dialect` field in config is required (not auto-detected). D1 requires `binding` instead of `url`.
-
-## KyselyDatabase Lazy Init (D1)
-
-For the D1 dialect, `KyselyDatabase` defers initialization because the D1 binding is only available per-request via `RuntimeBindings`. The `@PostConstruct` is skipped and `ensureInitialized()` creates the Kysely instance on first access.
+The `dialect` field in config is required (not auto-detected).
 
 ## TransactionManager
 
@@ -101,5 +96,4 @@ No configuration needed — the plugin discovers `KyselyDatabase` automatically 
 
 - `KyselyDatabase` is non-generic — inject directly for untyped access, or use `@Module` + `@Provides` for typed `Kysely<DB>`
 - Test transactions skip nested transactions to avoid Kysely's "already in transaction" error
-- Dialect drivers (`pg`, `mysql2`, `better-sqlite3`, `kysely-neon`, `kysely-planetscale`, `kysely-d1`, `@libsql/kysely-libsql`) are optional peer dependencies — only the configured dialect needs to be installed
-- D1 dialect uses `RuntimeBindings` from `@goodie-ts/core` to access per-request CF Workers bindings
+- Dialect drivers (`pg`, `mysql2`, `better-sqlite3`, `kysely-neon`, `kysely-planetscale`, `@libsql/kysely-libsql`) are optional peer dependencies — only the configured dialect needs to be installed

@@ -132,15 +132,6 @@ describe('EmbeddedServer', () => {
     });
   });
 
-  describe('cloudflare runtime', () => {
-    it('throws — cloudflare uses export default, not EmbeddedServer', async () => {
-      const server = new EmbeddedServer(makeConfig({ runtime: 'cloudflare' }));
-      await expect(server.listen(fakeApp)).rejects.toThrow(
-        /does not support Cloudflare Workers/,
-      );
-    });
-  });
-
   describe('unsupported runtime', () => {
     it('throws for unknown runtime', async () => {
       const server = new EmbeddedServer(

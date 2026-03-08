@@ -87,20 +87,12 @@ Migrations run automatically at startup via `MigrationRunner` (`@PostConstruct`)
 | `sqlite` | `better-sqlite3` | No |
 | `neon` | `kysely-neon` | Yes |
 | `planetscale` | `kysely-planetscale` | Yes |
-| `d1` | `kysely-d1` | Yes (Cloudflare) |
 | `libsql` | `@libsql/kysely-libsql` | Yes |
 
 Configure via `config/default.json`:
 ```json
 { "datasource": { "url": "postgres://...", "dialect": "postgres" } }
 ```
-
-For Cloudflare D1, use `binding` instead of `url`:
-```json
-{ "datasource": { "dialect": "d1", "binding": "DB" } }
-```
-
-The D1 binding is resolved per-request via `RuntimeBindings` from `@goodie-ts/core`.
 
 ## Vite Plugin Setup
 

@@ -36,12 +36,6 @@ export class PoolConfig {
 export class DatasourceConfig {
   url = '';
   dialect = '';
-  /**
-   * Runtime binding name for dialects that use platform bindings instead of
-   * connection strings (e.g. Cloudflare D1). The binding is resolved at
-   * request time via `RuntimeBindings.get(binding)`.
-   */
-  binding = '';
 
   constructor(readonly pool: PoolConfig) {}
 
@@ -54,15 +48,7 @@ export class DatasourceConfig {
     }
     validateDialect(this.dialect);
 
-    const needsBinding = this.dialect === 'd1';
-    if (needsBinding) {
-      if (!this.binding) {
-        throw new Error(
-          "DatasourceConfig: 'datasource.binding' is required for the 'd1' dialect. " +
-            "Set it to your D1 binding name (e.g. 'DB').",
-        );
-      }
-    } else if (!this.url) {
+    if (!this.url) {
       throw new Error(
         "DatasourceConfig: 'datasource.url' is required. Example: postgres://localhost:5432/mydb",
       );

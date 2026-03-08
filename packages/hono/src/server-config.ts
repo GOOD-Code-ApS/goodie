@@ -1,7 +1,7 @@
 import { ConfigurationProperties, Singleton } from '@goodie-ts/core';
 
 /** Supported server runtimes. */
-export type ServerRuntime = 'node' | 'bun' | 'deno' | 'cloudflare';
+export type ServerRuntime = 'node' | 'bun' | 'deno';
 
 @Singleton()
 @ConfigurationProperties('server')
