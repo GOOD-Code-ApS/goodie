@@ -8,14 +8,45 @@ import type {
 import { test as base, type TestAPI } from 'vitest';
 import { TestContext, type TestContextBuilder } from './test-context.js';
 
+/** A function that builds bean definitions, optionally accepting config overrides. */
+type DefinitionsFactory = (
+  config?: Record<string, unknown>,
+) => BeanDefinition[];
+
+/** Input accepted by `createGoodieTest()` — either a definitions factory or a raw array. */
+type DefinitionsInput = DefinitionsFactory | BeanDefinition[];
+
 /**
  * Configuration options for `createGoodieTest()`.
  */
-export interface GoodieTestOptions {
+export interface GoodieTestOptions<
+  TFixtures extends Record<string, unknown> = Record<string, never>,
+> {
   /** Static config overrides, or a lazy function (useful for TestContainers URIs). */
   config?: Record<string, unknown> | (() => Record<string, unknown>);
   /** Escape hatch to customise the builder (e.g. `.override()`, `.mock()`). */
   setup?: (builder: TestContextBuilder) => TestContextBuilder;
+  /**
+   * Custom fixtures derived from the ApplicationContext.
+   * Each entry is a factory `(ctx) => T` — the result is exposed as a test fixture.
+   *
+   * @example
+   * ```typescript
+   * const test = createGoodieTest(buildDefinitions, {
+   *   fixtures: {
+   *     app: (ctx) => createRouter(ctx),
+   *   },
+   * });
+   *
+   * test('GET /todos', async ({ app }) => {
+   *   const res = await app.request('/api/todos');
+   *   expect(res.status).toBe(200);
+   * });
+   * ```
+   */
+  fixtures?: {
+    [K in keyof TFixtures]: (ctx: ApplicationContext) => TFixtures[K];
+  };
   /**
    * Wrap each test in a transaction that rolls back after the test.
    * Pass the class or InjectionToken of your TransactionManager bean.
@@ -47,33 +78,96 @@ interface TestTransactionManagerLike {
 
 /**
  * Create a vitest-native `test` function with Playwright-style fixtures
- * that provide a built `ApplicationContext` and a `resolve` helper.
+ * that provide a built `ApplicationContext`, a `resolve` helper, and
+ * any custom fixtures derived from the context.
  *
  * @example
  * ```typescript
- * const test = createGoodieTest(definitions, { config: { DB: 'test' } });
+ * // Basic usage with buildDefinitions function
+ * const test = createGoodieTest(buildDefinitions, {
+ *   config: () => ({ 'datasource.url': container.getConnectionUri() }),
+ * });
  *
- * test('creates a user', async ({ ctx, resolve }) => {
+ * test('creates a user', async ({ resolve }) => {
  *   const svc = resolve(UserService);
  *   expect(svc).toBeInstanceOf(UserService);
  * });
+ * ```
  *
- * test.skip('wip', async ({ ctx }) => { ... });
+ * @example
+ * ```typescript
+ * // With custom fixtures (e.g. Hono router)
+ * const test = createGoodieTest(buildDefinitions, {
+ *   fixtures: {
+ *     app: (ctx) => createRouter(ctx),
+ *   },
+ * });
+ *
+ * test('GET /todos', async ({ app, resolve }) => {
+ *   const res = await app.request('/api/todos');
+ *   expect(res.status).toBe(200);
+ * });
  * ```
  */
-export function createGoodieTest(
-  definitions: BeanDefinition[],
-  options?: GoodieTestOptions,
-): TestAPI<GoodieFixtures> {
+export function createGoodieTest<
+  TFixtures extends Record<string, unknown> = Record<string, never>,
+>(
+  definitions: DefinitionsInput,
+  options?: GoodieTestOptions<TFixtures>,
+): TestAPI<GoodieFixtures & TFixtures> {
   const transactional = options?.transactional;
   const rollback = options?.rollback ?? !!transactional;
 
-  const extended = base.extend<GoodieFixtures>({
-    // biome-ignore lint/correctness/noEmptyPattern: vitest requires destructuring pattern
-    ctx: async ({}, use) => {
-      let builder: TestContextBuilder = TestContext.from(definitions);
+  // Resolve definitions once (lazily on first test) and reuse across all tests.
+  // This ensures all tests share the same BeanDefinition[] reference, which is
+  // critical for transactional rollback — tests must share the same connection pool.
+  // When definitions is a factory, config() is evaluated once here and frozen for all tests.
+  // When definitions is a raw array, config is applied per-test via builder.withConfig().
+  let cachedDefs: BeanDefinition[] | undefined;
+  function resolveDefinitions(): BeanDefinition[] {
+    if (cachedDefs) return cachedDefs;
 
-      if (options?.config) {
+    if (typeof definitions === 'function') {
+      const configValue = options?.config
+        ? typeof options.config === 'function'
+          ? options.config()
+          : options.config
+        : undefined;
+      cachedDefs = definitions(configValue);
+    } else {
+      cachedDefs = definitions;
+    }
+
+    return cachedDefs;
+  }
+
+  // Build fixture entries from user-provided fixture factories.
+  // Each fixture depends on `ctx` and is exposed as a test fixture.
+  function buildCustomFixtures(): Record<string, unknown> {
+    if (!options?.fixtures) return {};
+    const entries: Record<string, unknown> = {};
+    for (const [name, factory] of Object.entries(options.fixtures)) {
+      entries[name] = async (
+        { ctx }: { ctx: ApplicationContext },
+        use: (value: unknown) => Promise<void>,
+      ) => {
+        await use((factory as (ctx: ApplicationContext) => unknown)(ctx));
+      };
+    }
+    return entries;
+  }
+
+  const baseFixtures: Record<string, unknown> = {
+    ctx: async (
+      // biome-ignore lint/correctness/noEmptyPattern: vitest requires destructuring syntax
+      {}: Record<string, never>,
+      use: (value: ApplicationContext) => Promise<void>,
+    ) => {
+      const defs = resolveDefinitions();
+      let builder: TestContextBuilder = TestContext.from(defs);
+
+      // When definitions is a raw array, apply config via withConfig().
+      if (options?.config && typeof definitions !== 'function') {
         const configValue =
           typeof options.config === 'function'
             ? options.config()
@@ -90,24 +184,47 @@ export function createGoodieTest(
       await ctx.close();
     },
 
-    resolve: async ({ ctx }, use) => {
+    resolve: async (
+      { ctx }: { ctx: ApplicationContext },
+      use: (
+        value: <T>(
+          token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+        ) => T,
+      ) => Promise<void>,
+    ) => {
       await use(
         <T>(
           token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
         ) => ctx.get(token),
       );
     },
-  });
+  };
 
-  if (!transactional || !rollback) return extended;
+  // Vitest's Fixtures type uses complex mapped types that don't play well with
+  // dynamic fixture objects. We use `as any` at the `.extend()` boundary — the
+  // return type cast to `TestAPI<GoodieFixtures & TFixtures>` ensures callers
+  // get full type safety on the fixtures they declared.
 
+  // When not using transactional mode, include custom fixtures directly.
+  if (!transactional || !rollback) {
+    return base.extend({
+      ...baseFixtures,
+      ...buildCustomFixtures(),
+    } as any) as TestAPI<GoodieFixtures & TFixtures>;
+  }
+
+  // With transactional mode: three layers of .extend() ensure correct ordering:
+  //   1. baseFixtures (ctx, resolve)
+  //   2. _rollback (auto) — starts the transaction
+  //   3. custom fixtures — run inside the transaction
   const transactionalToken = transactional;
 
-  // _rollback is auto:true (invisible to users), so cast to GoodieFixtures
-  // biome-ignore lint/suspicious/noConfusingVoidType: vitest auto-fixture provides no value
-  return extended.extend<{ _rollback: void }>({
+  const withRollback = base.extend(baseFixtures as any).extend({
     _rollback: [
-      async ({ ctx }, use) => {
+      async (
+        { ctx }: { ctx: ApplicationContext },
+        use: () => Promise<void>,
+      ) => {
         const tm = ctx.get(transactionalToken) as TestTransactionManagerLike;
         const rollbackFn = await tm.startTestTransaction();
         try {
@@ -118,5 +235,14 @@ export function createGoodieTest(
       },
       { auto: true },
     ],
-  });
+  } as any);
+
+  const customFixtures = buildCustomFixtures();
+  if (Object.keys(customFixtures).length === 0) {
+    return withRollback as TestAPI<GoodieFixtures & TFixtures>;
+  }
+
+  return withRollback.extend(customFixtures as any) as TestAPI<
+    GoodieFixtures & TFixtures
+  >;
 }

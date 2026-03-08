@@ -612,3 +612,75 @@ describe('withConfig()', () => {
     expect(ctx.get(Service).name).toBe('mock');
   });
 });
+
+// ── provide() ───────────────────────────────────────────────────
+
+describe('provide()', () => {
+  it('adds a new bean that does not exist in base definitions', async () => {
+    class Repo {
+      find(): string {
+        return 'found';
+      }
+    }
+    interface SecurityProvider {
+      authenticate(): string;
+    }
+    const SECURITY_TOKEN = new InjectionToken<SecurityProvider>(
+      'SecurityProvider',
+    );
+
+    const ctx = await TestContext.from([
+      makeDef(Repo, { factory: () => new Repo() }),
+    ])
+      .provide(SECURITY_TOKEN, { authenticate: () => 'test-user' })
+      .build();
+
+    expect(ctx.get(SECURITY_TOKEN).authenticate()).toBe('test-user');
+    expect(ctx.get(Repo)).toBeInstanceOf(Repo);
+  });
+
+  it('later provide() replaces earlier provide() for same token', async () => {
+    const TOKEN = new InjectionToken<string>('dedup');
+
+    const ctx = await TestContext.from([])
+      .provide(TOKEN, 'first')
+      .provide(TOKEN, 'second')
+      .build();
+
+    expect(ctx.get(TOKEN)).toBe('second');
+  });
+
+  it('throws DIError when token already exists in base definitions', () => {
+    class Existing {
+      value = 'original';
+    }
+
+    const builder = TestContext.from([
+      makeDef(Existing, { factory: () => new Existing() }),
+    ]);
+
+    expect(() => builder.provide(Existing, new Existing())).toThrow(DIError);
+    expect(() => builder.provide(Existing, new Existing())).toThrow(
+      'already exists in base definitions',
+    );
+  });
+
+  it('works alongside override()', async () => {
+    class Service {
+      value = 'real';
+    }
+
+    const EXTRA_TOKEN = new InjectionToken<string>('extra');
+
+    const ctx = await TestContext.from([
+      makeDef(Service, { factory: () => new Service() }),
+    ])
+      .override(Service)
+      .withValue({ value: 'mock' } as Service)
+      .provide(EXTRA_TOKEN, 'extra-value')
+      .build();
+
+    expect(ctx.get(Service).value).toBe('mock');
+    expect(ctx.get(EXTRA_TOKEN)).toBe('extra-value');
+  });
+});

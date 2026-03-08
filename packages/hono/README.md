@@ -49,23 +49,23 @@ export class TodoController {
 }
 ```
 
-The hono plugin generates `createRouter` and `startServer` in `AppContext.generated.ts`:
+The hono plugin registers an `app.onStart()` hook that wires controllers to the HTTP server automatically:
 
 ```typescript
-import { startServer } from './AppContext.generated.js';
+import { app } from './AppContext.generated.js';
 
 // Starts the DI context, wires routes, and listens on configured port
-await startServer();
+await app.start();
 ```
 
-Or for more control:
+For testing, use `createRouter` directly:
 
 ```typescript
-import { createRouter } from './AppContext.generated.js';
+import { createContext, createRouter } from './AppContext.generated.js';
 
-const ctx = await app.start();
+const ctx = await createContext({ 'datasource.url': testDbUrl });
 const router = createRouter(ctx);
-// Use router.fetch for testing or pass to a custom server
+// Use router.request() for in-process HTTP testing
 ```
 
 ## RPC Client (Type-Safe)
@@ -113,11 +113,7 @@ import type { TodoControllerRoutes } from './AppContext.generated.js';
 | `bun` | `Bun.serve()` | Built-in |
 | `deno` | `Deno.serve()` | Built-in |
 
-Or override at startup:
-
-```typescript
-await startServer({ port: 8080 });
-```
+Server host/port are configured via `config/default.json` under `server.host` and `server.port`.
 
 ## Route Handler Return Values
 

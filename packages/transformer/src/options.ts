@@ -143,6 +143,8 @@ export interface CodegenContribution {
   imports?: string[];
   /** Code lines to add after the bean definitions. */
   code?: string[];
+  /** Body lines for an `app.onStart()` hook. Codegen wraps them in `app.onStart(async (ctx) => { ... })`. */
+  onStart?: string[];
 }
 
 /** Context passed to plugin codegen hooks. */

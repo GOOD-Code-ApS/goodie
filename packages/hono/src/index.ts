@@ -1,5 +1,7 @@
 // Route decorators
 
+// Re-export resolver so generated code imports from @goodie-ts/hono, not hono-openapi
+export { resolver } from 'hono-openapi';
 // Security decorators
 export { Anonymous } from './anonymous.js';
 export { Controller } from './controller.js';
@@ -15,6 +17,16 @@ export { OpenApiConfig } from './openapi-config.js';
 export type { DescribeRouteOptions } from './openapi-types.js';
 export type { Principal } from './principal.js';
 export { Delete, Get, Patch, Post, Put } from './route.js';
+// Runtime helpers for generated route wiring
+export {
+  corsMiddleware,
+  handleResult,
+  mountOpenApiSpec,
+  openApiMiddleware,
+  requestScopeMiddleware,
+  securityMiddleware,
+  validationMiddleware,
+} from './router-helpers.js';
 export { Secured } from './secured.js';
 export type {
   SecurityProvider,

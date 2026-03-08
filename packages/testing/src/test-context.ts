@@ -114,6 +114,7 @@ export class OverrideBuilder<T> {
  */
 export class TestContextBuilder {
   private readonly overrides = new Map<Token, BeanDefinition>();
+  private readonly additions = new Map<Token, BeanDefinition>();
   private readonly tokenSet: Set<Token>;
 
   /** @internal — use TestContext.from() */
@@ -174,6 +175,38 @@ export class TestContextBuilder {
       this.overrides.set(token, def);
     }
 
+    return this;
+  }
+
+  /**
+   * Register a test-only bean. Unlike `override()`, this adds a new bean
+   * that doesn't need to exist in the base definitions.
+   *
+   * @example
+   * ```typescript
+   * TestContext.from(buildDefinitions())
+   *   .provide(SECURITY_PROVIDER, testSecurityProvider)
+   *   .build()
+   * ```
+   */
+  provide<T>(
+    token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
+    value: T,
+  ): TestContextBuilder {
+    if (this.tokenSet.has(token as Token)) {
+      throw new DIError(
+        `Cannot provide ${tokenName(token as Token)}: already exists in base definitions — use override() instead`,
+      );
+    }
+    const def: BeanDefinition = {
+      token: token as BeanDefinition['token'],
+      scope: 'singleton',
+      dependencies: [],
+      factory: () => value,
+      eager: false,
+      metadata: {},
+    };
+    this.additions.set(token as Token, def);
     return this;
   }
 
@@ -252,7 +285,7 @@ export class TestContextBuilder {
     const merged = this.baseDefs.map(
       (def) => this.overrides.get(def.token) ?? def,
     );
-    return ApplicationContext.create(merged);
+    return ApplicationContext.create([...merged, ...this.additions.values()]);
   }
 }
 

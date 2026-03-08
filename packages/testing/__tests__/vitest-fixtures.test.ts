@@ -149,6 +149,20 @@ describe('createGoodieTest()', () => {
     });
   });
 
+  // ── setup with provide() ────────────────────────────────────────
+
+  describe('setup with provide()', () => {
+    const AUTH_TOKEN = new InjectionToken<{ user: string }>('Auth');
+
+    const test = createGoodieTest([greeterDef], {
+      setup: (builder) => builder.provide(AUTH_TOKEN, { user: 'test-user' }),
+    });
+
+    test('resolves provided bean from setup', ({ ctx }) => {
+      expect(ctx.get(AUTH_TOKEN).user).toBe('test-user');
+    });
+  });
+
   // ── resolve() with InjectionToken ────────────────────────────────
 
   describe('resolve() with InjectionToken', () => {
@@ -197,6 +211,75 @@ describe('createGoodieTest()', () => {
     test('resolves beans with dependency injection', ({ resolve }) => {
       const svc = resolve(Service);
       expect(svc.getAll()).toEqual(['item1', 'item2']);
+    });
+  });
+
+  // ── buildDefinitions function ───────────────────────────────────
+
+  describe('buildDefinitions function', () => {
+    const CONFIG_TOKEN = new InjectionToken<Record<string, unknown>>(
+      '__Goodie_Config',
+    );
+
+    function buildDefinitions(
+      config?: Record<string, unknown>,
+    ): BeanDefinition[] {
+      return [
+        greeterDef,
+        makeDef(CONFIG_TOKEN, {
+          factory: () => ({ DB: 'default', ...config }),
+        }),
+      ];
+    }
+
+    const test = createGoodieTest(buildDefinitions, {
+      config: () => ({ DB: 'test-db' }),
+    });
+
+    test('passes config to buildDefinitions function', ({ ctx }) => {
+      const config = ctx.get(CONFIG_TOKEN);
+      expect(config.DB).toBe('test-db');
+    });
+  });
+
+  // ── custom fixtures ───────────────────────────────────────────
+
+  describe('custom fixtures', () => {
+    class Router {
+      constructor(private readonly greeter: Greeter) {}
+      handle(name: string): string {
+        return this.greeter.greet(name);
+      }
+    }
+
+    const test = createGoodieTest([greeterDef], {
+      fixtures: {
+        router: (ctx) => new Router(ctx.get(Greeter)),
+      },
+    });
+
+    test('exposes custom fixtures alongside ctx and resolve', ({
+      router,
+      resolve,
+    }) => {
+      expect(router.handle('World')).toBe('Hello, World!');
+      expect(resolve(Greeter)).toBeInstanceOf(Greeter);
+    });
+  });
+
+  // ── multiple custom fixtures ──────────────────────────────────
+
+  describe('multiple custom fixtures', () => {
+    const test = createGoodieTest([greeterDef, counterDef], {
+      fixtures: {
+        greeting: (ctx) => ctx.get(Greeter).greet('fixture'),
+        count: (ctx) => ctx.get(Counter).increment(),
+      },
+    });
+
+    test('provides all custom fixtures', ({ greeting, count }) => {
+      expect(greeting).toBe('Hello, fixture!');
+      expect(count).toBe(1);
     });
   });
 
