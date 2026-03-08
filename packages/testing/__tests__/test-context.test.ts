@@ -639,6 +639,17 @@ describe('provide()', () => {
     expect(ctx.get(Repo)).toBeInstanceOf(Repo);
   });
 
+  it('later provide() replaces earlier provide() for same token', async () => {
+    const TOKEN = new InjectionToken<string>('dedup');
+
+    const ctx = await TestContext.from([])
+      .provide(TOKEN, 'first')
+      .provide(TOKEN, 'second')
+      .build();
+
+    expect(ctx.get(TOKEN)).toBe('second');
+  });
+
   it('works alongside override()', async () => {
     class Service {
       value = 'real';

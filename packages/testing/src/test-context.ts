@@ -114,7 +114,7 @@ export class OverrideBuilder<T> {
  */
 export class TestContextBuilder {
   private readonly overrides = new Map<Token, BeanDefinition>();
-  private readonly additions: BeanDefinition[] = [];
+  private readonly additions = new Map<Token, BeanDefinition>();
   private readonly tokenSet: Set<Token>;
 
   /** @internal — use TestContext.from() */
@@ -201,7 +201,7 @@ export class TestContextBuilder {
       eager: false,
       metadata: {},
     };
-    this.additions.push(def);
+    this.additions.set(token as Token, def);
     return this;
   }
 
@@ -280,7 +280,7 @@ export class TestContextBuilder {
     const merged = this.baseDefs.map(
       (def) => this.overrides.get(def.token) ?? def,
     );
-    return ApplicationContext.create([...merged, ...this.additions]);
+    return ApplicationContext.create([...merged, ...this.additions.values()]);
   }
 }
 

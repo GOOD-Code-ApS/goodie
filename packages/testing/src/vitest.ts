@@ -158,7 +158,8 @@ export function createGoodieTest<
 
   const baseFixtures: Record<string, unknown> = {
     ctx: async (
-      _deps: Record<string, never>,
+      // biome-ignore lint/correctness/noEmptyPattern: vitest requires destructuring syntax
+      {}: Record<string, never>,
       use: (value: ApplicationContext) => Promise<void>,
     ) => {
       const defs = resolveDefinitions();
@@ -211,11 +212,13 @@ export function createGoodieTest<
     } as any) as TestAPI<GoodieFixtures & TFixtures>;
   }
 
-  // With transactional mode: first extend with base fixtures, then extend again
-  // with _rollback (auto) + custom fixtures so they run inside the transaction.
+  // With transactional mode: three layers of .extend() ensure correct ordering:
+  //   1. baseFixtures (ctx, resolve)
+  //   2. _rollback (auto) — starts the transaction
+  //   3. custom fixtures — run inside the transaction
   const transactionalToken = transactional;
 
-  return base.extend(baseFixtures as any).extend({
+  const withRollback = base.extend(baseFixtures as any).extend({
     _rollback: [
       async (
         { ctx }: { ctx: ApplicationContext },
@@ -231,6 +234,14 @@ export function createGoodieTest<
       },
       { auto: true },
     ],
-    ...buildCustomFixtures(),
-  } as any) as TestAPI<GoodieFixtures & TFixtures>;
+  } as any);
+
+  const customFixtures = buildCustomFixtures();
+  if (Object.keys(customFixtures).length === 0) {
+    return withRollback as TestAPI<GoodieFixtures & TFixtures>;
+  }
+
+  return withRollback.extend(customFixtures as any) as TestAPI<
+    GoodieFixtures & TFixtures
+  >;
 }
