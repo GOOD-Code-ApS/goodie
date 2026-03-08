@@ -1258,7 +1258,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       expect(result.code).toContain(
-        "import { ApplicationContext, Goodie } from '@goodie-ts/core'",
+        "import { ApplicationContext } from '@goodie-ts/core'",
       );
     });
 
@@ -1271,22 +1271,9 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.code).toContain('export { definitions }');
+      expect(result.code).not.toContain('export { definitions }');
+      expect(result.code).not.toContain('export const app');
       expect(result.code).toContain('export async function createContext()');
-    });
-
-    it('should export Goodie app builder', () => {
-      const result = createTestProject({
-        '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
-          export class Repo {}
-        `,
-      });
-
-      expect(result.code).toContain(
-        'export const app = Goodie.build(definitions)',
-      );
     });
   });
 });

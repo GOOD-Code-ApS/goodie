@@ -453,18 +453,8 @@ describe('Code Generator', () => {
     expect(code).toContain(
       'return ApplicationContext.create(definitions, { preSorted: true })',
     );
-    expect(code).toContain('export { definitions }');
-  });
-
-  it('should generate Goodie app builder export', () => {
-    const code = generateCode([], {
-      outputPath: '/out/AppContext.generated.ts',
-    });
-
-    expect(code).toContain(
-      "import { ApplicationContext, Goodie } from '@goodie-ts/core'",
-    );
-    expect(code).toContain('export const app = Goodie.build(definitions)');
+    expect(code).not.toContain('export { definitions }');
+    expect(code).not.toContain('export const app');
   });
 
   it('should generate eager: true for eager beans', () => {
@@ -734,7 +724,7 @@ describe('Code Generator', () => {
     expect(code).not.toContain("__config['key'break']");
   });
 
-  it('should generate createApp function when @Value fields exist', () => {
+  it('should not export createApp or app when @Value fields exist', () => {
     const beans: IRBeanDefinition[] = [
       {
         tokenRef: {
@@ -760,11 +750,9 @@ describe('Code Generator', () => {
       outputPath: '/out/AppContext.generated.ts',
     });
 
-    expect(code).toContain(
-      'export function createApp(config?: Record<string, unknown>)',
-    );
-    expect(code).toContain('return Goodie.build(buildDefinitions(config))');
-    expect(code).toContain('export const app = createApp()');
+    expect(code).not.toContain('export function createApp');
+    expect(code).not.toContain('Goodie.build');
+    expect(code).not.toContain('export const app');
   });
 
   it('should export __Goodie_Config token when @Value fields exist', () => {
@@ -937,7 +925,7 @@ describe('Code Generator', () => {
 
     expect(code).toContain('loadConfigFiles');
     expect(code).toContain(
-      "import { ApplicationContext, Goodie, loadConfigFiles } from '@goodie-ts/core'",
+      "import { ApplicationContext, loadConfigFiles } from '@goodie-ts/core'",
     );
     expect(code).toContain(
       'loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? "/project/config", process.env.NODE_ENV)',
@@ -1034,7 +1022,7 @@ describe('Code Generator', () => {
     });
 
     expect(code).toContain(
-      "import { ApplicationContext, Goodie, loadConfigFiles } from '@goodie-ts/core'",
+      "import { ApplicationContext, loadConfigFiles } from '@goodie-ts/core'",
     );
     expect(code).toContain('export const __Goodie_Config');
     expect(code).toContain('export function buildDefinitions(');
@@ -1075,7 +1063,7 @@ describe('Code Generator', () => {
 
     expect(code).not.toContain('loadConfigFiles');
     expect(code).toContain(
-      "import { ApplicationContext, Goodie } from '@goodie-ts/core'",
+      "import { ApplicationContext } from '@goodie-ts/core'",
     );
     expect(code).toContain('"server.port":"8080"');
     expect(code).toContain('"server.host":"localhost"');
