@@ -1,6 +1,6 @@
 ---
-'@goodie-ts/core': minor
-'@goodie-ts/transformer': minor
+'@goodie-ts/core': major
+'@goodie-ts/transformer': major
 ---
 
 Improve error messages and diagnostics
