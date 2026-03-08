@@ -162,16 +162,12 @@ export async function transform(
   }
 
   // 7. Build graph (validate + topo sort)
-  // Resolve configDir early so conditional plugin can use it
   const resolvedConfigDir = options.configDir
     ? path.isAbsolute(options.configDir)
       ? options.configDir
       : path.resolve(baseDir, options.configDir)
     : undefined;
-  const graphResult = buildGraph(
-    { ...resolveResult, beans },
-    { configDir: resolvedConfigDir },
-  );
+  const graphResult = buildGraph({ ...resolveResult, beans });
 
   // 8. beforeCodegen hook
   let finalBeans = graphResult.beans;
@@ -315,10 +311,7 @@ export function transformInMemory(
   }
 
   // 6. Build graph (validate + topo sort)
-  const graphResult = buildGraph(
-    { ...resolveResult, beans },
-    options?.configDir ? { configDir: options.configDir } : undefined,
-  );
+  const graphResult = buildGraph({ ...resolveResult, beans });
 
   // 7. beforeCodegen hook
   let finalBeans = graphResult.beans;
@@ -430,6 +423,7 @@ export async function transformLibrary(
   }
 
   // 8. Build graph (validate + topo sort)
+  // Conditional rules are evaluated at runtime by ApplicationContext, not at build time.
   const graphResult = buildGraph({ ...resolveResult, beans });
 
   // 9. beforeCodegen hook (plugins may add synthetic beans)

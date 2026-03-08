@@ -6,9 +6,21 @@ import {
   MissingDependencyError,
 } from './errors.js';
 import type { InjectionToken } from './injection-token.js';
+import { RequestScopeManager } from './request-scope.js';
 import { isMetricsEnabled, StartupMetrics } from './startup-metrics.js';
 import { topoSort } from './topo-sort.js';
 import type { AbstractConstructor, Constructor } from './types.js';
+
+/** Shape of conditional rules stored in `metadata.conditionalRules` by the transformer. */
+interface ConditionalRule {
+  type: 'onEnv' | 'onProperty' | 'onMissingBean';
+  envVar?: string;
+  expectedValue?: string;
+  expectedValues?: string[];
+  key?: string;
+  tokenClassName?: string;
+  tokenImportPath?: string;
+}
 
 type Token = InjectionToken<unknown> | Constructor | AbstractConstructor;
 
@@ -71,13 +83,16 @@ export class ApplicationContext {
     const metrics = isMetricsEnabled() ? new StartupMetrics() : undefined;
     const totalStart = metrics ? performance.now() : 0;
 
+    // Evaluate conditional rules at runtime (env, config properties, missing beans)
+    const filtered = filterConditionalBeans(definitions);
+
     const sorted = metrics
       ? metrics.timeStageSync('topoSort', () =>
-          options?.preSorted ? definitions : topoSort(definitions),
+          options?.preSorted ? filtered : topoSort(filtered),
         )
       : options?.preSorted
-        ? definitions
-        : topoSort(definitions);
+        ? filtered
+        : topoSort(filtered);
 
     const ctx = new ApplicationContext(sorted);
     ctx.startupMetrics = metrics;
@@ -133,9 +148,13 @@ export class ApplicationContext {
     }
 
     if (def.scope === 'singleton') {
-      const cached = this.singletonCache.get(token as Token);
-      if (cached === UNRESOLVED || this.asyncInFlight.has(token as Token)) {
-        throw new AsyncBeanNotReadyError(tokenName(token as Token));
+      // Check cache under both the requested token and the def's actual token
+      // (they differ when resolving via baseTokens, e.g. abstract → concrete)
+      const cached =
+        this.singletonCache.get(token as Token) ??
+        this.singletonCache.get(def.token);
+      if (cached === UNRESOLVED || this.asyncInFlight.has(def.token)) {
+        throw new AsyncBeanNotReadyError(tokenName(def.token));
       }
       if (cached !== undefined) {
         return cached as T;
@@ -143,6 +162,10 @@ export class ApplicationContext {
       // Attempt synchronous resolution
       const instance = this.resolveSync<T>(def);
       return instance;
+    }
+
+    if (def.scope === 'request') {
+      return this.getRequestScopedInstance<T>(def);
     }
 
     // Prototype: new instance every time
@@ -162,25 +185,33 @@ export class ApplicationContext {
     }
 
     if (def.scope === 'singleton') {
-      const cached = this.singletonCache.get(token as Token);
+      const cached =
+        this.singletonCache.get(token as Token) ??
+        this.singletonCache.get(def.token);
       if (cached !== undefined && cached !== UNRESOLVED) {
         return cached as T;
       }
 
       // Deduplicate concurrent async resolution
-      const inFlight = this.asyncInFlight.get(token as Token);
+      const inFlight =
+        this.asyncInFlight.get(token as Token) ??
+        this.asyncInFlight.get(def.token);
       if (inFlight) {
         return inFlight as Promise<T>;
       }
 
       const promise = this.resolveAsync<T>(def);
-      this.asyncInFlight.set(token as Token, promise);
+      this.asyncInFlight.set(def.token, promise);
       try {
         const instance = await promise;
         return instance;
       } finally {
-        this.asyncInFlight.delete(token as Token);
+        this.asyncInFlight.delete(def.token);
       }
+    }
+
+    if (def.scope === 'request') {
+      return this.getRequestScopedInstance<T>(def);
     }
 
     // Prototype
@@ -336,7 +367,7 @@ export class ApplicationContext {
     }
   }
 
-  private resolveDepsSync(deps: Dependency[]): unknown[] {
+  private resolveDepsSync(deps: Dependency[], parentScope?: string): unknown[] {
     return deps.map((dep) => {
       if (dep.collection) {
         return this.getAll(dep.token);
@@ -346,15 +377,27 @@ export class ApplicationContext {
         if (dep.optional) return undefined;
         throw new MissingDependencyError(tokenName(dep.token));
       }
+      // Singleton depending on request-scoped bean → inject a proxy
+      if (depDef.scope === 'request' && parentScope === 'singleton') {
+        return this.createRequestScopeProxy(depDef);
+      }
       if (depDef.scope === 'singleton') {
-        const cached = this.singletonCache.get(dep.token);
+        const cached =
+          this.singletonCache.get(dep.token) ??
+          this.singletonCache.get(depDef.token);
         if (cached !== undefined && cached !== UNRESOLVED) return cached;
+      }
+      if (depDef.scope === 'request') {
+        return this.getRequestScopedInstance(depDef);
       }
       return this.resolveSync(depDef);
     });
   }
 
-  private async resolveDepsAsync(deps: Dependency[]): Promise<unknown[]> {
+  private async resolveDepsAsync(
+    deps: Dependency[],
+    parentScope?: string,
+  ): Promise<unknown[]> {
     const resolved: unknown[] = [];
     for (const dep of deps) {
       if (dep.collection) {
@@ -369,12 +412,22 @@ export class ApplicationContext {
         }
         throw new MissingDependencyError(tokenName(dep.token));
       }
+      if (depDef.scope === 'request' && parentScope === 'singleton') {
+        resolved.push(this.createRequestScopeProxy(depDef));
+        continue;
+      }
       if (depDef.scope === 'singleton') {
-        const cached = this.singletonCache.get(dep.token);
+        const cached =
+          this.singletonCache.get(dep.token) ??
+          this.singletonCache.get(depDef.token);
         if (cached !== undefined && cached !== UNRESOLVED) {
           resolved.push(cached);
           continue;
         }
+      }
+      if (depDef.scope === 'request') {
+        resolved.push(this.getRequestScopedInstance(depDef));
+        continue;
       }
       resolved.push(await this.resolveAsyncRaw(depDef, false));
     }
@@ -382,7 +435,7 @@ export class ApplicationContext {
   }
 
   private resolveSync<T>(def: BeanDefinition): T {
-    const deps = this.resolveDepsSync(def.dependencies);
+    const deps = this.resolveDepsSync(def.dependencies, def.scope);
     const raw = def.factory(...deps);
     if (raw instanceof Promise) {
       // Mark as unresolved so sync get() knows to throw
@@ -415,7 +468,7 @@ export class ApplicationContext {
       if (cached !== undefined && cached !== UNRESOLVED) return cached;
     }
 
-    const deps = await this.resolveDepsAsync(def.dependencies);
+    const deps = await this.resolveDepsAsync(def.dependencies, def.scope);
     let instance = await def.factory(...deps);
 
     if (!skipPostProcessors) {
@@ -426,6 +479,59 @@ export class ApplicationContext {
       this.singletonCache.set(def.token, instance);
     }
     return instance;
+  }
+
+  /**
+   * Resolve a request-scoped bean from the current request's store.
+   * Creates and caches the instance if not yet created in this scope.
+   */
+  private getRequestScopedInstance<T>(def: BeanDefinition): T {
+    const store = RequestScopeManager.getStore();
+    if (!store) {
+      throw new Error(
+        `No active request scope for bean '${tokenName(def.token)}'. ` +
+          `Ensure the request is running inside RequestScopeManager.run().`,
+      );
+    }
+    const cached = store.get(def.token);
+    if (cached !== undefined) return cached as T;
+
+    const deps = this.resolveDepsSync(def.dependencies, def.scope);
+    const raw = def.factory(...deps);
+    if (raw instanceof Promise) {
+      throw new AsyncBeanNotReadyError(tokenName(def.token));
+    }
+    const instance = this.applyPostProcessorsSync(raw as T, def);
+    store.set(def.token, instance);
+    return instance;
+  }
+
+  /**
+   * Create a proxy that delegates to the current request scope's instance.
+   * Used when a singleton depends on a request-scoped bean.
+   */
+  private createRequestScopeProxy(def: BeanDefinition): unknown {
+    const resolve = () => this.getRequestScopedInstance(def) as object;
+    return new Proxy(Object.create(null), {
+      get(_, prop, receiver) {
+        return Reflect.get(resolve(), prop, receiver);
+      },
+      set(_, prop, value, receiver) {
+        return Reflect.set(resolve(), prop, value, receiver);
+      },
+      has(_, prop) {
+        return Reflect.has(resolve(), prop);
+      },
+      ownKeys() {
+        return Reflect.ownKeys(resolve());
+      },
+      getOwnPropertyDescriptor(_, prop) {
+        return Reflect.getOwnPropertyDescriptor(resolve(), prop);
+      },
+      getPrototypeOf() {
+        return Reflect.getPrototypeOf(resolve());
+      },
+    });
   }
 
   private applyPostProcessorsSync<T>(bean: T, def: BeanDefinition): T {
@@ -499,4 +605,120 @@ function tokenName(token: Token): string {
     return token.name || 'Anonymous';
   }
   return token.description;
+}
+
+/**
+ * Filter beans based on conditional rules stored in `metadata.conditionalRules`.
+ * Evaluated at runtime following the Micronaut pattern — the transformer records
+ * the rules, the container evaluates them.
+ *
+ * Order: onEnv → onProperty → onMissingBean (since missingBean depends on what remains).
+ * All conditions on a single bean use AND logic.
+ */
+function filterConditionalBeans(
+  definitions: BeanDefinition[],
+): BeanDefinition[] {
+  // Quick exit if no beans have conditional rules
+  const hasAnyRules = definitions.some(
+    (d) =>
+      d.metadata.conditionalRules &&
+      (d.metadata.conditionalRules as ConditionalRule[]).length > 0,
+  );
+  if (!hasAnyRules) return definitions;
+
+  // Lazily resolve config for @ConditionalOnProperty
+  let config: Record<string, unknown> | undefined;
+
+  // Phase 1: filter by onEnv and onProperty
+  let remaining = definitions.filter((def) => {
+    const rules = def.metadata.conditionalRules as
+      | ConditionalRule[]
+      | undefined;
+    if (!rules || rules.length === 0) return true;
+
+    for (const rule of rules) {
+      if (rule.type === 'onEnv') {
+        const envValue = process.env[rule.envVar!];
+        if (rule.expectedValue !== undefined) {
+          if (envValue !== rule.expectedValue) return false;
+        } else {
+          if (envValue === undefined) return false;
+        }
+      } else if (rule.type === 'onProperty') {
+        if (!config) {
+          config = resolveConfigFromDefinitions(definitions);
+        }
+        const propValue = config[rule.key!];
+        if (rule.expectedValues !== undefined) {
+          if (!rule.expectedValues.includes(String(propValue))) return false;
+        } else if (rule.expectedValue !== undefined) {
+          if (String(propValue) !== rule.expectedValue) return false;
+        } else {
+          if (propValue === undefined) return false;
+        }
+      }
+      // onMissingBean handled in phase 2
+    }
+    return true;
+  });
+
+  // Phase 2: filter by onMissingBean (evaluated against remaining beans)
+  const registeredNames = new Set<string>();
+  for (const def of remaining) {
+    registeredNames.add(tokenName(def.token));
+    // Also register base token names for subtype matching
+    if (def.baseTokens) {
+      for (const base of def.baseTokens) {
+        registeredNames.add(tokenName(base as Token));
+      }
+    }
+  }
+
+  remaining = remaining.filter((def) => {
+    const rules = def.metadata.conditionalRules as
+      | ConditionalRule[]
+      | undefined;
+    if (!rules || rules.length === 0) return true;
+
+    for (const rule of rules) {
+      if (rule.type !== 'onMissingBean') continue;
+
+      const ownName = tokenName(def.token);
+      // Bean is excluded when the target bean IS present (it's "on *missing* bean")
+      if (
+        registeredNames.has(rule.tokenClassName!) &&
+        rule.tokenClassName !== ownName
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  return remaining;
+}
+
+/**
+ * Resolve config values for @ConditionalOnProperty evaluation.
+ * Finds the __Goodie_Config bean (if present) and calls its factory,
+ * which returns the merged config (inlined + process.env + overrides).
+ * Falls back to process.env if no config bean exists.
+ */
+function resolveConfigFromDefinitions(
+  definitions: BeanDefinition[],
+): Record<string, unknown> {
+  const configDef = definitions.find(
+    (d) =>
+      typeof d.token !== 'function' &&
+      d.token.description === '__Goodie_Config',
+  );
+  if (configDef) {
+    // Config bean has zero dependencies — safe to call factory directly
+    const result = configDef.factory();
+    if (result && typeof result === 'object') {
+      return result as Record<string, unknown>;
+    }
+  }
+  // No config bean — fall back to process.env
+  return { ...process.env } as Record<string, unknown>;
 }

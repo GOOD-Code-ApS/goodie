@@ -48,7 +48,7 @@ The generated file exports:
 
 ## Library Mode
 
-For packages that ship pre-scanned beans, use `transformLibrary()` (via `goodie generate --mode library`). It serializes bean definitions to `beans.json` and also scans for `createAopDecorator<{...}>()` calls, including AOP config in the manifest. Consumers auto-discover beans and AOP mappings at build time.
+For packages that ship pre-scanned beans, use `transformLibrary()` (via `goodie generate --mode library`). It serializes all bean definitions (including conditional ones) to `beans.json` and also scans for `createAopDecorator<{...}>()` calls, including AOP config in the manifest. Conditional beans are not filtered at build time -- evaluation of `@ConditionalOnProperty`, `@ConditionalOnEnv`, and `@ConditionalOnMissingBean` happens at runtime in `ApplicationContext.create()`. Consumers auto-discover beans and AOP mappings at build time.
 
 ## License
 

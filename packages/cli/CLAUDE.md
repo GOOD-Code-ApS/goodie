@@ -48,6 +48,10 @@ The CLI calls `transform()` directly (full rebuild every time). No `ts-morph` Pr
 - Skips non-`.ts` files and the generated output file (prevents infinite loops)
 - Returns a `WatchHandle` with `.close()` for cleanup
 
+## Library Mode Warning
+
+When `goodie generate --mode library` succeeds and produces beans (count > 0), the CLI checks whether `package.json` contains a `"goodie": { "beans": "..." }` field. If missing, it prints a warning reminding the user to add it so consumers can discover the library's beans. The warning is silent when the field already exists or when no beans were produced.
+
 ## Gotchas
 
 - `engines.node >= 22.13.0` in package.json — `fs.watch` recursive support on Linux

@@ -216,6 +216,7 @@ export default function createHonoPlugin(): TransformerPlugin {
       const hasOpenApi = controllerBeans.some((c) =>
         c.routes.some((r) => r.openapi),
       );
+      const hasRequestScoped = beans.some((b) => b.scope === 'request');
 
       const isServerless = context?.config['server.runtime'] === 'cloudflare';
 
@@ -223,10 +224,16 @@ export default function createHonoPlugin(): TransformerPlugin {
         controllerBeans,
         hasSecurity,
         hasOpenApi,
+        hasRequestScoped,
         isServerless,
       );
       const code = [
-        ...generateCreateRouter(controllerBeans, hasSecurity, hasOpenApi),
+        ...generateCreateRouter(
+          controllerBeans,
+          hasSecurity,
+          hasOpenApi,
+          hasRequestScoped,
+        ),
         '',
         ...(isServerless ? [] : generateEntryPoint()),
         '',
@@ -464,6 +471,7 @@ function buildImports(
   controllers: ControllerBean[],
   hasSecurity: boolean,
   hasOpenApi: boolean,
+  hasRequestScoped: boolean,
   isServerless: boolean,
 ): string[] {
   const imports: string[] = [];
@@ -471,6 +479,9 @@ function buildImports(
   imports.push("import { hc } from 'hono/client'");
   if (!isServerless) {
     imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  }
+  if (hasRequestScoped) {
+    imports.push("import { RequestScopeManager } from '@goodie-ts/core'");
   }
 
   if (hasSecurity) {
@@ -527,6 +538,7 @@ function generateCreateRouter(
   controllers: ControllerBean[],
   hasSecurity: boolean,
   hasOpenApi: boolean,
+  hasRequestScoped: boolean,
 ): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
@@ -619,6 +631,11 @@ function generateCreateRouter(
     );
   }
   lines.push('  const __router = new Hono()');
+  if (hasRequestScoped) {
+    lines.push(
+      "  __router.use('*', async (c, next) => { await RequestScopeManager.run(() => next(), c.env) })",
+    );
+  }
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);

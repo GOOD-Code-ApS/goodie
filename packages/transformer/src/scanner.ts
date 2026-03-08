@@ -42,6 +42,7 @@ const DECORATOR_NAMES = {
   PreDestroy: 'PreDestroy',
   PostConstruct: 'PostConstruct',
   PostProcessor: 'PostProcessor',
+  RequestScoped: 'RequestScoped',
   Value: 'Value',
 } as const;
 
@@ -230,13 +231,21 @@ export function scan(
       const isModule = hasDecorator(decorators, DECORATOR_NAMES.Module);
       const isInjectable = hasDecorator(decorators, DECORATOR_NAMES.Injectable);
       const isSingleton = hasDecorator(decorators, DECORATOR_NAMES.Singleton);
+      const isRequestScoped = hasDecorator(
+        decorators,
+        DECORATOR_NAMES.RequestScoped,
+      );
       const isPostProcessor = hasDecorator(
         decorators,
         DECORATOR_NAMES.PostProcessor,
       );
       const isPluginBean = pluginBeanScope !== undefined;
       const coreDecoratorBean =
-        isModule || isInjectable || isSingleton || isPostProcessor;
+        isModule ||
+        isInjectable ||
+        isSingleton ||
+        isRequestScoped ||
+        isPostProcessor;
 
       // Plugin-registered beans cannot be combined with core DI decorators
       if (isPluginBean && coreDecoratorBean) {
@@ -244,9 +253,11 @@ export function scan(
           ? 'Module'
           : isSingleton
             ? 'Singleton'
-            : isPostProcessor
-              ? 'PostProcessor'
-              : 'Injectable';
+            : isRequestScoped
+              ? 'RequestScoped'
+              : isPostProcessor
+                ? 'PostProcessor'
+                : 'Injectable';
         throw new InvalidDecoratorUsageError(
           pluginDecoratorName ?? 'bean',
           `@${pluginDecoratorName ?? 'PluginBean'} cannot be combined with @${coreDecName} on class "${cls.getName()}". @${pluginDecoratorName ?? 'PluginBean'} already registers the class as a bean.`,
@@ -262,11 +273,13 @@ export function scan(
           ? 'Module'
           : isSingleton
             ? 'Singleton'
-            : isPostProcessor
-              ? 'PostProcessor'
-              : isInjectable
-                ? 'Injectable'
-                : (pluginDecoratorName ?? 'bean');
+            : isRequestScoped
+              ? 'RequestScoped'
+              : isPostProcessor
+                ? 'PostProcessor'
+                : isInjectable
+                  ? 'Injectable'
+                  : (pluginDecoratorName ?? 'bean');
         throw new InvalidDecoratorUsageError(
           decoratorName,
           `Cannot apply @${decoratorName}() to abstract class "${cls.getName()}". Abstract classes cannot be instantiated. Remove the decorator or make the class concrete.`,
@@ -282,16 +295,19 @@ export function scan(
         );
       }
 
-      const isSingletonScope =
-        isModule ||
-        isSingleton ||
-        isPostProcessor ||
-        pluginBeanScope === 'singleton';
+      const scope: Scope = isRequestScoped
+        ? 'request'
+        : isModule ||
+            isSingleton ||
+            isPostProcessor ||
+            pluginBeanScope === 'singleton'
+          ? 'singleton'
+          : (pluginBeanScope ?? 'prototype');
       const scannedBean = scanBean(
         cls,
         decorators,
         sourceFile,
-        isSingletonScope,
+        scope,
         isModule,
         typeCache,
       );
@@ -310,14 +326,12 @@ function scanBean(
   cls: ClassDeclaration,
   decorators: Decorator[],
   sourceFile: SourceFile,
-  isSingleton: boolean,
+  scope: Scope,
   isModule: boolean,
   cache: TypeResolutionCache,
 ): ScannedBean | undefined {
   const className = cls.getName();
   if (!className) return undefined;
-
-  const scope: Scope = isSingleton ? 'singleton' : 'prototype';
   const eager = hasDecorator(decorators, DECORATOR_NAMES.Eager);
   const name = getNamedValue(decorators);
   const constructorParams = scanConstructorParams(cls, cache);

@@ -32,7 +32,11 @@ export function createConfigPlugin(): TransformerPlugin {
       // Validate that a bean decorator is present
       const hasBeanDecorator = decorators.some((d) => {
         const name = d.getName();
-        return name === 'Singleton' || name === 'Injectable';
+        return (
+          name === 'Singleton' ||
+          name === 'Injectable' ||
+          name === 'RequestScoped'
+        );
       });
       if (!hasBeanDecorator) {
         const className = ctx.classDeclaration.getName() ?? '<anonymous>';

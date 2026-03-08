@@ -74,6 +74,7 @@ Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in pa
 - Resolves `@Named()` qualifiers to match `@Inject('name')`
 - Topological sort for dependency ordering
 - Note: `@Provides` expansion now happens in the resolver stage, not the graph builder
+- Conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) pass through unfiltered — the conditional plugin records rules in `metadata.conditionalRules`, but evaluation happens at runtime in `ApplicationContext.create()`
 
 ## Library Import Path Reconciliation
 
@@ -84,7 +85,7 @@ Library beans use bare package specifiers (`@goodie-ts/kysely`) in their tokenRe
 
 ## Library Mode (`transformLibrary`)
 
-`transformLibrary()` scans library source, runs the full pipeline, then serializes beans to `beans.json`. It also:
+`transformLibrary()` scans library source, runs the full pipeline, then serializes all beans (including conditional ones) to `beans.json`. Conditional filtering is deferred to the consumer's `ApplicationContext` at runtime. It also:
 1. Runs `scanAopDecoratorDefinitions()` to find `createAopDecorator<{...}>()` calls
 2. Extracts AOP config from type parameters (interceptor class, order, metadata, argMapping, defaults)
 3. Includes the config in the manifest's `aop` section
