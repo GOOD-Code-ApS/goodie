@@ -72,9 +72,9 @@ describe('Hono Plugin Codegen', () => {
 
     expect(result.code).toContain("import { Hono } from 'hono'");
     expect(result.code).toContain("import { hc } from 'hono/client'");
-    expect(result.code).toContain(
-      "import { EmbeddedServer } from '@goodie-ts/hono'",
-    );
+    expect(result.code).toContain('EmbeddedServer');
+    expect(result.code).toContain('handleResult');
+    expect(result.code).toContain("from '@goodie-ts/hono'");
   });
 
   it('does not import security types when no @Secured is used', () => {
@@ -175,7 +175,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain(".route('/api/todos'");
   });
 
-  it('generates Response passthrough in route handlers', () => {
+  it('uses handleResult helper for route handlers', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -187,27 +187,7 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain(
-      'if (result instanceof Response) return result',
-    );
-    expect(result.code).toContain('return c.json(result)');
-  });
-
-  it('generates void/null guard for route handlers', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Post } from './decorators.js'
-        @Controller('/')
-        class Ctrl {
-          @Post('/')
-          action() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      'if (result === undefined || result === null) return c.body(null, 204)',
-    );
+    expect(result.code).toContain('handleResult(c, await ctrl.getData(c))');
   });
 
   it('handles all HTTP methods', () => {
@@ -276,8 +256,10 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain("import { validator } from 'hono-openapi'");
-    expect(result.code).toContain("validator('json', createTodoSchema");
+    expect(result.code).toContain('validationMiddleware');
+    expect(result.code).toContain(
+      "validationMiddleware('json', createTodoSchema)",
+    );
 
     // Schema import should use a relative path, not an absolute one
     expect(result.code).toMatch(
@@ -318,10 +300,10 @@ describe('Hono Plugin — @Cors', () => {
       `,
     });
 
-    expect(result.code).toContain("import { cors } from 'hono/cors'");
+    expect(result.code).toContain('corsMiddleware');
   });
 
-  it('emits cors() middleware for class-level @Cors() with no args', () => {
+  it('emits corsMiddleware() for class-level @Cors() with no args', () => {
     const result = createProject({
       '/src/ApiController.ts': `
         import { Controller, Get, Cors } from './decorators.js'
@@ -335,7 +317,7 @@ describe('Hono Plugin — @Cors', () => {
       `,
     });
 
-    expect(result.code).toContain('cors(),');
+    expect(result.code).toContain('corsMiddleware(),');
   });
 
   it('emits cors(config) for class-level @Cors with options', () => {
@@ -352,7 +334,9 @@ describe('Hono Plugin — @Cors', () => {
       `,
     });
 
-    expect(result.code).toContain("cors({ origin: 'https://example.com'");
+    expect(result.code).toContain(
+      "corsMiddleware({ origin: 'https://example.com'",
+    );
     expect(result.code).toContain("allowMethods: ['GET', 'POST']");
   });
 
@@ -373,7 +357,9 @@ describe('Hono Plugin — @Cors', () => {
     });
 
     // Both routes should have cors middleware
-    const corsMatches = result.code.match(/cors\(\{ origin: '\*' \}\)/g);
+    const corsMatches = result.code.match(
+      /corsMiddleware\(\{ origin: '\*' \}\)/g,
+    );
     expect(corsMatches).toHaveLength(2);
   });
 
@@ -396,9 +382,11 @@ describe('Hono Plugin — @Cors', () => {
     });
 
     // /api/default should use class-level cors
-    expect(result.code).toContain("cors({ origin: 'https://example.com' })");
+    expect(result.code).toContain(
+      "corsMiddleware({ origin: 'https://example.com' })",
+    );
     // /api/public should use method-level cors (origin: '*')
-    expect(result.code).toContain("cors({ origin: '*' })");
+    expect(result.code).toContain("corsMiddleware({ origin: '*' })");
   });
 
   it('does not emit cors for routes without @Cors', () => {
@@ -414,7 +402,7 @@ describe('Hono Plugin — @Cors', () => {
       `,
     });
 
-    expect(result.code).not.toContain('cors');
+    expect(result.code).not.toContain('corsMiddleware');
     expect(result.code).not.toContain('hono/cors');
   });
 
@@ -436,7 +424,7 @@ describe('Hono Plugin — @Cors', () => {
     });
 
     // Only the /public route should have cors
-    const corsMatches = result.code.match(/cors\(/g);
+    const corsMatches = result.code.match(/corsMiddleware\(/g);
     expect(corsMatches).toHaveLength(1);
   });
 
@@ -459,8 +447,8 @@ describe('Hono Plugin — @Cors', () => {
       `,
     });
 
-    const corsIdx = result.code.indexOf('cors(');
-    const validatorIdx = result.code.indexOf('validator(');
+    const corsIdx = result.code.indexOf('corsMiddleware(');
+    const validatorIdx = result.code.indexOf('validationMiddleware(');
     expect(corsIdx).toBeLessThan(validatorIdx);
   });
 });
@@ -479,9 +467,8 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
       `,
     });
 
-    expect(result.code).toContain(
-      "import { SECURITY_PROVIDER } from '@goodie-ts/hono'",
-    );
+    expect(result.code).toContain('SECURITY_PROVIDER');
+    expect(result.code).toContain('securityMiddleware');
     expect(result.code).toContain(
       "import type { SecurityProvider } from '@goodie-ts/hono'",
     );
@@ -501,12 +488,10 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
       `,
     });
 
-    // Should check for authentication
-    expect(result.code).toContain('__securityProvider.authenticate');
-    // Should return 401 on failure
-    expect(result.code).toContain("c.json({ error: 'Unauthorized' }, 401)");
-    // Should set principal on Hono context
-    expect(result.code).toContain("c.set('principal', __principal)");
+    // Should use securityMiddleware helper with 'required' mode
+    expect(result.code).toContain(
+      "securityMiddleware(__securityProvider, 'required')",
+    );
   });
 
   it('resolves SecurityProvider in createRouter', () => {
@@ -578,19 +563,14 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
       `,
     });
 
-    // Both secured and anonymous routes exist
-    // The anonymous route should still authenticate and set principal but not reject
-    // Count occurrences of authenticate to verify both routes handle auth
-    const authMatches = result.code.match(/__securityProvider\.authenticate/g);
-    expect(authMatches).toHaveLength(2);
-
-    // The secured route rejects with 401 if no principal
-    // The anonymous route does not reject
-    const unauthorizedMatches = result.code.match(
-      /if \(!__principal\) return c\.json/g,
+    // The secured route uses 'required' mode
+    expect(result.code).toContain(
+      "securityMiddleware(__securityProvider, 'required')",
     );
-    // Only the secured route has the rejection
-    expect(unauthorizedMatches).toHaveLength(1);
+    // The anonymous route uses 'optional' mode
+    expect(result.code).toContain(
+      "securityMiddleware(__securityProvider, 'optional')",
+    );
   });
 
   it('handles method-level @Secured without class-level', () => {
@@ -612,8 +592,10 @@ describe('Hono Plugin — @Secured / @Anonymous', () => {
     // Should import security types
     expect(result.code).toContain('SECURITY_PROVIDER');
     // Only admin route should have security middleware
-    const authMatches = result.code.match(/__securityProvider\.authenticate/g);
-    expect(authMatches).toHaveLength(1);
+    const securityMatches = result.code.match(
+      /securityMiddleware\(__securityProvider/g,
+    );
+    expect(securityMatches).toHaveLength(1);
   });
 
   it('mixes secured and non-secured controllers', () => {
@@ -805,8 +787,8 @@ describe('Hono Plugin — RPC Client', () => {
   });
 });
 
-describe('Hono Plugin — OpenAPI (describeRoute)', () => {
-  it('generates describeRoute middleware when route has OpenAPI options', () => {
+describe('Hono Plugin — OpenAPI', () => {
+  it('generates openApiMiddleware when route has OpenAPI options', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -818,15 +800,13 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
       `,
     });
 
+    expect(result.code).toContain('openApiMiddleware');
     expect(result.code).toContain(
-      "import { describeRoute } from 'hono-openapi'",
-    );
-    expect(result.code).toContain(
-      'describeRoute({ summary: "List items", description: "Returns all items" })',
+      'openApiMiddleware({ summary: "List items", description: "Returns all items" })',
     );
   });
 
-  it('generates describeRoute with tags', () => {
+  it('generates openApiMiddleware with tags', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -841,7 +821,7 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
     expect(result.code).toContain('tags: ["items","public"]');
   });
 
-  it('generates describeRoute with deprecated flag', () => {
+  it('generates openApiMiddleware with deprecated flag', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -856,7 +836,7 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
     expect(result.code).toContain('deprecated: true');
   });
 
-  it('passes responses raw to describeRoute and imports resolver + schemas', () => {
+  it('passes responses raw to openApiMiddleware and imports resolver + schemas', () => {
     const result = createProject({
       '/src/schema.ts': `
         export const itemSchema = {}
@@ -876,17 +856,17 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
       `,
     });
 
-    expect(result.code).toContain('describeRoute({');
+    expect(result.code).toContain('openApiMiddleware({');
     expect(result.code).toContain('responses: {');
     expect(result.code).toContain("200: { description: 'Success'");
     expect(result.code).toContain('resolver(itemSchema)');
-    // Should import resolver from hono-openapi
-    expect(result.code).toContain("import { resolver } from 'hono-openapi'");
+    // Should import resolver from @goodie-ts/hono
+    expect(result.code).toContain('resolver');
     // Should import the schema used inside resolver()
     expect(result.code).toContain('import { itemSchema }');
   });
 
-  it('does not generate describeRoute when no route has OpenAPI options', () => {
+  it('does not generate openApiMiddleware when no route has OpenAPI options', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -898,12 +878,12 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
       `,
     });
 
-    expect(result.code).not.toContain('describeRoute');
-    expect(result.code).not.toContain('openAPIRouteHandler');
+    expect(result.code).not.toContain('openApiMiddleware');
+    expect(result.code).not.toContain('mountOpenApiSpec');
     expect(result.code).not.toContain('OpenApiConfig');
   });
 
-  it('generates openAPIRouteHandler when any route has OpenAPI options', () => {
+  it('generates mountOpenApiSpec when any route has OpenAPI options', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -915,21 +895,15 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
       `,
     });
 
-    expect(result.code).toContain(
-      "import { openAPIRouteHandler } from 'hono-openapi'",
-    );
-    expect(result.code).toContain(
-      "import { OpenApiConfig } from '@goodie-ts/hono'",
-    );
+    expect(result.code).toContain('mountOpenApiSpec');
+    expect(result.code).toContain('OpenApiConfig');
     expect(result.code).toContain('ctx.get(OpenApiConfig)');
     expect(result.code).toContain(
-      'openAPIRouteHandler(__router, { documentation: { info: {',
+      'mountOpenApiSpec(__router, __openApiConfig)',
     );
-    expect(result.code).toContain('title: __openApiConfig.title');
-    expect(result.code).toContain('version: __openApiConfig.version');
   });
 
-  it('mounts openAPIRouteHandler on /openapi.json', () => {
+  it('calls mountOpenApiSpec with router and config', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -941,10 +915,12 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
       `,
     });
 
-    expect(result.code).toContain("__router.get('/openapi.json'");
+    expect(result.code).toContain(
+      'mountOpenApiSpec(__router, __openApiConfig)',
+    );
   });
 
-  it('describeRoute appears before other middleware', () => {
+  it('openApiMiddleware appears before other middleware', () => {
     const result = createProject({
       '/src/schema.ts': `export const bodySchema = {}`,
       '/src/Ctrl.ts': `
@@ -960,10 +936,12 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
       `,
     });
 
-    const describeIdx = result.code.indexOf('describeRoute(');
-    const securityIdx = result.code.indexOf('__securityProvider.authenticate');
-    const validatorIdx = result.code.indexOf("validator('json'");
-    expect(describeIdx).toBeLessThan(securityIdx);
+    const openApiIdx = result.code.indexOf('openApiMiddleware(');
+    const securityIdx = result.code.indexOf(
+      "securityMiddleware(__securityProvider, 'required')",
+    );
+    const validatorIdx = result.code.indexOf("validationMiddleware('json'");
+    expect(openApiIdx).toBeLessThan(securityIdx);
     expect(securityIdx).toBeLessThan(validatorIdx);
   });
 
@@ -982,8 +960,8 @@ describe('Hono Plugin — OpenAPI (describeRoute)', () => {
       `,
     });
 
-    // describeRoute should appear once (for list), not for health
-    const matches = result.code.match(/describeRoute\(/g);
+    // openApiMiddleware should appear once (for list), not for health
+    const matches = result.code.match(/openApiMiddleware\(/g);
     expect(matches).toHaveLength(1);
   });
 });
@@ -1003,9 +981,8 @@ describe('Multi-runtime codegen', () => {
 
     expect(result.code).toContain('app.onStart(async (ctx) => {');
     expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
-    expect(result.code).toContain(
-      "import { EmbeddedServer } from '@goodie-ts/hono'",
-    );
+    expect(result.code).toContain('EmbeddedServer');
+    expect(result.code).toContain("from '@goodie-ts/hono'");
     expect(result.code).not.toContain('RuntimeBindings');
     expect(result.code).not.toContain('export default');
   });

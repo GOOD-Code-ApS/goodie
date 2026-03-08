@@ -480,58 +480,66 @@ function buildImports(
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
+
+  // Collect all needed runtime helpers from @goodie-ts/hono
+  const honoHelpers: string[] = ['handleResult'];
   if (!isServerless) {
-    imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+    honoHelpers.push('EmbeddedServer');
+  }
+  if (hasSecurity) {
+    honoHelpers.push('SECURITY_PROVIDER', 'securityMiddleware');
   }
   if (hasRequestScoped) {
-    imports.push("import { RequestScopeManager } from '@goodie-ts/core'");
-  }
-
-  if (hasSecurity) {
-    imports.push("import { SECURITY_PROVIDER } from '@goodie-ts/hono'");
-    imports.push("import type { SecurityProvider } from '@goodie-ts/hono'");
+    honoHelpers.push('requestScopeMiddleware');
   }
 
   const allRoutes = controllers.flatMap((c) => c.routes);
-
-  // Check if any route needs CORS (class-level or method-level)
   const hasCors =
     controllers.some((c) => c.cors !== undefined) ||
     allRoutes.some((r) => r.cors !== undefined);
   if (hasCors) {
-    imports.push("import { cors } from 'hono/cors'");
+    honoHelpers.push('corsMiddleware');
   }
 
   const schemaImports = collectSchemaImports(controllers);
-
   const hasValidation = allRoutes.some(
     (r) => r.validation && r.validation.length > 0,
   );
   if (hasValidation) {
-    imports.push("import { validator } from 'hono-openapi'");
+    honoHelpers.push('validationMiddleware');
     for (const [schemaRef, importPath] of schemaImports) {
       imports.push(`import { ${schemaRef} } from '${importPath}'`);
     }
   }
 
   if (hasOpenApi) {
-    imports.push("import { describeRoute } from 'hono-openapi'");
-    imports.push("import { openAPIRouteHandler } from 'hono-openapi'");
-    imports.push("import { OpenApiConfig } from '@goodie-ts/hono'");
+    honoHelpers.push('mountOpenApiSpec', 'openApiMiddleware', 'OpenApiConfig');
 
-    // Import resolver if any route uses it in responses
     const usesResolver = allRoutes.some((r) => r.openapi?.usesResolver);
     if (usesResolver) {
-      imports.push("import { resolver } from 'hono-openapi'");
+      honoHelpers.push('resolver');
     }
 
-    // Import schema refs used inside resolver() calls in responses
     const responseSchemaImports = collectResponseSchemaImports(controllers);
     for (const [schemaRef, importPath] of responseSchemaImports) {
       if (!schemaImports.has(schemaRef)) {
         imports.push(`import { ${schemaRef} } from '${importPath}'`);
       }
     }
+  }
+
+  // Single import line for all @goodie-ts/hono helpers
+  const honoTypeImports: string[] = [];
+  if (hasSecurity) {
+    honoTypeImports.push('SecurityProvider');
+  }
+  imports.push(
+    `import { ${honoHelpers.sort().join(', ')} } from '@goodie-ts/hono'`,
+  );
+  if (honoTypeImports.length > 0) {
+    imports.push(
+      `import type { ${honoTypeImports.join(', ')} } from '@goodie-ts/hono'`,
+    );
   }
 
   return imports;
@@ -566,33 +574,30 @@ function generateCreateRouter(
         route.path.startsWith('/') ? route.path : `/${route.path}`,
       );
 
-      // Collect middleware: describeRoute, security, CORS, then validation
+      // Collect middleware: openApi, security, CORS, then validation
       const middleware: string[] = [];
 
-      // OpenAPI describeRoute middleware (before other middleware)
       if (route.openapi) {
         middleware.push(generateDescribeRoute(route));
       }
 
-      // Determine if this route needs security middleware
       const routeNeedsAuth =
         (ctrl.secured || route.secured) && !route.anonymous;
       const routeInSecuredController = ctrl.secured && !routeNeedsAuth;
 
       if (routeNeedsAuth) {
-        middleware.push(
-          `async (c: any, next: any) => { if (!__securityProvider) return c.json({ error: 'Unauthorized' }, 401); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (!__principal) return c.json({ error: 'Unauthorized' }, 401); c.set('principal', __principal); return next() }`,
-        );
+        middleware.push("securityMiddleware(__securityProvider, 'required')");
       } else if (routeInSecuredController) {
-        middleware.push(
-          `async (c: any, next: any) => { if (!__securityProvider) return next(); const __req = { headers: { get: (n: string) => c.req.header(n) }, url: c.req.url, method: c.req.method }; const __principal = await __securityProvider.authenticate(__req); if (__principal) c.set('principal', __principal); return next() }`,
-        );
+        middleware.push("securityMiddleware(__securityProvider, 'optional')");
       }
 
-      // Method-level @Cors overrides class-level
       const corsConfig = route.cors ?? ctrl.cors;
       if (corsConfig !== undefined) {
-        middleware.push(corsConfig === true ? 'cors()' : `cors(${corsConfig})`);
+        middleware.push(
+          corsConfig === true
+            ? 'corsMiddleware()'
+            : `corsMiddleware(${corsConfig})`,
+        );
       }
 
       middleware.push(...generateValidationMiddleware(route.validation));
@@ -601,16 +606,9 @@ function generateCreateRouter(
       for (const mw of middleware) {
         lines.push(`      ${mw},`);
       }
-      lines.push('      async (c) => {');
       lines.push(
-        `      const result = await ${varName}.${route.methodName}(c)`,
+        `      async (c) => handleResult(c, await ${varName}.${route.methodName}(c)))`,
       );
-      lines.push('      if (result instanceof Response) return result');
-      lines.push(
-        '      if (result === undefined || result === null) return c.body(null, 204)',
-      );
-      lines.push('      return c.json(result)');
-      lines.push('    })');
     }
     lines.push('}');
 
@@ -635,9 +633,7 @@ function generateCreateRouter(
   }
   lines.push('  const __router = new Hono()');
   if (hasRequestScoped) {
-    lines.push(
-      "  __router.use('*', async (c, next) => { await RequestScopeManager.run(() => next(), c.env as Record<string, unknown>) })",
-    );
+    lines.push("  __router.use('*', requestScopeMiddleware())");
   }
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
@@ -649,12 +645,9 @@ function generateCreateRouter(
     );
   }
 
-  // Mount openAPIRouteHandler if any route has OpenAPI options
   if (hasOpenApi) {
     lines.push('  const __openApiConfig = ctx.get(OpenApiConfig)');
-    lines.push(
-      "  __router.get('/openapi.json', openAPIRouteHandler(__router, { documentation: { info: { title: __openApiConfig.title, version: __openApiConfig.version, ...((__openApiConfig.description) ? { description: __openApiConfig.description } : {}) } } }))",
-    );
+    lines.push('  mountOpenApiSpec(__router, __openApiConfig)');
   }
 
   lines.push('  return __router');
@@ -686,7 +679,7 @@ function generateDescribeRoute(route: RouteDefinition): string {
     parts.push(`responses: ${opts.responsesRaw}`);
   }
 
-  return `describeRoute({ ${parts.join(', ')} })`;
+  return `openApiMiddleware({ ${parts.join(', ')} })`;
 }
 
 function buildControllerVarNames(
@@ -729,8 +722,7 @@ function generateValidationMiddleware(
 ): string[] {
   if (!validation || validation.length === 0) return [];
   return validation.map(
-    (v) =>
-      `validator('${v.target}', ${v.schemaRef}, (result, c) => { if (!result.success) return c.json({ error: 'Validation failed', issues: result.error.map((i: any) => ({ path: i.path, message: i.message })) }, 400) })`,
+    (v) => `validationMiddleware('${v.target}', ${v.schemaRef})`,
   );
 }
 
