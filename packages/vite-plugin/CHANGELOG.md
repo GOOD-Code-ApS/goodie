@@ -1,5 +1,18 @@
 # @goodie-ts/vite-plugin
 
+## 1.0.0
+
+### Major Changes
+
+- f1ca28d: Release v1.0.0 — stable API. Library packages now declare `@goodie-ts/core` as a peerDependency.
+
+### Patch Changes
+
+- Updated dependencies [9e54e65]
+- Updated dependencies [be45d51]
+- Updated dependencies [8fc7032]
+  - @goodie-ts/transformer@1.0.0
+
 ## 0.5.8
 
 ### Patch Changes
