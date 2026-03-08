@@ -453,7 +453,7 @@ describe('Code Generator', () => {
     expect(code).toContain(
       'return ApplicationContext.create(definitions, { preSorted: true })',
     );
-    expect(code).not.toContain('export { definitions }');
+    expect(code).toContain('export { definitions }');
     expect(code).toContain('export const app = Goodie.build(definitions)');
   });
 

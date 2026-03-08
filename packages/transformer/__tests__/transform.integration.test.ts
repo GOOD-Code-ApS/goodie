@@ -1275,7 +1275,7 @@ describe('Transform Pipeline (Integration)', () => {
       expect(result.code).toContain(
         'export const app = Goodie.build(definitions)',
       );
-      expect(result.code).not.toContain('export { definitions }');
+      expect(result.code).toContain('export { definitions }');
       expect(result.code).not.toContain('export function createApp');
     });
   });

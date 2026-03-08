@@ -322,6 +322,10 @@ export function generateCode(
   }
   lines.push('');
 
+  // Export definitions for TestContext.from(definitions)
+  lines.push('export { definitions }');
+  lines.push('');
+
   // app — the main entry point: `await app.start()`
   lines.push('export const app = Goodie.build(definitions)');
   lines.push('');

@@ -113,7 +113,7 @@ export function corsMiddleware(options?: Record<string, unknown>) {
 
 /** Create request scope middleware — wraps each request in a new RequestScopeManager scope. */
 export function requestScopeMiddleware() {
-  return async (_c: Context, next: Next) => {
-    await RequestScopeManager.run(next);
+  return async (c: Context, next: Next) => {
+    await RequestScopeManager.run(next, c.env as Record<string, unknown>);
   };
 }
