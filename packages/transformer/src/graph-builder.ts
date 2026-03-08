@@ -3,6 +3,7 @@ import type { ResolveResult } from './resolver.js';
 import {
   AmbiguousProviderError,
   CircularDependencyError,
+  findSimilarTokens,
   InvalidDecoratorUsageError,
   MissingProviderError,
 } from './transformer-errors.js';
@@ -99,8 +100,10 @@ function resolveNamedQualifiers(
 /** Validate that all required dependencies have a registered provider. */
 function validateProviders(beans: IRBeanDefinition[]): void {
   const registered = new Set<string>();
+  const registeredNames: string[] = [];
   for (const bean of beans) {
     registered.add(tokenRefKey(bean.tokenRef));
+    registeredNames.push(tokenRefDisplayName(bean.tokenRef));
     if (bean.baseTokenRefs) {
       for (const ref of bean.baseTokenRefs) {
         registered.add(tokenRefKey(ref));
@@ -110,6 +113,15 @@ function validateProviders(beans: IRBeanDefinition[]): void {
 
   // Well-known tokens always available at runtime (self-registered by ApplicationContext)
   registered.add('class:@goodie-ts/core:ApplicationContext');
+  registeredNames.push('ApplicationContext');
+
+  function buildHint(_depKey: string, depName: string): string | undefined {
+    const similar = findSimilarTokens(depName, registeredNames);
+    if (similar.length > 0) {
+      return `Did you mean: ${similar.join(', ')}?`;
+    }
+    return undefined;
+  }
 
   // Validate all required deps have providers
   for (const bean of beans) {
@@ -126,7 +138,12 @@ function validateProviders(beans: IRBeanDefinition[]): void {
           dep.tokenRef.kind === 'class'
             ? dep.tokenRef.className
             : dep.tokenRef.tokenName;
-        throw new MissingProviderError(depName, ownerName, dep.sourceLocation);
+        throw new MissingProviderError(
+          depName,
+          ownerName,
+          dep.sourceLocation,
+          buildHint(key, depName),
+        );
       }
     }
 
@@ -138,7 +155,12 @@ function validateProviders(beans: IRBeanDefinition[]): void {
           field.tokenRef.kind === 'class'
             ? field.tokenRef.className
             : field.tokenRef.tokenName;
-        throw new MissingProviderError(depName, ownerName, bean.sourceLocation);
+        throw new MissingProviderError(
+          depName,
+          ownerName,
+          bean.sourceLocation,
+          buildHint(key, depName),
+        );
       }
     }
 
@@ -150,7 +172,12 @@ function validateProviders(beans: IRBeanDefinition[]): void {
           interceptorDep.tokenRef.kind === 'class'
             ? interceptorDep.tokenRef.className
             : interceptorDep.tokenRef.tokenName;
-        throw new MissingProviderError(depName, ownerName, bean.sourceLocation);
+        throw new MissingProviderError(
+          depName,
+          ownerName,
+          bean.sourceLocation,
+          buildHint(key, depName),
+        );
       }
     }
   }

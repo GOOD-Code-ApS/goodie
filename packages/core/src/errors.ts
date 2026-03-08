@@ -11,11 +11,15 @@ export class MissingDependencyError extends DIError {
   constructor(
     readonly tokenDescription: string,
     readonly requiredBy?: string,
+    readonly hint?: string,
   ) {
-    const msg = requiredBy
-      ? `No provider registered for ${tokenDescription} (required by ${requiredBy})`
-      : `No provider registered for ${tokenDescription}`;
-    super(msg);
+    const parts = [
+      requiredBy
+        ? `No provider registered for ${tokenDescription} (required by ${requiredBy})`
+        : `No provider registered for ${tokenDescription}`,
+    ];
+    if (hint) parts.push(hint);
+    super(parts.join('. '));
     this.name = 'MissingDependencyError';
   }
 }

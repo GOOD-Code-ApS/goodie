@@ -36,10 +36,33 @@ import type {
 import { resolve } from './resolver.js';
 import { scan } from './scanner.js';
 
+import { TransformerError } from './transformer-errors.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PKG_VERSION: string = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'),
 ).version;
+
+/**
+ * Wrap a plugin hook invocation with error context.
+ * Re-throws TransformerErrors as-is, wraps other errors with plugin name.
+ */
+function runPluginHook<T>(
+  pluginName: string,
+  hookName: string,
+  fn: () => T,
+): T {
+  try {
+    return fn();
+  } catch (err) {
+    if (err instanceof TransformerError) throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Error in plugin '${pluginName}' during ${hookName}: ${message}`,
+      { cause: err },
+    );
+  }
+}
 
 /**
  * Run the full compile-time transform pipeline:
@@ -113,7 +136,9 @@ export async function transform(
 
   // 2. beforeScan hooks
   for (const plugin of activePlugins) {
-    plugin.beforeScan?.();
+    if (plugin.beforeScan) {
+      runPluginHook(plugin.name, 'beforeScan', () => plugin.beforeScan!());
+    }
   }
 
   // 3. Scan (with plugin visitor hooks inlined)
@@ -139,7 +164,9 @@ export async function transform(
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
-      beans = plugin.afterResolve(beans);
+      beans = runPluginHook(plugin.name, 'afterResolve', () =>
+        plugin.afterResolve!(beans),
+      );
     }
   }
 
@@ -173,7 +200,9 @@ export async function transform(
   let finalBeans = graphResult.beans;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
-      finalBeans = plugin.beforeCodegen(finalBeans);
+      finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
+        plugin.beforeCodegen!(finalBeans),
+      );
     }
   }
 
@@ -188,7 +217,11 @@ export async function transform(
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
-      contributions.push(plugin.codegen(finalBeans, codegenContext));
+      contributions.push(
+        runPluginHook(plugin.name, 'codegen', () =>
+          plugin.codegen!(finalBeans, codegenContext),
+        ),
+      );
     }
   }
 
@@ -228,6 +261,11 @@ export async function transform(
     { ...codegenOptions, hash: currentHash },
     contributions,
   );
+
+  // 11b. Debug output
+  if (process.env.GOODIE_DEBUG === 'true') {
+    printDebugInfo(finalBeans, activePlugins, contributions);
+  }
 
   // 12. Write output
   const outputDir = path.dirname(options.outputPath);
@@ -271,7 +309,9 @@ export function transformInMemory(
 
   // 1. beforeScan hooks
   for (const plugin of activePlugins) {
-    plugin.beforeScan?.();
+    if (plugin.beforeScan) {
+      runPluginHook(plugin.name, 'beforeScan', () => plugin.beforeScan!());
+    }
   }
 
   // 2. Scan (with plugin visitor hooks inlined)
@@ -295,7 +335,9 @@ export function transformInMemory(
   // 5. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
-      beans = plugin.afterResolve(beans);
+      beans = runPluginHook(plugin.name, 'afterResolve', () =>
+        plugin.afterResolve!(beans),
+      );
     }
   }
 
@@ -317,7 +359,9 @@ export function transformInMemory(
   let finalBeans = graphResult.beans;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
-      finalBeans = plugin.beforeCodegen(finalBeans);
+      finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
+        plugin.beforeCodegen!(finalBeans),
+      );
     }
   }
 
@@ -326,7 +370,11 @@ export function transformInMemory(
   const contributions: CodegenContribution[] = [];
   for (const plugin of activePlugins) {
     if (plugin.codegen) {
-      contributions.push(plugin.codegen(finalBeans, codegenCtx));
+      contributions.push(
+        runPluginHook(plugin.name, 'codegen', () =>
+          plugin.codegen!(finalBeans, codegenCtx),
+        ),
+      );
     }
   }
 
@@ -400,7 +448,9 @@ export async function transformLibrary(
 
   // 2. beforeScan hooks
   for (const plugin of activePlugins) {
-    plugin.beforeScan?.();
+    if (plugin.beforeScan) {
+      runPluginHook(plugin.name, 'beforeScan', () => plugin.beforeScan!());
+    }
   }
 
   // 3. Scan (with plugin visitor hooks inlined)
@@ -418,7 +468,9 @@ export async function transformLibrary(
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
-      beans = plugin.afterResolve(beans);
+      beans = runPluginHook(plugin.name, 'afterResolve', () =>
+        plugin.afterResolve!(beans),
+      );
     }
   }
 
@@ -430,7 +482,9 @@ export async function transformLibrary(
   let finalBeans = graphResult.beans;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
-      finalBeans = plugin.beforeCodegen(finalBeans);
+      finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
+        plugin.beforeCodegen!(finalBeans),
+      );
     }
   }
 
@@ -440,7 +494,11 @@ export async function transformLibrary(
     const contributions: CodegenContribution[] = [];
     for (const plugin of activePlugins) {
       if (plugin.codegen) {
-        contributions.push(plugin.codegen(finalBeans));
+        contributions.push(
+          runPluginHook(plugin.name, 'codegen', () =>
+            plugin.codegen!(finalBeans),
+          ),
+        );
       }
     }
 
@@ -509,6 +567,49 @@ export async function transformLibrary(
     code,
     codeOutputPath: options.codeOutputPath,
   };
+}
+
+/**
+ * Print bean graph and plugin contributions when GOODIE_DEBUG=true.
+ */
+function printDebugInfo(
+  beans: IRBeanDefinition[],
+  plugins: TransformerPlugin[],
+  contributions: CodegenContribution[],
+): void {
+  console.log('[goodie] ══════════════════════════════════');
+  console.log(`[goodie] Build-time debug info`);
+  console.log('[goodie] ══════════════════════════════════');
+  console.log(`[goodie] Beans (${beans.length}) in resolution order:`);
+  for (const bean of beans) {
+    const name =
+      bean.tokenRef.kind === 'class'
+        ? bean.tokenRef.className
+        : bean.tokenRef.tokenName;
+    const deps = bean.constructorDeps
+      .map((d) =>
+        d.tokenRef.kind === 'class'
+          ? d.tokenRef.className
+          : d.tokenRef.tokenName,
+      )
+      .join(', ');
+    const scope = bean.scope;
+    const eager = bean.eager ? ' [eager]' : '';
+    console.log(
+      `[goodie]   ${name} (${scope}${eager})${deps ? ` ← [${deps}]` : ''}`,
+    );
+  }
+  console.log('[goodie] ──────────────────────────────────');
+  console.log(
+    `[goodie] Active plugins: ${plugins.map((p) => p.name).join(', ')}`,
+  );
+  const codegenPlugins = contributions.filter(
+    (c) => (c.code && c.code.length > 0) || (c.imports && c.imports.length > 0),
+  );
+  console.log(
+    `[goodie] Plugin codegen contributions: ${codegenPlugins.length}`,
+  );
+  console.log('[goodie] ══════════════════════════════════');
 }
 
 /**

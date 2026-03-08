@@ -46,6 +46,10 @@ The generated file exports:
 - `createContext()` — async factory returning an `ApplicationContext`
 - `app` — a `Goodie.build(definitions)` instance ready to `.start()`
 
+## Error Messages
+
+Missing provider errors include fuzzy matching suggestions ("Did you mean: UserService?") and plugin errors are wrapped with the plugin name for context. Set `GOODIE_DEBUG=true` to print the full bean graph, resolution order, and active plugins during build.
+
 ## Library Mode
 
 For packages that ship pre-scanned beans, use `transformLibrary()` (via `goodie generate --mode library`). It serializes all bean definitions (including conditional ones) to `beans.json` and also scans for `createAopDecorator<{...}>()` calls, including AOP config in the manifest. Conditional beans are not filtered at build time -- evaluation of `@ConditionalOnProperty`, `@ConditionalOnEnv`, and `@ConditionalOnMissingBean` happens at runtime in `ApplicationContext.create()`. Consumers auto-discover beans and AOP mappings at build time.

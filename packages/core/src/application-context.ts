@@ -39,6 +39,8 @@ export class ApplicationContext {
   private readonly singletonCache = new Map<Token, unknown>();
   private readonly asyncInFlight = new Map<Token, Promise<unknown>>();
   private readonly postProcessors: BeanPostProcessor[] = [];
+  /** Names of beans excluded by conditional rules, with reason strings. */
+  private readonly filteredOutBeans = new Map<string, string>();
   private closed = false;
   private startupMetrics: StartupMetrics | undefined;
 
@@ -84,7 +86,8 @@ export class ApplicationContext {
     const totalStart = metrics ? performance.now() : 0;
 
     // Evaluate conditional rules at runtime (env, config properties, missing beans)
-    const filtered = filterConditionalBeans(definitions);
+    const { beans: filtered, filteredOut } =
+      filterConditionalBeans(definitions);
 
     const sorted = metrics
       ? metrics.timeStageSync('topoSort', () =>
@@ -95,6 +98,9 @@ export class ApplicationContext {
         : topoSort(filtered);
 
     const ctx = new ApplicationContext(sorted);
+    for (const [name, reason] of filteredOut) {
+      ctx.filteredOutBeans.set(name, reason);
+    }
     ctx.startupMetrics = metrics;
 
     // Self-register so beans can inject ApplicationContext.
@@ -144,7 +150,7 @@ export class ApplicationContext {
     this.assertOpen();
     const def = this.primaryDef.get(token as Token);
     if (!def) {
-      throw new MissingDependencyError(tokenName(token as Token));
+      throw this.missingDependencyWithSuggestions(token as Token);
     }
 
     if (def.scope === 'singleton') {
@@ -181,7 +187,7 @@ export class ApplicationContext {
     this.assertOpen();
     const def = this.primaryDef.get(token as Token);
     if (!def) {
-      throw new MissingDependencyError(tokenName(token as Token));
+      throw this.missingDependencyWithSuggestions(token as Token);
     }
 
     if (def.scope === 'singleton') {
@@ -305,7 +311,14 @@ export class ApplicationContext {
         try {
           await (instance as Record<string, () => unknown>)[methodName]();
         } catch (err) {
-          errors.push(err instanceof Error ? err : new Error(String(err)));
+          const name = tokenName(def.token);
+          const original = err instanceof Error ? err.message : String(err);
+          errors.push(
+            new Error(
+              `Failed to execute @PreDestroy on ${name}.${methodName}(): ${original}`,
+              { cause: err },
+            ),
+          );
         }
       }
     }
@@ -332,9 +345,11 @@ export class ApplicationContext {
           !dep.collection &&
           !this.primaryDef.has(dep.token)
         ) {
+          const depName = tokenName(dep.token);
           throw new MissingDependencyError(
-            tokenName(dep.token),
+            depName,
             tokenName(def.token),
+            this.buildSuggestionHint(depName),
           );
         }
       }
@@ -367,7 +382,10 @@ export class ApplicationContext {
     }
   }
 
-  private resolveDepsSync(deps: Dependency[], parentScope?: string): unknown[] {
+  private resolveDepsSync(
+    deps: Dependency[],
+    parentDef?: BeanDefinition,
+  ): unknown[] {
     return deps.map((dep) => {
       if (dep.collection) {
         return this.getAll(dep.token);
@@ -375,10 +393,15 @@ export class ApplicationContext {
       const depDef = this.primaryDef.get(dep.token);
       if (!depDef) {
         if (dep.optional) return undefined;
-        throw new MissingDependencyError(tokenName(dep.token));
+        const depName = tokenName(dep.token);
+        throw new MissingDependencyError(
+          depName,
+          parentDef ? tokenName(parentDef.token) : undefined,
+          this.buildSuggestionHint(depName),
+        );
       }
       // Singleton depending on request-scoped bean → inject a proxy
-      if (depDef.scope === 'request' && parentScope === 'singleton') {
+      if (depDef.scope === 'request' && parentDef?.scope === 'singleton') {
         return this.createRequestScopeProxy(depDef);
       }
       if (depDef.scope === 'singleton') {
@@ -396,7 +419,7 @@ export class ApplicationContext {
 
   private async resolveDepsAsync(
     deps: Dependency[],
-    parentScope?: string,
+    parentDef?: BeanDefinition,
   ): Promise<unknown[]> {
     const resolved: unknown[] = [];
     for (const dep of deps) {
@@ -410,9 +433,14 @@ export class ApplicationContext {
           resolved.push(undefined);
           continue;
         }
-        throw new MissingDependencyError(tokenName(dep.token));
+        const depName = tokenName(dep.token);
+        throw new MissingDependencyError(
+          depName,
+          parentDef ? tokenName(parentDef.token) : undefined,
+          this.buildSuggestionHint(depName),
+        );
       }
-      if (depDef.scope === 'request' && parentScope === 'singleton') {
+      if (depDef.scope === 'request' && parentDef?.scope === 'singleton') {
         resolved.push(this.createRequestScopeProxy(depDef));
         continue;
       }
@@ -435,7 +463,7 @@ export class ApplicationContext {
   }
 
   private resolveSync<T>(def: BeanDefinition): T {
-    const deps = this.resolveDepsSync(def.dependencies, def.scope);
+    const deps = this.resolveDepsSync(def.dependencies, def);
     const raw = def.factory(...deps);
     if (raw instanceof Promise) {
       // Mark as unresolved so sync get() knows to throw
@@ -468,7 +496,7 @@ export class ApplicationContext {
       if (cached !== undefined && cached !== UNRESOLVED) return cached;
     }
 
-    const deps = await this.resolveDepsAsync(def.dependencies, def.scope);
+    const deps = await this.resolveDepsAsync(def.dependencies, def);
     let instance = await def.factory(...deps);
 
     if (!skipPostProcessors) {
@@ -496,7 +524,7 @@ export class ApplicationContext {
     const cached = store.get(def.token);
     if (cached !== undefined) return cached as T;
 
-    const deps = this.resolveDepsSync(def.dependencies, def.scope);
+    const deps = this.resolveDepsSync(def.dependencies, def);
     const raw = def.factory(...deps);
     if (raw instanceof Promise) {
       throw new AsyncBeanNotReadyError(tokenName(def.token));
@@ -523,7 +551,7 @@ export class ApplicationContext {
     const cached = store.get(def.token);
     if (cached !== undefined) return cached as T;
 
-    const deps = await this.resolveDepsAsync(def.dependencies, def.scope);
+    const deps = await this.resolveDepsAsync(def.dependencies, def);
     let instance = await def.factory(...deps);
     instance = await this.applyPostProcessorsAsync(instance, def);
     store.set(def.token, instance);
@@ -568,7 +596,17 @@ export class ApplicationContext {
       | undefined;
     if (postConstructMethods) {
       for (const methodName of postConstructMethods) {
-        const result = (current as Record<string, () => unknown>)[methodName]();
+        let result: unknown;
+        try {
+          result = (current as Record<string, () => unknown>)[methodName]();
+        } catch (err) {
+          const name = tokenName(def.token);
+          const original = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `Failed to execute @PostConstruct on ${name}.${methodName}(): ${original}`,
+            { cause: err },
+          );
+        }
         if (result instanceof Promise) {
           result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
@@ -604,7 +642,16 @@ export class ApplicationContext {
       | undefined;
     if (postConstructMethods) {
       for (const methodName of postConstructMethods) {
-        await (current as Record<string, () => unknown>)[methodName]();
+        try {
+          await (current as Record<string, () => unknown>)[methodName]();
+        } catch (err) {
+          const name = tokenName(def.token);
+          const original = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `Failed to execute @PostConstruct on ${name}.${methodName}(): ${original}`,
+            { cause: err },
+          );
+        }
       }
     }
     for (const pp of this.postProcessors) {
@@ -613,6 +660,30 @@ export class ApplicationContext {
       }
     }
     return current;
+  }
+
+  private missingDependencyWithSuggestions(
+    token: Token,
+  ): MissingDependencyError {
+    const name = tokenName(token);
+    return new MissingDependencyError(
+      name,
+      undefined,
+      this.buildSuggestionHint(name),
+    );
+  }
+
+  private buildSuggestionHint(name: string): string | undefined {
+    // Check if the bean was excluded by a conditional rule
+    const conditionalReason = this.filteredOutBeans.get(name);
+    if (conditionalReason) {
+      return `A bean '${name}' exists but was excluded by: ${conditionalReason}`;
+    }
+    const registered = Array.from(this.primaryDef.keys()).map(tokenName);
+    const similar = findSimilar(name, registered);
+    return similar.length > 0
+      ? `Did you mean: ${similar.join(', ')}?`
+      : undefined;
   }
 }
 
@@ -623,6 +694,41 @@ function tokenName(token: Token): string {
   return token.description;
 }
 
+// NOTE: findSimilar/levenshtein are duplicated in packages/transformer/src/transformer-errors.ts
+// (separate packages, no shared util). Keep threshold logic in sync.
+function findSimilar(
+  name: string,
+  candidates: string[],
+  maxResults = 3,
+): string[] {
+  const threshold = Math.max(3, Math.ceil(name.length / 2));
+  const lower = name.toLowerCase();
+  const scored = candidates
+    .map((c) => ({ name: c, dist: levenshtein(lower, c.toLowerCase()) }))
+    .filter((s) => s.dist <= threshold && s.dist > 0)
+    .sort((a, b) => a.dist - b.dist);
+  return scored.slice(0, maxResults).map((s) => s.name);
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    Array(n + 1).fill(0),
+  );
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
 /**
  * Filter beans based on conditional rules stored in `metadata.conditionalRules`.
  * Evaluated at runtime following the Micronaut pattern — the transformer records
@@ -631,16 +737,19 @@ function tokenName(token: Token): string {
  * Order: onEnv → onProperty → onMissingBean (since missingBean depends on what remains).
  * All conditions on a single bean use AND logic.
  */
-function filterConditionalBeans(
-  definitions: BeanDefinition[],
-): BeanDefinition[] {
+function filterConditionalBeans(definitions: BeanDefinition[]): {
+  beans: BeanDefinition[];
+  filteredOut: Map<string, string>;
+} {
+  const filteredOut = new Map<string, string>();
+
   // Quick exit if no beans have conditional rules
   const hasAnyRules = definitions.some(
     (d) =>
       d.metadata.conditionalRules &&
       (d.metadata.conditionalRules as ConditionalRule[]).length > 0,
   );
-  if (!hasAnyRules) return definitions;
+  if (!hasAnyRules) return { beans: definitions, filteredOut };
 
   // Lazily resolve config for @ConditionalOnProperty
   let config: Record<string, unknown> | undefined;
@@ -656,9 +765,21 @@ function filterConditionalBeans(
       if (rule.type === 'onEnv') {
         const envValue = process.env[rule.envVar!];
         if (rule.expectedValue !== undefined) {
-          if (envValue !== rule.expectedValue) return false;
+          if (envValue !== rule.expectedValue) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnEnv('${rule.envVar}', '${rule.expectedValue}') — env is '${envValue ?? '<undefined>'}'`,
+            );
+            return false;
+          }
         } else {
-          if (envValue === undefined) return false;
+          if (envValue === undefined) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnEnv('${rule.envVar}') — env var is not set`,
+            );
+            return false;
+          }
         }
       } else if (rule.type === 'onProperty') {
         if (!config) {
@@ -666,11 +787,29 @@ function filterConditionalBeans(
         }
         const propValue = config[rule.key!];
         if (rule.expectedValues !== undefined) {
-          if (!rule.expectedValues.includes(String(propValue))) return false;
+          if (!rule.expectedValues.includes(String(propValue))) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnProperty('${rule.key}', { havingValue: [${rule.expectedValues.map((v) => `'${v}'`).join(', ')}] }) — property is '${propValue ?? '<undefined>'}'`,
+            );
+            return false;
+          }
         } else if (rule.expectedValue !== undefined) {
-          if (String(propValue) !== rule.expectedValue) return false;
+          if (String(propValue) !== rule.expectedValue) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnProperty('${rule.key}', '${rule.expectedValue}') — property is '${propValue ?? '<undefined>'}'`,
+            );
+            return false;
+          }
         } else {
-          if (propValue === undefined) return false;
+          if (propValue === undefined) {
+            filteredOut.set(
+              tokenName(def.token),
+              `@ConditionalOnProperty('${rule.key}') — property is not set`,
+            );
+            return false;
+          }
         }
       }
       // onMissingBean handled in phase 2
@@ -705,13 +844,17 @@ function filterConditionalBeans(
         registeredNames.has(rule.tokenClassName!) &&
         rule.tokenClassName !== ownName
       ) {
+        filteredOut.set(
+          tokenName(def.token),
+          `@ConditionalOnMissingBean(${rule.tokenClassName}) — bean '${rule.tokenClassName}' is present`,
+        );
         return false;
       }
     }
     return true;
   });
 
-  return remaining;
+  return { beans: remaining, filteredOut };
 }
 
 /**
