@@ -239,7 +239,7 @@ export function generateCode(
     lines.push('');
   }
 
-  // Bean definitions array
+  // Bean definitions factory — always a function so tests can call it with config overrides
   if (needsConfigBean) {
     lines.push(
       'export function buildDefinitions(config?: Record<string, unknown>): BeanDefinition[] {',
@@ -269,37 +269,36 @@ export function generateCode(
     lines.push('      metadata: {},');
     lines.push('    },');
   } else {
-    lines.push('const definitions: BeanDefinition[] = [');
+    lines.push('export function buildDefinitions(): BeanDefinition[] {');
+    lines.push('  return [');
   }
 
   for (const bean of beans) {
-    lines.push('  {');
-    lines.push(`    token: ${resolveTokenRef(bean.tokenRef)},`);
-    lines.push(`    scope: '${bean.scope}',`);
+    lines.push('    {');
+    lines.push(`      token: ${resolveTokenRef(bean.tokenRef)},`);
+    lines.push(`      scope: '${bean.scope}',`);
     lines.push(
-      `    dependencies: ${depsToCode(bean, resolveTokenRef, needsConfigBean, interceptorDepsPerBean)},`,
+      `      dependencies: ${depsToCode(bean, resolveTokenRef, needsConfigBean, interceptorDepsPerBean)},`,
     );
-    lines.push(`    factory: ${factoryToCode(bean, interceptorDepsPerBean)},`);
-    lines.push(`    eager: ${bean.eager},`);
+    lines.push(
+      `      factory: ${factoryToCode(bean, interceptorDepsPerBean)},`,
+    );
+    lines.push(`      eager: ${bean.eager},`);
     const proxyFnName = scopedProxyNames.get(bean);
-    lines.push(`    metadata: ${metadataToCode(bean.metadata, proxyFnName)},`);
+    lines.push(
+      `      metadata: ${metadataToCode(bean.metadata, proxyFnName)},`,
+    );
     if (bean.baseTokenRefs && bean.baseTokenRefs.length > 0) {
       const baseTokensList = bean.baseTokenRefs
         .map((ref) => ref.className)
         .join(', ');
-      lines.push(`    baseTokens: [${baseTokensList}],`);
+      lines.push(`      baseTokens: [${baseTokensList}],`);
     }
-    lines.push('  },');
+    lines.push('    },');
   }
 
-  if (needsConfigBean) {
-    lines.push('  ]');
-    lines.push('}');
-    lines.push('');
-    lines.push('const definitions = buildDefinitions()');
-  } else {
-    lines.push(']');
-  }
+  lines.push('  ]');
+  lines.push('}');
   lines.push('');
 
   // createContext — for testing and advanced use (supports config overrides)
@@ -316,18 +315,14 @@ export function generateCode(
       'export async function createContext(): Promise<ApplicationContext> {',
     );
     lines.push(
-      '  return ApplicationContext.create(definitions, { preSorted: true })',
+      '  return ApplicationContext.create(buildDefinitions(), { preSorted: true })',
     );
     lines.push('}');
   }
   lines.push('');
 
-  // Export definitions for TestContext.from(definitions)
-  lines.push('export { definitions }');
-  lines.push('');
-
   // app — the main entry point: `await app.start()`
-  lines.push('export const app = Goodie.build(definitions)');
+  lines.push('export const app = Goodie.build(buildDefinitions())');
   lines.push('');
 
   // Plugin contribution code

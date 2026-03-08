@@ -8,14 +8,45 @@ import type {
 import { test as base, type TestAPI } from 'vitest';
 import { TestContext, type TestContextBuilder } from './test-context.js';
 
+/** A function that builds bean definitions, optionally accepting config overrides. */
+type DefinitionsFactory = (
+  config?: Record<string, unknown>,
+) => BeanDefinition[];
+
+/** Input accepted by `createGoodieTest()` — either a definitions factory or a raw array. */
+type DefinitionsInput = DefinitionsFactory | BeanDefinition[];
+
 /**
  * Configuration options for `createGoodieTest()`.
  */
-export interface GoodieTestOptions {
+export interface GoodieTestOptions<
+  TFixtures extends Record<string, unknown> = Record<string, never>,
+> {
   /** Static config overrides, or a lazy function (useful for TestContainers URIs). */
   config?: Record<string, unknown> | (() => Record<string, unknown>);
   /** Escape hatch to customise the builder (e.g. `.override()`, `.mock()`). */
   setup?: (builder: TestContextBuilder) => TestContextBuilder;
+  /**
+   * Custom fixtures derived from the ApplicationContext.
+   * Each entry is a factory `(ctx) => T` — the result is exposed as a test fixture.
+   *
+   * @example
+   * ```typescript
+   * const test = createGoodieTest(buildDefinitions, {
+   *   fixtures: {
+   *     app: (ctx) => createRouter(ctx),
+   *   },
+   * });
+   *
+   * test('GET /todos', async ({ app }) => {
+   *   const res = await app.request('/api/todos');
+   *   expect(res.status).toBe(200);
+   * });
+   * ```
+   */
+  fixtures?: {
+    [K in keyof TFixtures]: (ctx: ApplicationContext) => TFixtures[K];
+  };
   /**
    * Wrap each test in a transaction that rolls back after the test.
    * Pass the class or InjectionToken of your TransactionManager bean.
@@ -47,37 +78,65 @@ interface TestTransactionManagerLike {
 
 /**
  * Create a vitest-native `test` function with Playwright-style fixtures
- * that provide a built `ApplicationContext` and a `resolve` helper.
+ * that provide a built `ApplicationContext`, a `resolve` helper, and
+ * any custom fixtures derived from the context.
  *
  * @example
  * ```typescript
- * const test = createGoodieTest(definitions, { config: { DB: 'test' } });
+ * // Basic usage with buildDefinitions function
+ * const test = createGoodieTest(buildDefinitions, {
+ *   config: () => ({ 'datasource.url': container.getConnectionUri() }),
+ * });
  *
- * test('creates a user', async ({ ctx, resolve }) => {
+ * test('creates a user', async ({ resolve }) => {
  *   const svc = resolve(UserService);
  *   expect(svc).toBeInstanceOf(UserService);
  * });
+ * ```
  *
- * test.skip('wip', async ({ ctx }) => { ... });
+ * @example
+ * ```typescript
+ * // With custom fixtures (e.g. Hono router)
+ * const test = createGoodieTest(buildDefinitions, {
+ *   fixtures: {
+ *     app: (ctx) => createRouter(ctx),
+ *   },
+ * });
+ *
+ * test('GET /todos', async ({ app, resolve }) => {
+ *   const res = await app.request('/api/todos');
+ *   expect(res.status).toBe(200);
+ * });
  * ```
  */
-export function createGoodieTest(
-  definitions: BeanDefinition[],
-  options?: GoodieTestOptions,
-): TestAPI<GoodieFixtures> {
+export function createGoodieTest<
+  TFixtures extends Record<string, unknown> = Record<string, never>,
+>(
+  definitions: DefinitionsInput,
+  options?: GoodieTestOptions<TFixtures>,
+): TestAPI<GoodieFixtures & TFixtures> {
   const transactional = options?.transactional;
   const rollback = options?.rollback ?? !!transactional;
 
-  const extended = base.extend<GoodieFixtures>({
+  const extended = base.extend<GoodieFixtures & TFixtures>({
     // biome-ignore lint/correctness/noEmptyPattern: vitest requires destructuring pattern
     ctx: async ({}, use) => {
-      let builder: TestContextBuilder = TestContext.from(definitions);
+      const configValue = options?.config
+        ? typeof options.config === 'function'
+          ? options.config()
+          : options.config
+        : undefined;
 
-      if (options?.config) {
-        const configValue =
-          typeof options.config === 'function'
-            ? options.config()
-            : options.config;
+      const defs =
+        typeof definitions === 'function'
+          ? definitions(configValue)
+          : definitions;
+
+      let builder: TestContextBuilder = TestContext.from(defs);
+
+      // When definitions is a factory, config was already baked into the definitions.
+      // When definitions is a raw array, apply config via withConfig().
+      if (configValue && typeof definitions !== 'function') {
         builder = builder.withConfig(configValue);
       }
 
@@ -97,7 +156,22 @@ export function createGoodieTest(
         ) => ctx.get(token),
       );
     },
-  });
+
+    // Spread custom fixture factories — each receives the built ctx
+    ...(options?.fixtures
+      ? Object.fromEntries(
+          Object.entries(options.fixtures).map(([name, factory]) => [
+            name,
+            async (
+              { ctx }: { ctx: ApplicationContext },
+              use: (value: unknown) => Promise<void>,
+            ) => {
+              await use((factory as (ctx: ApplicationContext) => unknown)(ctx));
+            },
+          ]),
+        )
+      : {}),
+  } as any);
 
   if (!transactional || !rollback) return extended;
 
