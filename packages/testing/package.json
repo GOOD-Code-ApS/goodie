@@ -28,11 +28,12 @@
     "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "dependencies": {
-    "@goodie-ts/core": "workspace:^"
-  },
   "peerDependencies": {
+    "@goodie-ts/core": ">=1.0.0",
     "vitest": ">=3.0.0"
+  },
+  "devDependencies": {
+    "@goodie-ts/core": "workspace:*"
   },
   "peerDependenciesMeta": {
     "vitest": {

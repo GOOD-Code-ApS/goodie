@@ -70,6 +70,6 @@ pnpm clean          # Clean all dist/
 - All packages use `composite: true` for TypeScript project references
 - Generated files: `AppContext.generated.ts` — gitignored, never hand-edit
 
-## TODO: peerDependency migration at 1.0.0
+## peerDependency Convention
 
-Library packages (cache, logging, resilience, health, hono, kysely, events, scheduler, testing) currently declare `@goodie-ts/core` and other `@goodie-ts/*` runtime deps as regular `dependencies`. They should be `peerDependencies` to prevent duplicate copies causing class identity mismatches at runtime. This migration is blocked while packages are at `0.x` because Changesets + `onlyUpdatePeerDependentsWhenOutOfRange` treats every minor bump as out-of-range in `0.x` semver (`^0.5.0` does not include `0.6.0`), forcing all peer dependents to `1.0.0`. When ready to release `1.0.0`, move `@goodie-ts/*` runtime deps to `peerDependencies` across all library packages. Build-time tools (cli, vite-plugin, transformer) should keep regular dependencies.
+Library packages (cache, logging, resilience, health, hono, kysely, events, scheduler, testing) declare `@goodie-ts/core` as a `peerDependency` (`>=1.0.0`). Build-time tools (cli, vite-plugin, transformer) keep it as a regular `dependency`.
