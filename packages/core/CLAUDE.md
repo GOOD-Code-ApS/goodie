@@ -33,6 +33,14 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 - `getAll(token)` — returns all beans registered under a token
 - `close()` — tears down context, rejects subsequent calls with `ContextClosedError`
 
+## Error Messages
+
+- **Fuzzy suggestions**: All `MissingDependencyError` throws (startup validation, `get()`/`getAsync()`, dep resolution) suggest similar registered token names via Levenshtein distance ("Did you mean: UserService?")
+- **Conditional bean hints**: When a missing dependency was excluded by a conditional rule, the error explains why ("bean exists but was excluded by: @ConditionalOnProperty('datasource.dialect', 'postgres') — property is 'mysql'")
+- **`requiredBy` context**: All missing dependency errors include which bean required the missing dep
+- **Lifecycle error wrapping**: `@PostConstruct` and `@PreDestroy` errors include bean name, method name, and the original error via `{ cause }`
+- **`MissingDependencyError`**: has `tokenDescription`, `requiredBy?`, and `hint?` fields
+
 ## Gotchas
 
 - `get()` on an async bean that hasn't resolved yet throws — always use `getAsync()` for async factories

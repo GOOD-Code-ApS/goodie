@@ -108,3 +108,9 @@ Tests use `createTestProject` helper for in-memory ts-morph projects — no real
 
 All extend `TransformerError` with `sourceLocation` and optional `hint`:
 `MissingProviderError`, `AmbiguousProviderError`, `UnresolvableTypeError`, `InvalidDecoratorUsageError`, `GenericTypeResolutionError`, `CircularDependencyError`
+
+- **Fuzzy suggestions**: `MissingProviderError` suggests similar registered token names via `findSimilarTokens()` (Levenshtein distance, threshold `max(3, ceil(name.length / 2))`)
+- **Plugin error wrapping**: All plugin hook invocations (`beforeScan`, `afterResolve`, `beforeCodegen`, `codegen`) are wrapped with plugin name context ("Error in plugin 'kysely' during afterResolve: ...") and preserve the original error via `{ cause }`. `TransformerError` subclasses pass through unwrapped.
+- **`GOODIE_DEBUG`**: When `GOODIE_DEBUG=true`, `transform()` prints the full bean graph, resolution order, active plugins, and codegen contributions to stderr
+
+NOTE: `findSimilarTokens`/`levenshtein` in `transformer-errors.ts` are duplicated from `packages/core/src/application-context.ts` (separate packages, no shared util). Keep threshold logic in sync.

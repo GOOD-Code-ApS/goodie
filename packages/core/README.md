@@ -42,6 +42,8 @@ await app.context.close();
 - `ctx.getAll(token)` — returns all beans registered under a token
 - `ctx.close()` — tears down the context
 
+All missing dependency errors include fuzzy matching suggestions ("Did you mean: UserService?"), `requiredBy` context, and hints when a bean was excluded by a conditional rule.
+
 ## License
 
 [MIT](https://github.com/GOOD-Code-ApS/goodie/blob/main/LICENSE)
