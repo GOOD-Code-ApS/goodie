@@ -650,7 +650,7 @@ describe('provide()', () => {
     expect(ctx.get(TOKEN)).toBe('second');
   });
 
-  it('throws OverrideError when token already exists in base definitions', () => {
+  it('throws DIError when token already exists in base definitions', () => {
     class Existing {
       value = 'original';
     }
@@ -659,11 +659,9 @@ describe('provide()', () => {
       makeDef(Existing, { factory: () => new Existing() }),
     ]);
 
+    expect(() => builder.provide(Existing, new Existing())).toThrow(DIError);
     expect(() => builder.provide(Existing, new Existing())).toThrow(
-      OverrideError,
-    );
-    expect(() => builder.provide(Existing, new Existing())).toThrow(
-      'override()',
+      'already exists in base definitions',
     );
   });
 

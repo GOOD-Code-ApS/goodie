@@ -194,8 +194,8 @@ export class TestContextBuilder {
     value: T,
   ): TestContextBuilder {
     if (this.tokenSet.has(token as Token)) {
-      throw new OverrideError(
-        `${tokenName(token as Token)} already exists in base definitions — use override() instead`,
+      throw new DIError(
+        `Cannot provide ${tokenName(token as Token)}: already exists in base definitions — use override() instead`,
       );
     }
     const def: BeanDefinition = {
