@@ -35,7 +35,11 @@
     "kysely": ">=0.27.0",
     "pg": ">=8.0.0",
     "mysql2": ">=3.0.0",
-    "better-sqlite3": ">=9.0.0"
+    "better-sqlite3": ">=9.0.0",
+    "kysely-neon": ">=0.3.0",
+    "kysely-planetscale": ">=1.0.0",
+    "@libsql/kysely-libsql": ">=0.4.0",
+    "kysely-d1": ">=0.4.0"
   },
   "peerDependenciesMeta": {
     "pg": {
@@ -45,6 +49,18 @@
       "optional": true
     },
     "better-sqlite3": {
+      "optional": true
+    },
+    "kysely-neon": {
+      "optional": true
+    },
+    "kysely-planetscale": {
+      "optional": true
+    },
+    "@libsql/kysely-libsql": {
+      "optional": true
+    },
+    "kysely-d1": {
       "optional": true
     }
   },

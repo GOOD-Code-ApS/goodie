@@ -106,6 +106,7 @@ function resolveBean(
       Object.keys(scanned.methodDecorators).length > 0
         ? scanned.methodDecorators
         : undefined,
+    publicMembers: scanned.publicMembers,
     metadata,
     sourceLocation: scanned.sourceLocation,
   };

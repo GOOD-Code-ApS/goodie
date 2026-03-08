@@ -1,5 +1,6 @@
 import {
   type ClassVisitorContext,
+  type CodegenContext,
   type CodegenContribution,
   InvalidDecoratorUsageError,
   type IRBeanDefinition,
@@ -84,6 +85,10 @@ interface ControllerBean {
  * When route decorators include a second argument with OpenAPI options,
  * generates `describeRoute()` middleware from `hono-openapi` and mounts
  * `openAPIRouteHandler()` to serve the OpenAPI spec.
+ *
+ * Reads `server.runtime` from build-time config to determine the entry point:
+ * - `'node'` (default) / `'bun'` / `'deno'` → generates `startServer()` with `EmbeddedServer`
+ * - `'cloudflare'` → serverless: skips `startServer()` and `EmbeddedServer` import (use `createRouter()` directly)
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
@@ -198,7 +203,10 @@ export default function createHonoPlugin(): TransformerPlugin {
       });
     },
 
-    codegen(beans: IRBeanDefinition[]): CodegenContribution {
+    codegen(
+      beans: IRBeanDefinition[],
+      context?: CodegenContext,
+    ): CodegenContribution {
       const controllerBeans = extractControllerBeans(beans);
       if (controllerBeans.length === 0) return {};
 
@@ -208,17 +216,30 @@ export default function createHonoPlugin(): TransformerPlugin {
       const hasOpenApi = controllerBeans.some((c) =>
         c.routes.some((r) => r.openapi),
       );
+      const hasRequestScoped = beans.some(
+        (b) =>
+          b.scope === 'request' &&
+          isConditionallyActive(b, context?.config ?? {}),
+      );
 
-      const imports = buildImports(controllerBeans, hasSecurity, hasOpenApi);
+      const isServerless = context?.config['server.runtime'] === 'cloudflare';
+
+      const imports = buildImports(
+        controllerBeans,
+        hasSecurity,
+        hasOpenApi,
+        hasRequestScoped,
+        isServerless,
+      );
       const code = [
-        ...generateCreateRouter(controllerBeans, hasSecurity, hasOpenApi),
+        ...generateCreateRouter(
+          controllerBeans,
+          hasSecurity,
+          hasOpenApi,
+          hasRequestScoped,
+        ),
         '',
-        'export async function startServer(options?: { port?: number; host?: string }) {',
-        '  const ctx = await app.start()',
-        '  const router = createRouter(ctx)',
-        '  ctx.get(EmbeddedServer).listen(router, options)',
-        '  return ctx',
-        '}',
+        ...(isServerless ? [] : generateEntryPoint()),
         '',
         'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
         '  return hc<AppType>(baseUrl, options)',
@@ -439,15 +460,33 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
   return result;
 }
 
+function generateEntryPoint(): string[] {
+  return [
+    'export async function startServer(options?: { port?: number; host?: string }) {',
+    '  const ctx = await app.start()',
+    '  const router = createRouter(ctx)',
+    '  await ctx.get(EmbeddedServer).listen(router, options)',
+    '  return ctx',
+    '}',
+  ];
+}
+
 function buildImports(
   controllers: ControllerBean[],
   hasSecurity: boolean,
   hasOpenApi: boolean,
+  hasRequestScoped: boolean,
+  isServerless: boolean,
 ): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
-  imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  if (!isServerless) {
+    imports.push("import { EmbeddedServer } from '@goodie-ts/hono'");
+  }
+  if (hasRequestScoped) {
+    imports.push("import { RequestScopeManager } from '@goodie-ts/core'");
+  }
 
   if (hasSecurity) {
     imports.push("import { SECURITY_PROVIDER } from '@goodie-ts/hono'");
@@ -503,6 +542,7 @@ function generateCreateRouter(
   controllers: ControllerBean[],
   hasSecurity: boolean,
   hasOpenApi: boolean,
+  hasRequestScoped: boolean,
 ): string[] {
   const lines: string[] = [];
   const ctrlVarNames = buildControllerVarNames(controllers);
@@ -595,6 +635,11 @@ function generateCreateRouter(
     );
   }
   lines.push('  const __router = new Hono()');
+  if (hasRequestScoped) {
+    lines.push(
+      "  __router.use('*', async (c, next) => { await RequestScopeManager.run(() => next(), c.env as Record<string, unknown>) })",
+    );
+  }
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
@@ -705,6 +750,40 @@ function collectSchemaImports(
     }
   }
   return imports;
+}
+
+/**
+ * Check whether a bean's conditional rules are satisfied by the build-time config.
+ * Used to avoid generating request-scope middleware for beans that won't be active.
+ * Only evaluates `onProperty` rules (config is available at build time).
+ * `onEnv` and `onMissingBean` are conservatively treated as active.
+ */
+function isConditionallyActive(
+  bean: IRBeanDefinition,
+  config: Record<string, string>,
+): boolean {
+  const rules = bean.metadata.conditionalRules as
+    | Array<{
+        type: string;
+        key?: string;
+        expectedValue?: string;
+        expectedValues?: string[];
+      }>
+    | undefined;
+  if (!rules || rules.length === 0) return true;
+
+  for (const rule of rules) {
+    if (rule.type !== 'onProperty') continue;
+    const propValue = config[rule.key!];
+    if (rule.expectedValues !== undefined) {
+      if (!rule.expectedValues.includes(String(propValue))) return false;
+    } else if (rule.expectedValue !== undefined) {
+      if (String(propValue) !== rule.expectedValue) return false;
+    } else {
+      if (propValue === undefined) return false;
+    }
+  }
+  return true;
 }
 
 function collectResponseSchemaImports(

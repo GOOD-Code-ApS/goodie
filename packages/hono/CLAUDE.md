@@ -17,8 +17,8 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, OpenAP
 | `src/goodie-env.ts` | `GoodieEnv` — Hono env type for typed `c.get('principal')` access |
 | `src/principal.ts` | `Principal` type — `{ name, attributes }` |
 | `src/errors.ts` | `UnauthorizedError` |
-| `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` wrapping `@hono/node-server` |
-| `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean |
+| `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
+| `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host`, `port`, `runtime` |
 | `src/cors.ts` | `@Cors(options?)` — Hono-specific CORS marker (generates `hono/cors` middleware) |
 | `src/validate.ts` | `@Validate` — Hono-specific validation decorator |
 | `src/metadata.ts` | `ValidateMetadata`, `ValidationTarget` types |
@@ -30,7 +30,7 @@ The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dis
 
 - **`visitClass`** — detects `@Controller(basePath)`, `@Secured`, `@Cors`, registers bean as singleton
 - **`visitMethod`** — detects `@Get`/`@Post`/etc (with optional OpenAPI options as second arg), `@Validate`, `@Cors`, `@Secured`, `@Anonymous`
-- **`codegen`** — generates per-controller route factories, `createRouter(ctx)`, `startServer()`, RPC types/clients, and OpenAPI middleware when routes have OpenAPI options
+- **`codegen`** — receives `CodegenContext` with build-time config. Generates per-controller route factories, `createRouter(ctx)`, `startServer()` (skipped for serverless runtimes like `cloudflare`), RPC types/clients, and OpenAPI middleware when routes have OpenAPI options
 
 ### OpenAPI Support
 
@@ -80,8 +80,8 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 ## Library Beans (beans.json)
 
 3 singleton beans:
-- **ServerConfig** — `@ConfigurationProperties('server')` with host/port
-- **EmbeddedServer** — wraps `@hono/node-server`, depends on `ServerConfig`
+- **ServerConfig** — `@ConfigurationProperties('server')` with host/port/runtime (`ServerRuntime`: `'node' | 'bun' | 'deno'`)
+- **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`. Dispatches to `@hono/node-server` (Node), `Bun.serve()` (Bun), `Deno.serve()` (Deno). Not used for serverless runtimes (`cloudflare`).
 - **OpenApiConfig** — `@ConfigurationProperties('openapi')` with title/version/description
 
 ## Design Decisions
@@ -93,6 +93,17 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 - **Principal via Hono context** — `c.set('principal', ...)` / `c.get('principal')` using `GoodieEnv` type for type safety. No `AsyncLocalStorage` — works on edge runtimes.
 - **OpenAPI via `hono-openapi`** — middleware-based approach. `describeRoute()` per route, `openAPIRouteHandler()` for spec. Only generated when routes have OpenAPI options.
 - **Validation via `hono-openapi`** — `validator()` replaces `@hono/zod-validator`. Always used (even without OpenAPI options) so validation schemas automatically feed into the spec when OpenAPI is enabled.
+
+## Multi-Runtime Support
+
+`EmbeddedServer` dispatches based on `ServerConfig.runtime`:
+- **`node`** (default) — dynamic `import('@hono/node-server')`, requires `@hono/node-server` peer dep
+- **`bun`** — `Bun.serve()` via `globalThis.Bun`
+- **`deno`** — `Deno.serve()` via `globalThis.Deno`
+
+The plugin reads `server.runtime` from `CodegenContext.config` at build time:
+- `'node'` (default) / `'bun'` / `'deno'` → generates `startServer()` with `EmbeddedServer`
+- `'cloudflare'` → serverless: skips `startServer()` and `EmbeddedServer` import (use `createRouter()` directly)
 
 ## Gotchas
 

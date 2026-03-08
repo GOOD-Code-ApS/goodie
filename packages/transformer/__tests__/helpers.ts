@@ -40,8 +40,9 @@ export function Cors(opts?: any) { return (t: any, c: any) => {} }
 export function Secured() { return (t: any, c: any) => {} }
 export function Anonymous() { return (t: any, c: any) => {} }
 export function ConditionalOnEnv(envVar: string, value?: string) { return (t: any, c: any) => {} }
-export function ConditionalOnProperty(key: string, value?: string) { return (t: any, c: any) => {} }
+export function ConditionalOnProperty(key: string, value?: string | { havingValue: string | string[] }) { return (t: any, c: any) => {} }
 export function ConditionalOnMissingBean(token: any) { return (t: any, c: any) => {} }
+export function RequestScoped() { return (t: any, c: any) => {} }
 `;
 
 /**

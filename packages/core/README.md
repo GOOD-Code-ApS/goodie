@@ -21,7 +21,6 @@ This package provides the runtime container that resolves pre-built `BeanDefinit
 - **`buildInterceptorChain`** — AOP runtime: chains `MethodInterceptor` instances around a method
 - **`wrapBeforeAdvice` / `wrapAfterAdvice`** — Adapt `BeforeAdvice` / `AfterAdvice` into `MethodInterceptor`
 - **`MethodInterceptor`, `InvocationContext`** — AOP type contracts for interceptors
-
 ## Usage
 
 ```typescript
@@ -37,7 +36,7 @@ await app.context.close();
 
 ## API
 
-- `ApplicationContext.create(defs)` — async factory, topo-sorts and validates the dependency graph
+- `ApplicationContext.create(defs, options?)` — async factory, evaluates conditional rules (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) at runtime, then topo-sorts and validates the dependency graph
 - `ctx.get(token)` — synchronous lookup (throws for unresolved async beans)
 - `ctx.getAsync(token)` — always safe for async factories
 - `ctx.getAll(token)` — returns all beans registered under a token

@@ -78,6 +78,22 @@ class CreateTodosTable extends AbstractMigration {
 
 Migrations run automatically at startup via `MigrationRunner` (`@PostConstruct`), sorted by name.
 
+## Supported Dialects
+
+| Dialect | Driver Package | Edge-Compatible |
+|---------|---------------|-----------------|
+| `postgres` | `pg` | No |
+| `mysql` | `mysql2` | No |
+| `sqlite` | `better-sqlite3` | No |
+| `neon` | `kysely-neon` | Yes |
+| `planetscale` | `kysely-planetscale` | Yes |
+| `libsql` | `@libsql/kysely-libsql` | Yes |
+
+Configure via `config/default.json`:
+```json
+{ "datasource": { "url": "postgres://...", "dialect": "postgres" } }
+```
+
 ## Vite Plugin Setup
 
 ```typescript

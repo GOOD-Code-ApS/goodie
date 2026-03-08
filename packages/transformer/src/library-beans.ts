@@ -62,6 +62,7 @@ function serializeBean(bean: IRBeanDefinition): Record<string, unknown> {
     baseTokenRefs: bean.baseTokenRefs ?? null,
     decorators: bean.decorators ?? null,
     methodDecorators: bean.methodDecorators ?? null,
+    publicMembers: bean.publicMembers ?? null,
     metadata: bean.metadata,
     sourceLocation: bean.sourceLocation,
   };
@@ -158,6 +159,8 @@ function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
     methodDecorators:
       (raw.methodDecorators as IRBeanDefinition['methodDecorators']) ??
       undefined,
+    publicMembers:
+      (raw.publicMembers as IRBeanDefinition['publicMembers']) ?? undefined,
     metadata: (raw.metadata as Record<string, unknown>) ?? {},
     sourceLocation: raw.sourceLocation as IRBeanDefinition['sourceLocation'],
   };

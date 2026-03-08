@@ -1,16 +1,7 @@
-import { PostConstruct, PreDestroy, Singleton } from '@goodie-ts/core';
 import type { Kysely } from 'kysely';
-import type { DatasourceConfig } from './datasource-config.js';
-import type { Dialect } from './dialect.js';
 
 /**
- * Library-provided Kysely database singleton.
- *
- * Creates and manages a `Kysely<DB>` instance based on `DatasourceConfig`.
- * Automatically selects the correct dialect driver via dynamic import:
- * - `postgres` → `pg` + `PostgresDialect`
- * - `mysql` → `mysql2` + `MysqlDialect`
- * - `sqlite` → `better-sqlite3` + `SqliteDialect`
+ * Abstract base for Kysely database access.
  *
  * Non-generic (`Kysely<any>`) by design. Users bridge to their schema
  * type via a `@Module` with `@Provides`:
@@ -26,28 +17,15 @@ import type { Dialect } from './dialect.js';
  * }
  * ```
  *
- * Repositories then inject `Kysely<DB>` for fully typed access.
+ * Concrete implementations are conditionally selected at build time
+ * based on `datasource.dialect` in the config.
  */
-@Singleton()
-export class KyselyDatabase {
-  kysely!: Kysely<any>;
+export abstract class KyselyDatabase {
+  abstract get kysely(): Kysely<any>;
 
-  constructor(private readonly config: DatasourceConfig) {}
-
-  get dialect(): Dialect {
-    return this.config.dialect as Dialect;
-  }
-
-  @PostConstruct()
-  async init() {
-    const { default: createDialect } = await import('./dialect-factory.js');
-    const kyselyDialect = await createDialect(this.config);
-    const { Kysely } = await import('kysely');
-    this.kysely = new Kysely({ dialect: kyselyDialect });
-  }
-
-  @PreDestroy()
-  async destroy() {
-    await this.kysely?.destroy();
-  }
+  /**
+   * Whether the dialect supports `RETURNING` clauses natively.
+   * Used by `TransactionManager` for optimized insert/update/delete operations.
+   */
+  abstract get supportsReturning(): boolean;
 }

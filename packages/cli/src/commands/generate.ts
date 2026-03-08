@@ -88,6 +88,10 @@ export const generate = defineCommand({
         return;
       }
 
+      if (outcome.result.beans.length > 0) {
+        warnMissingGoodieField(cwd, args['beans-output']);
+      }
+
       if (args.watch) {
         console.warn(
           '[goodie] --watch is not supported in library mode. Run without --watch.',
@@ -123,6 +127,26 @@ export const generate = defineCommand({
     }
   },
 });
+
+/**
+ * Warn if `package.json` is missing the `"goodie": { "beans": "..." }` field
+ * that consumers need for automatic library bean discovery.
+ */
+function warnMissingGoodieField(cwd: string, beansOutput: string): void {
+  const pkgJsonPath = path.join(cwd, 'package.json');
+  try {
+    const raw = fs.readFileSync(pkgJsonPath, 'utf-8');
+    const pkg = JSON.parse(raw) as { goodie?: { beans?: string } };
+    if (pkg.goodie?.beans) return; // Already configured
+  } catch {
+    return; // No package.json — nothing to warn about
+  }
+  console.warn(
+    `[goodie] Warning: package.json is missing the "goodie.beans" field. Consumers won't discover your library beans.\n` +
+      `  Add this to your package.json:\n` +
+      `  "goodie": { "beans": "${beansOutput}" }`,
+  );
+}
 
 function detectPackageName(cwd: string): string {
   const pkgJsonPath = path.join(cwd, 'package.json');

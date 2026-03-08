@@ -1,33 +1,41 @@
 # @goodie-ts/kysely
 
-Kysely database integration for goodie-ts: `KyselyDatabase` library bean, `@Transactional` decorator, `TransactionManager`, `@Migration` with auto-wired `MigrationRunner`.
+Kysely database integration for goodie-ts: abstract `KyselyDatabase` with per-dialect implementations, `@Transactional` decorator, `TransactionManager`, `@Migration` with auto-wired `MigrationRunner`.
 
 ## Key Files
 
 | File | Role |
 |------|------|
-| `src/kysely-database.ts` | `KyselyDatabase` — library-provided `@Singleton`, creates `Kysely<any>` from `DatasourceConfig` |
-| `src/datasource-config.ts` | `DatasourceConfig` + `PoolConfig` — `@ConfigurationProperties('datasource')` and `@ConfigurationProperties('datasource.pool')` |
-| `src/dialect.ts` | `Dialect` type (`'postgres' \| 'mysql' \| 'sqlite'`) and `supportsReturning()` |
-| `src/dialect-factory.ts` | `createDialect()` — async factory using dynamic imports for `pg`, `mysql2`, `better-sqlite3` |
+| `src/kysely-database.ts` | `KyselyDatabase` — abstract base class with `kysely` and `supportsReturning` abstract properties |
+| `src/pool-config.ts` | `PoolConfig` — `@ConfigurationProperties('datasource.pool')`, conditional on postgres/mysql |
+| `src/dialects/postgres.ts` | `PostgresDatasourceConfig` + `PostgresKyselyDatabase` — `@ConditionalOnProperty('datasource.dialect', { havingValue: 'postgres' })` |
+| `src/dialects/mysql.ts` | `MysqlDatasourceConfig` + `MysqlKyselyDatabase` — conditional on `mysql` |
+| `src/dialects/sqlite.ts` | `SqliteDatasourceConfig` + `SqliteKyselyDatabase` — conditional on `sqlite` |
+| `src/dialects/neon.ts` | `NeonDatasourceConfig` + `NeonKyselyDatabase` — conditional on `neon` (serverless Postgres) |
+| `src/dialects/planetscale.ts` | `PlanetscaleDatasourceConfig` + `PlanetscaleKyselyDatabase` — conditional on `planetscale` (serverless MySQL) |
+| `src/dialects/libsql.ts` | `LibsqlDatasourceConfig` + `LibsqlKyselyDatabase` — conditional on `libsql` (Turso) |
+| `src/dialects/d1.ts` | `D1DatasourceConfig` + `D1KyselyDatabase` — conditional on `d1` (Cloudflare Workers, request-scoped) |
+| `src/dialect.ts` | `Dialect` type union and `DIALECTS` array |
 | `src/transaction-manager.ts` | `TransactionManager` — `AsyncLocalStorage`-based transaction propagation, `KyselyProvider` interface |
 | `src/transactional-interceptor.ts` | `TransactionalInterceptor` — AOP interceptor wrapping methods in transactions (order `-40`) |
 | `src/migration-runner.ts` | `MigrationRunner` — runs `@Migration` classes in sorted order via `@PostConstruct` |
 | `src/abstract-migration.ts` | `AbstractMigration` — base class with `up(db)` / `down?(db)` |
-| `src/kysely-transformer-plugin.ts` | `createKyselyPlugin()` — finds `KyselyDatabase` from library beans, synthesizes `TransactionManager` and interceptor |
+| `src/kysely-transformer-plugin.ts` | `createKyselyPlugin()` — wires `TransactionManager` via abstract `KyselyDatabase` token, synthesizes interceptor |
 | `src/decorators/transactional.ts` | `@Transactional({ propagation? })` — `REQUIRED` (default) or `REQUIRES_NEW` |
 | `src/decorators/migration.ts` | `@Migration('name')` — marks a class as a migration with a sortable name |
 
-## KyselyDatabase
+## KyselyDatabase (Per-Dialect Architecture)
 
-Library-provided `@Singleton` that creates and manages a `Kysely<any>` instance:
-- Depends on `DatasourceConfig` (injected via constructor)
-- `@PostConstruct init()` — dynamically imports the dialect driver and creates the `Kysely` instance
-- `@PreDestroy destroy()` — closes the connection pool
-- Non-generic (`Kysely<any>`) — inject directly for untyped access (e.g. health checks with `sql\`SELECT 1\``)
-- For typed access, use `@Module` with `@Provides` to cast once and inject `Kysely<DB>` into consumers
+Abstract base class — concrete implementations are conditionally selected at build time based on `datasource.dialect`:
 
-### Typed access via @Module + @Provides
+- Each dialect has its own `DatasourceConfig` class with `@ConfigurationProperties('datasource')` + `@ConditionalOnProperty`
+- Each dialect has its own `KyselyDatabase` subclass with `@PostConstruct init()` for async driver initialization
+- `supportsReturning` is an abstract property on `KyselyDatabase`, implemented per dialect
+- `PoolConfig` (`datasource.pool.*`) is only active for pooled dialects (postgres, mysql)
+- D1 is `@RequestScoped` (bindings come from per-request `env`), all others are `@Singleton`
+- Runtime resolves the concrete impl via `baseTokenRefs` on the abstract `KyselyDatabase` token
+
+Non-generic (`Kysely<any>`) by design. For typed access, use `@Module` with `@Provides`:
 
 ```typescript
 @Module()
@@ -46,12 +54,9 @@ class TodoRepository {
 }
 ```
 
-## DatasourceConfig + PoolConfig
+## Per-Dialect Config
 
-Two `@ConfigurationProperties` library beans for database configuration:
-- `DatasourceConfig` — `url`, `dialect` fields, prefix `datasource`
-- `PoolConfig` — `min` (default 2), `max` (default 10) fields, prefix `datasource.pool`
-- `DatasourceConfig` has a `@PostConstruct validate()` that checks `dialect` and `url`
+Each dialect has a typed config class with `@ConfigurationProperties('datasource')`. Common fields are typed per dialect; the driver validates at init time and errors are wrapped with context.
 
 Config via `config/default.json`:
 ```json
@@ -60,26 +65,28 @@ Config via `config/default.json`:
 
 ## Multi-Dialect Support
 
-`dialect-factory.ts` uses async `await import()` for optional peer dependencies:
-- `postgres` → `pg` (`Pool` + `PostgresDialect`)
-- `mysql` → `mysql2/promise` (`createPool` + `MysqlDialect`)
-- `sqlite` → `better-sqlite3` (`BetterSqlite3Dialect`)
-
-The `dialect` field in config is required (not auto-detected).
+All dialect drivers are optional peer dependencies — only the configured dialect needs to be installed:
+- `postgres` → `pg` + `kysely` (`supportsReturning: true`)
+- `mysql` → `mysql2/promise` + `kysely` (`supportsReturning: false`)
+- `sqlite` → `better-sqlite3` + `kysely` (`supportsReturning: true`)
+- `neon` → `kysely-neon` (`supportsReturning: true`)
+- `planetscale` → `kysely-planetscale` (`supportsReturning: false`)
+- `libsql` → `@libsql/kysely-libsql` (`supportsReturning: true`)
+- `d1` → `kysely-d1` + `kysely` (`supportsReturning: true`, request-scoped)
 
 ## TransactionManager
 
 - Uses `AsyncLocalStorage` for transaction propagation across async call chains
-- Constructor accepts `Kysely<any>` or a `KyselyProvider` (duck-type: object with `.kysely` property)
+- Constructor accepts `Kysely<any>` or a `KyselyProvider` (duck-type: object with `.kysely` and `.supportsReturning`)
 - When given a provider, patches `provider.kysely` with a getter that returns the active transaction
-- Resolves dialect from `KyselyProvider.dialect` for `supportsReturning` support
+- Reads `supportsReturning` from the `KyselyProvider` (i.e. the `KyselyDatabase` subclass)
 - `runInTransaction(fn, requiresNew?)` — REQUIRED reuses existing tx, REQUIRES_NEW always starts fresh
 - `startTestTransaction()` — replaces the Kysely ref with a transaction for test isolation; returns a rollback function
 
 ## Plugin Auto-Wiring
 
-`createKyselyPlugin()` finds `KyselyDatabase` from library beans in `afterResolve` and wires:
-1. `TransactionManager` singleton (depends on `KyselyDatabase`)
+`createKyselyPlugin()` detects any `KyselyDatabase` subclass via `baseTokenRefs` in `afterResolve` and wires:
+1. `TransactionManager` singleton (depends on abstract `KyselyDatabase` token — resolved at runtime via `baseTokenRefs`)
 2. `TransactionalInterceptor` singleton (depends on `TransactionManager`)
 3. `MigrationRunner` singleton with individual `@Migration` classes as constructor deps
 
@@ -91,6 +98,8 @@ No configuration needed — the plugin discovers `KyselyDatabase` automatically 
 
 ## Gotchas
 
-- `KyselyDatabase` is non-generic — inject directly for untyped access, or use `@Module` + `@Provides` for typed `Kysely<DB>`
+- `KyselyDatabase` is abstract and non-generic — inject for untyped access, or use `@Module` + `@Provides` for typed `Kysely<DB>`
+- Concrete dialect selection happens at build time via `@ConditionalOnProperty` — requires `configDir` to be set (e.g. via vite plugin)
 - Test transactions skip nested transactions to avoid Kysely's "already in transaction" error
-- Dialect drivers (`pg`, `mysql2`, `better-sqlite3`) are optional peer dependencies — only the configured dialect needs to be installed
+- Dialect drivers are optional peer dependencies — only the configured dialect needs to be installed
+- D1 is the only request-scoped dialect; all others are singletons

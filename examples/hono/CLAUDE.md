@@ -5,8 +5,8 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 ## What It Demonstrates
 
 - `@Controller` / `@Get` / `@Post` for declarative HTTP routing (codegen via hono plugin)
-- `KyselyDatabase` library bean from `@goodie-ts/kysely` for database connectivity
-- `DatasourceConfig` / `PoolConfig` library beans via `@ConfigurationProperties('datasource')`
+- `KyselyDatabase` abstract base with `PostgresKyselyDatabase` conditionally selected via `@ConditionalOnProperty`
+- `PostgresDatasourceConfig` + `PoolConfig` library beans via `@ConfigurationProperties('datasource')`
 - `@Module` with `@Provides` for typed `Kysely<Database>` injection (single cast in module, no casts in consumers)
 - `@Singleton` classes with constructor injection for repository and service layers
 - `configDir: 'config'` in vite config for JSON-based configuration files
@@ -18,7 +18,9 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 ## Architecture
 
 ```
-Library beans: KyselyDatabase(@Singleton) ← DatasourceConfig ← PoolConfig
+Library beans: PostgresKyselyDatabase(@Singleton, conditional on dialect=postgres)
+  ├── PostgresDatasourceConfig(@ConfigurationProperties('datasource'))
+  ├── PoolConfig(@ConfigurationProperties('datasource.pool'))
   └── config/default.json: { "datasource": { "url": "...", "dialect": "postgres", "pool": {...} } }
 │
 @Module DatabaseModule(KyselyDatabase)
@@ -91,10 +93,7 @@ Tests use `createRouter(ctx)` to get a Hono app wired to the test DI context. `h
 ## Running
 
 ```bash
-# Generate DI code
-pnpm generate
-
-# Build
+# Build (also regenerates AppContext.generated.ts via vite plugin)
 pnpm build
 
 # Start server (requires running PostgreSQL)

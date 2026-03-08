@@ -27,7 +27,7 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 
 ## ApplicationContext API
 
-- `ApplicationContext.create(defs, options?)` — async factory, topo-sorts (unless `{ preSorted: true }`), validates, eagerly inits marked beans
+- `ApplicationContext.create(defs, options?)` — async factory, evaluates `metadata.conditionalRules` to filter conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) before topo sort, validates, eagerly inits marked beans
 - `get(token)` — sync, throws `AsyncBeanNotReadyError` if bean is async and unresolved
 - `getAsync(token)` — always safe for async beans
 - `getAll(token)` — returns all beans registered under a token
