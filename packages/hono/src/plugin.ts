@@ -216,7 +216,11 @@ export default function createHonoPlugin(): TransformerPlugin {
       const hasOpenApi = controllerBeans.some((c) =>
         c.routes.some((r) => r.openapi),
       );
-      const hasRequestScoped = beans.some((b) => b.scope === 'request');
+      const hasRequestScoped = beans.some(
+        (b) =>
+          b.scope === 'request' &&
+          isConditionallyActive(b, context?.config ?? {}),
+      );
 
       const isServerless = context?.config['server.runtime'] === 'cloudflare';
 
@@ -633,7 +637,7 @@ function generateCreateRouter(
   lines.push('  const __router = new Hono()');
   if (hasRequestScoped) {
     lines.push(
-      "  __router.use('*', async (c, next) => { await RequestScopeManager.run(() => next(), c.env) })",
+      "  __router.use('*', async (c, next) => { await RequestScopeManager.run(() => next(), c.env as Record<string, unknown>) })",
     );
   }
   for (const ctrl of controllers) {
@@ -746,6 +750,40 @@ function collectSchemaImports(
     }
   }
   return imports;
+}
+
+/**
+ * Check whether a bean's conditional rules are satisfied by the build-time config.
+ * Used to avoid generating request-scope middleware for beans that won't be active.
+ * Only evaluates `onProperty` rules (config is available at build time).
+ * `onEnv` and `onMissingBean` are conservatively treated as active.
+ */
+function isConditionallyActive(
+  bean: IRBeanDefinition,
+  config: Record<string, string>,
+): boolean {
+  const rules = bean.metadata.conditionalRules as
+    | Array<{
+        type: string;
+        key?: string;
+        expectedValue?: string;
+        expectedValues?: string[];
+      }>
+    | undefined;
+  if (!rules || rules.length === 0) return true;
+
+  for (const rule of rules) {
+    if (rule.type !== 'onProperty') continue;
+    const propValue = config[rule.key!];
+    if (rule.expectedValues !== undefined) {
+      if (!rule.expectedValues.includes(String(propValue))) return false;
+    } else if (rule.expectedValue !== undefined) {
+      if (String(propValue) !== rule.expectedValue) return false;
+    } else {
+      if (propValue === undefined) return false;
+    }
+  }
+  return true;
 }
 
 function collectResponseSchemaImports(

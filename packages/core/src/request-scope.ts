@@ -1,12 +1,43 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
-
 /** Per-request store: bean cache + optional platform env bindings. */
 interface RequestStore {
   beans: Map<unknown, unknown>;
   env?: Record<string, unknown>;
 }
 
-const storage = new AsyncLocalStorage<RequestStore>();
+/**
+ * Lazy-loaded AsyncLocalStorage instance.
+ * Deferred so that importing this module doesn't fail on runtimes without
+ * `node:async_hooks` (e.g. Cloudflare Workers without `nodejs_compat`).
+ * The import only happens when a request scope is actually used.
+ */
+let storage:
+  | import('node:async_hooks').AsyncLocalStorage<RequestStore>
+  | undefined;
+
+async function getStorage() {
+  if (!storage) {
+    try {
+      const { AsyncLocalStorage } = await import('node:async_hooks');
+      storage = new AsyncLocalStorage<RequestStore>();
+    } catch {
+      throw new Error(
+        'RequestScopeManager requires AsyncLocalStorage from node:async_hooks. ' +
+          'On Cloudflare Workers, enable the nodejs_compat compatibility flag.',
+      );
+    }
+  }
+  return storage;
+}
+
+function getStorageSync() {
+  if (!storage) {
+    throw new Error(
+      'RequestScopeManager: not initialized. ' +
+        'Call RequestScopeManager.run() first (which performs async initialization).',
+    );
+  }
+  return storage;
+}
 
 /**
  * Manages request-scoped bean instances via AsyncLocalStorage.
@@ -15,7 +46,11 @@ const storage = new AsyncLocalStorage<RequestStore>();
  * are created once per scope and cached for the duration of that scope.
  *
  * Platform bindings (e.g. Cloudflare Workers `env`) can be passed via
- * `beginScope(env)` and retrieved via `getEnv()`.
+ * `run(fn, env)` and retrieved via `getEnv()`.
+ *
+ * The `node:async_hooks` import is lazy — it only happens on the first
+ * `run()` call. On Cloudflare Workers, the `nodejs_compat` compatibility
+ * flag must be enabled.
  */
 export const RequestScopeManager = {
   /**
@@ -23,15 +58,19 @@ export const RequestScopeManager = {
    * All request-scoped beans resolved during `fn` will be cached
    * in this scope's store.
    */
-  run<R>(fn: () => R, env?: Record<string, unknown>): R {
-    return storage.run({ beans: new Map(), env }, fn);
+  async run<R>(
+    fn: () => R | Promise<R>,
+    env?: Record<string, unknown>,
+  ): Promise<R> {
+    const als = await getStorage();
+    return als.run({ beans: new Map(), env }, fn);
   },
 
   /**
    * Check if code is running inside a request scope.
    */
   isActive(): boolean {
-    return storage.getStore() !== undefined;
+    return storage?.getStore() !== undefined;
   },
 
   /**
@@ -39,7 +78,7 @@ export const RequestScopeManager = {
    * Returns undefined if not inside a scope.
    */
   getStore(): Map<unknown, unknown> | undefined {
-    return storage.getStore()?.beans;
+    return storage?.getStore()?.beans;
   },
 
   /**
@@ -47,7 +86,7 @@ export const RequestScopeManager = {
    * Returns undefined if not inside a scope or no env was provided.
    */
   getEnv<T = Record<string, unknown>>(): T | undefined {
-    return storage.getStore()?.env as T | undefined;
+    return storage?.getStore()?.env as T | undefined;
   },
 
   /**
@@ -55,7 +94,7 @@ export const RequestScopeManager = {
    * Throws if not inside a scope or the binding doesn't exist.
    */
   getBinding<T>(key: string): T {
-    const store = storage.getStore();
+    const store = getStorageSync().getStore();
     if (!store?.env) {
       throw new Error(
         `RequestScopeManager: no request scope active. ` +

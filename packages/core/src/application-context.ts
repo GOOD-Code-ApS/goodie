@@ -211,7 +211,7 @@ export class ApplicationContext {
     }
 
     if (def.scope === 'request') {
-      return this.getRequestScopedInstance<T>(def);
+      return this.getRequestScopedInstanceAsync<T>(def);
     }
 
     // Prototype
@@ -426,7 +426,7 @@ export class ApplicationContext {
         }
       }
       if (depDef.scope === 'request') {
-        resolved.push(this.getRequestScopedInstance(depDef));
+        resolved.push(await this.getRequestScopedInstanceAsync(depDef));
         continue;
       }
       resolved.push(await this.resolveAsyncRaw(depDef, false));
@@ -507,17 +507,43 @@ export class ApplicationContext {
   }
 
   /**
+   * Async variant of getRequestScopedInstance. Supports beans with async
+   * factories or async @PostConstruct (e.g. D1KyselyDatabase).
+   */
+  private async getRequestScopedInstanceAsync<T>(
+    def: BeanDefinition,
+  ): Promise<T> {
+    const store = RequestScopeManager.getStore();
+    if (!store) {
+      throw new Error(
+        `No active request scope for bean '${tokenName(def.token)}'. ` +
+          `Ensure the request is running inside RequestScopeManager.run().`,
+      );
+    }
+    const cached = store.get(def.token);
+    if (cached !== undefined) return cached as T;
+
+    const deps = await this.resolveDepsAsync(def.dependencies, def.scope);
+    let instance = await def.factory(...deps);
+    instance = await this.applyPostProcessorsAsync(instance, def);
+    store.set(def.token, instance);
+    return instance as T;
+  }
+
+  /**
    * Create a proxy that delegates to the current request scope's instance.
    * Used when a singleton depends on a request-scoped bean.
    */
   private createRequestScopeProxy(def: BeanDefinition): unknown {
     const resolve = () => this.getRequestScopedInstance(def) as object;
     return new Proxy(Object.create(null), {
-      get(_, prop, receiver) {
-        return Reflect.get(resolve(), prop, receiver);
+      get(_, prop) {
+        const target = resolve();
+        return Reflect.get(target, prop, target);
       },
-      set(_, prop, value, receiver) {
-        return Reflect.set(resolve(), prop, value, receiver);
+      set(_, prop, value) {
+        const target = resolve();
+        return Reflect.set(target, prop, value, target);
       },
       has(_, prop) {
         return Reflect.has(resolve(), prop);

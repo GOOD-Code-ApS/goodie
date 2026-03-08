@@ -42,6 +42,7 @@ export class D1KyselyDatabase extends KyselyDatabase {
     return this._kysely;
   }
 
+  /** D1 is SQLite-based, which supports RETURNING since version 3.35.0. */
   get supportsReturning(): boolean {
     return true;
   }

@@ -10,6 +10,10 @@ class RequestService {
   value = 'default';
 }
 
+class AsyncRequestService {
+  initialized = false;
+}
+
 class SingletonService {
   constructor(public requestService: RequestService) {}
   getValue() {
@@ -27,6 +31,7 @@ function makeDef<T>(
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T;
     scope?: Scope;
+    metadata?: Record<string, unknown>;
   } = {},
 ): BeanDefinition<T> {
   return {
@@ -35,7 +40,7 @@ function makeDef<T>(
     dependencies: opts.deps ?? [],
     factory: opts.factory ?? ((() => ({})) as () => T),
     eager: false,
-    metadata: {},
+    metadata: opts.metadata ?? {},
   };
 }
 
@@ -53,13 +58,13 @@ describe('Request-scoped beans', () => {
     let instance1: RequestService | undefined;
     let instance2: RequestService | undefined;
 
-    RequestScopeManager.run(() => {
+    await RequestScopeManager.run(() => {
       instance1 = ctx.get(RequestService);
       const same = ctx.get(RequestService);
       expect(instance1).toBe(same); // same within one scope
     });
 
-    RequestScopeManager.run(() => {
+    await RequestScopeManager.run(() => {
       instance2 = ctx.get(RequestService);
     });
 
@@ -100,14 +105,14 @@ describe('Request-scoped beans', () => {
     expect(() => singleton.getValue()).toThrow('No active request scope');
 
     // Within a request scope, the proxy delegates correctly
-    RequestScopeManager.run(() => {
+    await RequestScopeManager.run(() => {
       const rs = ctx.get(RequestService);
       rs.value = 'from-request-1';
       expect(singleton.getValue()).toBe('from-request-1');
     });
 
     // Different request scope → different instance
-    RequestScopeManager.run(() => {
+    await RequestScopeManager.run(() => {
       expect(singleton.getValue()).toBe('default');
     });
   });
@@ -127,7 +132,7 @@ describe('Request-scoped beans', () => {
 
     const singleton = ctx.get(SingletonService);
 
-    RequestScopeManager.run(() => {
+    await RequestScopeManager.run(() => {
       // The proxy's prototype matches the real instance
       expect(singleton.requestService instanceof RequestService).toBe(true);
       // `in` operator works
@@ -135,10 +140,10 @@ describe('Request-scoped beans', () => {
     });
   });
 
-  it('should pass env bindings through RequestScopeManager', () => {
+  it('should pass env bindings through RequestScopeManager', async () => {
     const env = { DB: 'my-d1-binding', SECRET: 'abc' };
 
-    RequestScopeManager.run(() => {
+    await RequestScopeManager.run(() => {
       expect(RequestScopeManager.getEnv()).toEqual(env);
       expect(RequestScopeManager.getBinding('DB')).toBe('my-d1-binding');
       expect(() => RequestScopeManager.getBinding('MISSING')).toThrow(
@@ -158,6 +163,52 @@ describe('Request-scoped beans', () => {
     await RequestScopeManager.run(async () => {
       const instance = await ctx.getAsync(RequestService);
       expect(instance).toBeInstanceOf(RequestService);
+    });
+  });
+
+  it('should support async @PostConstruct on request-scoped beans via getAsync', async () => {
+    const ctx = await ApplicationContext.create([
+      makeDef(AsyncRequestService, {
+        scope: 'request',
+        factory: () => new AsyncRequestService(),
+        metadata: {
+          postConstructMethods: ['init'],
+        },
+      }),
+    ]);
+
+    // Patch the prototype with an async init
+    AsyncRequestService.prototype.init = async function (
+      this: AsyncRequestService,
+    ) {
+      await new Promise((r) => setTimeout(r, 1));
+      this.initialized = true;
+    };
+
+    await RequestScopeManager.run(async () => {
+      const instance = await ctx.getAsync(AsyncRequestService);
+      expect(instance).toBeInstanceOf(AsyncRequestService);
+      expect(instance.initialized).toBe(true);
+    });
+  });
+
+  it('should throw AsyncBeanNotReadyError for sync get() on async request-scoped bean', async () => {
+    const ctx = await ApplicationContext.create([
+      makeDef(AsyncRequestService, {
+        scope: 'request',
+        factory: () => new AsyncRequestService(),
+        metadata: {
+          postConstructMethods: ['init'],
+        },
+      }),
+    ]);
+
+    AsyncRequestService.prototype.init = async () => {
+      await new Promise((r) => setTimeout(r, 1));
+    };
+
+    await RequestScopeManager.run(() => {
+      expect(() => ctx.get(AsyncRequestService)).toThrow('async');
     });
   });
 });
