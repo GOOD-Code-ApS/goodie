@@ -1,5 +1,11 @@
 # @goodie-ts/health
 
+## 1.0.0
+
+### Major Changes
+
+- f1ca28d: Release v1.0.0 — stable API. Library packages now declare `@goodie-ts/core` as a peerDependency.
+
 ## 0.6.4
 
 ### Patch Changes

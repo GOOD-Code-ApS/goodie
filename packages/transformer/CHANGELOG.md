@@ -1,5 +1,37 @@
 # @goodie-ts/transformer
 
+## 1.0.0
+
+### Major Changes
+
+- 9e54e65: Improve error messages and diagnostics
+
+  - **@goodie-ts/core**: `MissingDependencyError` now includes `requiredBy` context and an optional `hint` field. `get()`/`getAsync()`, `validateDependencies()`, and dependency resolution all suggest similar token names via Levenshtein distance ("Did you mean: UserService?"). When a bean was excluded by a conditional rule (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`), the error explains why ("bean exists but was excluded by: @ConditionalOnProperty('datasource.dialect', 'postgres') — property is 'mysql'"). `@PostConstruct` and `@PreDestroy` errors include bean name and method with `{ cause }` chaining.
+  - **@goodie-ts/transformer**: `MissingProviderError` now includes fuzzy matching suggestions ("Did you mean: UserService?"). Plugin hook errors are wrapped with plugin name context and preserve the original error via `{ cause }`. `GOODIE_DEBUG=true` prints the full bean graph, resolution order, active plugins, and codegen contributions during build.
+
+- be45d51: Multi-runtime deployment support
+
+  - **@goodie-ts/core**: Add `@RequestScoped` decorator and `RequestScopeManager` for per-request bean instances via `AsyncLocalStorage`. `ApplicationContext` supports `scope: 'request'` with automatic proxy generation for singleton->request-scoped dependencies. Conditional bean evaluation (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) now happens at runtime in `ApplicationContext.create()` instead of at build time in the graph builder.
+  - **@goodie-ts/transformer**: Add `@RequestScoped` to scanner, `@ConditionalOnProperty` `havingValue` support (single string or array matching), `CodegenContext` with build-time config passed to plugin `codegen()` hooks. Config inlining reads `default.json` at build time, removing runtime `node:fs` dependency. Config plugin now recognises `@RequestScoped` as a bean decorator.
+  - **@goodie-ts/hono**: Multi-runtime `EmbeddedServer` (Node, Bun, Deno). `ServerConfig` gains `runtime` field (`ServerRuntime` type: `'node' | 'bun' | 'deno'`). When `server.runtime` is `'cloudflare'`, `app.onStart()` hook and `EmbeddedServer` import are omitted from codegen — use `createRouter(ctx)` directly. Request scope middleware auto-generated when request-scoped beans are present. **Breaking:** `EmbeddedServer.listen()` is now `async` — callers must `await` it.
+  - **@goodie-ts/kysely**: **Breaking:** `KyselyDatabase` is now abstract with per-dialect implementations (`PostgresKyselyDatabase`, `MysqlKyselyDatabase`, `SqliteKyselyDatabase`, `NeonKyselyDatabase`, `PlanetscaleKyselyDatabase`, `LibsqlKyselyDatabase`, `D1KyselyDatabase`). Each dialect is conditionally activated via `@ConditionalOnProperty('datasource.dialect')`. Per-dialect `DatasourceConfig` classes replace the shared `DatasourceConfig`. `PoolConfig` is conditional on pooled dialects (postgres, mysql). `supportsReturning` moved from standalone function to abstract property on `KyselyDatabase`. `TransactionManager` reads `supportsReturning` from `KyselyProvider` instead of `Dialect` type. D1 dialect is `@RequestScoped` for Cloudflare Workers. Removed: `DatasourceConfig`, `ConnectionStringKyselyDatabase`, `supportsReturning()`, `CONNECTION_STRING_DIALECTS`, `validateDialect()`, `dialect-factory.ts`.
+  - **@goodie-ts/cli**: Warn when `goodie generate --mode library` produces beans but `package.json` is missing the `"goodie": { "beans": "..." }` field. Silent when the field already exists or no beans were produced.
+
+- 8fc7032: Simplify application bootstrap: `await app.start()` is now the single entry point. The hono plugin registers an `onStart` hook to wire the router and start the HTTP server automatically. Generated route wiring now calls stable `@goodie-ts/hono` runtime helpers (`handleResult`, `securityMiddleware`, `validationMiddleware`, etc.) instead of raw Hono/hono-openapi APIs. `createGoodieTest()` now accepts a definitions factory function and supports custom fixtures derived from the ApplicationContext.
+
+  **Breaking changes to generated code** (re-run `pnpm build` to regenerate):
+
+  - `startServer()` removed — replaced by `await app.start()`
+  - `createApp()` removed — replaced by `app.start()` which returns the `ApplicationContext`
+  - `export { definitions }` removed — use `buildDefinitions()` instead
+
+### Patch Changes
+
+- Updated dependencies [9e54e65]
+- Updated dependencies [be45d51]
+- Updated dependencies [8fc7032]
+  - @goodie-ts/core@1.0.0
+
 ## 0.12.0
 
 ### Minor Changes
