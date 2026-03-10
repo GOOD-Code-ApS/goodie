@@ -3,7 +3,7 @@ import {
   Request as HttpRequest,
   Response as HttpResponse,
 } from '@goodie-ts/http';
-import type { Context, Next } from 'hono';
+import type { Context, Next, TypedResponse } from 'hono';
 import { cors } from 'hono/cors';
 import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
 
@@ -31,10 +31,15 @@ export async function buildRequest<T>(
 }
 
 /** Convert a controller method's return value to a Hono Response. */
+export function handleResult<T extends HttpResponse<any>>(
+  c: Context,
+  result: T,
+): T extends HttpResponse<infer U> ? TypedResponse<U, StatusCode> : never;
+export function handleResult(c: Context, result: unknown): Response;
 export function handleResult(
   c: Context,
   result: unknown,
-): Response | Promise<Response> {
+): Response | TypedResponse {
   // Framework-managed Response<T> from @goodie-ts/http
   if (result instanceof HttpResponse) {
     const httpRes = result as HttpResponse<unknown>;
