@@ -210,6 +210,21 @@ importers:
         specifier: ^24.0.0
         version: 24.0.0
 
+  packages/http:
+    devDependencies:
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
   packages/kysely:
     dependencies:
       '@libsql/kysely-libsql':

@@ -8,10 +8,21 @@ import { ConfigurationProperties, Singleton } from '@goodie-ts/core';
  */
 export type ServerRuntime = 'node' | 'bun' | 'deno' | 'cloudflare';
 
+/** CORS configuration. */
+export interface CorsConfig {
+  origin?: string | string[];
+  allowMethods?: string[];
+  allowHeaders?: string[];
+  exposeHeaders?: string[];
+  maxAge?: number;
+  credentials?: boolean;
+}
+
 @Singleton()
 @ConfigurationProperties('server')
 export class ServerConfig {
   host = 'localhost';
   port = 3000;
   runtime: ServerRuntime = 'node';
+  cors: CorsConfig = {};
 }

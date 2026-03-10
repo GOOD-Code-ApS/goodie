@@ -7,7 +7,7 @@ type ClassDecorator_Stage3 = (
  * Marks a class as an HTTP controller. Controllers are singletons.
  * The basePath is used as the route prefix for all methods.
  *
- * This is a compile-time marker (no-op at runtime). The hono transformer
+ * This is a compile-time marker (no-op at runtime). The http transformer
  * plugin extracts the basePath via AST scanning.
  */
 export function Controller(_basePath = '/'): ClassDecorator_Stage3 {
