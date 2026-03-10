@@ -1,6 +1,5 @@
 import { HealthAggregator } from '@goodie-ts/health';
-import { Controller, Get } from '@goodie-ts/hono';
-import type { Context } from 'hono';
+import { Controller, Get, Response } from '@goodie-ts/http';
 import type { DatabaseHealthIndicator } from './DatabaseHealthIndicator.js';
 import type { UptimeHealthIndicator } from './UptimeHealthIndicator.js';
 
@@ -19,8 +18,8 @@ export class HealthController {
   }
 
   @Get('/')
-  async check(c: Context) {
+  async check() {
     const health = await this.aggregator.checkAll();
-    return c.json(health, health.status === 'UP' ? 200 : 503);
+    return Response.status(health.status === 'UP' ? 200 : 503, health);
   }
 }

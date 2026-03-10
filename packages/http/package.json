@@ -1,13 +1,13 @@
 {
-  "name": "@goodie-ts/hono",
+  "name": "@goodie-ts/http",
   "version": "1.0.0",
-  "description": "Hono HTTP controller integration for goodie-ts",
+  "description": "Abstract HTTP layer for goodie-ts — controllers, route decorators, Request/Response types",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/GOOD-Code-ApS/goodie.git",
-    "directory": "packages/hono"
+    "directory": "packages/http"
   },
   "publishConfig": {
     "access": "public"
@@ -25,31 +25,20 @@
     }
   },
   "goodie": {
-    "beans": "dist/beans.json",
     "plugin": "dist/plugin.js"
   },
   "scripts": {
-    "build": "tsc && goodie generate --mode library",
+    "build": "tsc",
     "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "peerDependencies": {
+    "@goodie-ts/core": ">=1.0.0"
   },
   "devDependencies": {
     "@goodie-ts/core": "workspace:*",
-    "@goodie-ts/http": "workspace:*",
-    "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
     "@types/node": "^22.0.0",
     "ts-morph": "^24.0.0"
-  },
-  "peerDependencies": {
-    "@goodie-ts/core": ">=1.0.0",
-    "@goodie-ts/http": ">=1.0.0",
-    "@hono/node-server": ">=1.0.0",
-    "hono": ">=4.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@hono/node-server": {
-      "optional": true
-    }
   },
   "files": [
     "dist"
