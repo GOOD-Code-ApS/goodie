@@ -32,7 +32,7 @@ When `configDir` is set, the transformer reads JSON config files at build time a
 | `src/aop-scanner.ts` | `scanAopDecoratorDefinitions()` — scans `createAopDecorator<{...}>()` calls, extracts config from type parameters via type checker |
 | `src/aop-plugin.ts` | `createDeclarativeAopPlugin()` — generic AOP plugin driven by `AopDecoratorDeclaration` mappings |
 | `src/builtin-aop-plugin.ts` | `createAopPlugin()` — built-in plugin scanning `@Around/@Before/@After` decorators |
-| `src/builtin-config-plugin.ts` | `createConfigPlugin()` — built-in plugin scanning `@ConfigurationProperties` |
+| `src/builtin-config-plugin.ts` | `createConfigPlugin()` — built-in plugin reading introspection metadata for `@ConfigurationProperties` |
 | `src/builtin-introspection-plugin.ts` | `createIntrospectionPlugin()` — built-in plugin scanning `@Introspected`, extracting field types and decorator metadata |
 | `src/library-beans.ts` | `serializeBeans()`, `deserializeBeans()`, `discoverLibraryBeans()`, `discoverAopMappings()` |
 | `src/discover-plugins.ts` | `discoverAll()` — single-pass plugin + library manifest discovery from `node_modules` |
@@ -67,13 +67,15 @@ External packages can contribute codegen via the `TransformerPlugin` interface:
 - `visitClass` / `visitMethod` — scan hooks called during the single AST pass
 - `codegen(beans, context?)` — receives `CodegenContext` with build-time config (`context.config` is a flattened `Record<string, string>` from JSON config files). Returns `CodegenContribution` (`{ imports, code }`) appended to generated output
 
-Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, config, conditional, introspection) are always active.
+Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, introspection, config, conditional) are always active — introspection runs before config since `@ConfigurationProperties` implies `@Introspected`.
 
 ## Introspection Plugin
 
-The built-in introspection plugin scans `@Introspected()` classes and generates `MetadataRegistry` registration code. Key points:
+The built-in introspection plugin scans `@Introspected()` and `@ConfigurationProperties()` classes and generates `MetadataRegistry` registration code. Key points:
 
 - **NOT beans** — `@Introspected` classes are value objects (DTOs, request/response types). The plugin does NOT call `ctx.registerBean()`.
+- **`@ConfigurationProperties` implies `@Introspected`** — config classes are automatically introspected. The config plugin reads field metadata from `ctx.metadata.introspectedFields` rather than doing its own AST scanning.
+- **Inter-plugin metadata sharing** — stores scanned fields in `ctx.metadata.introspectedFields` so downstream plugins (e.g. config) can consume the data without duplicating scanning logic.
 - **Field type resolution** — builds a recursive `FieldType` tree: primitive, literal, array, reference, union, optional, nullable. Handles `boolean` correctly (ts-morph represents it as `false | true` union).
 - **Generic decorator metadata** — records ALL field decorators as `DecoratorMeta { name, args }`. The plugin doesn't interpret decorators — downstream consumers (validation, OpenAPI) do.
 - **Codegen** — emits `MetadataRegistry` import, class imports, and `__metadataRegistry.register(...)` calls with serialized field metadata.

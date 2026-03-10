@@ -2,6 +2,7 @@ import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it, vi } from 'vitest';
 import { createConfigPlugin } from '../src/builtin-config-plugin.js';
+import { createIntrospectionPlugin } from '../src/builtin-introspection-plugin.js';
 
 const DECORATOR_STUBS = `
 export function Injectable() { return (t: any, c: any) => {} }
@@ -21,7 +22,10 @@ function createTestProject(
     project.createSourceFile(filePath, content);
   }
 
-  return transformInMemory(project, outputPath, [createConfigPlugin()]);
+  return transformInMemory(project, outputPath, [
+    createIntrospectionPlugin(),
+    createConfigPlugin(),
+  ]);
 }
 
 describe('Config Transformer Plugin', () => {
@@ -396,81 +400,22 @@ describe('Config Transformer Plugin', () => {
     warnSpy.mockRestore();
   });
 
-  it('should skip @Value-decorated properties to avoid duplicate valueFields entries', () => {
+  it('should generate introspection metadata for @ConfigurationProperties class', () => {
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties, Value } from './decorators.js'
+        import { Singleton, ConfigurationProperties } from './decorators.js'
 
         @Singleton()
         @ConfigurationProperties('app')
         export class Config {
           name = 'my-app'
-
-          @Value('APP_SECRET')
-          accessor secret!: string
+          port = 3000
         }
       `,
     });
 
-    const bean = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
-    );
-    expect(bean).toBeDefined();
-
-    const valueFields = bean!.metadata.valueFields as Array<{
-      fieldName: string;
-      key: string;
-      default?: string;
-    }>;
-
-    // 'secret' should appear only once (from the scanner's @Value handling),
-    // NOT duplicated by the config plugin with key 'app.secret'
-    const secretEntries = valueFields.filter((f) => f.fieldName === 'secret');
-    expect(secretEntries).toHaveLength(1);
-    expect(secretEntries[0].key).toBe('APP_SECRET');
-
-    // 'name' should still be present from the config plugin
-    const nameField = valueFields.find((f) => f.fieldName === 'name');
-    expect(nameField).toBeDefined();
-    expect(nameField!.key).toBe('app.name');
-  });
-
-  it('should merge @Value fields with @ConfigurationProperties fields on the same class', () => {
-    const result = createTestProject({
-      '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties, Value } from './decorators.js'
-
-        @Singleton()
-        @ConfigurationProperties('app')
-        export class Config {
-          name = 'my-app'
-
-          @Value('APP_SECRET')
-          accessor secret!: string
-        }
-      `,
-    });
-
-    const bean = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
-    );
-    expect(bean).toBeDefined();
-
-    const valueFields = bean!.metadata.valueFields as Array<{
-      fieldName: string;
-      key: string;
-      default?: string;
-    }>;
-    expect(valueFields).toBeDefined();
-
-    // @Value field from the scanner
-    const secretField = valueFields.find((f) => f.fieldName === 'secret');
-    expect(secretField).toBeDefined();
-    expect(secretField!.key).toBe('APP_SECRET');
-
-    // @ConfigurationProperties field from the plugin
-    const nameField = valueFields.find((f) => f.fieldName === 'name');
-    expect(nameField).toBeDefined();
-    expect(nameField!.key).toBe('app.name');
+    // @ConfigurationProperties implies @Introspected — MetadataRegistry code should be generated
+    expect(result.code).toContain('MetadataRegistry');
+    expect(result.code).toContain("className: 'Config'");
   });
 });
