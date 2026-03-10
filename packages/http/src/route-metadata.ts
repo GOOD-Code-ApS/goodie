@@ -6,6 +6,8 @@ export interface RouteMetadata {
   methodName: string;
   httpMethod: HttpMethod;
   path: string;
+  /** Whether this method declares a Request<T> parameter. */
+  hasRequestParam: boolean;
   /** Whether this route requires authentication. */
   secured?: boolean;
   /** Whether this route is explicitly anonymous (overrides class-level @Secured). */

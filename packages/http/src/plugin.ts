@@ -3,6 +3,7 @@ import type {
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
+import { InvalidDecoratorUsageError } from '@goodie-ts/transformer';
 
 import type {
   ControllerMetadata,
@@ -24,6 +25,9 @@ const ROUTE_DECORATOR_MAP: Record<string, HttpMethod> = {
  *
  * Scans `@Controller` classes and `@Get`/`@Post`/etc. route methods,
  * populating `metadata.httpController` with `ControllerMetadata`.
+ *
+ * Validates that route method parameters are either empty or `Request<T>`
+ * from `@goodie-ts/http`. Any other parameter type is a compile-time error.
  *
  * This is the abstract HTTP layer — no framework-specific codegen.
  * Adapter plugins (e.g. Hono) read `metadata.httpController` and
@@ -101,6 +105,34 @@ export default function createHttpPlugin(): TransformerPlugin {
 
       if (!httpMethod) return;
 
+      // Validate and detect Request<T> parameter
+      const params = methodDeclaration.getParameters();
+      let hasRequestParam = false;
+
+      if (params.length > 0) {
+        const firstParam = params[0];
+        const typeNode = firstParam.getTypeNode();
+        const typeName = typeNode?.getText() ?? '';
+
+        // Accept Request, Request<T>, Request<void>, etc.
+        if (typeName === 'Request' || typeName.startsWith('Request<')) {
+          hasRequestParam = true;
+        } else {
+          // Any non-Request parameter type is a compile-time error
+          const sourceFile = methodDeclaration.getSourceFile();
+          throw new InvalidDecoratorUsageError(
+            httpMethod.charAt(0).toUpperCase() + httpMethod.slice(1),
+            `${ctx.className}.${methodName} parameter must use Request<T> from @goodie-ts/http. Found: ${typeName || firstParam.getType().getText()}`,
+            {
+              filePath: sourceFile.getFilePath(),
+              line: firstParam.getStartLineNumber(),
+              column:
+                firstParam.getStart() - firstParam.getStartLineNumber() + 1,
+            },
+          );
+        }
+      }
+
       // Scan method-level @Secured and @Anonymous
       const methodSecured = decorators.some((d) => d.getName() === 'Secured');
       const methodAnonymous = decorators.some(
@@ -111,6 +143,7 @@ export default function createHttpPlugin(): TransformerPlugin {
         methodName,
         httpMethod,
         path,
+        hasRequestParam,
         ...(methodSecured ? { secured: true } : {}),
         ...(methodAnonymous ? { anonymous: true } : {}),
       };

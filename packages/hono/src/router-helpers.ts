@@ -1,6 +1,11 @@
 import { RequestScopeManager } from '@goodie-ts/core';
+import {
+  Request as HttpRequest,
+  Response as HttpResponse,
+} from '@goodie-ts/http';
 import type { Context, Next } from 'hono';
 import { cors } from 'hono/cors';
+import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
 
 /**
  * Runtime helpers for generated route wiring.
@@ -11,13 +16,43 @@ import { cors } from 'hono/cors';
  * helpers — generated code stays unchanged.
  */
 
+/** Construct a Request<T> from a Hono Context. */
+export async function buildRequest<T>(
+  c: Context,
+  parseBody: boolean,
+): Promise<HttpRequest<T>> {
+  const body = parseBody ? await c.req.json<T>() : (undefined as T);
+  return new HttpRequest<T>({
+    body,
+    headers: c.req.raw.headers,
+    query: new URLSearchParams(c.req.query()),
+    params: c.req.param() as Record<string, string>,
+  });
+}
+
 /** Convert a controller method's return value to a Hono Response. */
 export function handleResult(
   c: Context,
   result: unknown,
 ): Response | Promise<Response> {
+  // Framework-managed Response<T> from @goodie-ts/http
+  if (result instanceof HttpResponse) {
+    const httpRes = result as HttpResponse<unknown>;
+    for (const [key, value] of Object.entries(httpRes.headers)) {
+      c.header(key, value as string);
+    }
+    if (httpRes.body === undefined)
+      return c.body(null, httpRes.status as StatusCode);
+    return c.json(
+      httpRes.body as object,
+      httpRes.status as ContentfulStatusCode,
+    );
+  }
+  // Native Response passthrough
   if (result instanceof Response) return result;
+  // No return value → 204
   if (result === undefined || result === null) return c.body(null, 204);
+  // Plain object → JSON 200
   return c.json(result as object);
 }
 

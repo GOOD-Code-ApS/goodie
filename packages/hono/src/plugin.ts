@@ -23,6 +23,7 @@ interface RouteInfo {
   methodName: string;
   httpMethod: HttpMethod;
   path: string;
+  hasRequestParam: boolean;
 }
 
 /**
@@ -56,7 +57,14 @@ export default function createHonoPlugin(): TransformerPlugin {
       const isServerless = context?.config['server.runtime'] === 'cloudflare';
       const config = context?.config ?? {};
 
-      const imports = buildImports(hasRequestScoped, isServerless);
+      const hasRequestParam = controllerBeans.some((c) =>
+        c.routes.some((r) => r.hasRequestParam),
+      );
+      const imports = buildImports(
+        hasRequestScoped,
+        isServerless,
+        hasRequestParam,
+      );
       const code = [
         ...generateCreateRouter(controllerBeans, hasRequestScoped, config),
         '',
@@ -85,6 +93,7 @@ function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
       methodName: route.methodName,
       httpMethod: route.httpMethod,
       path: route.path,
+      hasRequestParam: route.hasRequestParam,
     }));
 
     result.push({
@@ -107,6 +116,7 @@ function generateOnStartHook(): string[] {
 function buildImports(
   hasRequestScoped: boolean,
   isServerless: boolean,
+  hasRequestParam: boolean,
 ): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
@@ -118,6 +128,9 @@ function buildImports(
   }
   if (hasRequestScoped) {
     honoHelpers.push('requestScopeMiddleware');
+  }
+  if (hasRequestParam) {
+    honoHelpers.push('buildRequest');
   }
 
   imports.push(
@@ -147,9 +160,16 @@ function generateCreateRouter(
       );
 
       lines.push(`    .${route.httpMethod}('${relativePath}',`);
-      lines.push(
-        `      async (c) => handleResult(c, await ${varName}.${route.methodName}(c)))`,
-      );
+      if (route.hasRequestParam) {
+        const hasBody = ['post', 'put', 'patch'].includes(route.httpMethod);
+        lines.push(
+          `      async (c) => handleResult(c, await ${varName}.${route.methodName}(await buildRequest(c, ${hasBody}))))`,
+        );
+      } else {
+        lines.push(
+          `      async (c) => handleResult(c, await ${varName}.${route.methodName}()))`,
+        );
+      }
     }
     lines.push('}');
 

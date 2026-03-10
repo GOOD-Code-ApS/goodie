@@ -1,6 +1,7 @@
 export { EmbeddedServer } from './embedded-server.js';
 // Runtime helpers for generated route wiring
 export {
+  buildRequest,
   corsMiddleware,
   handleResult,
   requestScopeMiddleware,

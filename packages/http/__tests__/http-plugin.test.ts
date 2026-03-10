@@ -100,26 +100,31 @@ describe('HTTP Plugin', () => {
       methodName: 'list',
       httpMethod: 'get',
       path: '/list',
+      hasRequestParam: false,
     });
     expect(httpController.routes[1]).toEqual({
       methodName: 'create',
       httpMethod: 'post',
       path: '/',
+      hasRequestParam: false,
     });
     expect(httpController.routes[2]).toEqual({
       methodName: 'update',
       httpMethod: 'put',
       path: '/:id',
+      hasRequestParam: false,
     });
     expect(httpController.routes[3]).toEqual({
       methodName: 'remove',
       httpMethod: 'delete',
       path: '/:id',
+      hasRequestParam: false,
     });
     expect(httpController.routes[4]).toEqual({
       methodName: 'patch',
       httpMethod: 'patch',
       path: '/:id',
+      hasRequestParam: false,
     });
   });
 
@@ -226,6 +231,80 @@ describe('HTTP Plugin', () => {
       basePath: string;
     };
     expect(httpController.basePath).toBe('/');
+  });
+
+  it('detects Request parameter and sets hasRequestParam', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post } from './decorators.js'
+        class Request<T = unknown> {
+          body: T;
+          headers: any;
+          query: any;
+          params: Record<string, string>;
+        }
+        @Controller('/api')
+        class Ctrl {
+          @Get('/')
+          list() {}
+          @Get('/:id')
+          getById(req: Request) {}
+          @Post('/')
+          create(req: Request<{ title: string }>) {}
+        }
+      `,
+    });
+
+    const bean = result.beans.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
+    );
+    const httpController = bean!.metadata.httpController as {
+      routes: Array<{ methodName: string; hasRequestParam: boolean }>;
+    };
+
+    expect(httpController.routes[0]).toMatchObject({
+      methodName: 'list',
+      hasRequestParam: false,
+    });
+    expect(httpController.routes[1]).toMatchObject({
+      methodName: 'getById',
+      hasRequestParam: true,
+    });
+    expect(httpController.routes[2]).toMatchObject({
+      methodName: 'create',
+      hasRequestParam: true,
+    });
+  });
+
+  it('throws compile-time error for non-Request parameter types', () => {
+    expect(() =>
+      createProject({
+        '/src/Ctrl.ts': `
+          import { Controller, Get } from './decorators.js'
+          interface Context { req: any }
+          @Controller('/api')
+          class Ctrl {
+            @Get('/')
+            list(c: Context) {}
+          }
+        `,
+      }),
+    ).toThrow(/must use Request<T> from @goodie-ts\/http.*Found: Context/);
+  });
+
+  it('throws compile-time error for primitive parameter types', () => {
+    expect(() =>
+      createProject({
+        '/src/Ctrl.ts': `
+          import { Controller, Get } from './decorators.js'
+          @Controller('/api')
+          class Ctrl {
+            @Get('/:id')
+            getById(id: string) {}
+          }
+        `,
+      }),
+    ).toThrow(/must use Request<T> from @goodie-ts\/http.*Found: string/);
   });
 
   it('defaults route path to / when no argument', () => {

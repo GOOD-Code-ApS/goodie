@@ -1,28 +1,28 @@
 /**
  * Typed HTTP request wrapper. The type parameter `T` represents the
- * request body type, which must be `@Introspected` for compile-time
- * validation metadata extraction.
+ * request body type.
  *
- * In framework-managed controller methods, `Request<T>` is the parameter
- * type. The adapter (e.g. Hono) constructs the `Request<T>` instance
- * from the raw HTTP request, parsing and validating the body against
- * the introspected type metadata.
+ * In controller methods, `Request<T>` is the parameter type. The adapter
+ * (e.g. Hono) constructs the `Request<T>` instance from the raw HTTP
+ * request, parsing the body for methods that carry one (POST, PUT, PATCH).
+ *
+ * Methods that don't need a body can use `Request` (defaults to `unknown`).
  */
-export class Request<T> {
+export class Request<T = unknown> {
   readonly body: T;
-  readonly headers: ReadonlyMap<string, string>;
-  readonly query: ReadonlyMap<string, string>;
-  readonly params: ReadonlyMap<string, string>;
+  readonly headers: Headers;
+  readonly query: URLSearchParams;
+  readonly params: Record<string, string>;
 
   constructor(options: {
     body: T;
-    headers?: ReadonlyMap<string, string>;
-    query?: ReadonlyMap<string, string>;
-    params?: ReadonlyMap<string, string>;
+    headers?: Headers;
+    query?: URLSearchParams;
+    params?: Record<string, string>;
   }) {
     this.body = options.body;
-    this.headers = options.headers ?? new Map();
-    this.query = options.query ?? new Map();
-    this.params = options.params ?? new Map();
+    this.headers = options.headers ?? new Headers();
+    this.query = options.query ?? new URLSearchParams();
+    this.params = options.params ?? {};
   }
 }

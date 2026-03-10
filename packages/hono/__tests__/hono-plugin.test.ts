@@ -93,8 +93,8 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain(".route('/api/users'");
     expect(result.code).toContain(".get('/'");
     expect(result.code).toContain(".post('/'");
-    expect(result.code).toContain('userController.list(c)');
-    expect(result.code).toContain('userController.create(c)');
+    expect(result.code).toContain('userController.list()');
+    expect(result.code).toContain('userController.create()');
   });
 
   it('retrieves controllers from ApplicationContext in createRouter', () => {
@@ -169,7 +169,54 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain('handleResult(c, await ctrl.getData(c))');
+    expect(result.code).toContain('handleResult(c, await ctrl.getData())');
+  });
+
+  it('generates buildRequest for routes with Request<T> parameter', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post } from './decorators.js'
+        class Request<T = unknown> { body: T; params: Record<string, string> }
+        @Controller('/api')
+        class Ctrl {
+          @Get('/')
+          list() {}
+          @Get('/:id')
+          getById(req: Request) {}
+          @Post('/')
+          create(req: Request<{ title: string }>) {}
+        }
+      `,
+    });
+
+    // No param → no buildRequest
+    expect(result.code).toContain('await ctrl.list()');
+    // GET with Request → buildRequest(c, false)
+    expect(result.code).toContain(
+      'await ctrl.getById(await buildRequest(c, false))',
+    );
+    // POST with Request<T> → buildRequest(c, true)
+    expect(result.code).toContain(
+      'await ctrl.create(await buildRequest(c, true))',
+    );
+    // buildRequest imported
+    expect(result.code).toContain('buildRequest');
+    expect(result.code).toContain("from '@goodie-ts/hono'");
+  });
+
+  it('does not import buildRequest when no routes use Request<T>', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).not.toContain('buildRequest');
   });
 
   it('handles all HTTP methods', () => {

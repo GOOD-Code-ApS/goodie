@@ -20,6 +20,7 @@ export default defineConfig({
         '@goodie-ts/resilience',
         '@goodie-ts/kysely',
         '@goodie-ts/hono',
+        '@goodie-ts/http',
         'hono',
         'hono/request-id',
         '@hono/node-server',
