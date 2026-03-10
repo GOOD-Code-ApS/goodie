@@ -3,7 +3,7 @@
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
  * The transformer reads this decorator via AST inspection at build time
- * and generates a `BeanIntrospection` with field/type/constraint metadata.
+ * and generates a `TypeMetadata` entry with field type and decorator metadata.
  *
  * `@Introspected` classes are NOT beans — they are value objects (DTOs,
  * request/response types) whose shape is needed at runtime by validation,
