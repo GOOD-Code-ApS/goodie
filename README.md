@@ -80,7 +80,7 @@ const userService = app.context.get(UserService);
 | Package | Description |
 |---------|-------------|
 | [`@goodie-ts/core`](./packages/core) | Runtime container, decorators, AOP interceptor chain, `ApplicationContext`, `InjectionToken`, topological sort |
-| [`@goodie-ts/transformer`](./packages/transformer) | ts-morph scanner, code generator, and built-in AOP + config plugins (build-time only) |
+| [`@goodie-ts/transformer`](./packages/transformer) | ts-morph scanner, code generator, and built-in AOP + config + introspection plugins (build-time only) |
 | [`@goodie-ts/cli`](./packages/cli) | CLI tool — `goodie generate` with watch mode |
 | [`@goodie-ts/vite-plugin`](./packages/vite-plugin) | Vite integration — runs transformer on build and HMR |
 | [`@goodie-ts/testing`](./packages/testing) | `TestContext` with bean overrides and `@MockDefinition` |

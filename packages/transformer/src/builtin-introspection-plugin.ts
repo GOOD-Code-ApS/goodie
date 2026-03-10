@@ -60,12 +60,16 @@ export function createIntrospectionPlugin(): TransformerPlugin {
 
     visitClass(ctx: ClassVisitorContext): void {
       const isIntrospected = ctx.decorators.some(
-        (d) => d.name === 'Introspected',
+        (d) =>
+          d.name === 'Introspected' || d.name === 'ConfigurationProperties',
       );
       if (!isIntrospected) return;
 
       const cls = ctx.classDeclaration;
       const fields = scanClassFields(cls);
+
+      // Store in metadata so other plugins (e.g. config) can consume it
+      ctx.metadata.introspectedFields = fields;
 
       introspectedClasses.push({
         className: ctx.className,
@@ -125,9 +129,10 @@ function scanClassFields(cls: ClassDeclaration): ScannedIntrospectedField[] {
   for (const prop of cls.getProperties()) {
     const name = String(prop.getName());
 
-    // Skip private/protected
+    // Skip private/protected (by TypeScript modifier or underscore convention)
     const scope = prop.getScope();
     if (scope === 'private' || scope === 'protected') continue;
+    if (name.startsWith('_')) continue;
 
     // Resolve type
     const propType = prop.getType();
