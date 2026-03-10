@@ -35,6 +35,10 @@ interface RouteInfo {
  *
  * CORS is config-driven via `server.cors.*` properties in ServerConfig.
  *
+ * Error handling always wraps route handlers in try/catch. If a
+ * `ValidationErrorMapper` bean is registered (e.g. from `@goodie-ts/validation`),
+ * it maps errors to HTTP responses. Otherwise errors are re-thrown.
+ *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */
 export default function createHonoPlugin(): TransformerPlugin {
@@ -130,7 +134,7 @@ function buildImports(
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
 
-  const honoHelpers: string[] = ['handleResult'];
+  const honoHelpers: string[] = ['handleError', 'handleResult'];
   if (hasCors) {
     honoHelpers.push('corsMiddleware');
   }
@@ -148,6 +152,8 @@ function buildImports(
     `import { ${honoHelpers.sort().join(', ')} } from '@goodie-ts/hono'`,
   );
 
+  imports.push("import { ValidationErrorMapper } from '@goodie-ts/http'");
+
   return imports;
 }
 
@@ -164,7 +170,9 @@ function generateCreateRouter(
     const varName = ctrlVarNames.get(controllerKey(ctrl))!;
     const factoryName = `__create${ctrl.className}Routes`;
 
-    lines.push(`function ${factoryName}(${varName}: ${ctrl.className}) {`);
+    lines.push(
+      `function ${factoryName}(${varName}: ${ctrl.className}, __errorMapper: ValidationErrorMapper | undefined) {`,
+    );
     lines.push('  return new Hono()');
     for (const route of ctrl.routes) {
       const relativePath = escapeStringLiteral(
@@ -172,16 +180,25 @@ function generateCreateRouter(
       );
 
       lines.push(`    .${route.httpMethod}('${relativePath}',`);
+      lines.push('      async (c) => {');
+      lines.push('        try {');
       if (route.hasRequestParam) {
         const hasBody = ['post', 'put', 'patch'].includes(route.httpMethod);
         lines.push(
-          `      async (c) => handleResult(c, await ${varName}.${route.methodName}(await buildRequest(c, ${hasBody}))))`,
+          `          return handleResult(c, await ${varName}.${route.methodName}(await buildRequest(c, ${hasBody})))`,
         );
       } else {
         lines.push(
-          `      async (c) => handleResult(c, await ${varName}.${route.methodName}()))`,
+          `          return handleResult(c, await ${varName}.${route.methodName}())`,
         );
       }
+      lines.push('        } catch (e) {');
+      lines.push(
+        '          if (__errorMapper) return handleError(c, e, __errorMapper)',
+      );
+      lines.push('          throw e');
+      lines.push('        }');
+      lines.push('      })');
     }
     lines.push('}');
 
@@ -197,6 +214,7 @@ function generateCreateRouter(
   }
 
   lines.push('export function createRouter(ctx: ApplicationContext) {');
+  lines.push('  const __errorMapper = ctx.getAll(ValidationErrorMapper)[0]');
   lines.push('  const __router = new Hono()');
   if (hasRequestScoped) {
     lines.push("  __router.use('*', requestScopeMiddleware())");
@@ -210,7 +228,7 @@ function generateCreateRouter(
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
     lines.push(
-      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className})))`,
+      `    .route('${basePath}', ${factoryName}(ctx.get(${ctrl.className}), __errorMapper))`,
     );
   }
 

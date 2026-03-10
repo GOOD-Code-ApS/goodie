@@ -1,3 +1,5 @@
+import { Introspected } from '@goodie-ts/core';
+
 /**
  * Typed HTTP request wrapper. The type parameter `T` represents the
  * request body type.
@@ -7,7 +9,11 @@
  * request, parsing the body for methods that carry one (POST, PUT, PATCH).
  *
  * Methods that don't need a body can use `Request` (defaults to `unknown`).
+ *
+ * Decorated with `@Introspected` so that compile-time metadata is generated
+ * for the body type `T`, enabling validation and OpenAPI spec generation.
  */
+@Introspected()
 export class Request<T = unknown> {
   readonly body: T;
   readonly headers: Headers;

@@ -2,6 +2,7 @@ import { RequestScopeManager } from '@goodie-ts/core';
 import {
   Request as HttpRequest,
   Response as HttpResponse,
+  type ValidationErrorMapper,
 } from '@goodie-ts/http';
 import type { Context, Next, TypedResponse } from 'hono';
 import { cors } from 'hono/cors';
@@ -72,4 +73,25 @@ export function requestScopeMiddleware() {
   return async (c: Context, next: Next) => {
     await RequestScopeManager.run(next, c.env as Record<string, unknown>);
   };
+}
+
+/**
+ * Handle errors in route handlers. If a `ValidationErrorMapper` is provided,
+ * tries to map the error to a validation response (400). Otherwise re-throws.
+ */
+export function handleError(
+  c: Context,
+  error: unknown,
+  errorMapper: ValidationErrorMapper,
+): Response {
+  const mapped = errorMapper.tryMap(error);
+  if (mapped) {
+    for (const [key, value] of Object.entries(mapped.headers)) {
+      c.header(key, value as string);
+    }
+    if (mapped.body === undefined)
+      return c.body(null, mapped.status as StatusCode);
+    return c.json(mapped.body as object, mapped.status as ContentfulStatusCode);
+  }
+  throw error;
 }

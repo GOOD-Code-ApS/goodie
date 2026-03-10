@@ -9,7 +9,7 @@ Hono adapter for goodie-ts. Provides config-driven CORS, `EmbeddedServer`, `Serv
 | `src/plugin.ts` | Transformer plugin — reads `metadata.httpController` from http plugin, generates `createRouter()`, `app.onStart()` hook, CORS from config, RPC clients |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
 | `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host`, `port`, `runtime`, `cors` |
-| `src/router-helpers.ts` | Runtime helpers (`handleResult`, `buildRequest`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
+| `src/router-helpers.ts` | Runtime helpers (`handleResult`, `handleError`, `buildRequest`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
 | `src/index.ts` | Public exports — adapter-specific beans and helpers only (no decorator re-exports) |
 
 ## Transformer Plugin (`src/plugin.ts`)
@@ -52,19 +52,29 @@ No config → no CORS middleware emitted. No `@Cors` decorator — CORS is a ser
 Generated code never calls Hono APIs directly. Instead it calls runtime helpers exported from `@goodie-ts/hono`:
 
 - `handleResult(c, result)` — converts controller return values to Hono Response. Generic overloads preserve `TypedResponse<T>` for RPC inference.
+- `handleError(c, error, errorMapper)` — delegates to `ValidationErrorMapper.tryMap()`, re-throws if unmapped
 - `buildRequest(c, parseBody)` — constructs `Request<T>` from Hono Context
 - `corsMiddleware(options?)` — wraps `cors()` from hono/cors
 - `requestScopeMiddleware()` — wraps `RequestScopeManager.run()` from @goodie-ts/core
 
+### Error Handling
+
+All route handlers are wrapped in try/catch. At startup, `createRouter` uses `ctx.getAll(ValidationErrorMapper)[0]` to optionally get an error mapper. If a `ValidationErrorMapper` bean exists (e.g. `ValiValidationErrorMapper` from `@goodie-ts/validation`), caught errors are delegated to `handleError()` which calls `tryMap()`. If no mapper or `tryMap()` returns undefined, the error is re-thrown. Follows Micronaut's pattern — always catch, conditionally handle.
+
 ### Route Factory Pattern
 
 ```typescript
-function __createCtrlRoutes(ctrl: Ctrl) {
+function __createCtrlRoutes(ctrl: Ctrl, __errorMapper: ValidationErrorMapper | undefined) {
   return new Hono()
     .get('/items',
-      async (c) => handleResult(c, await ctrl.list()))
-    .post('/items',
-      async (c) => handleResult(c, await ctrl.create(await buildRequest(c, true))))
+      async (c) => {
+        try {
+          return handleResult(c, await ctrl.list())
+        } catch (e) {
+          if (__errorMapper) return handleError(c, e, __errorMapper)
+          throw e
+        }
+      })
 }
 ```
 
@@ -79,7 +89,7 @@ function __createCtrlRoutes(ctrl: Ctrl) {
 - **Adapter pattern** — hono plugin reads from `metadata.httpController` set by the http plugin. Route scanning is in `@goodie-ts/http`, Hono-specific codegen is here.
 - **No decorator re-exports** — users import decorators from `@goodie-ts/http` directly. Swapping adapters requires no decorator import changes.
 - **CORS is config-driven and opt-in** — only emitted when `server.cors.*` config keys exist.
-- **Security, validation, and OpenAPI removed** — will be rebuilt as dedicated packages
+- **Error handling is always-on** — route handlers always have try/catch. Error mappers are optional runtime beans. No conditional codegen for error handling — follows Micronaut.
 - **Generated code never imports Hono ecosystem directly** — all Hono API calls are in `router-helpers.ts`
 
 ## Multi-Runtime Support

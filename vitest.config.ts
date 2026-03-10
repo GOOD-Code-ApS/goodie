@@ -60,6 +60,10 @@ export default defineConfig({
         __dirname,
         'packages/scheduler/src/index.ts',
       ),
+      '@goodie-ts/validation': path.resolve(
+        __dirname,
+        'packages/validation/src/index.ts',
+      ),
     },
   },
   test: {

@@ -3,6 +3,7 @@ export { EmbeddedServer } from './embedded-server.js';
 export {
   buildRequest,
   corsMiddleware,
+  handleError,
   handleResult,
   requestScopeMiddleware,
 } from './router-helpers.js';

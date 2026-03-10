@@ -157,6 +157,33 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain(".route('/api/todos'");
   });
 
+  it('always wraps route handlers in try/catch with error mapper', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    expect(result.code).toContain('try {');
+    expect(result.code).toContain('} catch (e) {');
+    expect(result.code).toContain(
+      'if (__errorMapper) return handleError(c, e, __errorMapper)',
+    );
+    expect(result.code).toContain('throw e');
+    expect(result.code).toContain(
+      'const __errorMapper = ctx.getAll(ValidationErrorMapper)[0]',
+    );
+    expect(result.code).toContain(
+      "import { ValidationErrorMapper } from '@goodie-ts/http'",
+    );
+    expect(result.code).toContain('handleError');
+  });
+
   it('uses handleResult helper for route handlers', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
@@ -402,7 +429,9 @@ describe('Hono Plugin — RPC Client', () => {
       `,
     });
 
-    expect(result.code).toContain('function __createCtrlRoutes(ctrl: Ctrl)');
+    expect(result.code).toContain(
+      'function __createCtrlRoutes(ctrl: Ctrl, __errorMapper: ValidationErrorMapper | undefined)',
+    );
     expect(result.code).toContain(".get('/items'");
     expect(result.code).toContain(".post('/items'");
     expect(result.code).toContain(
@@ -484,7 +513,7 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     expect(result.code).toContain(
-      'function __createRootControllerRoutes(rootController: RootController)',
+      'function __createRootControllerRoutes(rootController: RootController, __errorMapper: ValidationErrorMapper | undefined)',
     );
     expect(result.code).toContain(".route('/'");
     expect(result.code).toContain(".get('/health'");
