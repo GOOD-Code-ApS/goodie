@@ -33,6 +33,7 @@ When `configDir` is set, the transformer reads JSON config files at build time a
 | `src/aop-plugin.ts` | `createDeclarativeAopPlugin()` — generic AOP plugin driven by `AopDecoratorDeclaration` mappings |
 | `src/builtin-aop-plugin.ts` | `createAopPlugin()` — built-in plugin scanning `@Around/@Before/@After` decorators |
 | `src/builtin-config-plugin.ts` | `createConfigPlugin()` — built-in plugin scanning `@ConfigurationProperties` |
+| `src/builtin-introspection-plugin.ts` | `createIntrospectionPlugin()` — built-in plugin scanning `@Introspected`, extracting field types and decorator metadata |
 | `src/library-beans.ts` | `serializeBeans()`, `deserializeBeans()`, `discoverLibraryBeans()`, `discoverAopMappings()` |
 | `src/discover-plugins.ts` | `discoverAll()` — single-pass plugin + library manifest discovery from `node_modules` |
 | `src/transformer-errors.ts` | `TransformerError` subclasses with source locations |
@@ -66,7 +67,17 @@ External packages can contribute codegen via the `TransformerPlugin` interface:
 - `visitClass` / `visitMethod` — scan hooks called during the single AST pass
 - `codegen(beans, context?)` — receives `CodegenContext` with build-time config (`context.config` is a flattened `Record<string, string>` from JSON config files). Returns `CodegenContribution` (`{ imports, code }`) appended to generated output
 
-Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, config) are always active.
+Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, config, conditional, introspection) are always active.
+
+## Introspection Plugin
+
+The built-in introspection plugin scans `@Introspected()` classes and generates `MetadataRegistry` registration code. Key points:
+
+- **NOT beans** — `@Introspected` classes are value objects (DTOs, request/response types). The plugin does NOT call `ctx.registerBean()`.
+- **Field type resolution** — builds a recursive `FieldType` tree: primitive, literal, array, reference, union, optional, nullable. Handles `boolean` correctly (ts-morph represents it as `false | true` union).
+- **Generic decorator metadata** — records ALL field decorators as `DecoratorMeta { name, args }`. The plugin doesn't interpret decorators — downstream consumers (validation, OpenAPI) do.
+- **Codegen** — emits `MetadataRegistry` import, class imports, and `__metadataRegistry.register(...)` calls with serialized field metadata.
+- **`strictNullChecks` requirement** — without it, `string | null` collapses to `string`. The framework's `tsconfig.base.json` sets `strict: true` which implies `strictNullChecks`. A build-time validation check is planned for v2.0.0.
 
 ## Graph Builder Details
 

@@ -19,6 +19,7 @@ export type {
   AroundOptions,
   BeforeOptions,
   ConditionalOnPropertyOptions,
+  IntrospectedOptions,
   ModuleOptions,
   ValueOptions,
 } from './decorators/index.js';
@@ -35,6 +36,7 @@ export {
   Eager,
   Inject,
   Injectable,
+  Introspected,
   Module,
   Named,
   Optional,
@@ -57,6 +59,20 @@ export {
 export { Goodie, GoodieBuilder } from './goodie.js';
 export { InjectionToken } from './injection-token.js';
 export { buildInterceptorChain } from './interceptor-chain.js';
+export type {
+  ArrayFieldType,
+  DecoratorMeta,
+  FieldType,
+  IntrospectedField,
+  LiteralFieldType,
+  NullableFieldType,
+  OptionalFieldType,
+  PrimitiveFieldType,
+  ReferenceFieldType,
+  TypeMetadata,
+  UnionFieldType,
+} from './introspection.js';
+export { MetadataRegistry } from './introspection.js';
 export { RequestScopeManager } from './request-scope.js';
 export { StartupMetrics } from './startup-metrics.js';
 export { topoSort } from './topo-sort.js';

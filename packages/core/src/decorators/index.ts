@@ -14,6 +14,8 @@ export { createAopDecorator } from './create-aop-decorator.js';
 export { Eager } from './eager.js';
 export { Inject } from './inject.js';
 export { Injectable } from './injectable.js';
+export type { IntrospectedOptions } from './introspected.js';
+export { Introspected } from './introspected.js';
 export type { ModuleOptions } from './module.js';
 export { Module } from './module.js';
 export { Named } from './named.js';

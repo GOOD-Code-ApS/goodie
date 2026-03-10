@@ -11,6 +11,7 @@ import { scanAopDecoratorDefinitions } from './aop-scanner.js';
 import { createAopPlugin } from './builtin-aop-plugin.js';
 import { createConditionalPlugin } from './builtin-conditional-plugin.js';
 import { createConfigPlugin } from './builtin-config-plugin.js';
+import { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
 import { computeIRHash, extractIRHash, generateCode } from './codegen.js';
 import {
   discoverAll,
@@ -128,6 +129,7 @@ export async function transform(
     createAopPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
+    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discoveredPlugins],
@@ -301,6 +303,7 @@ export function transformInMemory(
     createAopPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
+    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins],
@@ -440,6 +443,7 @@ export async function transformLibrary(
     createAopPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
+    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discovered],
