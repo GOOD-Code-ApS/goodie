@@ -1,5 +1,16 @@
 # @goodie-ts/core
 
+## 1.1.0
+
+### Minor Changes
+
+- 2d62bec: Add `@Introspected` decorator and compile-time type metadata generation.
+
+  `@Introspected()` marks value objects (DTOs, request/response types) for compile-time field metadata extraction. The built-in introspection transformer plugin scans these classes and generates `MetadataRegistry` registration code with recursive `FieldType` trees and generic `DecoratorMeta` on each field. Introspected classes are NOT beans — they are consumed at runtime by validation, OpenAPI, and serialization systems.
+
+  New exports from `@goodie-ts/core`: `Introspected`, `TypeMetadata`, `IntrospectedField`, `FieldType`, `DecoratorMeta`, `MetadataRegistry`.
+  New export from `@goodie-ts/transformer`: `createIntrospectionPlugin`.
+
 ## 1.0.0
 
 ### Major Changes

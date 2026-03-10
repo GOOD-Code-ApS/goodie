@@ -15,7 +15,8 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 | `src/aop-types.ts` | AOP types: `MethodInterceptor`, `InvocationContext`, `BeforeAdvice`, `AfterAdvice`, `InterceptorRef`, `InterceptedMethodDescriptor` |
 | `src/interceptor-chain.ts` | `buildInterceptorChain()` — chains interceptors with proceed/original-method fallback |
 | `src/advice-wrappers.ts` | `wrapBeforeAdvice()`, `wrapAfterAdvice()` — adapt advice to `MethodInterceptor` |
-| `src/decorators/` | All decorators: `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, `@Value`, `@Around`, `@Before`, `@After`, `@ConfigurationProperties`, `createAopDecorator()`, lifecycle hooks |
+| `src/decorators/` | All decorators: `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, `@Value`, `@Around`, `@Before`, `@After`, `@ConfigurationProperties`, `@Introspected`, `createAopDecorator()`, lifecycle hooks |
+| `src/introspection.ts` | `TypeMetadata`, `IntrospectedField`, `FieldType` (recursive tree), `DecoratorMeta`, `MetadataRegistry` |
 
 ## Core Types
 
@@ -24,6 +25,11 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 - **`Dependency`**: `{ token, optional }`
 - **`InjectionToken<T>`**: class with `description` string and phantom `__type` for type safety
 - **`BeanPostProcessor`**: `{ beforeInit?, afterInit? }` — hooks called during instantiation. Discovered via `metadata.isBeanPostProcessor = true`.
+- **`TypeMetadata<T>`**: `{ type, className, fields }` — compile-time generated introspection for `@Introspected` classes (NOT beans — value objects/DTOs)
+- **`IntrospectedField`**: `{ name, type: FieldType, decorators: DecoratorMeta[] }` — field with recursive type tree and generic decorator metadata
+- **`FieldType`**: recursive union: `primitive | literal | array | reference | union | optional | nullable`
+- **`DecoratorMeta`**: `{ name, args }` — generic, decorator-agnostic. Consumers (validation, OpenAPI) interpret recognized decorators.
+- **`MetadataRegistry`**: runtime `Map`-based registry — `register()`, `get(type)`, `has(type)`, `getAll()`
 
 ## ApplicationContext API
 
