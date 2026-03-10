@@ -87,6 +87,24 @@ describe('builtin-introspection-plugin', () => {
     expect(result.code).toContain('"kind":"primitive","type":"string"');
   });
 
+  it('handles optional AND nullable fields (string | null | undefined)', () => {
+    const result = createStrictTestProject({
+      '/src/Dto.ts': `
+        import { Introspected } from './decorators'
+
+        @Introspected()
+        class Dto {
+          value?: string | null
+        }
+      `,
+    });
+
+    // undefined stripped first → optional, then null stripped → nullable, then primitive
+    expect(result.code).toContain(
+      '"kind":"optional","inner":{"kind":"nullable","inner":{"kind":"primitive","type":"string"}}',
+    );
+  });
+
   it('handles array fields', () => {
     const result = createStrictTestProject({
       '/src/Dto.ts': `

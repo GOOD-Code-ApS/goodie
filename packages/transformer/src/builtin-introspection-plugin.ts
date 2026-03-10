@@ -251,6 +251,24 @@ function resolveFieldType(type: Type): ScannedFieldType {
     const undefinedIdx = unionTypes.findIndex((t) => t.isUndefined());
     if (undefinedIdx !== -1) {
       const remaining = unionTypes.filter((_, i) => i !== undefinedIdx);
+
+      // Also strip null → optional + nullable (e.g. string | null | undefined)
+      const nullIdx = remaining.findIndex((t) => t.isNull());
+      if (nullIdx !== -1) {
+        const innerRemaining = remaining.filter((_, i) => i !== nullIdx);
+        const innerType =
+          innerRemaining.length === 1
+            ? resolveFieldType(innerRemaining[0])
+            : {
+                kind: 'union' as const,
+                types: innerRemaining.map(resolveFieldType),
+              };
+        return {
+          kind: 'optional',
+          inner: { kind: 'nullable', inner: innerType },
+        };
+      }
+
       const inner =
         remaining.length === 1
           ? resolveFieldType(remaining[0])
