@@ -1,7 +1,3 @@
-// Re-export HTTP decorators from @goodie-ts/http
-export { Controller, Delete, Get, Patch, Post, Put } from '@goodie-ts/http';
-
-// Hono-specific types and beans
 export { EmbeddedServer } from './embedded-server.js';
 // Runtime helpers for generated route wiring
 export {

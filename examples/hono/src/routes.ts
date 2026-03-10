@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Patch, Post } from '@goodie-ts/hono';
+import { Controller, Delete, Get, Patch, Post } from '@goodie-ts/http';
 import type { Context } from 'hono';
 import type { TodoService } from './TodoService.js';
 
