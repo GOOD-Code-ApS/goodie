@@ -127,9 +127,9 @@ export async function transform(
   // Built-in plugins always active; declarative AOP comes next; then discovered + user plugins
   const builtinPlugins = [
     createAopPlugin(),
+    createIntrospectionPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
-    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discoveredPlugins],
@@ -301,9 +301,9 @@ export function transformInMemory(
       : [];
   const builtinPlugins = [
     createAopPlugin(),
+    createIntrospectionPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
-    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins],
@@ -441,9 +441,9 @@ export async function transformLibrary(
 
   const builtinPlugins = [
     createAopPlugin(),
+    createIntrospectionPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
-    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discovered],

@@ -3,14 +3,14 @@ import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 /**
  * Built-in config transformer plugin.
  *
- * Scans `@ConfigurationProperties(prefix)` on classes that also have
- * `@Singleton` (or `@Injectable`). For each public class field, generates a
- * `valueFields` metadata entry with key `prefix.fieldName` and the
+ * Reads field metadata from the introspection plugin (`ctx.metadata.introspectedFields`)
+ * for `@ConfigurationProperties(prefix)` classes. For each introspected field,
+ * generates a `valueFields` metadata entry with key `prefix.fieldName` and the
  * field initializer as the default value.
  *
- * Private and protected fields (by TypeScript modifier or underscore prefix)
- * are excluded. A warning is emitted if `@ConfigurationProperties` is used
- * without a companion `@Singleton` or `@Injectable` decorator.
+ * Requires the introspection plugin to run first — `@ConfigurationProperties`
+ * implies `@Introspected`. A warning is emitted if `@ConfigurationProperties`
+ * is used without a companion `@Singleton` or `@Injectable` decorator.
  *
  * The existing codegen automatically handles `valueFields` — it creates
  * the `__Goodie_Config` token, adds it as a dependency, and generates
@@ -73,28 +73,25 @@ export function createConfigPlugin(): TransformerPlugin {
       }
       const prefix = prefixArg.slice(1, -1);
 
-      // Extract class fields (both regular and accessor properties)
+      // Read fields from introspection metadata (populated by the introspection plugin)
+      const introspectedFields = ctx.metadata.introspectedFields as
+        | Array<{ name: string }>
+        | undefined;
+
+      if (!introspectedFields) return;
+
       const fields: Array<{
         fieldName: string;
         defaultValue: string | undefined;
       }> = [];
 
-      for (const prop of ctx.classDeclaration.getProperties()) {
-        const fieldName = prop.getName();
-
-        // Skip private/protected fields (by TypeScript modifier or convention)
-        const scope = prop.getScope();
-        if (scope === 'private' || scope === 'protected') continue;
-        if (fieldName.startsWith('_')) continue;
-
-        // Skip fields already decorated with @Value (handled by the scanner)
-        if (prop.getDecorators().some((d) => d.getName() === 'Value')) continue;
-
-        // Get default value from initializer
-        const initializer = prop.getInitializer();
+      for (const field of introspectedFields) {
+        // Look up initializer for default value
+        const prop = ctx.classDeclaration.getProperty(field.name);
+        const initializer = prop?.getInitializer();
         const defaultValue = initializer ? initializer.getText() : undefined;
 
-        fields.push({ fieldName, defaultValue });
+        fields.push({ fieldName: field.name, defaultValue });
       }
 
       if (fields.length === 0) return;
