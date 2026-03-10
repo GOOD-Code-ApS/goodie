@@ -60,13 +60,20 @@ export default function createHonoPlugin(): TransformerPlugin {
       const hasRequestParam = controllerBeans.some((c) =>
         c.routes.some((r) => r.hasRequestParam),
       );
+      const hasCors = hasCorsConfig(config);
       const imports = buildImports(
         hasRequestScoped,
         isServerless,
         hasRequestParam,
+        hasCors,
       );
       const code = [
-        ...generateCreateRouter(controllerBeans, hasRequestScoped, config),
+        ...generateCreateRouter(
+          controllerBeans,
+          hasRequestScoped,
+          hasCors,
+          config,
+        ),
         '',
         'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1]) {',
         '  return hc<AppType>(baseUrl, options)',
@@ -117,12 +124,16 @@ function buildImports(
   hasRequestScoped: boolean,
   isServerless: boolean,
   hasRequestParam: boolean,
+  hasCors: boolean,
 ): string[] {
   const imports: string[] = [];
   imports.push("import { Hono } from 'hono'");
   imports.push("import { hc } from 'hono/client'");
 
-  const honoHelpers: string[] = ['corsMiddleware', 'handleResult'];
+  const honoHelpers: string[] = ['handleResult'];
+  if (hasCors) {
+    honoHelpers.push('corsMiddleware');
+  }
   if (!isServerless) {
     honoHelpers.push('EmbeddedServer');
   }
@@ -143,6 +154,7 @@ function buildImports(
 function generateCreateRouter(
   controllers: ControllerBean[],
   hasRequestScoped: boolean,
+  hasCors: boolean,
   config: Record<string, string> = {},
 ): string[] {
   const lines: string[] = [];
@@ -189,7 +201,11 @@ function generateCreateRouter(
   if (hasRequestScoped) {
     lines.push("  __router.use('*', requestScopeMiddleware())");
   }
-  lines.push(`  __router.use('*', corsMiddleware(${buildCorsConfig(config)}))`);
+  if (hasCors) {
+    lines.push(
+      `  __router.use('*', corsMiddleware(${buildCorsConfig(config)}))`,
+    );
+  }
   for (const ctrl of controllers) {
     const factoryName = `__create${ctrl.className}Routes`;
     const basePath = escapeStringLiteral(ctrl.basePath);
@@ -204,6 +220,11 @@ function generateCreateRouter(
   lines.push('export type AppType = ReturnType<typeof createRouter>');
 
   return lines;
+}
+
+/** Check if any server.cors.* config keys exist. */
+function hasCorsConfig(config: Record<string, string>): boolean {
+  return Object.keys(config).some((key) => key.startsWith('server.cors.'));
 }
 
 /** Build CORS config object literal from server.cors.* config properties. */

@@ -266,7 +266,7 @@ describe('Hono Plugin Codegen', () => {
 });
 
 describe('Hono Plugin — CORS from config', () => {
-  it('always emits corsMiddleware in createRouter', () => {
+  it('does not emit corsMiddleware when no server.cors config', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -278,23 +278,7 @@ describe('Hono Plugin — CORS from config', () => {
       `,
     });
 
-    expect(result.code).toContain('corsMiddleware');
-    expect(result.code).toContain("__router.use('*', corsMiddleware(");
-  });
-
-  it('emits corsMiddleware() with no args when no server.cors config', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('corsMiddleware()');
+    expect(result.code).not.toContain('corsMiddleware');
   });
 
   it('emits corsMiddleware with origin from config', () => {

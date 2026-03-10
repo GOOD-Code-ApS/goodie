@@ -8,16 +8,10 @@ export interface RouteMetadata {
   path: string;
   /** Whether this method declares a Request<T> parameter. */
   hasRequestParam: boolean;
-  /** Whether this route requires authentication. */
-  secured?: boolean;
-  /** Whether this route is explicitly anonymous (overrides class-level @Secured). */
-  anonymous?: boolean;
 }
 
 /** Controller metadata stored on bean metadata by the http plugin. */
 export interface ControllerMetadata {
   basePath: string;
   routes: RouteMetadata[];
-  /** Whether the class has @Secured. */
-  secured?: boolean;
 }

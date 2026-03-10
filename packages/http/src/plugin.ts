@@ -62,14 +62,10 @@ export default function createHttpPlugin(): TransformerPlugin {
 
       ctx.registerBean({ scope: 'singleton', decoratorName: 'Controller' });
 
-      // Scan class-level @Secured
-      const classSecured = decorators.some((d) => d.getName() === 'Secured');
-
       // Initialize controller metadata — routes populated by visitMethod
       metadata.httpController = {
         basePath,
         routes: [],
-        ...(classSecured ? { secured: true } : {}),
       } satisfies ControllerMetadata;
     },
 
@@ -133,19 +129,11 @@ export default function createHttpPlugin(): TransformerPlugin {
         }
       }
 
-      // Scan method-level @Secured and @Anonymous
-      const methodSecured = decorators.some((d) => d.getName() === 'Secured');
-      const methodAnonymous = decorators.some(
-        (d) => d.getName() === 'Anonymous',
-      );
-
       const route: RouteMetadata = {
         methodName,
         httpMethod,
         path,
         hasRequestParam,
-        ...(methodSecured ? { secured: true } : {}),
-        ...(methodAnonymous ? { anonymous: true } : {}),
       };
 
       controller.routes.push(route);
