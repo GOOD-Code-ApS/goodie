@@ -43,6 +43,10 @@ export function ConditionalOnEnv(envVar: string, value?: string) { return (t: an
 export function ConditionalOnProperty(key: string, value?: string | { havingValue: string | string[] }) { return (t: any, c: any) => {} }
 export function ConditionalOnMissingBean(token: any) { return (t: any, c: any) => {} }
 export function RequestScoped() { return (t: any, c: any) => {} }
+export function Introspected(opts?: any) { return (t: any, c: any) => {} }
+export function MinLength(value: number) { return (t: any, c: any) => {} }
+export function MaxLength(value: number) { return (t: any, c: any) => {} }
+export function Email() { return (t: any, c: any) => {} }
 `;
 
 /**

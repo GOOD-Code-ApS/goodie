@@ -14,6 +14,7 @@ export { createAopPlugin } from './builtin-aop-plugin.js';
 export type { ConditionalRule } from './builtin-conditional-plugin.js';
 export { createConditionalPlugin } from './builtin-conditional-plugin.js';
 export { createConfigPlugin } from './builtin-config-plugin.js';
+export { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
 export type { CodegenOptions } from './codegen.js';
 // Code Generator
 export { generateCode } from './codegen.js';
