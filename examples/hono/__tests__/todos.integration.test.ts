@@ -1,3 +1,5 @@
+import { adaptRouter } from '@goodie-ts/hono';
+import { Router } from '@goodie-ts/http';
 import { TransactionManager } from '@goodie-ts/kysely';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
@@ -5,7 +7,7 @@ import {
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
+import { buildDefinitions } from '../src/AppContext.generated.js';
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
@@ -24,13 +26,13 @@ describe('Hono + PostgreSQL Todo API', () => {
       'datasource.dialect': 'postgres',
     }),
     fixtures: {
-      app: (ctx) => createRouter(ctx),
+      app: (ctx) => adaptRouter(Router.fromContext(ctx), ctx),
     },
     transactional: TransactionManager,
   });
 
   async function createTodo(
-    app: ReturnType<typeof createRouter>,
+    app: ReturnType<typeof createHonoRouter>,
     title: string,
   ) {
     const res = await app.request('/api/todos', {

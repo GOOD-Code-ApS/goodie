@@ -1,23 +1,53 @@
+import type { ApplicationContext } from '@goodie-ts/core';
 import { Singleton } from '@goodie-ts/core';
+import { EmbeddedServer, Router } from '@goodie-ts/http';
 import type { Hono } from 'hono';
+import { adaptRouter } from './adapt-router.js';
 import type { ServerConfig, ServerRuntime } from './server-config.js';
 
+/**
+ * Hono implementation of `EmbeddedServer`.
+ *
+ * Auto-discovered by `GoodieBuilder.start()` via `baseTokens: [EmbeddedServer]`.
+ * Builds a `Router` from the context, adapts it to Hono, and starts
+ * listening on the configured host/port/runtime.
+ *
+ * Multi-runtime: Node (`@hono/node-server`), Bun (`Bun.serve`), Deno (`Deno.serve`).
+ * Cloudflare Workers: use `Router.fromContext(ctx)` + `adaptRouter()` directly.
+ */
 @Singleton()
-export class EmbeddedServer {
+export class HonoEmbeddedServer extends EmbeddedServer {
   private _app?: Hono;
   private _close?: () => Promise<void>;
 
-  constructor(private readonly config: ServerConfig) {}
+  constructor(private readonly config: ServerConfig) {
+    super();
+  }
 
+  /** The Hono app instance. Only available after `start()` has been called. */
   get app(): Hono {
     if (!this._app) {
       throw new Error(
-        'EmbeddedServer: app not available. Call listen(app) first.',
+        'HonoEmbeddedServer: app not available. Call start() first.',
       );
     }
     return this._app;
   }
 
+  /**
+   * Build the Router, adapt to Hono, and start listening.
+   * Called automatically by `GoodieBuilder.start()`.
+   */
+  async start(ctx: ApplicationContext): Promise<void> {
+    const router = Router.fromContext(ctx);
+    const hono = adaptRouter(router, ctx);
+    await this.listen(hono);
+  }
+
+  /**
+   * Start listening with an externally-built Hono app.
+   * Useful for advanced setups where you need to customize the Hono instance.
+   */
   async listen(
     app: Hono,
     options?: { port?: number; host?: string },
@@ -56,8 +86,8 @@ async function startRuntime(
       return startDeno(app, port, hostname);
     case 'cloudflare':
       throw new Error(
-        "EmbeddedServer does not support 'cloudflare' runtime. " +
-          'Use createRouter(ctx) directly in your Cloudflare Workers entry point.',
+        "HonoEmbeddedServer does not support 'cloudflare' runtime. " +
+          'Use Router.fromContext(ctx) and adaptRouter() directly in your Workers entry point.',
       );
     default:
       throw new Error(
@@ -85,11 +115,10 @@ async function startBun(
   port: number,
   hostname: string,
 ): Promise<() => Promise<void>> {
-  // Bun.serve is a global — available at runtime in Bun environments
   const bunGlobal = globalThis as any;
   if (!bunGlobal.Bun?.serve) {
     throw new Error(
-      "EmbeddedServer: runtime is 'bun' but Bun.serve is not available. " +
+      "HonoEmbeddedServer: runtime is 'bun' but Bun.serve is not available. " +
         'Are you running in a Bun environment?',
     );
   }
@@ -108,11 +137,10 @@ async function startDeno(
   port: number,
   hostname: string,
 ): Promise<() => Promise<void>> {
-  // Deno.serve is a global — available at runtime in Deno environments
   const denoGlobal = globalThis as any;
   if (!denoGlobal.Deno?.serve) {
     throw new Error(
-      "EmbeddedServer: runtime is 'deno' but Deno.serve is not available. " +
+      "HonoEmbeddedServer: runtime is 'deno' but Deno.serve is not available. " +
         'Are you running in a Deno environment?',
     );
   }

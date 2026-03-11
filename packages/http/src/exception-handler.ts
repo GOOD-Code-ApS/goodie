@@ -9,17 +9,17 @@ import type { Response } from './response.js';
  * `ExceptionHandler<T, R>` pattern.
  */
 export abstract class ExceptionHandler {
-  abstract handle(error: unknown): Response<unknown> | undefined;
+  abstract handle(error: unknown): Response | undefined;
 }
 
 /**
- * Wraps a `Response<T>` from the exception handling pipeline so it can
+ * Wraps a `Response` from the exception handling pipeline so it can
  * be thrown (not returned) from route handlers. This prevents the error
  * response from polluting the handler's return type — adapters catch
  * `MappedException` in a global error handler and translate the response.
  */
 export class MappedException extends Error {
-  constructor(public readonly response: Response<unknown>) {
+  constructor(public readonly response: Response) {
     super('Mapped exception');
   }
 }

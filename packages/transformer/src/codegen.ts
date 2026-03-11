@@ -505,8 +505,8 @@ function buildTokenVarNameMap(tokens: TokenInfo[]): Map<string, string> {
  *      'port'              → 'Port_Token'
  */
 function tokenVarName(tokenName: string): string {
-  // 1. Replace generic chars with underscores
-  const sanitized = tokenName.replace(/[<>, ]/g, '_');
+  // 1. Replace generic chars and dots with underscores
+  const sanitized = tokenName.replace(/[<>, .]/g, '_');
 
   // 2. Split on underscores, filter empty segments
   const segments = sanitized.split('_').filter(Boolean);
