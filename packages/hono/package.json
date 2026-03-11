@@ -18,10 +18,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
     }
   },
   "goodie": {
-    "beans": "dist/beans.json"
+    "beans": "dist/beans.json",
+    "plugin": "dist/plugin.js"
   },
   "scripts": {
     "build": "tsc && goodie generate --mode library",
@@ -32,7 +37,8 @@
     "@goodie-ts/http": "workspace:*",
     "@goodie-ts/cli": "workspace:*",
     "@goodie-ts/transformer": "workspace:*",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
   },
   "peerDependencies": {
     "@goodie-ts/core": ">=1.0.0",

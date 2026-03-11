@@ -143,7 +143,6 @@ function expandProvides(
       p.returnTypeArguments,
       p.returnResolvedBaseTypeName,
       p.methodName,
-      className,
       p.sourceLocation,
     ),
   }));
@@ -181,28 +180,6 @@ function expandProvides(
       sourceLocation: p.sourceLocation,
     };
 
-    // When a @Provides returns a class type (resolved to InjectionToken with
-    // typeImports), track the return type class as a baseTokenRef so that
-    // collection injection via getAll(ReturnTypeClass) discovers this bean.
-    let baseTokenRefs: import('./ir.js').ClassTokenRef[] | undefined;
-    if (
-      tokenRef.kind === 'injection-token' &&
-      tokenRef.typeAnnotation &&
-      tokenRef.typeImports?.size
-    ) {
-      const returnClassName = tokenRef.typeAnnotation;
-      const returnImportPath = tokenRef.typeImports.get(returnClassName);
-      if (returnImportPath) {
-        baseTokenRefs = [
-          {
-            kind: 'class',
-            className: returnClassName,
-            importPath: returnImportPath,
-          },
-        ];
-      }
-    }
-
     return {
       tokenRef,
       scope: 'singleton' as const,
@@ -215,7 +192,7 @@ function expandProvides(
         moduleTokenRef: scanned.classTokenRef,
         methodName: p.methodName,
       },
-      baseTokenRefs,
+      baseTokenRefs: undefined,
       metadata: {},
       sourceLocation: p.sourceLocation,
     };
@@ -300,7 +277,6 @@ function resolveProvidesReturnType(
   typeArguments: ScannedTypeArgument[],
   resolvedBaseTypeName: string | undefined,
   methodName: string,
-  ownerClassName: string,
   _sourceLocation: SourceLocation,
 ): TokenRef {
   if (!typeName || isPrimitiveType(typeName)) {
@@ -333,18 +309,12 @@ function resolveProvidesReturnType(
     };
   }
 
-  // Non-generic class return type → generate a unique InjectionToken
-  // namespaced by the owning class to avoid conflicts when multiple
-  // modules provide the same return type. The class itself is tracked
-  // via baseTokenRefs in expandProvides() for collection discovery.
+  // If there's a source file for the type, it's a class
   if (typeSourceFile) {
-    const className = resolvedBaseTypeName ?? typeName;
     return {
-      kind: 'injection-token',
-      tokenName: `${ownerClassName}.${methodName}`,
+      kind: 'class',
+      className: resolvedBaseTypeName ?? typeName,
       importPath: typeSourceFile.getFilePath(),
-      typeAnnotation: className,
-      typeImports: new Map([[className, typeSourceFile.getFilePath()]]),
     };
   }
 

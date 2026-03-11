@@ -12,7 +12,7 @@ import { ValiError } from 'valibot';
  */
 @Singleton()
 export class ValiExceptionHandler extends ExceptionHandler {
-  handle(error: unknown): Response | undefined {
+  handle(error: unknown): Response<unknown> | undefined {
     if (error instanceof ValiError) {
       return Response.status(400, {
         errors: error.issues.map((issue) => ({

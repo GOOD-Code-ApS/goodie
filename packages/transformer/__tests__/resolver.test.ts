@@ -174,7 +174,7 @@ describe('Resolver', () => {
   });
 
   describe('@Provides resolution', () => {
-    it('should resolve @Provides with class return type to namespaced InjectionToken with baseTokenRefs', () => {
+    it('should resolve @Provides with class return type to ClassTokenRef', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Module(opts?: any) { return (t: any, c: any) => {} }
@@ -203,73 +203,11 @@ describe('Resolver', () => {
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans).toHaveLength(1);
-      // Token is a namespaced InjectionToken: {ModuleName}.{methodName}
       expect(providesBeans[0].tokenRef).toEqual({
-        kind: 'injection-token',
-        tokenName: 'AppModule.client',
+        kind: 'class',
+        className: 'Client',
         importPath: '/src/Client.ts',
-        typeAnnotation: 'Client',
-        typeImports: new Map([['Client', '/src/Client.ts']]),
       });
-      // baseTokenRefs tracks the return type class for collection discovery
-      expect(providesBeans[0].baseTokenRefs).toEqual([
-        { kind: 'class', className: 'Client', importPath: '/src/Client.ts' },
-      ]);
-    });
-
-    it('should generate unique tokens when multiple modules provide the same class type', () => {
-      const result = scanAndResolve({
-        '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
-          export function Provides() { return (t: any, c: any) => {} }
-        `,
-        '/src/RouteDefinition.ts': `
-          export class RouteDefinition {}
-        `,
-        '/src/TodoRoutes.ts': `
-          import { Module, Provides } from './decorators.js'
-          import { RouteDefinition } from './RouteDefinition.js'
-
-          @Module()
-          export class TodoRoutes {
-            @Provides()
-            todoRoutes(): RouteDefinition { return new RouteDefinition() }
-          }
-        `,
-        '/src/UserRoutes.ts': `
-          import { Module, Provides } from './decorators.js'
-          import { RouteDefinition } from './RouteDefinition.js'
-
-          @Module()
-          export class UserRoutes {
-            @Provides()
-            userRoutes(): RouteDefinition { return new RouteDefinition() }
-          }
-        `,
-      });
-
-      const providesBeans = result.beans.filter(
-        (b) => b.factoryKind === 'provides',
-      );
-      expect(providesBeans).toHaveLength(2);
-
-      // Each has a unique token name namespaced by module
-      const tokenNames = providesBeans.map((b) =>
-        b.tokenRef.kind === 'injection-token' ? b.tokenRef.tokenName : '',
-      );
-      expect(tokenNames).toContain('TodoRoutes.todoRoutes');
-      expect(tokenNames).toContain('UserRoutes.userRoutes');
-
-      // Both have baseTokenRefs pointing to RouteDefinition
-      for (const bean of providesBeans) {
-        expect(bean.baseTokenRefs).toEqual([
-          {
-            kind: 'class',
-            className: 'RouteDefinition',
-            importPath: '/src/RouteDefinition.ts',
-          },
-        ]);
-      }
     });
 
     it('should resolve @Provides with primitive return type to method-name InjectionToken', () => {

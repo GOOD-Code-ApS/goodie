@@ -1,5 +1,11 @@
-export { adaptRouter } from './adapt-router.js';
-export { createHonoRouter } from './create-hono-router.js';
-export { HonoEmbeddedServer } from './embedded-server.js';
+export { EmbeddedServer } from './embedded-server.js';
+// Runtime helpers for generated route wiring
+export {
+  buildRequest,
+  corsMiddleware,
+  requestScopeMiddleware,
+  toHonoErrorResponse,
+  toHonoResponse,
+} from './router-helpers.js';
 export type { CorsConfig, ServerRuntime } from './server-config.js';
 export { ServerConfig } from './server-config.js';

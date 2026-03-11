@@ -7,7 +7,7 @@ import {
 import { Response } from '../src/response.js';
 
 class NotFoundHandler extends ExceptionHandler {
-  handle(error: unknown): Response | undefined {
+  handle(error: unknown): Response<unknown> | undefined {
     if (error instanceof Error && error.message === 'not found') {
       return Response.status(404, { message: 'Not found' });
     }
@@ -16,7 +16,7 @@ class NotFoundHandler extends ExceptionHandler {
 }
 
 class ValidationHandler extends ExceptionHandler {
-  handle(error: unknown): Response | undefined {
+  handle(error: unknown): Response<unknown> | undefined {
     if (error instanceof Error && error.message.startsWith('validation:')) {
       return Response.status(400, { message: error.message });
     }

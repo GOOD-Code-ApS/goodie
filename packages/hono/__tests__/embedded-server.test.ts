@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HonoEmbeddedServer } from '../src/embedded-server.js';
+import { EmbeddedServer } from '../src/embedded-server.js';
 import type { ServerConfig } from '../src/server-config.js';
 
 function makeConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
@@ -16,8 +16,8 @@ const fakeApp = { fetch: vi.fn() } as any;
 describe('EmbeddedServer', () => {
   describe('app getter', () => {
     it('throws before listen() is called', () => {
-      const server = new HonoEmbeddedServer(makeConfig());
-      expect(() => server.app).toThrow(/Call start\(\) first/);
+      const server = new EmbeddedServer(makeConfig());
+      expect(() => server.app).toThrow(/Call listen\(app\) first/);
     });
   });
 
@@ -30,9 +30,7 @@ describe('EmbeddedServer', () => {
         serve: vi.fn(() => fakeServer),
       }));
 
-      const { HonoEmbeddedServer: ES } = await import(
-        '../src/embedded-server.js'
-      );
+      const { EmbeddedServer: ES } = await import('../src/embedded-server.js');
       const server = new ES(makeConfig({ runtime: 'node' }));
       await server.listen(fakeApp);
 
@@ -65,7 +63,7 @@ describe('EmbeddedServer', () => {
       const serveFn = vi.fn(() => ({ stop: stopFn }));
       (globalThis as any).Bun = { serve: serveFn };
 
-      const server = new HonoEmbeddedServer(
+      const server = new EmbeddedServer(
         makeConfig({ runtime: 'bun', port: 4000, host: '0.0.0.0' }),
       );
       await server.listen(fakeApp);
@@ -83,7 +81,7 @@ describe('EmbeddedServer', () => {
     it('throws when Bun.serve is not available', async () => {
       delete (globalThis as any).Bun;
 
-      const server = new HonoEmbeddedServer(makeConfig({ runtime: 'bun' }));
+      const server = new EmbeddedServer(makeConfig({ runtime: 'bun' }));
       await expect(server.listen(fakeApp)).rejects.toThrow(
         /Bun\.serve is not available/,
       );
@@ -110,7 +108,7 @@ describe('EmbeddedServer', () => {
       const serveFn = vi.fn(() => ({ shutdown: shutdownFn }));
       (globalThis as any).Deno = { serve: serveFn };
 
-      const server = new HonoEmbeddedServer(
+      const server = new EmbeddedServer(
         makeConfig({ runtime: 'deno', port: 5000, host: '127.0.0.1' }),
       );
       await server.listen(fakeApp);
@@ -127,7 +125,7 @@ describe('EmbeddedServer', () => {
     it('throws when Deno.serve is not available', async () => {
       delete (globalThis as any).Deno;
 
-      const server = new HonoEmbeddedServer(makeConfig({ runtime: 'deno' }));
+      const server = new EmbeddedServer(makeConfig({ runtime: 'deno' }));
       await expect(server.listen(fakeApp)).rejects.toThrow(
         /Deno\.serve is not available/,
       );
@@ -136,7 +134,7 @@ describe('EmbeddedServer', () => {
 
   describe('unsupported runtime', () => {
     it('throws for unknown runtime', async () => {
-      const server = new HonoEmbeddedServer(
+      const server = new EmbeddedServer(
         makeConfig({ runtime: 'unknown' as any }),
       );
       await expect(server.listen(fakeApp)).rejects.toThrow(
@@ -147,7 +145,7 @@ describe('EmbeddedServer', () => {
 
   describe('stop()', () => {
     it('is a no-op when listen() was never called', async () => {
-      const server = new HonoEmbeddedServer(makeConfig());
+      const server = new EmbeddedServer(makeConfig());
       await expect(server.stop()).resolves.toBeUndefined();
     });
   });
