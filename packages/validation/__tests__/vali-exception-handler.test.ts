@@ -1,15 +1,15 @@
 import { Response } from '@goodie-ts/http';
 import * as v from 'valibot';
 import { describe, expect, it } from 'vitest';
-import { ValiValidationErrorMapper } from '../src/vali-validation-error-mapper.js';
+import { ValiExceptionHandler } from '../src/vali-exception-handler.js';
 
-function createMapper(): ValiValidationErrorMapper {
-  return new (ValiValidationErrorMapper as any)();
+function createHandler(): ValiExceptionHandler {
+  return new (ValiExceptionHandler as any)();
 }
 
-describe('ValiValidationErrorMapper', () => {
+describe('ValiExceptionHandler', () => {
   it('maps ValiError to 400 response with error details', () => {
-    const mapper = createMapper();
+    const handler = createHandler();
     const schema = v.object({
       title: v.pipe(v.string(), v.minLength(1)),
     });
@@ -21,7 +21,7 @@ describe('ValiValidationErrorMapper', () => {
       error = e;
     }
 
-    const result = mapper.tryMap(error);
+    const result = handler.handle(error);
     expect(result).toBeDefined();
     expect(result).toBeInstanceOf(Response);
     expect(result!.status).toBe(400);
@@ -35,15 +35,15 @@ describe('ValiValidationErrorMapper', () => {
   });
 
   it('returns undefined for non-ValiError', () => {
-    const mapper = createMapper();
+    const handler = createHandler();
 
-    expect(mapper.tryMap(new Error('something'))).toBeUndefined();
-    expect(mapper.tryMap('string')).toBeUndefined();
-    expect(mapper.tryMap(null)).toBeUndefined();
+    expect(handler.handle(new Error('something'))).toBeUndefined();
+    expect(handler.handle('string')).toBeUndefined();
+    expect(handler.handle(null)).toBeUndefined();
   });
 
   it('handles nested path errors', () => {
-    const mapper = createMapper();
+    const handler = createHandler();
     const schema = v.object({
       address: v.object({
         city: v.pipe(v.string(), v.minLength(1)),
@@ -57,7 +57,7 @@ describe('ValiValidationErrorMapper', () => {
       error = e;
     }
 
-    const result = mapper.tryMap(error);
+    const result = handler.handle(error);
     expect(result).toBeDefined();
 
     const body = result!.body as {
@@ -67,7 +67,7 @@ describe('ValiValidationErrorMapper', () => {
   });
 
   it('handles multiple validation errors', () => {
-    const mapper = createMapper();
+    const handler = createHandler();
     const schema = v.object({
       name: v.string(),
       age: v.number(),
@@ -80,7 +80,7 @@ describe('ValiValidationErrorMapper', () => {
       error = e;
     }
 
-    const result = mapper.tryMap(error);
+    const result = handler.handle(error);
     expect(result).toBeDefined();
 
     const body = result!.body as {

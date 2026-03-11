@@ -3,9 +3,9 @@ export { EmbeddedServer } from './embedded-server.js';
 export {
   buildRequest,
   corsMiddleware,
-  handleError,
-  handleResult,
   requestScopeMiddleware,
+  toHonoErrorResponse,
+  toHonoResponse,
 } from './router-helpers.js';
 export type { CorsConfig, ServerRuntime } from './server-config.js';
 export { ServerConfig } from './server-config.js';

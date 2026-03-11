@@ -72,7 +72,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain("import { Hono } from 'hono'");
     expect(result.code).toContain("import { hc } from 'hono/client'");
     expect(result.code).toContain('EmbeddedServer');
-    expect(result.code).toContain('handleResult');
+    expect(result.code).toContain('toHonoResponse');
     expect(result.code).toContain("from '@goodie-ts/hono'");
   });
 
@@ -157,7 +157,7 @@ describe('Hono Plugin Codegen', () => {
     expect(result.code).toContain(".route('/api/todos'");
   });
 
-  it('always wraps route handlers in try/catch with error mapper', () => {
+  it('always wraps route handlers in try/catch with exception handlers', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -171,20 +171,21 @@ describe('Hono Plugin Codegen', () => {
 
     expect(result.code).toContain('try {');
     expect(result.code).toContain('} catch (e) {');
-    expect(result.code).toContain(
-      'if (__errorMapper) return handleError(c, e, __errorMapper)',
-    );
+    expect(result.code).toContain('handleException(e, __exceptionHandlers)');
     expect(result.code).toContain('throw e');
     expect(result.code).toContain(
-      'const __errorMapper = ctx.getAll(ValidationErrorMapper)[0]',
+      'const __exceptionHandlers = ctx.getAll(ExceptionHandler)',
     );
     expect(result.code).toContain(
-      "import { ValidationErrorMapper } from '@goodie-ts/http'",
+      "import { ExceptionHandler, MappedException, handleException } from '@goodie-ts/http'",
     );
-    expect(result.code).toContain('handleError');
+    // MappedException caught in onError handler (chained on the router)
+    expect(result.code).toContain('.onError(');
+    expect(result.code).toContain('MappedException');
+    expect(result.code).toContain('toHonoErrorResponse(c, e.response)');
   });
 
-  it('uses handleResult helper for route handlers', () => {
+  it('uses toHonoResponse helper for route handlers', () => {
     const result = createProject({
       '/src/Ctrl.ts': `
         import { Controller, Get } from './decorators.js'
@@ -196,7 +197,7 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    expect(result.code).toContain('handleResult(c, await ctrl.getData())');
+    expect(result.code).toContain('toHonoResponse(c, await ctrl.getData())');
   });
 
   it('generates buildRequest for routes with Request<T> parameter', () => {
@@ -430,7 +431,7 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     expect(result.code).toContain(
-      'function __createCtrlRoutes(ctrl: Ctrl, __errorMapper: ValidationErrorMapper | undefined)',
+      'function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])',
     );
     expect(result.code).toContain(".get('/items'");
     expect(result.code).toContain(".post('/items'");
@@ -513,7 +514,7 @@ describe('Hono Plugin — RPC Client', () => {
     });
 
     expect(result.code).toContain(
-      'function __createRootControllerRoutes(rootController: RootController, __errorMapper: ValidationErrorMapper | undefined)',
+      'function __createRootControllerRoutes(rootController: RootController, __exceptionHandlers: ExceptionHandler[])',
     );
     expect(result.code).toContain(".route('/'");
     expect(result.code).toContain(".get('/health'");
@@ -521,6 +522,97 @@ describe('Hono Plugin — RPC Client', () => {
     expect(result.code).toContain('export type RootControllerRoutes =');
     expect(result.code).toContain(
       'export function createRootControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
+    );
+  });
+});
+
+describe('Hono Plugin — RPC type preservation', () => {
+  it('chains createRouter from new Hono() so TypeScript infers route types', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/items')
+          list() {}
+          @Post('/items')
+          create() {}
+        }
+      `,
+    });
+
+    // createRouter must assign the full chain to __router:
+    //   const __router = new Hono()
+    //     .onError(...)
+    //     .route(...)
+    // NOT: const __router = new Hono(); __router.route(...)
+    // The latter loses route types because TypeScript doesn't track mutations.
+    expect(result.code).toMatch(
+      /const __router = new Hono\(\)\s*\n\s*\.onError/,
+    );
+  });
+
+  it('catch block only throws, never returns — prevents polluting route return types', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    // The catch block must NOT return a response (which would add to the
+    // handler's return type union and erase TypedResponse<T> for RPC).
+    // It should only: 1) call handleException (which throws MappedException) 2) throw e
+    const catchBlock = result.code.match(/} catch \(e\) \{([\s\S]*?)}/)?.[1];
+    expect(catchBlock).toBeDefined();
+    expect(catchBlock).toContain('handleException(e, __exceptionHandlers)');
+    expect(catchBlock).toContain('throw e');
+    expect(catchBlock).not.toContain('return');
+  });
+
+  it('registers onError handler for MappedException on the router chain', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get } from './decorators.js'
+        @Controller('/api')
+        class Ctrl {
+          @Get('/data')
+          getData() {}
+        }
+      `,
+    });
+
+    // onError must be part of the chain (not a separate statement)
+    // to preserve route types
+    expect(result.code).toContain('.onError(');
+    expect(result.code).toContain('e instanceof MappedException');
+    expect(result.code).toContain('toHonoErrorResponse(c, e.response)');
+  });
+
+  it('preserves route types with CORS middleware in the chain', () => {
+    const result = createProject(
+      {
+        '/src/Ctrl.ts': `
+          import { Controller, Get } from './decorators.js'
+          @Controller('/api')
+          class Ctrl {
+            @Get('/data')
+            getData() {}
+          }
+        `,
+      },
+      '/out/AppContext.generated.ts',
+      [httpPlugin, honoPlugin],
+      { 'server.cors.origin': '*' },
+    );
+
+    // CORS middleware must be in the chain, not a separate statement
+    expect(result.code).toMatch(
+      /const __router = new Hono\(\)\s*\n\s*\.onError[\s\S]*?\.use\('\*', corsMiddleware/,
     );
   });
 });

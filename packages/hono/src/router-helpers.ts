@@ -2,7 +2,6 @@ import { RequestScopeManager } from '@goodie-ts/core';
 import {
   Request as HttpRequest,
   Response as HttpResponse,
-  type ValidationErrorMapper,
 } from '@goodie-ts/http';
 import type { Context, Next, TypedResponse } from 'hono';
 import { cors } from 'hono/cors';
@@ -31,13 +30,19 @@ export async function buildRequest<T>(
   });
 }
 
-/** Convert a controller method's return value to a Hono Response. */
-export function handleResult<T extends HttpResponse<any>>(
+/**
+ * Translate a `Response<T>` from `@goodie-ts/http` to a Hono TypedResponse.
+ *
+ * Uses a conditional type so union returns like `Response<A> | Response<B>`
+ * distribute correctly. Specifies `'json'` format for Hono RPC inference.
+ */
+export function toHonoResponse<T extends HttpResponse<any>>(
   c: Context,
   result: T,
-): T extends HttpResponse<infer U> ? TypedResponse<U, StatusCode> : never;
-export function handleResult(c: Context, result: unknown): Response;
-export function handleResult(
+): T extends HttpResponse<infer U>
+  ? TypedResponse<U, StatusCode, 'json'>
+  : never;
+export function toHonoResponse(
   c: Context,
   result: unknown,
 ): Response | TypedResponse {
@@ -62,6 +67,23 @@ export function handleResult(
   return c.json(result as object);
 }
 
+/**
+ * Translate a `Response<T>` from the exception handling pipeline to a
+ * Hono Response. Returns native `Response` (not `TypedResponse<T>`) to
+ * avoid polluting Hono's RPC type inference on the happy path.
+ */
+export function toHonoErrorResponse(
+  c: Context,
+  result: HttpResponse<unknown>,
+): Response {
+  for (const [key, value] of Object.entries(result.headers)) {
+    c.header(key, value as string);
+  }
+  if (result.body === undefined)
+    return c.body(null, result.status as StatusCode);
+  return c.json(result.body as object, result.status as ContentfulStatusCode);
+}
+
 /** Create CORS middleware. */
 export function corsMiddleware(options?: Record<string, unknown>) {
   // Cast needed: hono/cors does not export CORSOptions type.
@@ -73,25 +95,4 @@ export function requestScopeMiddleware() {
   return async (c: Context, next: Next) => {
     await RequestScopeManager.run(next, c.env as Record<string, unknown>);
   };
-}
-
-/**
- * Handle errors in route handlers. If a `ValidationErrorMapper` is provided,
- * tries to map the error to a validation response (400). Otherwise re-throws.
- */
-export function handleError(
-  c: Context,
-  error: unknown,
-  errorMapper: ValidationErrorMapper,
-): Response {
-  const mapped = errorMapper.tryMap(error);
-  if (mapped) {
-    for (const [key, value] of Object.entries(mapped.headers)) {
-      c.header(key, value as string);
-    }
-    if (mapped.body === undefined)
-      return c.body(null, mapped.status as StatusCode);
-    return c.json(mapped.body as object, mapped.status as ContentfulStatusCode);
-  }
-  throw error;
 }

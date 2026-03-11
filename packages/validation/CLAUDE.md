@@ -8,7 +8,7 @@ Valibot-based validation from compile-time introspection metadata for goodie-ts.
 |------|------|
 | `src/vali-schema-factory.ts` | `ValiSchemaFactory` — builds Valibot schemas from `TypeMetadata` in `MetadataRegistry`, caches per type |
 | `src/validation-interceptor.ts` | `ValidationInterceptor` — AOP interceptor, reads `paramTypes` from `ctx.metadata`, validates via `ValiSchemaFactory` |
-| `src/vali-validation-error-mapper.ts` | `ValiValidationErrorMapper` — extends `ValidationErrorMapper` from http, catches `ValiError` -> 400 |
+| `src/vali-exception-handler.ts` | `ValiExceptionHandler` — extends `ExceptionHandler` from http, catches `ValiError` -> 400 |
 | `src/decorators/constraints.ts` | Constraint decorators: `@MinLength`, `@MaxLength`, `@Min`, `@Max`, `@Pattern`, `@NotBlank`, `@Email`, `@Size` |
 | `src/decorators/create-constraint.ts` | `createConstraint()` — define custom constraint decorators with runtime validator |
 | `src/decorators/validated.ts` | `@Validated` — AOP decorator via `createAopDecorator`, wires `ValidationInterceptor` |
@@ -18,7 +18,7 @@ Valibot-based validation from compile-time introspection metadata for goodie-ts.
 1. **Build time**: Constraint decorators are no-ops. The introspection plugin scans them as generic `DecoratorMeta { name, args }` on `@Introspected` fields.
 2. **Startup**: `ValiSchemaFactory` reads `MetadataRegistry.INSTANCE`, recursively maps `FieldType` tree + constraint metadata to Valibot schemas. Schemas cached per constructor.
 3. **Runtime**: `ValidationInterceptor` reads `paramTypes` from AOP metadata, looks up schemas, calls `v.parse()`. For `Request<T>` params, validates `request.body`.
-4. **Error boundary**: `ValiValidationErrorMapper` catches `ValiError` and returns `Response.status(400, { errors })`.
+4. **Error boundary**: `ValiExceptionHandler` catches `ValiError` and returns `Response.status(400, { errors })`.
 
 ## Schema Building
 
@@ -38,7 +38,7 @@ Constraints applied via `v.pipe(schema, ...actions)`.
 3 singleton beans:
 - **ValiSchemaFactory** — schema builder + cache
 - **ValidationInterceptor** — AOP interceptor, depends on ValiSchemaFactory
-- **ValiValidationErrorMapper** — extends ValidationErrorMapper (from http)
+- **ValiExceptionHandler** — extends ExceptionHandler (from http)
 
 ## Design Decisions
 
@@ -46,4 +46,4 @@ Constraints applied via `v.pipe(schema, ...actions)`.
 - **Schemas built from introspection, not codegen** — `ValiSchemaFactory` reads `MetadataRegistry` at runtime. No Valibot imports in generated code.
 - **Non-introspected references are `v.unknown()`** — validation is opt-in. Missing `@Introspected` on a referenced type means that field isn't validated, not an error.
 - **`@Validated` at class and method level** — class-level validates all methods. Method-level for fine-grained control.
-- **Error mapper lives here, not in the adapter** — follows Micronaut's pattern. Hono adapter always generates try/catch and delegates to `ValidationErrorMapper` if one exists.
+- **Exception handler lives here, not in the adapter** — follows Micronaut's pattern. The generic exception handling pipeline in `@goodie-ts/http` iterates all `ExceptionHandler` beans. `ValiExceptionHandler` is one of potentially many.
