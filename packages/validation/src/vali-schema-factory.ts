@@ -105,12 +105,17 @@ export class ValiSchemaFactory {
   }
 
   private referenceToVali(className: string): GenericSchema {
-    // Look up by className in registry
+    // Look up by className in registry — warn if duplicates found
     const allMetadata = MetadataRegistry.INSTANCE.getAll();
-    const metadata = allMetadata.find((m) => m.className === className);
-    if (!metadata) return v.unknown() as GenericSchema;
+    const matches = allMetadata.filter((m) => m.className === className);
+    if (matches.length === 0) return v.unknown() as GenericSchema;
+    if (matches.length > 1) {
+      console.warn(
+        `[validation] Multiple @Introspected classes named '${className}' found. Using first match. Consider renaming to avoid ambiguity.`,
+      );
+    }
 
-    return this.getSchema(metadata.type) ?? (v.unknown() as GenericSchema);
+    return this.getSchema(matches[0].type) ?? (v.unknown() as GenericSchema);
   }
 
   private unionToVali(members: FieldType[]): GenericSchema {
@@ -159,7 +164,9 @@ export class ValiSchemaFactory {
       case 'Pattern':
         return [v.regex(new RegExp(val as string))];
       case 'NotBlank':
-        return [v.minLength(1)];
+        return [
+          v.check((s: string) => s.trim().length > 0, 'Must not be blank'),
+        ];
       case 'Email':
         return [v.email()];
       case 'Size': {

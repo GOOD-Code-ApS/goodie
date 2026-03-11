@@ -11,8 +11,8 @@ import type { ValiSchemaFactory } from './vali-schema-factory.js';
  * param type that has an introspection schema, validates the corresponding
  * argument via `v.parse()`.
  *
- * For `Request<T>` parameters, validates `request.body` against the
- * schema for `T` (the type arg).
+ * Uses `paramIndex` to locate the correct argument in the method's arg list,
+ * since the body parameter may not be at index 0 (e.g. `update(id: string, body: Dto)`).
  */
 @Singleton()
 export class ValidationInterceptor implements MethodInterceptor {
@@ -22,31 +22,22 @@ export class ValidationInterceptor implements MethodInterceptor {
     const target = ctx.target as {
       constructor: new (...args: any[]) => unknown;
     };
-    const paramTypes = MetadataRegistry.INSTANCE.getMethodParams(
+    const methodMeta = MetadataRegistry.INSTANCE.getMethodParams(
       target.constructor,
       ctx.methodName,
     );
 
-    if (paramTypes) {
+    if (methodMeta) {
+      const { paramTypes, paramIndex } = methodMeta;
       for (let i = 0; i < paramTypes.length; i++) {
         const paramType = paramTypes[i];
         const schema = this.schemaFactory.getSchema(paramType);
         if (!schema) continue;
 
-        const arg = ctx.args[i];
+        const arg = ctx.args[paramIndex + i];
         if (arg === undefined || arg === null) continue;
 
-        // If the argument has a `body` property (Request<T> pattern),
-        // validate the body against the schema for T
-        if (
-          typeof arg === 'object' &&
-          'body' in arg &&
-          arg.body !== undefined
-        ) {
-          v.parse(schema, arg.body);
-        } else {
-          v.parse(schema, arg);
-        }
+        v.parse(schema, arg);
       }
     }
 

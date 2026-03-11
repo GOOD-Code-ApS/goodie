@@ -125,8 +125,13 @@ export class MetadataRegistry {
   >();
 
   private readonly methodParams = new Map<
-    string,
-    Array<new (...args: any[]) => unknown>
+    new (
+      ...args: any[]
+    ) => unknown,
+    Map<
+      string,
+      { paramTypes: Array<new (...args: any[]) => unknown>; paramIndex: number }
+    >
   >();
 
   /** Register a TypeMetadata entry. */
@@ -158,8 +163,14 @@ export class MetadataRegistry {
     target: new (...args: any[]) => unknown,
     methodName: string,
     paramTypes: Array<new (...args: any[]) => unknown>,
+    paramIndex = 0,
   ): void {
-    this.methodParams.set(`${target.name}:${methodName}`, paramTypes);
+    let methods = this.methodParams.get(target);
+    if (!methods) {
+      methods = new Map();
+      this.methodParams.set(target, methods);
+    }
+    methods.set(methodName, { paramTypes, paramIndex });
   }
 
   /**
@@ -169,8 +180,13 @@ export class MetadataRegistry {
   getMethodParams(
     target: new (...args: any[]) => unknown,
     methodName: string,
-  ): Array<new (...args: any[]) => unknown> | undefined {
-    return this.methodParams.get(`${target.name}:${methodName}`);
+  ):
+    | {
+        paramTypes: Array<new (...args: any[]) => unknown>;
+        paramIndex: number;
+      }
+    | undefined {
+    return this.methodParams.get(target)?.get(methodName);
   }
 
   /** Reset the registry. For testing only. */

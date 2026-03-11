@@ -19,16 +19,21 @@ interface ValidatedMethodParam {
   bodyTypeClassName: string;
   /** Absolute file path of the body type class. */
   bodyTypeFilePath: string;
+  /** Index of the body parameter in the method's argument list. */
+  paramIndex: number;
 }
 
 /**
  * Validation transformer plugin.
  *
- * Scans `@Validated` methods for `Request<T>` parameters and generates
+ * Scans `@Validated` methods for body parameters and generates
  * `MetadataRegistry.INSTANCE.registerMethodParams(...)` calls so that
  * `ValidationInterceptor` knows which types to validate at runtime.
  *
- * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
+ * Detects direct body parameters (Micronaut-style) — uses the parameter's
+ * class type and tracks its position in the argument list.
+ *
+ * Auto-discovered via `"goodie": { "plugin\": \"dist/plugin.js\" }` in package.json.
  */
 export default function createValidationPlugin(): TransformerPlugin {
   const validatedMethods: ValidatedMethodParam[] = [];
@@ -43,28 +48,36 @@ export default function createValidationPlugin(): TransformerPlugin {
       const params = ctx.methodDeclaration.getParameters();
       if (params.length === 0) return;
 
-      const firstParam = params[0];
-      const paramType = firstParam.getType();
-      const typeArgs = paramType.getTypeArguments();
-      if (typeArgs.length === 0) return;
+      // Find a non-primitive class parameter (body param)
+      for (let i = 0; i < params.length; i++) {
+        const param = params[i];
+        const paramType = param.getType();
+        const paramTypeName =
+          param.getTypeNode()?.getText() ?? paramType.getText();
 
-      // Extract the body type T from Request<T>
-      const bodyType = typeArgs[0];
-      const symbol = bodyType.getSymbol() ?? bodyType.getAliasSymbol();
-      if (!symbol) return;
+        // Skip primitives, primitive arrays, and HttpContext
+        if (['string', 'number', 'boolean'].includes(paramTypeName)) continue;
+        if (['string[]', 'number[]', 'boolean[]'].includes(paramTypeName))
+          continue;
+        if (paramTypeName === 'HttpContext') continue;
 
-      const declarations = symbol.getDeclarations();
-      if (declarations.length === 0) return;
-
-      const sourceFile = declarations[0].getSourceFile();
-
-      validatedMethods.push({
-        beanClassName: ctx.className,
-        beanFilePath: ctx.filePath,
-        methodName: ctx.methodName,
-        bodyTypeClassName: symbol.getName(),
-        bodyTypeFilePath: sourceFile.getFilePath(),
-      });
+        // This is a class-typed param → body parameter
+        const symbol = paramType.getSymbol() ?? paramType.getAliasSymbol();
+        if (symbol) {
+          const declarations = symbol.getDeclarations();
+          if (declarations.length > 0) {
+            validatedMethods.push({
+              beanClassName: ctx.className,
+              beanFilePath: ctx.filePath,
+              methodName: ctx.methodName,
+              bodyTypeClassName: symbol.getName(),
+              bodyTypeFilePath: declarations[0].getSourceFile().getFilePath(),
+              paramIndex: i,
+            });
+            return;
+          }
+        }
+      }
     },
 
     codegen(_beans: IRBeanDefinition[]): CodegenContribution {
@@ -105,7 +118,7 @@ export default function createValidationPlugin(): TransformerPlugin {
 
       for (const m of methodMap.values()) {
         code.push(
-          `MetadataRegistry.INSTANCE.registerMethodParams(${m.beanClassName}, '${m.methodName}', [${m.bodyTypeClassName}])`,
+          `MetadataRegistry.INSTANCE.registerMethodParams(${m.beanClassName}, '${m.methodName}', [${m.bodyTypeClassName}], ${m.paramIndex})`,
         );
       }
 

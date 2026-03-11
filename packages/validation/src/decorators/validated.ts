@@ -10,6 +10,11 @@ import type { ValidationInterceptor } from '../validation-interceptor.js';
  * The transformer wires `ValidationInterceptor` with `paramTypes`
  * metadata — the interceptor looks up schemas at runtime via
  * `ValiSchemaFactory`.
+ *
+ * Order `-90` ensures validation runs early in the interceptor chain,
+ * before business logic interceptors like `@Log` (0), `@Cacheable` (0),
+ * `@Retryable` (10), etc. Invalid input is rejected before any
+ * side-effecting interceptors execute.
  */
 export const Validated = createAopDecorator<{
   interceptor: ValidationInterceptor;

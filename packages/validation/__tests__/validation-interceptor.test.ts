@@ -1,6 +1,5 @@
 import type { InvocationContext } from '@goodie-ts/core';
 import { MetadataRegistry } from '@goodie-ts/core';
-import { Request } from '@goodie-ts/http';
 import { ValiError } from 'valibot';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ValiSchemaFactory } from '../src/vali-schema-factory.js';
@@ -27,12 +26,14 @@ function createContext(
   args: unknown[],
   paramTypes?: Array<new (...a: any[]) => unknown>,
   proceedResult: unknown = 'ok',
+  paramIndex = 0,
 ): InvocationContext {
   if (paramTypes) {
     MetadataRegistry.INSTANCE.registerMethodParams(
       TestController,
       'testMethod',
       paramTypes,
+      paramIndex,
     );
   }
   return {
@@ -92,32 +93,6 @@ describe('ValidationInterceptor', () => {
     expect(() => interceptor.intercept(invalidCtx)).toThrow(ValiError);
   });
 
-  it('validates Request<T>.body against introspection schema for T', () => {
-    MetadataRegistry.INSTANCE.register({
-      type: TodoRequest,
-      className: 'TodoRequest',
-      fields: [
-        {
-          name: 'title',
-          type: { kind: 'primitive', type: 'string' },
-          decorators: [{ name: 'MinLength', args: { value: 1 } }],
-        },
-      ],
-    });
-
-    const interceptor = createInterceptor();
-
-    // Valid Request<T>
-    const validReq = new Request({ body: { title: 'hello' } });
-    const validCtx = createContext([validReq], [TodoRequest]);
-    expect(interceptor.intercept(validCtx)).toBe('ok');
-
-    // Invalid Request<T> — empty title
-    const invalidReq = new Request({ body: { title: '' } });
-    const invalidCtx = createContext([invalidReq], [TodoRequest]);
-    expect(() => interceptor.intercept(invalidCtx)).toThrow(ValiError);
-  });
-
   it('skips null/undefined args', () => {
     MetadataRegistry.INSTANCE.register({
       type: TodoRequest,
@@ -135,6 +110,54 @@ describe('ValidationInterceptor', () => {
     const ctx = createContext([undefined], [TodoRequest]);
 
     expect(interceptor.intercept(ctx)).toBe('ok');
+  });
+
+  it('validates at correct paramIndex when body is not first arg', () => {
+    MetadataRegistry.INSTANCE.register({
+      type: TodoRequest,
+      className: 'TodoRequest',
+      fields: [
+        {
+          name: 'title',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'MinLength', args: { value: 1 } }],
+        },
+      ],
+    });
+
+    const interceptor = createInterceptor();
+
+    // Valid — body at args[1] has valid title, paramIndex=1
+    const validCtx = createContext(
+      ['some-id', { title: 'hello' }],
+      [TodoRequest],
+      'ok',
+      1,
+    );
+    expect(interceptor.intercept(validCtx)).toBe('ok');
+
+    // Reset and re-register for the invalid test
+    MetadataRegistry.INSTANCE.reset();
+    MetadataRegistry.INSTANCE.register({
+      type: TodoRequest,
+      className: 'TodoRequest',
+      fields: [
+        {
+          name: 'title',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'MinLength', args: { value: 1 } }],
+        },
+      ],
+    });
+
+    // Invalid — body at args[1] has empty title, paramIndex=1
+    const invalidCtx = createContext(
+      ['some-id', { title: '' }],
+      [TodoRequest],
+      'ok',
+      1,
+    );
+    expect(() => interceptor.intercept(invalidCtx)).toThrow(ValiError);
   });
 
   it('calls proceed after successful validation', () => {

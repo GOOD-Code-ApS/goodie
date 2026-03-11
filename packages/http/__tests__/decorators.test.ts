@@ -1,4 +1,12 @@
-import { Controller, Delete, Get, Patch, Post, Put } from '@goodie-ts/http';
+import {
+  Controller,
+  Delete,
+  Get,
+  Patch,
+  Post,
+  Put,
+  Status,
+} from '@goodie-ts/http';
 import { describe, expect, it } from 'vitest';
 
 describe('@Controller()', () => {
@@ -59,6 +67,16 @@ describe('route decorators', () => {
       class _TestController {
         @Patch('/:id')
         update() {}
+      }
+    }).not.toThrow();
+  });
+
+  it('@Status is a no-op at runtime', () => {
+    expect(() => {
+      class _TestController {
+        @Status(201)
+        @Post('/')
+        create() {}
       }
     }).not.toThrow();
   });

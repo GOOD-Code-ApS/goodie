@@ -387,6 +387,68 @@ describe('ValiSchemaFactory', () => {
     expect(v.safeParse(schema, { name: 'ABC', age: 1 }).success).toBe(false);
   });
 
+  it('applies NotBlank constraint and rejects whitespace-only strings', () => {
+    MetadataRegistry.INSTANCE.register({
+      type: WithConstraints,
+      className: 'WithConstraints',
+      fields: [
+        {
+          name: 'title',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'NotBlank', args: {} }],
+        },
+        {
+          name: 'count',
+          type: { kind: 'primitive', type: 'number' },
+          decorators: [],
+        },
+      ],
+    });
+
+    const factory = createFactory();
+    const schema = factory.getSchema(WithConstraints)!;
+
+    expect(v.safeParse(schema, { title: 'hello', count: 1 }).success).toBe(
+      true,
+    );
+    expect(v.safeParse(schema, { title: '', count: 1 }).success).toBe(false);
+    expect(v.safeParse(schema, { title: '   ', count: 1 }).success).toBe(false);
+    expect(v.safeParse(schema, { title: ' \t\n ', count: 1 }).success).toBe(
+      false,
+    );
+  });
+
+  it('applies Size constraint (minLength + maxLength)', () => {
+    MetadataRegistry.INSTANCE.register({
+      type: WithConstraints,
+      className: 'WithConstraints',
+      fields: [
+        {
+          name: 'title',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'Size', args: { value: 2, value2: 5 } }],
+        },
+        {
+          name: 'count',
+          type: { kind: 'primitive', type: 'number' },
+          decorators: [],
+        },
+      ],
+    });
+
+    const factory = createFactory();
+    const schema = factory.getSchema(WithConstraints)!;
+
+    expect(v.safeParse(schema, { title: 'ab', count: 0 }).success).toBe(true);
+    expect(v.safeParse(schema, { title: 'abcde', count: 0 }).success).toBe(
+      true,
+    );
+    expect(v.safeParse(schema, { title: 'a', count: 0 }).success).toBe(false);
+    expect(v.safeParse(schema, { title: 'abcdef', count: 0 }).success).toBe(
+      false,
+    );
+  });
+
   it('applies multiple constraints on same field', () => {
     MetadataRegistry.INSTANCE.register({
       type: WithConstraints,
