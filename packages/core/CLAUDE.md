@@ -29,7 +29,7 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 - **`IntrospectedField`**: `{ name, type: FieldType, decorators: DecoratorMeta[] }` — field with recursive type tree and generic decorator metadata
 - **`FieldType`**: recursive union: `primitive | literal | array | reference | union | optional | nullable`
 - **`DecoratorMeta`**: `{ name, args }` — generic, decorator-agnostic. Consumers (validation, OpenAPI) interpret recognized decorators.
-- **`MetadataRegistry`**: runtime `Map`-based registry — `register()`, `get(type)`, `has(type)`, `getAll()`
+- **`MetadataRegistry`**: runtime `Map`-based registry — `register()`, `get(type)`, `has(type)`, `getAll()`, `registerMethodParams(target, methodName, types)`, `getMethodParams(target, methodName)`
 
 ## ApplicationContext API
 
