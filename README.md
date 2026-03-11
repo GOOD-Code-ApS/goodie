@@ -2,9 +2,23 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-A compile-time application framework for TypeScript. Decorators and code generation replace `reflect-metadata` — the dependency graph is resolved from definitions generated at build time, not runtime reflection.
+Build-time validated application framework for TypeScript — no reflection, no runtime scanning, errors before your app starts.
 
-HTTP routing, database integration, validation, caching, resilience patterns, and more — all following the same compile-time-first philosophy.
+The dependency graph is validated at build time by scanning your source with [ts-morph](https://github.com/dsherret/ts-morph). Missing dependencies, circular references, and typos are caught before the app runs — not at startup. No `reflect-metadata`, no `emitDecoratorMetadata`, no classpath scanning.
+
+HTTP routing, database integration, validation, caching, resilience patterns, and more — all following the same build-time-first philosophy.
+
+## Why goodie?
+
+| Framework | How deps are discovered | When wiring is validated | Reflection? |
+|-----------|------------------------|------------------------|-------------|
+| NestJS | `reflect-metadata` at runtime | App startup | Yes |
+| tsyringe | `reflect-metadata` at runtime | App startup | Yes |
+| inversify | `reflect-metadata` at runtime | App startup | Yes |
+| Awilix | Manual registration | App startup | No |
+| **goodie** | **ts-morph source scanning** | **Build time** | **No** |
+
+goodie is the only TypeScript DI framework that validates the dependency graph before your app runs **and** requires no runtime reflection. Missing beans, circular dependencies, and misspelled tokens are build errors with suggestions — not runtime crashes.
 
 ## Requirements
 

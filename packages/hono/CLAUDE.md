@@ -9,7 +9,7 @@ Hono adapter for goodie-ts. Thin I/O bridge between `@goodie-ts/http`'s generic 
 | `src/plugin.ts` | Transformer plugin — reads `metadata.httpController` from http plugin, generates `createRouter()`, `app.onStart()` hook, CORS from config, RPC clients |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
 | `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host`, `port`, `runtime`, `cors` |
-| `src/router-helpers.ts` | Runtime helpers (`toHonoResponse`, `toHonoErrorResponse`, `buildRequest`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
+| `src/router-helpers.ts` | Runtime helpers (`toHonoResponse`, `toHonoErrorResponse`, `buildHttpContext`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
 | `src/index.ts` | Public exports — adapter-specific beans and helpers only (no decorator re-exports) |
 
 ## Transformer Plugin (`src/plugin.ts`)
@@ -20,12 +20,16 @@ The plugin is codegen-only — no `visitClass`/`visitMethod` hooks. It reads rou
 
 - **`codegen`** — receives `CodegenContext` with build-time config. Generates per-controller route factories, `createRouter(ctx)`, `app.onStart()` hook (skipped for serverless runtimes like `cloudflare`), RPC types/clients, and CORS middleware from `server.cors.*` config.
 
-### Request/Response Adaptation
+### Parameter Binding & Response Adaptation
 
-Controller methods use `Request<T>` and `Response<T>` from `@goodie-ts/http`. The hono plugin generates adapter code:
+Controller methods use Micronaut-style parameter binding. The hono plugin generates per-param extraction code:
 
 - **No params** → `toHonoResponse(c, await ctrl.method())` — calls method with no args
-- **`Request<T>` param** → `toHonoResponse(c, await ctrl.method(await buildRequest(c, parseBody)))` — constructs `Request<T>` from Hono Context. `parseBody` is `true` for POST/PUT/PATCH, `false` otherwise.
+- **Path params** → `c.req.param('id')` with type coercion (`Number()` for numbers, `=== 'true'` for booleans)
+- **Query params** → `c.req.query('name')` for scalars, `c.req.queries('name')` for arrays
+- **Body params** → `await c.req.json()` (POST/PUT/PATCH only)
+- **`HttpContext` param** → `buildHttpContext(c)` — read-only request context (headers, cookies, etc.)
+- **`@Status(code)`** → passes `defaultStatus` to `toHonoResponse` for plain return values
 
 `toHonoResponse` uses generic overloads to preserve `TypedResponse<T>` for Hono's RPC type inference — the `hc` client gets full output types.
 
@@ -51,9 +55,9 @@ No config → no CORS middleware emitted. No `@Cors` decorator — CORS is a ser
 
 Generated code never calls Hono APIs directly. Instead it calls runtime helpers exported from `@goodie-ts/hono`:
 
-- `toHonoResponse(c, result)` — translates controller return values to Hono Response. Generic overloads preserve `TypedResponse<T>` for RPC inference.
+- `toHonoResponse(c, result, defaultStatus?)` — translates controller return values to Hono Response. Optional `defaultStatus` from `@Status` decorator. Generic overloads preserve `TypedResponse<T>` for RPC inference.
 - `toHonoErrorResponse(c, result)` — translates `Response<T>` from exception handling to native `Response`. Returns non-generic `Response` to avoid polluting Hono's RPC type inference.
-- `buildRequest(c, parseBody)` — constructs `Request<T>` from Hono Context
+- `buildHttpContext(c)` — constructs `HttpContext` from Hono Context (read-only: headers, cookies, query, params, url)
 - `corsMiddleware(options?)` — wraps `cors()` from hono/cors
 - `requestScopeMiddleware()` — wraps `RequestScopeManager.run()` from @goodie-ts/core
 
@@ -73,13 +77,14 @@ function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])
         try {
           return toHonoResponse(c, await ctrl.list())
         } catch (e) {
-          const __mapped = handleException(e, __exceptionHandlers)
-          if (__mapped) return toHonoErrorResponse(c, __mapped)
+          handleException(e, __exceptionHandlers)
           throw e
         }
       })
 }
 ```
+
+`handleException` throws `MappedException` if a handler matches — caught by `.onError()` on the router chain and translated via `toHonoErrorResponse`. This keeps the catch block throw-only, preserving RPC type inference.
 
 ## Library Beans (beans.json)
 

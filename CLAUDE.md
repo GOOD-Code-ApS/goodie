@@ -1,6 +1,6 @@
 # goodie-ts
 
-Compile-time dependency injection framework for TypeScript.
+Build-time validated application framework for TypeScript. No reflection, no runtime scanning — the dependency graph is validated at build time via ts-morph source scanning.
 
 ## Architecture
 
