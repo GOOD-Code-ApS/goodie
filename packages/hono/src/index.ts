@@ -1,7 +1,8 @@
+export { createHonoRouter } from './create-router.js';
 export { EmbeddedServer } from './embedded-server.js';
-// Runtime helpers for generated route wiring
+// Runtime helpers used by createHonoRouter
 export {
-  buildRequest,
+  buildHttpContext,
   corsMiddleware,
   requestScopeMiddleware,
   toHonoErrorResponse,

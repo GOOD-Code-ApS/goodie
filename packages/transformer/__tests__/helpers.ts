@@ -47,6 +47,26 @@ export function Introspected(opts?: any) { return (t: any, c: any) => {} }
 export function MinLength(value: number) { return (t: any, c: any) => {} }
 export function MaxLength(value: number) { return (t: any, c: any) => {} }
 export function Email() { return (t: any, c: any) => {} }
+export function Validated() { return (t: any, c: any) => {} }
+export function Status(code: number) { return (t: any, c: any) => {} }
+export class HttpContext {
+  readonly headers: any;
+  readonly query: any;
+  readonly params: Record<string, string>;
+  readonly url: string;
+  constructor(opts: any) { this.headers = opts.headers; this.query = opts.query; this.params = opts.params ?? {}; this.url = opts.url ?? ''; }
+  cookie(name: string): string | undefined { return undefined; }
+}
+export class Response<T> {
+  readonly status: number;
+  readonly body: T | undefined;
+  readonly headers: Record<string, string>;
+  private constructor(status: number, body: T | undefined, headers: Record<string, string>) { this.status = status; this.body = body; this.headers = headers; }
+  static ok<T>(body: T): Response<T> { return new Response(200, body, {}); }
+  static created<T>(body: T): Response<T> { return new Response(201, body, {}); }
+  static noContent(): Response<never> { return new Response(204, undefined, {}) as Response<never>; }
+  static status<T>(code: number, body?: T): Response<T> { return new Response(code, body, {}); }
+}
 `;
 
 /**

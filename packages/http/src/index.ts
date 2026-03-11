@@ -7,11 +7,14 @@ export {
   MappedException,
 } from './exception-handler.js';
 // Types
-export { Request } from './request.js';
+export { HttpContext } from './http-context.js';
 export { Response } from './response.js';
 export { Delete, Get, Patch, Post, Put } from './route.js';
 export type {
   ControllerMetadata,
   HttpMethod,
+  ParamBinding,
+  ParamMetadata,
   RouteMetadata,
 } from './route-metadata.js';
+export { Status } from './status.js';

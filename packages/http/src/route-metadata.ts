@@ -1,13 +1,32 @@
 /** HTTP method for a route. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
 
+/** How a controller method parameter is bound to the HTTP request. */
+export type ParamBinding = 'path' | 'query' | 'body' | 'context';
+
+/** Metadata for a single parameter on a route method. */
+export interface ParamMetadata {
+  /** Parameter name as declared in the method signature. */
+  name: string;
+  /** How this parameter is bound to the request. */
+  binding: ParamBinding;
+  /** TypeScript type text (e.g. 'string', 'number', 'CreateTodoDto'). */
+  typeName: string;
+  /** Whether the parameter is optional (has `?` or default value). */
+  optional: boolean;
+}
+
 /** Metadata for a single route method on a controller. */
 export interface RouteMetadata {
   methodName: string;
   httpMethod: HttpMethod;
   path: string;
-  /** Whether this method declares a Request<T> parameter. */
-  hasRequestParam: boolean;
+  /** Default response status code (from @Status decorator, defaults to 200). */
+  status: number;
+  /** Detailed parameter binding metadata for Micronaut-style param resolution. */
+  params: ParamMetadata[];
+  /** Return type text with Promise<T> and Response<T> unwrapped (e.g. 'Todo', 'Todo | null', 'void'). */
+  returnType: string;
 }
 
 /** Controller metadata stored on bean metadata by the http plugin. */
