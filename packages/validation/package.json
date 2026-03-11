@@ -21,6 +21,7 @@
     }
   },
   "goodie": {
+    "plugin": "dist/plugin.js",
     "beans": "dist/beans.json"
   },
   "scripts": {

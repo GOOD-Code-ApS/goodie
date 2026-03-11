@@ -134,44 +134,44 @@ export class ValiSchemaFactory {
     const actions: v.GenericValidation[] = [];
 
     for (const dec of decorators) {
-      const action = this.constraintToAction(dec);
-      if (action) actions.push(action);
+      const result = this.constraintToActions(dec);
+      if (result) actions.push(...result);
     }
 
     if (actions.length === 0) return schema;
     return v.pipe(schema, ...actions) as GenericSchema;
   }
 
-  private constraintToAction(
+  private constraintToActions(
     dec: DecoratorMeta,
-  ): v.GenericValidation | undefined {
+  ): v.GenericValidation[] | undefined {
     const val = dec.args.value;
 
     switch (dec.name) {
       case 'MinLength':
-        return v.minLength(val as number);
+        return [v.minLength(val as number)];
       case 'MaxLength':
-        return v.maxLength(val as number);
+        return [v.maxLength(val as number)];
       case 'Min':
-        return v.minValue(val as number);
+        return [v.minValue(val as number)];
       case 'Max':
-        return v.maxValue(val as number);
+        return [v.maxValue(val as number)];
       case 'Pattern':
-        return v.regex(new RegExp(val as string));
+        return [v.regex(new RegExp(val as string))];
       case 'NotBlank':
-        return v.minLength(1);
+        return [v.minLength(1)];
       case 'Email':
-        return v.email();
+        return [v.email()];
       case 'Size': {
         const min = val as number;
         const max = dec.args.value2 as number;
-        return v.length(min, max);
+        return [v.minLength(min), v.maxLength(max)];
       }
       default: {
         // Check custom constraint registry
         const validator = customConstraintRegistry.get(dec.name);
         if (validator) {
-          return v.check(validator, `Custom constraint '${dec.name}' failed`);
+          return [v.check(validator, `Custom constraint '${dec.name}' failed`)];
         }
         return undefined;
       }

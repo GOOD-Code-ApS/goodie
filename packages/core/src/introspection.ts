@@ -124,6 +124,11 @@ export class MetadataRegistry {
     TypeMetadata
   >();
 
+  private readonly methodParams = new Map<
+    string,
+    Array<new (...args: any[]) => unknown>
+  >();
+
   /** Register a TypeMetadata entry. */
   register(metadata: TypeMetadata): void {
     this.entries.set(metadata.type, metadata);
@@ -144,8 +149,33 @@ export class MetadataRegistry {
     return [...this.entries.values()];
   }
 
+  /**
+   * Register parameter types for a method.
+   * Generated code calls this so runtime consumers (validation, OpenAPI, etc.)
+   * can look up the introspected types of method parameters.
+   */
+  registerMethodParams(
+    target: new (...args: any[]) => unknown,
+    methodName: string,
+    paramTypes: Array<new (...args: any[]) => unknown>,
+  ): void {
+    this.methodParams.set(`${target.name}:${methodName}`, paramTypes);
+  }
+
+  /**
+   * Look up parameter types for a validated method.
+   * Returns undefined if not registered.
+   */
+  getMethodParams(
+    target: new (...args: any[]) => unknown,
+    methodName: string,
+  ): Array<new (...args: any[]) => unknown> | undefined {
+    return this.methodParams.get(`${target.name}:${methodName}`);
+  }
+
   /** Reset the registry. For testing only. */
   reset(): void {
     this.entries.clear();
+    this.methodParams.clear();
   }
 }

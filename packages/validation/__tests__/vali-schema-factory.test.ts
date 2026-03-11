@@ -1,4 +1,3 @@
-import type { TypeMetadata } from '@goodie-ts/core';
 import { MetadataRegistry } from '@goodie-ts/core';
 import * as v from 'valibot';
 import { afterEach, describe, expect, it } from 'vitest';

@@ -117,4 +117,78 @@ describe('Hono + PostgreSQL Todo API', () => {
     const body = await res.json();
     expect(body.error).toBe('Todo not found');
   });
+
+  // ── Validation tests ──
+
+  test('POST /api/todos returns 400 when title is empty', async ({ app }) => {
+    const res = await app.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '' }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.errors).toBeDefined();
+    expect(body.errors.length).toBeGreaterThan(0);
+  });
+
+  test('POST /api/todos returns 400 when title exceeds 255 characters', async ({
+    app,
+  }) => {
+    const longTitle = 'a'.repeat(256);
+
+    const res = await app.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: longTitle }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.errors).toBeDefined();
+    expect(body.errors.length).toBeGreaterThan(0);
+  });
+
+  test('POST /api/todos returns 400 when title is missing', async ({ app }) => {
+    const res = await app.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('PATCH /api/todos/:id returns 400 when title exceeds 255 characters', async ({
+    app,
+  }) => {
+    const created = await createTodo(app, 'Valid title');
+
+    const res = await app.request(`/api/todos/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'a'.repeat(256) }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.errors).toBeDefined();
+  });
+
+  test('POST /api/todos with valid title at exactly 255 chars succeeds', async ({
+    app,
+  }) => {
+    const maxTitle = 'a'.repeat(255);
+
+    const res = await app.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: maxTitle }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.title).toBe(maxTitle);
+  });
 });

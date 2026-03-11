@@ -7,6 +7,8 @@ import {
   type Request,
   Response,
 } from '@goodie-ts/http';
+import { Validated } from '@goodie-ts/validation';
+import type { CreateTodoDto, UpdateTodoDto } from './dto.js';
 import type { TodoService } from './TodoService.js';
 
 @Controller('/api/todos')
@@ -26,14 +28,16 @@ export class TodoController {
     return Response.ok(todo);
   }
 
+  @Validated()
   @Post('/')
-  async create(req: Request<{ title: string }>) {
+  async create(req: Request<CreateTodoDto>) {
     const todo = await this.todoService.create(req.body.title);
     return Response.created(todo);
   }
 
+  @Validated()
   @Patch('/:id')
-  async update(req: Request<{ title?: string; completed?: boolean }>) {
+  async update(req: Request<UpdateTodoDto>) {
     const todo = await this.todoService.update(req.params.id, req.body);
     if (!todo) return Response.status(404, { error: 'Todo not found' });
     return Response.ok(todo);

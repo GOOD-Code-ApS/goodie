@@ -10,6 +10,10 @@ class TodoRequest {
   title!: string;
 }
 
+class TestController {
+  testMethod() {}
+}
+
 afterEach(() => {
   MetadataRegistry.INSTANCE.reset();
 });
@@ -21,27 +25,34 @@ function createInterceptor(): ValidationInterceptor {
 
 function createContext(
   args: unknown[],
-  paramTypes: Array<new (...a: any[]) => unknown>,
+  paramTypes?: Array<new (...a: any[]) => unknown>,
   proceedResult: unknown = 'ok',
 ): InvocationContext {
+  if (paramTypes) {
+    MetadataRegistry.INSTANCE.registerMethodParams(
+      TestController,
+      'testMethod',
+      paramTypes,
+    );
+  }
   return {
-    className: 'TestClass',
+    className: 'TestController',
     methodName: 'testMethod',
     args,
-    target: {},
+    target: new TestController(),
     proceed: () => proceedResult,
-    metadata: { paramTypes },
+    metadata: {},
   };
 }
 
 describe('ValidationInterceptor', () => {
-  it('proceeds without validation when no paramTypes metadata', () => {
+  it('proceeds without validation when no paramTypes registered', () => {
     const interceptor = createInterceptor();
     const ctx: InvocationContext = {
-      className: 'TestClass',
+      className: 'TestController',
       methodName: 'testMethod',
       args: ['anything'],
-      target: {},
+      target: new TestController(),
       proceed: () => 'ok',
       metadata: undefined,
     };
@@ -139,18 +150,24 @@ describe('ValidationInterceptor', () => {
       ],
     });
 
+    MetadataRegistry.INSTANCE.registerMethodParams(
+      TestController,
+      'testMethod',
+      [TodoRequest],
+    );
+
     const interceptor = createInterceptor();
     let proceedCalled = false;
     const ctx: InvocationContext = {
-      className: 'TestClass',
+      className: 'TestController',
       methodName: 'testMethod',
       args: [{ title: 'hello' }],
-      target: {},
+      target: new TestController(),
       proceed: () => {
         proceedCalled = true;
         return 'result';
       },
-      metadata: { paramTypes: [TodoRequest] },
+      metadata: {},
     };
 
     expect(interceptor.intercept(ctx)).toBe('result');
@@ -170,18 +187,24 @@ describe('ValidationInterceptor', () => {
       ],
     });
 
+    MetadataRegistry.INSTANCE.registerMethodParams(
+      TestController,
+      'testMethod',
+      [TodoRequest],
+    );
+
     const interceptor = createInterceptor();
     let proceedCalled = false;
     const ctx: InvocationContext = {
-      className: 'TestClass',
+      className: 'TestController',
       methodName: 'testMethod',
       args: [{ title: '' }],
-      target: {},
+      target: new TestController(),
       proceed: () => {
         proceedCalled = true;
         return 'result';
       },
-      metadata: { paramTypes: [TodoRequest] },
+      metadata: {},
     };
 
     expect(() => interceptor.intercept(ctx)).toThrow(ValiError);
