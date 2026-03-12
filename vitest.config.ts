@@ -68,6 +68,10 @@ export default defineConfig({
         __dirname,
         'packages/management/src/index.ts',
       ),
+      '@goodie-ts/openapi': path.resolve(
+        __dirname,
+        'packages/openapi/src/index.ts',
+      ),
     },
   },
   test: {
