@@ -1,29 +1,32 @@
+import { Eager, PostConstruct, Singleton } from '@goodie-ts/core';
 import type { Migration as KyselyMigration } from 'kysely';
 import { Migrator } from 'kysely';
 import type { AbstractMigration } from './abstract-migration.js';
 import { getMigrationName } from './decorators/migration.js';
-import type { KyselyProvider } from './transaction-manager.js';
+import type { KyselyDatabase } from './kysely-database.js';
 
 /**
  * Runs Kysely migrations at application startup.
  *
- * Auto-wired by the Kysely transformer plugin as an eager singleton
- * with `@PostConstruct` on `migrate()`. Constructor receives the
- * KyselyProvider and all discovered @Migration instances.
+ * Library bean — eager singleton with `@PostConstruct migrate()`.
+ * Constructor receives `KyselyDatabase` and all `@Migration` instances
+ * via collection injection on `AbstractMigration`.
+ *
+ * Migrations are sorted by their `@Migration('name')` string and executed
+ * in lexicographic order via Kysely's `Migrator`.
  */
+@Singleton()
+@Eager()
 export class MigrationRunner {
-  private readonly kyselyProvider: KyselyProvider;
-  private readonly migrations: AbstractMigration[];
-
   constructor(
-    kyselyProvider: KyselyProvider,
-    ...migrations: AbstractMigration[]
-  ) {
-    this.kyselyProvider = kyselyProvider;
-    this.migrations = migrations;
-  }
+    private readonly kyselyDatabase: KyselyDatabase,
+    private readonly migrations: AbstractMigration[],
+  ) {}
 
+  @PostConstruct()
   async migrate(): Promise<void> {
+    if (this.migrations.length === 0) return;
+
     const migrationMap: Record<string, KyselyMigration> = {};
     for (const m of this.migrations) {
       const name = getMigrationName(m);
@@ -41,7 +44,7 @@ export class MigrationRunner {
     }
 
     const migrator = new Migrator({
-      db: this.kyselyProvider.kysely,
+      db: this.kyselyDatabase.kysely,
       provider: { getMigrations: async () => migrationMap },
     });
 

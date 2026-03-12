@@ -1,4 +1,5 @@
 import type { InvocationContext, MethodInterceptor } from '@goodie-ts/core';
+import { Singleton } from '@goodie-ts/core';
 import type { TransactionManager } from './transaction-manager.js';
 
 /** Metadata shape expected from the kysely transformer plugin. */
@@ -12,6 +13,7 @@ interface TransactionalMetadata {
  * Reads propagation strategy from `ctx.metadata` (set by the kysely
  * transformer plugin).
  */
+@Singleton()
 export class TransactionalInterceptor implements MethodInterceptor {
   constructor(private readonly transactionManager: TransactionManager) {}
 

@@ -133,7 +133,7 @@ describe('TransactionManager', () => {
       kysely: kysely as never,
       supportsReturning: true,
     };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider as any);
 
     const result = await tm.runInTransaction(async () => 'via provider');
     expect(result).toBe('via provider');
@@ -145,7 +145,7 @@ describe('TransactionManager', () => {
       kysely: kysely as never,
       supportsReturning: true,
     };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider as any);
 
     // getConnection() should return the raw kysely, not the provider wrapper
     expect(tm.getConnection()).toBe(kysely);
@@ -157,7 +157,7 @@ describe('TransactionManager', () => {
       kysely: kysely as never,
       supportsReturning: true,
     };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider as any);
 
     // Outside a transaction: provider.kysely returns the raw Kysely
     expect(provider.kysely).toBe(kysely);
@@ -186,7 +186,7 @@ describe('TransactionManager', () => {
       kysely: kysely as never,
       supportsReturning: true,
     };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider as any);
 
     expect(tm.supportsReturning).toBe(true);
   });
@@ -197,7 +197,7 @@ describe('TransactionManager', () => {
       kysely: kysely as never,
       supportsReturning: false,
     };
-    const tm = new TransactionManager(provider);
+    const tm = new TransactionManager(provider as any);
 
     expect(tm.supportsReturning).toBe(false);
   });

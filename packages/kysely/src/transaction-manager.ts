@@ -1,5 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { Singleton } from '@goodie-ts/core';
 import type { Kysely, Transaction } from 'kysely';
+import type { KyselyDatabase } from './kysely-database.js';
 
 /**
  * An object that exposes a `.kysely` property — e.g. KyselyDatabase or a custom wrapper.
@@ -16,41 +18,39 @@ export interface KyselyProvider {
  * Provides transaction propagation across async call chains without
  * explicitly threading a transaction object through every method.
  *
- * When auto-wired via `createKyselyPlugin()`, the constructor receives
- * the KyselyDatabase bean and reads its `.kysely` and `.supportsReturning` properties.
+ * Library bean — constructor receives the `KyselyDatabase` bean
+ * and reads its `.kysely` and `.supportsReturning` properties.
+ * For tests, call `new TransactionManager()` with no args + `configure()`.
  */
+@Singleton()
 export class TransactionManager {
   private readonly storage = new AsyncLocalStorage<Transaction<any>>();
   private kyselyRef?: Kysely<any>;
   private testTransactionActive = false;
   private _supportsReturning?: boolean;
 
-  constructor(kyselyOrProvider?: Kysely<any> | KyselyProvider) {
-    if (kyselyOrProvider) {
-      if ('kysely' in kyselyOrProvider) {
-        // Capture the current value (may already be set if @PostConstruct ran)
-        this.kyselyRef = kyselyOrProvider.kysely;
-        // Read supportsReturning from the provider (e.g. KyselyDatabase subclass)
-        if (kyselyOrProvider.supportsReturning !== undefined) {
-          this._supportsReturning = kyselyOrProvider.supportsReturning;
-        }
-        // Make the provider's .kysely property transaction-aware.
-        // Any code accessing provider.kysely (e.g. database.kysely) will
-        // automatically use the active transaction when inside one.
-        // The setter ensures @PostConstruct can still assign the value.
-        const tm = this;
-        Object.defineProperty(kyselyOrProvider, 'kysely', {
-          get() {
-            return tm.getConnection();
-          },
-          set(value: Kysely<any>) {
-            tm.kyselyRef = value;
-          },
-          configurable: true,
-        });
-      } else {
-        this.kyselyRef = kyselyOrProvider;
+  constructor(kyselyDatabase?: KyselyDatabase) {
+    if (kyselyDatabase) {
+      // Capture the current value (may already be set if @PostConstruct ran)
+      this.kyselyRef = kyselyDatabase.kysely;
+      // Read supportsReturning from the database (e.g. KyselyDatabase subclass)
+      if (kyselyDatabase.supportsReturning !== undefined) {
+        this._supportsReturning = kyselyDatabase.supportsReturning;
       }
+      // Make the database's .kysely property transaction-aware.
+      // Any code accessing database.kysely will automatically use the
+      // active transaction when inside one.
+      // The setter ensures @PostConstruct can still assign the value.
+      const tm = this;
+      Object.defineProperty(kyselyDatabase, 'kysely', {
+        get() {
+          return tm.getConnection();
+        },
+        set(value: Kysely<any>) {
+          tm.kyselyRef = value;
+        },
+        configurable: true,
+      });
     }
   }
 

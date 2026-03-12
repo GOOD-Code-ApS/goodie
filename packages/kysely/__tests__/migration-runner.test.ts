@@ -33,7 +33,10 @@ describe('MigrationRunner', () => {
     const migration1 = createMigrationClass('001_create_users');
     const migration2 = createMigrationClass('002_create_todos');
 
-    const runner = new MigrationRunner(provider, migration1, migration2);
+    const runner = new MigrationRunner(provider as any, [
+      migration1,
+      migration2,
+    ]);
     await runner.migrate();
 
     expect(Migrator).toHaveBeenCalledWith({
@@ -55,7 +58,10 @@ describe('MigrationRunner', () => {
     const migration1 = createMigrationClass('001_create_users');
     const migration2 = createMigrationClass('002_create_todos');
 
-    const runner = new MigrationRunner(provider, migration1, migration2);
+    const runner = new MigrationRunner(provider as any, [
+      migration1,
+      migration2,
+    ]);
     await runner.migrate();
 
     const migrations = await capturedProvider.getMigrations();
@@ -81,7 +87,7 @@ describe('MigrationRunner', () => {
 
     const provider = createMockKyselyProvider();
     const migration = createMigrationClass('001_bad');
-    const runner = new MigrationRunner(provider, migration);
+    const runner = new MigrationRunner(provider as any, [migration]);
 
     await expect(runner.migrate()).rejects.toThrow('migration failed');
     expect(errorSpy).toHaveBeenCalledWith('Migration "001_bad" failed');
@@ -100,7 +106,7 @@ describe('MigrationRunner', () => {
     }
     const badMigration = new UndecoratedMigration();
 
-    const runner = new MigrationRunner(provider, badMigration);
+    const runner = new MigrationRunner(provider as any, [badMigration]);
 
     await expect(runner.migrate()).rejects.toThrow(
       'without @Migration metadata',
