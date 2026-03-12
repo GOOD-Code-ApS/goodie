@@ -56,7 +56,13 @@ export class InfoEndpoint {
   }
 }
 
-/** Set a dotted path like "app.name" to a value in a nested object. */
+/**
+ * Set a dotted path like "app.name" to a value in a nested object.
+ *
+ * Assumes flat dotted keys don't conflict (e.g. both "info.app" as a scalar
+ * and "info.app.version" as nested). If they do, the later key wins.
+ * This matches how flat config maps are typically structured.
+ */
 function setNestedValue(
   obj: Record<string, unknown>,
   path: string,

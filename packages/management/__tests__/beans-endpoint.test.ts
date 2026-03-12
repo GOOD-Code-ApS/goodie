@@ -1,7 +1,7 @@
-import type {
+import {
   ApplicationContext,
-  BeanDefinition,
-  InjectionToken,
+  type BeanDefinition,
+  type InjectionToken,
 } from '@goodie-ts/core';
 import { Response } from '@goodie-ts/http';
 import { describe, expect, it, vi } from 'vitest';
@@ -100,6 +100,43 @@ describe('BeansEndpoint', () => {
 
     const body = result.body as { beans: Array<{ conditional: unknown }> };
     expect(body.beans[0].conditional).toEqual(rules);
+  });
+
+  it('filters out internal framework beans', () => {
+    const configToken = {
+      description: '__Goodie_Config',
+    } as InjectionToken<Record<string, unknown>>;
+
+    const configDef = {
+      token: configToken,
+      scope: 'singleton',
+      eager: false,
+      dependencies: [],
+      factory: () => ({}),
+      metadata: {},
+    } as BeanDefinition;
+
+    const appContextDef = {
+      token: ApplicationContext,
+      scope: 'singleton',
+      eager: false,
+      dependencies: [],
+      factory: () => null,
+      metadata: {},
+    } as BeanDefinition;
+
+    const ctx = createMockContext([
+      appContextDef,
+      configDef,
+      createClassDef(TodoService),
+    ]);
+
+    const endpoint = new BeansEndpoint(ctx);
+    const result = endpoint.beans();
+
+    const body = result.body as { beans: Array<{ token: string }> };
+    expect(body.beans).toHaveLength(1);
+    expect(body.beans[0].token).toBe('TodoService');
   });
 
   it('shows eager status', () => {

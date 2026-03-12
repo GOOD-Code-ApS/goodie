@@ -140,6 +140,24 @@ describe('EnvEndpoint', () => {
     expect(body.properties['JWT_SECRET']).toBe('******');
   });
 
+  it('does not mask keys that only contain patterns as substrings', () => {
+    const ctx = createMockContext({
+      'animal.monkey': 'george',
+      'food.turkey': 'thanksgiving',
+      'feature.keyboard': 'mechanical',
+      'auth.tokenized': 'should-not-mask',
+    });
+
+    const endpoint = new EnvEndpoint(ctx);
+    const result = endpoint.env();
+
+    const body = result.body as { properties: Record<string, unknown> };
+    expect(body.properties['animal.monkey']).toBe('george');
+    expect(body.properties['food.turkey']).toBe('thanksgiving');
+    expect(body.properties['feature.keyboard']).toBe('mechanical');
+    expect(body.properties['auth.tokenized']).toBe('should-not-mask');
+  });
+
   it('returns empty properties when no config bean exists', () => {
     const ctx = createEmptyContext();
 

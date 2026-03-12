@@ -3,7 +3,8 @@ import { Controller, Get, Response } from '@goodie-ts/http';
 
 /**
  * Micronaut-style default mask patterns.
- * Keys containing any of these substrings (case-insensitive) are masked.
+ * Keys are split on `.`, `_`, `-` separators and matched at the segment level
+ * to avoid false positives (e.g. "monkey" won't match "key").
  */
 const SENSITIVE_PATTERNS = [
   'password',
@@ -58,8 +59,8 @@ export class EnvEndpoint {
   }
 }
 
-/** Check if a config key should be masked. */
+/** Check if a config key should be masked (segment-level matching). */
 function isSensitive(key: string): boolean {
-  const lower = key.toLowerCase();
-  return SENSITIVE_PATTERNS.some((pattern) => lower.includes(pattern));
+  const segments = key.toLowerCase().split(/[._-]/);
+  return SENSITIVE_PATTERNS.some((p) => segments.some((s) => s === p));
 }
