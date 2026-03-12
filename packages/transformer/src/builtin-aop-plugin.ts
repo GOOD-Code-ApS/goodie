@@ -3,11 +3,7 @@ import type {
   InterceptorRef,
 } from '@goodie-ts/core';
 import type { IRBeanDefinition } from './ir.js';
-import type {
-  CodegenContribution,
-  MethodVisitorContext,
-  TransformerPlugin,
-} from './options.js';
+import type { MethodVisitorContext, TransformerPlugin } from './options.js';
 
 /** Internal tracking of AOP annotations found during method visiting. */
 interface AopMethodInfo {
@@ -134,36 +130,6 @@ export function createAopPlugin(): TransformerPlugin {
       }
 
       return beans;
-    },
-
-    codegen(beans: IRBeanDefinition[]): CodegenContribution {
-      const hasAop = beans.some(
-        (b) =>
-          b.metadata.interceptedMethods &&
-          (b.metadata.interceptedMethods as unknown[]).length > 0,
-      );
-
-      if (!hasAop) return {};
-
-      // Check which wrapper imports are needed
-      const allMethods = beans.flatMap(
-        (b) =>
-          (b.metadata.interceptedMethods as InterceptedMethodDescriptor[]) ??
-          [],
-      );
-      const allInterceptors = allMethods.flatMap((m) => m.interceptors);
-      const hasBefore = allInterceptors.some((i) => i.adviceType === 'before');
-      const hasAfter = allInterceptors.some((i) => i.adviceType === 'after');
-
-      const importSymbols = ['buildInterceptorChain'];
-      if (hasBefore) importSymbols.push('wrapBeforeAdvice');
-      if (hasAfter) importSymbols.push('wrapAfterAdvice');
-
-      return {
-        imports: [
-          `import { ${importSymbols.join(', ')} } from '@goodie-ts/core'`,
-        ],
-      };
     },
   };
 }

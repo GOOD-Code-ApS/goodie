@@ -3,99 +3,23 @@ import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
-import createHonoPlugin from '../src/plugin.js';
 
 const httpPlugin = createHttpPlugin();
-const honoPlugin = createHonoPlugin();
 
 function createProject(
   files: Record<string, string>,
   outputPath = '/out/AppContext.generated.ts',
-  plugins = [httpPlugin, honoPlugin],
-  inlinedConfig?: Record<string, string>,
+  plugins = [httpPlugin],
 ) {
   const project = new Project({ useInMemoryFileSystem: true });
   project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
   for (const [filePath, content] of Object.entries(files)) {
     project.createSourceFile(filePath, content);
   }
-  return transformInMemory(
-    project,
-    outputPath,
-    plugins,
-    undefined,
-    undefined,
-    inlinedConfig ? { inlinedConfig } : undefined,
-  );
+  return transformInMemory(project, outputPath, plugins);
 }
 
-describe('Hono Plugin Codegen', () => {
-  it('generates createRouter that delegates to createHonoRouter', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      'export function createRouter(ctx: ApplicationContext)',
-    );
-    expect(result.code).toContain('createHonoRouter(ctx)');
-  });
-
-  it('generates onStart hook with EmbeddedServer', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('app.onStart(async (ctx) => {');
-    expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
-  });
-
-  it('imports createHonoRouter and EmbeddedServer from @goodie-ts/hono', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      "import { createHonoRouter, EmbeddedServer } from '@goodie-ts/hono'",
-    );
-  });
-
-  it('does not generate anything when no controllers exist', () => {
-    const result = createProject({
-      '/src/MyService.ts': `
-        import { Singleton } from './decorators.js'
-        @Singleton()
-        class MyService {}
-      `,
-    });
-
-    expect(result.code).not.toContain('EmbeddedServer');
-    expect(result.code).not.toContain('app.onStart');
-    expect(result.code).not.toContain('createRouter');
-    expect(result.code).not.toContain('createHonoRouter');
-  });
-
+describe('HTTP Controller Metadata', () => {
   it('stores httpController metadata on controller beans', () => {
     const result = createProject({
       '/src/UserController.ts': `
@@ -211,36 +135,17 @@ describe('Hono Plugin Codegen', () => {
     expect(httpCtrl.routes[0].returnType).toBe('Todo[]');
     expect(httpCtrl.routes[1].returnType).toBe('Todo');
   });
-});
 
-describe('Hono Plugin — serverless runtime', () => {
-  const controllerFile = `
-    import { Controller, Get } from './decorators.js'
-    @Controller('/api/users')
-    class UserController {
-      @Get('/')
-      list() {}
-    }
-  `;
+  it('does not generate hono-specific code when no controllers exist', () => {
+    const result = createProject({
+      '/src/MyService.ts': `
+        import { Singleton } from './decorators.js'
+        @Singleton()
+        class MyService {}
+      `,
+    });
 
-  it('generates onStart hook for node runtime (default)', () => {
-    const result = createProject({ '/src/UserController.ts': controllerFile });
-
-    expect(result.code).toContain('app.onStart(async (ctx) => {');
-    expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
-  });
-
-  it('skips onStart hook for cloudflare runtime', () => {
-    const result = createProject(
-      { '/src/UserController.ts': controllerFile },
-      '/out/AppContext.generated.ts',
-      [httpPlugin, honoPlugin],
-      { 'server.runtime': 'cloudflare' },
-    );
-
-    expect(result.code).not.toContain('app.onStart');
-    expect(result.code).toContain(
-      'export function createRouter(ctx: ApplicationContext)',
-    );
+    expect(result.code).not.toContain('EmbeddedServer');
+    expect(result.code).not.toContain('createHonoRouter');
   });
 });

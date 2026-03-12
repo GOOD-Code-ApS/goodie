@@ -1,3 +1,4 @@
+export { AbstractServerBootstrap } from './abstract-server-bootstrap.js';
 // Decorators
 export { Controller } from './controller.js';
 // Exception handling pipeline

@@ -1,5 +1,6 @@
 export { createHonoRouter } from './create-router.js';
 export { EmbeddedServer } from './embedded-server.js';
+export { HonoServerBootstrap } from './hono-server-bootstrap.js';
 // Runtime helpers used by createHonoRouter
 export {
   buildHttpContext,

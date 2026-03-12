@@ -15,7 +15,8 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 | `src/aop-types.ts` | AOP types: `MethodInterceptor`, `InvocationContext`, `BeforeAdvice`, `AfterAdvice`, `InterceptorRef`, `InterceptedMethodDescriptor` |
 | `src/interceptor-chain.ts` | `buildInterceptorChain()` — chains interceptors with proceed/original-method fallback |
 | `src/advice-wrappers.ts` | `wrapBeforeAdvice()`, `wrapAfterAdvice()` — adapt advice to `MethodInterceptor` |
-| `src/decorators/` | All decorators: `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, `@Value`, `@Around`, `@Before`, `@After`, `@ConfigurationProperties`, `@Introspected`, `createAopDecorator()`, lifecycle hooks |
+| `src/on-start.ts` | `OnStart` — abstract lifecycle class for post-startup hooks, discovered via `baseTokens` |
+| `src/decorators/` | All decorators: `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, `@Value`, `@Around`, `@Before`, `@After`, `@ConfigurationProperties`, `@Introspected`, `@Order()`, `createAopDecorator()`, lifecycle hooks |
 | `src/introspection.ts` | `TypeMetadata`, `IntrospectedField`, `FieldType` (recursive tree), `DecoratorMeta`, `MetadataRegistry` |
 
 ## Core Types
@@ -50,5 +51,5 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 ## Gotchas
 
 - `get()` on an async bean that hasn't resolved yet throws — always use `getAsync()` for async factories
-- `Goodie.build(defs).start()` is the intended bootstrap path (wraps `ApplicationContext.create`)
+- `Goodie.build(defs).start()` is the intended bootstrap path (wraps `ApplicationContext.create`). After context creation, discovers all `OnStart` beans via `baseTokens`, sorts by `@Order()` metadata, and calls `onStart(ctx)` on each.
 - Optional dependencies resolve to `undefined` when missing, not `null`

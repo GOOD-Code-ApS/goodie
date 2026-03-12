@@ -89,6 +89,9 @@ function resolveBean(
   if (scanned.isModule) {
     metadata.isModule = true;
   }
+  if (scanned.order !== undefined) {
+    metadata.order = scanned.order;
+  }
 
   const beanDef: IRBeanDefinition = {
     tokenRef: scanned.classTokenRef,

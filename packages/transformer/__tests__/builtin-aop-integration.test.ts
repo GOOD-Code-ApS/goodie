@@ -70,9 +70,9 @@ describe('AOP Integration — Generated Code', () => {
       createAopPlugin(),
     ]);
 
-    expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/core'",
-    );
+    // buildInterceptorChain is auto-imported in core imports (merged with ApplicationContext, Goodie)
+    expect(result.code).toContain('buildInterceptorChain');
+    expect(result.code).toContain("from '@goodie-ts/core'");
   });
 
   it('interceptor class appears in dependencies array', () => {
@@ -127,9 +127,9 @@ describe('AOP Integration — Generated Code', () => {
 
     expect(result.code).toContain('wrapBeforeAdvice');
     expect(result.code).toContain('wrapAfterAdvice');
-    expect(result.code).toContain(
-      "import { buildInterceptorChain, wrapBeforeAdvice, wrapAfterAdvice } from '@goodie-ts/core'",
-    );
+    // AOP imports auto-derived in core import (merged with ApplicationContext, Goodie)
+    expect(result.code).toContain('buildInterceptorChain');
+    expect(result.code).toContain("from '@goodie-ts/core'");
   });
 
   it('multiple methods with different interceptors', () => {

@@ -61,9 +61,7 @@ describe('Kysely Transformer Plugin', () => {
     expect(result.code).toContain(
       "import { KyselyDatabase, TransactionManager, TransactionalInterceptor } from '@goodie-ts/kysely'",
     );
-    expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/core'",
-    );
+    expect(result.code).toContain('buildInterceptorChain');
   });
 
   it('should generate REQUIRED propagation metadata by default', () => {
