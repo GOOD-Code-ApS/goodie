@@ -15,6 +15,7 @@
     "@goodie-ts/http": "workspace:*",
     "@goodie-ts/cache": "workspace:*",
     "@goodie-ts/kysely": "workspace:*",
+    "@goodie-ts/management": "workspace:*",
     "@goodie-ts/logging": "workspace:*",
     "@goodie-ts/resilience": "workspace:*",
     "@goodie-ts/validation": "workspace:*",

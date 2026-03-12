@@ -64,6 +64,10 @@ export default defineConfig({
         __dirname,
         'packages/validation/src/index.ts',
       ),
+      '@goodie-ts/management': path.resolve(
+        __dirname,
+        'packages/management/src/index.ts',
+      ),
     },
   },
   test: {
