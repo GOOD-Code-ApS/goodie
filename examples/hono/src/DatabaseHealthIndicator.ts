@@ -1,14 +1,17 @@
 import { Singleton } from '@goodie-ts/core';
-import type { HealthIndicator, HealthResult } from '@goodie-ts/health';
+import type { HealthResult } from '@goodie-ts/health';
+import { HealthIndicator } from '@goodie-ts/health';
 // biome-ignore lint/style/useImportType: DI requires value import for constructor injection
 import { KyselyDatabase } from '@goodie-ts/kysely';
 import { sql } from 'kysely';
 
 @Singleton()
-export class DatabaseHealthIndicator implements HealthIndicator {
+export class DatabaseHealthIndicator extends HealthIndicator {
   readonly name = 'database';
 
-  constructor(private readonly db: KyselyDatabase) {}
+  constructor(private readonly db: KyselyDatabase) {
+    super();
+  }
 
   async check(): Promise<HealthResult> {
     try {
