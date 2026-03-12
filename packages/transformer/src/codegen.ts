@@ -378,36 +378,37 @@ export function generateCode(
 
   // ── Metadata registry (introspection + validation) ──────────────────
   if (hasTypeRegistrations || hasValidation) {
-    const registryLines: string[] = [];
+    sf.addStatements((writer) => {
+      writer.blankLine();
+      writer.writeLine('// Metadata registry population');
 
-    if (hasTypeRegistrations) {
-      for (const reg of typeRegistrations!) {
-        const fieldsJson = JSON.stringify(reg.fields);
-        registryLines.push(
-          `MetadataRegistry.INSTANCE.register({ type: ${reg.className}, className: '${reg.className}', fields: ${fieldsJson} })`,
-        );
-      }
-    }
-
-    if (hasValidation) {
-      for (const bean of beans) {
-        const params = bean.metadata.validatedMethodParams as
-          | ValidatedMethodParam[]
-          | undefined;
-        if (!params) continue;
-        const beanName =
-          bean.tokenRef.kind === 'class'
-            ? bean.tokenRef.className
-            : bean.tokenRef.tokenName;
-        for (const p of params) {
-          registryLines.push(
-            `MetadataRegistry.INSTANCE.registerMethodParams(${beanName}, '${p.methodName}', [${p.bodyTypeClassName}], ${p.paramIndex})`,
+      if (hasTypeRegistrations) {
+        for (const reg of typeRegistrations!) {
+          const fieldsJson = JSON.stringify(reg.fields);
+          writer.writeLine(
+            `MetadataRegistry.INSTANCE.register({ type: ${reg.className}, className: '${reg.className}', fields: ${fieldsJson} });`,
           );
         }
       }
-    }
 
-    sf.addStatements(['\n// Metadata registry population', ...registryLines]);
+      if (hasValidation) {
+        for (const bean of beans) {
+          const params = bean.metadata.validatedMethodParams as
+            | ValidatedMethodParam[]
+            | undefined;
+          if (!params) continue;
+          const beanName =
+            bean.tokenRef.kind === 'class'
+              ? bean.tokenRef.className
+              : bean.tokenRef.tokenName;
+          for (const p of params) {
+            writer.writeLine(
+              `MetadataRegistry.INSTANCE.registerMethodParams(${beanName}, '${p.methodName}', [${p.bodyTypeClassName}], ${p.paramIndex});`,
+            );
+          }
+        }
+      }
+    });
   }
 
   return sf.getFullText();
