@@ -390,7 +390,7 @@ function resolveConstructorParam(
 
   return {
     tokenRef,
-    optional: false,
+    optional: param.isOptional,
     collection: false,
     sourceLocation: param.sourceLocation,
   };

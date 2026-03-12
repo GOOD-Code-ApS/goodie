@@ -103,6 +103,8 @@ export interface ScannedConstructorParam {
   typeArguments: ScannedTypeArgument[];
   /** The resolved base type name (e.g. 'Repository' for Repository<User>). */
   resolvedBaseTypeName: string | undefined;
+  /** True when the parameter has a `?` modifier (e.g. `param?: Foo`). */
+  isOptional: boolean;
   /** True when the parameter is typed as T[] or Array<T>. */
   isCollection: boolean;
   /** When isCollection is true, the element type info for the array. */
@@ -410,6 +412,7 @@ function scanConstructorParams(
     let typeSourceFile: SourceFile | undefined;
     let typeArguments: ScannedTypeArgument[] = [];
     let resolvedBaseTypeName: string | undefined;
+    const isOptional = param.hasQuestionToken();
     let isCollection = false;
     let elementTypeName: string | undefined;
     let elementTypeSourceFile: SourceFile | undefined;
@@ -418,7 +421,10 @@ function scanConstructorParams(
 
     if (typeNode) {
       typeName = typeNode.getText();
-      const paramType = param.getType();
+      // For optional params (param?: Foo), getType() returns Foo | undefined.
+      // Use getNonNullableType() to strip undefined so resolveTypeSymbol works.
+      const rawType = param.getType();
+      const paramType = isOptional ? rawType.getNonNullableType() : rawType;
 
       // Detect array types: T[] or Array<T>
       if (paramType.isArray()) {
@@ -447,6 +453,7 @@ function scanConstructorParams(
       typeSourceFile,
       typeArguments,
       resolvedBaseTypeName,
+      isOptional,
       isCollection,
       elementTypeName,
       elementTypeSourceFile,
@@ -569,6 +576,7 @@ function scanProvidesMethods(
         typeSourceFile,
         typeArguments,
         resolvedBaseTypeName,
+        isOptional: param.hasQuestionToken(),
         isCollection: false,
         elementTypeName: undefined,
         elementTypeSourceFile: undefined,
