@@ -16,9 +16,10 @@ export class ValiExceptionHandler extends ExceptionHandler {
     if (error instanceof ValiError) {
       return Response.status(400, {
         errors: error.issues.map((issue) => ({
-          path: issue.path
-            ?.map((p: { key: string | number | symbol }) => p.key)
-            .join('.'),
+          path:
+            issue.path
+              ?.map((p: { key: string | number | symbol }) => p.key)
+              .join('.') ?? '',
           message: issue.message,
         })),
       });

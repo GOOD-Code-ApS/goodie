@@ -23,6 +23,11 @@ export class ValiSchemaFactory {
     GenericSchema
   >();
 
+  /** Clear the schema cache. Useful in tests after `MetadataRegistry.reset()`. */
+  clearCache(): void {
+    this.cache.clear();
+  }
+
   /**
    * Get or build a Valibot schema for the given class constructor.
    * Returns `undefined` if the type is not in `MetadataRegistry`.

@@ -66,6 +66,29 @@ describe('ValiExceptionHandler', () => {
     expect(body.errors[0].path).toBe('address.city');
   });
 
+  it('returns empty string path for root-level validation errors', () => {
+    const handler = createHandler();
+    const schema = v.pipe(v.string(), v.minLength(1));
+
+    let error: unknown;
+    try {
+      v.parse(schema, '');
+    } catch (e) {
+      error = e;
+    }
+
+    const result = handler.handle(error);
+    expect(result).toBeDefined();
+    expect(result!.status).toBe(400);
+
+    const body = result!.body as {
+      errors: Array<{ path: string; message: string }>;
+    };
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0].path).toBe('');
+    expect(body.errors[0].message).toBeDefined();
+  });
+
   it('handles multiple validation errors', () => {
     const handler = createHandler();
     const schema = v.object({

@@ -30,7 +30,10 @@ export class HttpContext {
   cookie(name: string): string | undefined {
     const cookieHeader = this.headers.get('Cookie');
     if (!cookieHeader) return undefined;
-    const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = cookieHeader.match(
+      new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`),
+    );
     return match ? decodeURIComponent(match[1]) : undefined;
   }
 }
