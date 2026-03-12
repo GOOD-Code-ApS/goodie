@@ -199,14 +199,14 @@ export function generateCode(
 
   classImports.delete('ApplicationContext');
 
-  // Add imports for validation body types (Phase 2)
+  // Add imports for validated param types
   for (const bean of beans) {
     const params = bean.metadata.validatedMethodParams as
       | ValidatedMethodParam[]
       | undefined;
     if (params) {
       for (const p of params) {
-        classImports.set(p.bodyTypeClassName, p.bodyTypeImportPath);
+        classImports.set(p.typeClassName, p.typeImportPath);
       }
     }
   }
@@ -403,7 +403,7 @@ export function generateCode(
               : bean.tokenRef.tokenName;
           for (const p of params) {
             writer.writeLine(
-              `MetadataRegistry.INSTANCE.registerMethodParams(${beanName}, '${p.methodName}', [${p.bodyTypeClassName}], ${p.paramIndex});`,
+              `MetadataRegistry.INSTANCE.registerMethodParam(${beanName}, '${p.methodName}', ${p.typeClassName}, ${p.paramIndex});`,
             );
           }
         }
@@ -713,8 +713,8 @@ function tokenVarName(tokenName: string): string {
 /** Shape of validated method param metadata stored on beans by the validation plugin. */
 interface ValidatedMethodParam {
   methodName: string;
-  bodyTypeClassName: string;
-  bodyTypeImportPath: string;
+  typeClassName: string;
+  typeImportPath: string;
   paramIndex: number;
 }
 

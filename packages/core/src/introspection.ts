@@ -130,7 +130,10 @@ export class MetadataRegistry {
     ) => unknown,
     Map<
       string,
-      { paramTypes: Array<new (...args: any[]) => unknown>; paramIndex: number }
+      Array<{
+        paramType: new (...args: any[]) => unknown;
+        paramIndex: number;
+      }>
     >
   >();
 
@@ -155,36 +158,41 @@ export class MetadataRegistry {
   }
 
   /**
-   * Register parameter types for a method.
-   * Generated code calls this so runtime consumers (validation, OpenAPI, etc.)
-   * can look up the introspected types of method parameters.
+   * Register a single validated parameter for a method.
+   * Generated code calls this once per class-typed param so runtime consumers
+   * (validation, OpenAPI, etc.) can look up which arguments to validate.
    */
-  registerMethodParams(
+  registerMethodParam(
     target: new (...args: any[]) => unknown,
     methodName: string,
-    paramTypes: Array<new (...args: any[]) => unknown>,
-    paramIndex = 0,
+    paramType: new (...args: any[]) => unknown,
+    paramIndex: number,
   ): void {
     let methods = this.methodParams.get(target);
     if (!methods) {
       methods = new Map();
       this.methodParams.set(target, methods);
     }
-    methods.set(methodName, { paramTypes, paramIndex });
+    let entries = methods.get(methodName);
+    if (!entries) {
+      entries = [];
+      methods.set(methodName, entries);
+    }
+    entries.push({ paramType, paramIndex });
   }
 
   /**
-   * Look up parameter types for a validated method.
-   * Returns undefined if not registered.
+   * Look up validated parameter entries for a method.
+   * Returns undefined if no params are registered.
    */
   getMethodParams(
     target: new (...args: any[]) => unknown,
     methodName: string,
   ):
-    | {
-        paramTypes: Array<new (...args: any[]) => unknown>;
+    | Array<{
+        paramType: new (...args: any[]) => unknown;
         paramIndex: number;
-      }
+      }>
     | undefined {
     return this.methodParams.get(target)?.get(methodName);
   }

@@ -24,17 +24,18 @@ function createInterceptor(): ValidationInterceptor {
 
 function createContext(
   args: unknown[],
-  paramTypes?: Array<new (...a: any[]) => unknown>,
+  params?: Array<{ type: new (...a: any[]) => unknown; index: number }>,
   proceedResult: unknown = 'ok',
-  paramIndex = 0,
 ): InvocationContext {
-  if (paramTypes) {
-    MetadataRegistry.INSTANCE.registerMethodParams(
-      TestController,
-      'testMethod',
-      paramTypes,
-      paramIndex,
-    );
+  if (params) {
+    for (const p of params) {
+      MetadataRegistry.INSTANCE.registerMethodParam(
+        TestController,
+        'testMethod',
+        p.type,
+        p.index,
+      );
+    }
   }
   return {
     className: 'TestController',
@@ -63,7 +64,10 @@ describe('ValidationInterceptor', () => {
 
   it('proceeds without validation when param type is not introspected', () => {
     const interceptor = createInterceptor();
-    const ctx = createContext([{ title: 'hello' }], [TodoRequest]);
+    const ctx = createContext(
+      [{ title: 'hello' }],
+      [{ type: TodoRequest, index: 0 }],
+    );
 
     // TodoRequest is NOT registered in MetadataRegistry → skip validation
     expect(interceptor.intercept(ctx)).toBe('ok');
@@ -85,11 +89,17 @@ describe('ValidationInterceptor', () => {
     const interceptor = createInterceptor();
 
     // Valid
-    const validCtx = createContext([{ title: 'hello' }], [TodoRequest]);
+    const validCtx = createContext(
+      [{ title: 'hello' }],
+      [{ type: TodoRequest, index: 0 }],
+    );
     expect(interceptor.intercept(validCtx)).toBe('ok');
 
     // Invalid — empty title
-    const invalidCtx = createContext([{ title: '' }], [TodoRequest]);
+    const invalidCtx = createContext(
+      [{ title: '' }],
+      [{ type: TodoRequest, index: 0 }],
+    );
     expect(() => interceptor.intercept(invalidCtx)).toThrow(ValiError);
   });
 
@@ -107,7 +117,7 @@ describe('ValidationInterceptor', () => {
     });
 
     const interceptor = createInterceptor();
-    const ctx = createContext([undefined], [TodoRequest]);
+    const ctx = createContext([undefined], [{ type: TodoRequest, index: 0 }]);
 
     expect(interceptor.intercept(ctx)).toBe('ok');
   });
@@ -130,9 +140,7 @@ describe('ValidationInterceptor', () => {
     // Valid — body at args[1] has valid title, paramIndex=1
     const validCtx = createContext(
       ['some-id', { title: 'hello' }],
-      [TodoRequest],
-      'ok',
-      1,
+      [{ type: TodoRequest, index: 1 }],
     );
     expect(interceptor.intercept(validCtx)).toBe('ok');
 
@@ -153,9 +161,7 @@ describe('ValidationInterceptor', () => {
     // Invalid — body at args[1] has empty title, paramIndex=1
     const invalidCtx = createContext(
       ['some-id', { title: '' }],
-      [TodoRequest],
-      'ok',
-      1,
+      [{ type: TodoRequest, index: 1 }],
     );
     expect(() => interceptor.intercept(invalidCtx)).toThrow(ValiError);
   });
@@ -173,10 +179,11 @@ describe('ValidationInterceptor', () => {
       ],
     });
 
-    MetadataRegistry.INSTANCE.registerMethodParams(
+    MetadataRegistry.INSTANCE.registerMethodParam(
       TestController,
       'testMethod',
-      [TodoRequest],
+      TodoRequest,
+      0,
     );
 
     const interceptor = createInterceptor();
@@ -210,10 +217,11 @@ describe('ValidationInterceptor', () => {
       ],
     });
 
-    MetadataRegistry.INSTANCE.registerMethodParams(
+    MetadataRegistry.INSTANCE.registerMethodParam(
       TestController,
       'testMethod',
-      [TodoRequest],
+      TodoRequest,
+      0,
     );
 
     const interceptor = createInterceptor();
@@ -232,5 +240,85 @@ describe('ValidationInterceptor', () => {
 
     expect(() => interceptor.intercept(ctx)).toThrow(ValiError);
     expect(proceedCalled).toBe(false);
+  });
+
+  it('validates multiple non-contiguous class-typed params', () => {
+    class AuthToken {
+      token!: string;
+    }
+
+    class UpdateDto {
+      title!: string;
+    }
+
+    MetadataRegistry.INSTANCE.register({
+      type: AuthToken,
+      className: 'AuthToken',
+      fields: [
+        {
+          name: 'token',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'MinLength', args: { value: 1 } }],
+        },
+      ],
+    });
+
+    MetadataRegistry.INSTANCE.register({
+      type: UpdateDto,
+      className: 'UpdateDto',
+      fields: [
+        {
+          name: 'title',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'MinLength', args: { value: 1 } }],
+        },
+      ],
+    });
+
+    const interceptor = createInterceptor();
+
+    // Both params valid — args: [id, auth, name, body]
+    const validCtx = createContext(
+      ['id-1', { token: 'abc' }, 'some-name', { title: 'hello' }],
+      [
+        { type: AuthToken, index: 1 },
+        { type: UpdateDto, index: 3 },
+      ],
+    );
+    expect(interceptor.intercept(validCtx)).toBe('ok');
+
+    MetadataRegistry.INSTANCE.reset();
+    MetadataRegistry.INSTANCE.register({
+      type: AuthToken,
+      className: 'AuthToken',
+      fields: [
+        {
+          name: 'token',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'MinLength', args: { value: 1 } }],
+        },
+      ],
+    });
+    MetadataRegistry.INSTANCE.register({
+      type: UpdateDto,
+      className: 'UpdateDto',
+      fields: [
+        {
+          name: 'title',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [{ name: 'MinLength', args: { value: 1 } }],
+        },
+      ],
+    });
+
+    // Second class-typed param invalid — empty title at index 3
+    const invalidCtx = createContext(
+      ['id-1', { token: 'abc' }, 'some-name', { title: '' }],
+      [
+        { type: AuthToken, index: 1 },
+        { type: UpdateDto, index: 3 },
+      ],
+    );
+    expect(() => interceptor.intercept(invalidCtx)).toThrow(ValiError);
   });
 });

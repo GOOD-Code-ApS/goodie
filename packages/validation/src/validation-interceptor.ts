@@ -6,13 +6,13 @@ import type { ValiSchemaFactory } from './vali-schema-factory.js';
 /**
  * AOP interceptor for `@Validated` methods.
  *
- * Looks up parameter types from `MetadataRegistry.getMethodParams()` —
+ * Looks up parameter entries from `MetadataRegistry.getMethodParams()` —
  * populated at startup by the validation transformer plugin. For each
- * param type that has an introspection schema, validates the corresponding
- * argument via `v.parse()`.
+ * class-typed param that has an introspection schema, validates the
+ * corresponding argument via `v.parse()`.
  *
- * Uses `paramIndex` to locate the correct argument in the method's arg list,
- * since the body parameter may not be at index 0 (e.g. `update(id: string, body: Dto)`).
+ * Each entry carries its own `paramIndex` to locate the correct argument,
+ * supporting non-contiguous class-typed params (e.g. `process(id: string, auth: AuthToken, name: string, body: UpdateDto)`).
  */
 @Singleton()
 export class ValidationInterceptor implements MethodInterceptor {
@@ -22,19 +22,17 @@ export class ValidationInterceptor implements MethodInterceptor {
     const target = ctx.target as {
       constructor: new (...args: any[]) => unknown;
     };
-    const methodMeta = MetadataRegistry.INSTANCE.getMethodParams(
+    const entries = MetadataRegistry.INSTANCE.getMethodParams(
       target.constructor,
       ctx.methodName,
     );
 
-    if (methodMeta) {
-      const { paramTypes, paramIndex } = methodMeta;
-      for (let i = 0; i < paramTypes.length; i++) {
-        const paramType = paramTypes[i];
+    if (entries) {
+      for (const { paramType, paramIndex } of entries) {
         const schema = this.schemaFactory.getSchema(paramType);
         if (!schema) continue;
 
-        const arg = ctx.args[paramIndex + i];
+        const arg = ctx.args[paramIndex];
         if (arg === undefined || arg === null) continue;
 
         v.parse(schema, arg);
