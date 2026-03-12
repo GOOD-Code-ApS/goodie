@@ -20,7 +20,7 @@ export class BeansEndpoint {
       .getDefinitions()
       .filter((def) =>
         typeof def.token === 'function'
-          ? def.token !== ApplicationContext
+          ? (def.token as Function) !== ApplicationContext
           : def.token.description !== '__Goodie_Config',
       );
 

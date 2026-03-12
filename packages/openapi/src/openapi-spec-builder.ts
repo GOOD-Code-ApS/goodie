@@ -159,15 +159,16 @@ export class OpenApiSpecBuilder {
     );
     const statusCode = String(route.status);
 
+    const responses = operation.responses!;
     if (responseSchema) {
-      operation.responses[statusCode] = {
+      responses[statusCode] = {
         description: '',
         content: {
           'application/json': { schema: responseSchema },
         },
       };
     } else {
-      operation.responses[statusCode] = { description: '' };
+      responses[statusCode] = { description: '' };
     }
 
     return operation;
