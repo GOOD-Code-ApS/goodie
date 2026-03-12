@@ -111,8 +111,11 @@ function validateProviders(beans: IRBeanDefinition[]): void {
     }
   }
 
-  // Well-known tokens always available at runtime (self-registered by ApplicationContext)
+  // Well-known tokens always available at runtime (self-registered by ApplicationContext).
+  // Register both the bare package path and a className-only sentinel so library builds
+  // (which use absolute file paths before rewriting) also pass validation.
   registered.add('class:@goodie-ts/core:ApplicationContext');
+  registered.add('well-known:ApplicationContext');
   registeredNames.push('ApplicationContext');
 
   function buildHint(_depKey: string, depName: string): string | undefined {
@@ -133,7 +136,14 @@ function validateProviders(beans: IRBeanDefinition[]): void {
     for (const dep of bean.constructorDeps) {
       if (dep.optional || dep.collection) continue;
       const key = tokenRefKey(dep.tokenRef);
-      if (!registered.has(key)) {
+      const wellKnownKey =
+        dep.tokenRef.kind === 'class'
+          ? `well-known:${dep.tokenRef.className}`
+          : undefined;
+      if (
+        !registered.has(key) &&
+        !(wellKnownKey && registered.has(wellKnownKey))
+      ) {
         const depName =
           dep.tokenRef.kind === 'class'
             ? dep.tokenRef.className
@@ -150,7 +160,14 @@ function validateProviders(beans: IRBeanDefinition[]): void {
     for (const field of bean.fieldDeps) {
       if (field.optional) continue;
       const key = tokenRefKey(field.tokenRef);
-      if (!registered.has(key)) {
+      const wellKnownKey =
+        field.tokenRef.kind === 'class'
+          ? `well-known:${field.tokenRef.className}`
+          : undefined;
+      if (
+        !registered.has(key) &&
+        !(wellKnownKey && registered.has(wellKnownKey))
+      ) {
         const depName =
           field.tokenRef.kind === 'class'
             ? field.tokenRef.className

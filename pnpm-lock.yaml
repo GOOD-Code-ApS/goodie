@@ -53,6 +53,9 @@ importers:
       '@goodie-ts/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@goodie-ts/management':
+        specifier: workspace:*
+        version: link:../../packages/management
       '@goodie-ts/resilience':
         specifier: workspace:*
         version: link:../../packages/resilience
@@ -166,6 +169,9 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+      '@goodie-ts/http':
+        specifier: workspace:*
+        version: link:../http
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
@@ -276,6 +282,27 @@ importers:
       '@goodie-ts/core':
         specifier: workspace:*
         version: link:../core
+      '@goodie-ts/transformer':
+        specifier: workspace:*
+        version: link:../transformer
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ts-morph:
+        specifier: ^24.0.0
+        version: 24.0.0
+
+  packages/management:
+    devDependencies:
+      '@goodie-ts/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@goodie-ts/core':
+        specifier: workspace:*
+        version: link:../core
+      '@goodie-ts/http':
+        specifier: workspace:*
+        version: link:../http
       '@goodie-ts/transformer':
         specifier: workspace:*
         version: link:../transformer
