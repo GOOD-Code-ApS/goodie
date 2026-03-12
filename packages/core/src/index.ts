@@ -40,6 +40,7 @@ export {
   Module,
   Named,
   Optional,
+  Order,
   PostConstruct,
   PostProcessor,
   PreDestroy,
@@ -73,6 +74,7 @@ export type {
   UnionFieldType,
 } from './introspection.js';
 export { MetadataRegistry } from './introspection.js';
+export { OnStart } from './on-start.js';
 export { RequestScopeManager } from './request-scope.js';
 export { StartupMetrics } from './startup-metrics.js';
 export { topoSort } from './topo-sort.js';

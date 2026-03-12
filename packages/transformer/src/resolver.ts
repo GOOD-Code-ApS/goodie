@@ -89,6 +89,9 @@ function resolveBean(
   if (scanned.isModule) {
     metadata.isModule = true;
   }
+  if (scanned.order !== undefined) {
+    metadata.order = scanned.order;
+  }
 
   const beanDef: IRBeanDefinition = {
     tokenRef: scanned.classTokenRef,
@@ -387,7 +390,7 @@ function resolveConstructorParam(
 
   return {
     tokenRef,
-    optional: false,
+    optional: param.isOptional,
     collection: false,
     sourceLocation: param.sourceLocation,
   };

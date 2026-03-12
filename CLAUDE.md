@@ -1,6 +1,6 @@
 # goodie-ts
 
-Compile-time dependency injection framework for TypeScript.
+Build-time validated application framework for TypeScript. No reflection, no runtime scanning — the dependency graph is validated at build time via ts-morph source scanning.
 
 ## Architecture
 
@@ -44,14 +44,15 @@ pnpm clean          # Clean all dist/
 
 | Package | Purpose |
 |---------|---------|
-| `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), BeanDefinition, InjectionToken, topoSort |
+| `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), BeanDefinition, InjectionToken, topoSort, `OnStart` lifecycle, `@Order()` |
 | `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config + introspection plugins. Framework-agnostic — no HTTP knowledge. |
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
 | `packages/testing` | TestContext with bean overrides and @MockDefinition |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
-| `packages/http` | Abstract HTTP — @Controller, @Get/@Post/etc route decorators, Request\<T\>, Response\<T\>, RouteMetadata, ValidationErrorMapper, scan-phase transformer plugin |
-| `packages/hono` | Hono adapter — re-exports http decorators, @Secured, @Anonymous, SecurityProvider, config-driven CORS, EmbeddedServer, ServerConfig, codegen-only transformer plugin |
+| `packages/http` | Abstract HTTP — @Controller, @Get/@Post/etc route decorators, Request\<T\>, Response\<T\>, RouteMetadata, ExceptionHandler, AbstractServerBootstrap, scan-phase transformer plugin |
+| `packages/hono` | Hono adapter — config-driven CORS, EmbeddedServer, ServerConfig, HonoServerBootstrap (library bean), runtime helpers (toHonoResponse, buildRequest) |
+| `packages/validation` | Valibot-based validation — @Validated, @Introspected DTOs, constraint decorators, ValiSchemaFactory, ValidationInterceptor, ValiExceptionHandler, transformer plugin |
 | `packages/kysely` | Kysely integration — abstract KyselyDatabase with per-dialect conditional implementations, @Transactional, @Migration |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
 | `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |

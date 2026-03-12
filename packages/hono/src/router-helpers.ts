@@ -1,8 +1,5 @@
 import { RequestScopeManager } from '@goodie-ts/core';
-import {
-  Request as HttpRequest,
-  Response as HttpResponse,
-} from '@goodie-ts/http';
+import { HttpContext, Response as HttpResponse } from '@goodie-ts/http';
 import type { Context, Next, TypedResponse } from 'hono';
 import { cors } from 'hono/cors';
 import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
@@ -16,29 +13,41 @@ import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
  * helpers — generated code stays unchanged.
  */
 
-/** Construct a Request<T> from a Hono Context. */
-export async function buildRequest<T>(
-  c: Context,
-  parseBody: boolean,
-): Promise<HttpRequest<T>> {
-  const body = parseBody ? await c.req.json<T>() : (undefined as T);
-  return new HttpRequest<T>({
-    body,
+/** Construct an HttpContext from a Hono Context. */
+export function buildHttpContext(c: Context): HttpContext {
+  return new HttpContext({
     headers: c.req.raw.headers,
     query: new URLSearchParams(c.req.query()),
     params: c.req.param() as Record<string, string>,
+    url: c.req.url,
   });
 }
 
-/** Convert a controller method's return value to a Hono Response. */
-export function handleResult<T extends HttpResponse<any>>(
+/**
+ * Translate a `Response<T>` from `@goodie-ts/http` to a Hono TypedResponse.
+ *
+ * Uses a conditional type so union returns like `Response<A> | Response<B>`
+ * distribute correctly. Specifies `'json'` format for Hono RPC inference.
+ *
+ * Optional `defaultStatus` is used when the return value is a plain object
+ * (not a `Response<T>`) — set by `@Status` decorator.
+ */
+export function toHonoResponse<T extends HttpResponse<any>>(
   c: Context,
   result: T,
-): T extends HttpResponse<infer U> ? TypedResponse<U, StatusCode> : never;
-export function handleResult(c: Context, result: unknown): Response;
-export function handleResult(
+  defaultStatus?: number,
+): T extends HttpResponse<infer U>
+  ? TypedResponse<U, StatusCode, 'json'>
+  : never;
+export function toHonoResponse<T>(
+  c: Context,
+  result: T,
+  defaultStatus?: number,
+): TypedResponse<T, StatusCode, 'json'>;
+export function toHonoResponse(
   c: Context,
   result: unknown,
+  defaultStatus?: number,
 ): Response | TypedResponse {
   // Framework-managed Response<T> from @goodie-ts/http
   if (result instanceof HttpResponse) {
@@ -57,12 +66,30 @@ export function handleResult(
   if (result instanceof Response) return result;
   // No return value → 204
   if (result === undefined || result === null) return c.body(null, 204);
-  // Plain object → JSON 200
-  return c.json(result as object);
+  // Plain object → JSON with default status (or 200)
+  const status = (defaultStatus ?? 200) as ContentfulStatusCode;
+  return c.json(result as object, status);
+}
+
+/**
+ * Translate a `Response<T>` from the exception handling pipeline to a
+ * Hono Response. Returns native `Response` (not `TypedResponse<T>`) to
+ * avoid polluting Hono's RPC type inference on the happy path.
+ */
+export function toHonoErrorResponse(
+  c: Context,
+  result: HttpResponse<unknown>,
+): Response {
+  for (const [key, value] of Object.entries(result.headers)) {
+    c.header(key, value as string);
+  }
+  if (result.body === undefined)
+    return c.body(null, result.status as StatusCode);
+  return c.json(result.body as object, result.status as ContentfulStatusCode);
 }
 
 /** Create CORS middleware. */
-export function corsMiddleware(options?: Record<string, unknown>) {
+export function corsMiddleware(options?: object) {
   // Cast needed: hono/cors does not export CORSOptions type.
   return options ? cors(options as any) : cors();
 }

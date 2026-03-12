@@ -5,21 +5,9 @@ import {
   SyntaxKind,
   type Type,
 } from 'ts-morph';
-import type { IRBeanDefinition } from './ir.js';
-import type {
-  ClassVisitorContext,
-  CodegenContext,
-  CodegenContribution,
-  TransformerPlugin,
-} from './options.js';
+import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 
 // ── Scanned introspection data (intermediate representation) ──
-
-interface ScannedIntrospectedClass {
-  className: string;
-  importPath: string;
-  fields: ScannedIntrospectedField[];
-}
 
 interface ScannedDecoratorMeta {
   name: string;
@@ -53,8 +41,6 @@ type ScannedFieldType =
  * that belongs to the validation package's plugin (#105).
  */
 export function createIntrospectionPlugin(): TransformerPlugin {
-  const introspectedClasses: ScannedIntrospectedClass[] = [];
-
   return {
     name: 'introspection',
 
@@ -68,52 +54,19 @@ export function createIntrospectionPlugin(): TransformerPlugin {
       const cls = ctx.classDeclaration;
       const fields = scanClassFields(cls);
 
-      // Store in metadata so other plugins (e.g. config) can consume it
+      // Store raw fields so other plugins (e.g. config) can consume it
       ctx.metadata.introspectedFields = fields;
 
-      introspectedClasses.push({
+      // Store pre-serialized registration data for core codegen
+      ctx.metadata.__typeRegistration = {
         className: ctx.className,
         importPath: ctx.filePath,
-        fields,
-      });
-    },
-
-    codegen(
-      _beans: IRBeanDefinition[],
-      _context?: CodegenContext,
-    ): CodegenContribution {
-      if (introspectedClasses.length === 0) {
-        return {};
-      }
-
-      const imports: string[] = [
-        "import { MetadataRegistry } from '@goodie-ts/core'",
-      ];
-      const code: string[] = [];
-
-      // Import all introspected classes
-      for (const cls of introspectedClasses) {
-        imports.push(`import { ${cls.className} } from '${cls.importPath}'`);
-      }
-
-      // Populate the static singleton registry
-      code.push('// Metadata registry population');
-
-      for (const cls of introspectedClasses) {
-        const fieldsJson = JSON.stringify(
-          cls.fields.map((f) => ({
-            name: f.name,
-            type: serializeFieldType(f.type),
-            decorators: f.decorators,
-          })),
-        );
-
-        code.push(
-          `MetadataRegistry.INSTANCE.register({ type: ${cls.className}, className: '${cls.className}', fields: ${fieldsJson} })`,
-        );
-      }
-
-      return { imports, code };
+        fields: fields.map((f) => ({
+          name: f.name,
+          type: serializeFieldType(f.type),
+          decorators: f.decorators,
+        })),
+      };
     },
   };
 }

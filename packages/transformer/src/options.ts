@@ -137,22 +137,6 @@ export interface MethodVisitorContext {
   decorators: IRDecoratorEntry[];
 }
 
-/** Contribution from a plugin's codegen hook. */
-export interface CodegenContribution {
-  /** Import statements to add at the top of the generated file. */
-  imports?: string[];
-  /** Code lines to add after the bean definitions. */
-  code?: string[];
-  /** Body lines for an `app.onStart()` hook. Codegen wraps them in `app.onStart(async (ctx) => { ... })`. */
-  onStart?: string[];
-}
-
-/** Context passed to plugin codegen hooks. */
-export interface CodegenContext {
-  /** Flattened config values read from config files at build time (e.g. `{ 'server.runtime': 'cloudflare' }`). */
-  config: Record<string, string>;
-}
-
 /** Plugin interface for extending the transformer pipeline. */
 export interface TransformerPlugin {
   /** Unique plugin name. */
@@ -202,14 +186,4 @@ export interface TransformerPlugin {
    * already present in the bean list, or are self-contained (no dependencies).
    */
   beforeCodegen?(beans: IRBeanDefinition[]): IRBeanDefinition[];
-
-  /**
-   * Contribute additional imports and code to the generated file.
-   * Called during code generation. Duplicate imports across plugins are
-   * automatically deduplicated.
-   */
-  codegen?(
-    beans: IRBeanDefinition[],
-    context?: CodegenContext,
-  ): CodegenContribution;
 }

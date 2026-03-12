@@ -1,33 +1,37 @@
 # @goodie-ts/hono
 
-Hono adapter for goodie-ts. Provides config-driven CORS, `EmbeddedServer`, `ServerConfig`, and the codegen-only transformer plugin for compile-time route wiring. Decorators (`@Controller`, `@Get`, etc.) live in `@goodie-ts/http`.
+Hono adapter for goodie-ts. Thin I/O bridge between `@goodie-ts/http`'s generic HTTP abstractions and Hono's native API. Provides config-driven CORS, `EmbeddedServer`, `ServerConfig`, `HonoServerBootstrap` (library bean), and runtime helpers.
 
 ## Key Files
 
 | File | Role |
 |------|------|
-| `src/plugin.ts` | Transformer plugin — reads `metadata.httpController` from http plugin, generates `createRouter()`, `app.onStart()` hook, CORS from config, RPC clients |
+| `src/hono-server-bootstrap.ts` | `HonoServerBootstrap` — `@Singleton` library bean extending `AbstractServerBootstrap`, creates Hono router and starts `EmbeddedServer` on `onStart()` |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
 | `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host`, `port`, `runtime`, `cors` |
-| `src/router-helpers.ts` | Runtime helpers (`handleResult`, `buildRequest`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
+| `src/router-helpers.ts` | Runtime helpers (`toHonoResponse`, `toHonoErrorResponse`, `buildHttpContext`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
 | `src/index.ts` | Public exports — adapter-specific beans and helpers only (no decorator re-exports) |
 
-## Transformer Plugin (`src/plugin.ts`)
+## HonoServerBootstrap
 
-The hono plugin is auto-discovered at build time via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
+`HonoServerBootstrap` is a library bean (in `beans.json`) that extends `AbstractServerBootstrap` (from `@goodie-ts/http`) which extends `OnStart` (from `@goodie-ts/core`). It is discovered at runtime via the `baseTokens` mechanism.
 
-The plugin is codegen-only — no `visitClass`/`visitMethod` hooks. It reads route metadata from the http plugin's `metadata.httpController` and generates Hono-specific code.
+- **`@ConditionalOnProperty('server.runtime', { havingValue: ['node', 'bun', 'deno'] })`** — excluded on Cloudflare Workers (serverless deployments call `createHonoRouter(ctx)` directly)
+- **`onStart(ctx)`** — calls `createHonoRouter(ctx)` to build the Hono app, then `embeddedServer.listen(router)` to start serving
+- **baseTokenRefs chain**: `HonoServerBootstrap → AbstractServerBootstrap → OnStart`
 
-- **`codegen`** — receives `CodegenContext` with build-time config. Generates per-controller route factories, `createRouter(ctx)`, `app.onStart()` hook (skipped for serverless runtimes like `cloudflare`), RPC types/clients, and CORS middleware from `server.cors.*` config.
+### Parameter Binding & Response Adaptation
 
-### Request/Response Adaptation
+Controller methods use Micronaut-style parameter binding. The hono plugin generates per-param extraction code:
 
-Controller methods use `Request<T>` and `Response<T>` from `@goodie-ts/http`. The hono plugin generates adapter code:
+- **No params** → `toHonoResponse(c, await ctrl.method())` — calls method with no args
+- **Path params** → `c.req.param('id')` with type coercion (`Number()` for numbers, `=== 'true'` for booleans)
+- **Query params** → `c.req.query('name')` for scalars, `c.req.queries('name')` for arrays
+- **Body params** → `await c.req.json()` (POST/PUT/PATCH only)
+- **`HttpContext` param** → `buildHttpContext(c)` — read-only request context (headers, cookies, etc.)
+- **`@Status(code)`** → passes `defaultStatus` to `toHonoResponse` for plain return values
 
-- **No params** → `handleResult(c, await ctrl.method())` — calls method with no args
-- **`Request<T>` param** → `handleResult(c, await ctrl.method(await buildRequest(c, parseBody)))` — constructs `Request<T>` from Hono Context. `parseBody` is `true` for POST/PUT/PATCH, `false` otherwise.
-
-`handleResult` uses generic overloads to preserve `TypedResponse<T>` for Hono's RPC type inference — the `hc` client gets full output types.
+`toHonoResponse` uses generic overloads to preserve `TypedResponse<T>` for Hono's RPC type inference — the `hc` client gets full output types.
 
 ### CORS — Config-Driven (opt-in)
 
@@ -51,35 +55,51 @@ No config → no CORS middleware emitted. No `@Cors` decorator — CORS is a ser
 
 Generated code never calls Hono APIs directly. Instead it calls runtime helpers exported from `@goodie-ts/hono`:
 
-- `handleResult(c, result)` — converts controller return values to Hono Response. Generic overloads preserve `TypedResponse<T>` for RPC inference.
-- `buildRequest(c, parseBody)` — constructs `Request<T>` from Hono Context
+- `toHonoResponse(c, result, defaultStatus?)` — translates controller return values to Hono Response. Optional `defaultStatus` from `@Status` decorator. Generic overloads preserve `TypedResponse<T>` for RPC inference.
+- `toHonoErrorResponse(c, result)` — translates `Response<T>` from exception handling to native `Response`. Returns non-generic `Response` to avoid polluting Hono's RPC type inference.
+- `buildHttpContext(c)` — constructs `HttpContext` from Hono Context (read-only: headers, cookies, query, params, url)
 - `corsMiddleware(options?)` — wraps `cors()` from hono/cors
 - `requestScopeMiddleware()` — wraps `RequestScopeManager.run()` from @goodie-ts/core
+
+### Error Handling
+
+All route handlers are wrapped in try/catch. At startup, `createRouter` resolves all `ExceptionHandler` beans via `ctx.getAll(ExceptionHandler)`. Caught errors are delegated to `handleException()` from `@goodie-ts/http` which iterates all handlers. If a handler returns a `Response<T>`, it's translated to a Hono response via `toHonoResponse()`. If no handler matches, the error is re-thrown.
+
+This follows Micronaut's `ExceptionHandler` pattern — multiple handlers supported (validation, security, custom), the generic pipeline lives in `@goodie-ts/http`, the adapter only bridges I/O.
 
 ### Route Factory Pattern
 
 ```typescript
-function __createCtrlRoutes(ctrl: Ctrl) {
+function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[]) {
   return new Hono()
     .get('/items',
-      async (c) => handleResult(c, await ctrl.list()))
-    .post('/items',
-      async (c) => handleResult(c, await ctrl.create(await buildRequest(c, true))))
+      async (c) => {
+        try {
+          return toHonoResponse(c, await ctrl.list())
+        } catch (e) {
+          handleException(e, __exceptionHandlers)
+          throw e
+        }
+      })
 }
 ```
 
+`handleException` throws `MappedException` if a handler matches — caught by `.onError()` on the router chain and translated via `toHonoErrorResponse`. This keeps the catch block throw-only, preserving RPC type inference.
+
 ## Library Beans (beans.json)
 
-2 singleton beans:
+3 singleton beans:
 - **ServerConfig** — `@ConfigurationProperties('server')` with host/port/runtime/cors
 - **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`
+- **HonoServerBootstrap** — extends `AbstractServerBootstrap → OnStart`, conditional on `server.runtime` being `node`/`bun`/`deno`, depends on `EmbeddedServer`
 
 ## Design Decisions
 
+- **Thin I/O bridge** — hono adapter only bridges Hono's native API to `@goodie-ts/http` abstractions. Exception handling pipeline, `ExceptionHandler`, and `handleException()` live in `@goodie-ts/http`. A future Express adapter would use the same pipeline with its own I/O bridge.
 - **Adapter pattern** — hono plugin reads from `metadata.httpController` set by the http plugin. Route scanning is in `@goodie-ts/http`, Hono-specific codegen is here.
 - **No decorator re-exports** — users import decorators from `@goodie-ts/http` directly. Swapping adapters requires no decorator import changes.
 - **CORS is config-driven and opt-in** — only emitted when `server.cors.*` config keys exist.
-- **Security, validation, and OpenAPI removed** — will be rebuilt as dedicated packages
+- **Error handling is always-on** — route handlers always have try/catch. Exception handlers are optional runtime beans. No conditional codegen for error handling — follows Micronaut.
 - **Generated code never imports Hono ecosystem directly** — all Hono API calls are in `router-helpers.ts`
 
 ## Multi-Runtime Support
@@ -89,6 +109,4 @@ function __createCtrlRoutes(ctrl: Ctrl) {
 - **`bun`** — `Bun.serve()` via `globalThis.Bun`
 - **`deno`** — `Deno.serve()` via `globalThis.Deno`
 
-The plugin reads `server.runtime` from `CodegenContext.config` at build time:
-- `'node'` (default) / `'bun'` / `'deno'` → generates `app.onStart()` hook with `EmbeddedServer`
-- `'cloudflare'` → serverless: skips the hook and `EmbeddedServer` import (use `createRouter()` directly)
+`HonoServerBootstrap` uses `@ConditionalOnProperty('server.runtime', { havingValue: ['node', 'bun', 'deno'] })` — when `server.runtime` is `'cloudflare'`, the bean is excluded at runtime, and users call `createHonoRouter(ctx)` directly.

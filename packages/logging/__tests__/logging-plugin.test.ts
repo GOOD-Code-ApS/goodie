@@ -72,9 +72,8 @@ describe('Logging Transformer Plugin', () => {
     expect(result.code).toContain(
       "import { LoggingInterceptor } from '@goodie-ts/logging'",
     );
-    expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/core'",
-    );
+    // buildInterceptorChain auto-derived in core import
+    expect(result.code).toContain('buildInterceptorChain');
   });
 
   it('should generate metadata with level info by default', () => {

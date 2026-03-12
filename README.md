@@ -2,21 +2,23 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-> **Alpha software.** APIs may change between minor versions until 1.0. Pin your versions and check the [changelog](./.changeset) before upgrading.
+Build-time validated application framework for TypeScript — no reflection, no runtime scanning, errors before your app starts.
 
-Compile-time dependency injection for TypeScript. No `reflect-metadata`, no runtime scanning — just decorators and code generation.
+The dependency graph is validated at build time by scanning your source with [ts-morph](https://github.com/dsherret/ts-morph). Missing dependencies, circular references, and typos are caught before the app runs — not at startup. No `reflect-metadata`, no `emitDecoratorMetadata`, no classpath scanning.
 
-## How It Works
+HTTP routing, database integration, validation, caching, resilience patterns, and more — all following the same build-time-first philosophy.
 
-```
-Decorators (your code) → Transformer (compile-time) → Generated code → Runtime (ApplicationContext)
-```
+## Why goodie?
 
-1. You annotate classes with Stage 3 decorators (`@Singleton`, `@Injectable`, `@Inject`, etc.)
-2. At build time, a ts-morph transformer scans your code and generates a typed wiring file
-3. At runtime, `ApplicationContext` resolves the dependency graph from the generated definitions
+| Framework | How deps are discovered | When wiring is validated | Reflection? |
+|-----------|------------------------|------------------------|-------------|
+| NestJS | `reflect-metadata` at runtime | App startup | Yes |
+| tsyringe | `reflect-metadata` at runtime | App startup | Yes |
+| inversify | `reflect-metadata` at runtime | App startup | Yes |
+| Awilix | Manual registration | App startup | No |
+| **goodie** | **ts-morph source scanning** | **Build time** | **No** |
 
-The result: full DI with zero runtime reflection, type-safe tokens, and instant startup.
+goodie is the only TypeScript DI framework that validates the dependency graph before your app runs **and** requires no runtime reflection. Missing beans, circular dependencies, and misspelled tokens are build errors with suggestions — not runtime crashes.
 
 ## Requirements
 
@@ -89,24 +91,26 @@ const userService = app.context.get(UserService);
 
 | Package | Description |
 |---------|-------------|
-| [`@goodie-ts/cache`](./packages/cache) | In-memory caching — `@Cacheable`, `@CacheEvict`, `@CachePut` |
-| [`@goodie-ts/hono`](./packages/hono) | HTTP routing — `@Controller`, `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch`, `ServerConfig`, `EmbeddedServer`, transformer plugin |
+| [`@goodie-ts/http`](./packages/http) | Abstract HTTP — `@Controller`, `@Get`/`@Post`/etc route decorators, `Request<T>`, `Response<T>`, `ExceptionHandler` |
+| [`@goodie-ts/hono`](./packages/hono) | Hono adapter — `EmbeddedServer`, `ServerConfig`, config-driven CORS, codegen plugin |
+| [`@goodie-ts/validation`](./packages/validation) | Valibot-based validation — `@Validated`, constraint decorators (`@NotBlank`, `@MaxLength`, etc.), `ValiSchemaFactory`, transformer plugin |
 | [`@goodie-ts/kysely`](./packages/kysely) | Kysely integration — `KyselyDatabase`, `@Transactional`, `@Migration` |
+| [`@goodie-ts/cache`](./packages/cache) | In-memory caching — `@Cacheable`, `@CacheEvict`, `@CachePut` |
 | [`@goodie-ts/logging`](./packages/logging) | Method logging — `@Log`, `LoggerFactory`, `MDC` |
 | [`@goodie-ts/health`](./packages/health) | Health checks — `HealthIndicator`, `HealthAggregator`, `UptimeHealthIndicator` |
 | [`@goodie-ts/resilience`](./packages/resilience) | Resilience patterns — `@Retryable`, `@CircuitBreaker`, `@Timeout` |
 
 ## Performance
 
-Benchmarks measured on an Apple M-series MacBook. Run `pnpm bench` to reproduce on your machine. Cloud/CI environments will show lower absolute numbers, but relative comparisons hold.
+Benchmarks measured on an Apple M-series MacBook (March 2026). Run `pnpm bench` to reproduce on your machine. Cloud/CI environments will show lower absolute numbers, but relative comparisons hold.
 
 ### Build-time (transformer)
 
 | Benchmark | 50 beans | 100 beans | 500 beans |
 |---|---|---|---|
-| Full pipeline (scan + resolve + graph + codegen) | ~75ms | ~75ms | ~97ms |
-| Scanner only | ~71ms | ~76ms | ~94ms |
-| Code generation only | ~0.17ms | ~0.35ms | ~1.7ms |
+| Full pipeline (scan + resolve + graph + codegen) | ~82ms | ~87ms | ~104ms |
+| Scanner only | ~80ms | ~72ms | ~99ms |
+| Code generation only | ~0.20ms | ~0.38ms | ~1.9ms |
 
 The scanner (ts-morph AST traversal + type resolution) dominates build time. Code generation is negligible. Watch-mode rebuilds skip codegen entirely when the DI graph hasn't changed (IR hash comparison).
 
@@ -114,11 +118,11 @@ The scanner (ts-morph AST traversal + type resolution) dominates build time. Cod
 
 | Benchmark | ops/sec |
 |---|---|
-| `ApplicationContext.create()` — 50 beans | ~222k |
-| `ApplicationContext.create()` — 500 beans | ~20k |
-| Singleton `get()` (cached) | ~10.5M |
-| Prototype `get()` (new instance) | ~143k |
-| `getAll()` — 100 beans | ~1M |
+| `ApplicationContext.create()` — 50 beans | ~203k |
+| `ApplicationContext.create()` — 500 beans | ~19k |
+| Singleton `get()` (cached) | ~10.4M |
+| Prototype `get()` (new instance) | ~144k |
+| `getAll()` — 100 beans | ~1.1M |
 
 Singleton resolution is a single Map lookup — effectively free. The `preSorted` optimization (used by generated code) makes `create()` ~2x faster by skipping redundant topological sorting.
 

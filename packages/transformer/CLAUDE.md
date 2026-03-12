@@ -63,9 +63,11 @@ Plugins can register classes as beans via `ctx.registerBean({ scope })` in their
 
 ## Plugin System
 
-External packages can contribute codegen via the `TransformerPlugin` interface:
+External packages can extend the transformer via the `TransformerPlugin` interface:
+- `beforeScan` — called before scanning starts
 - `visitClass` / `visitMethod` — scan hooks called during the single AST pass
-- `codegen(beans, context?)` — receives `CodegenContext` with build-time config (`context.config` is a flattened `Record<string, string>` from JSON config files). Returns `CodegenContribution` (`{ imports, code }`) appended to generated output
+- `afterResolve(beans)` — post-resolution hook, can filter/mutate IR beans
+- `beforeCodegen(beans)` — pre-codegen hook, can inject synthetic beans
 
 Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, introspection, config, conditional) are always active — introspection runs before config since `@ConfigurationProperties` implies `@Introspected`.
 
@@ -123,7 +125,7 @@ All extend `TransformerError` with `sourceLocation` and optional `hint`:
 `MissingProviderError`, `AmbiguousProviderError`, `UnresolvableTypeError`, `InvalidDecoratorUsageError`, `GenericTypeResolutionError`, `CircularDependencyError`
 
 - **Fuzzy suggestions**: `MissingProviderError` suggests similar registered token names via `findSimilarTokens()` (Levenshtein distance, threshold `max(3, ceil(name.length / 2))`)
-- **Plugin error wrapping**: All plugin hook invocations (`beforeScan`, `afterResolve`, `beforeCodegen`, `codegen`) are wrapped with plugin name context ("Error in plugin 'kysely' during afterResolve: ...") and preserve the original error via `{ cause }`. `TransformerError` subclasses pass through unwrapped.
-- **`GOODIE_DEBUG`**: When `GOODIE_DEBUG=true`, `transform()` prints the full bean graph, resolution order, active plugins, and codegen contributions to stderr
+- **Plugin error wrapping**: All plugin hook invocations (`beforeScan`, `afterResolve`, `beforeCodegen`) are wrapped with plugin name context ("Error in plugin 'kysely' during afterResolve: ...") and preserve the original error via `{ cause }`. `TransformerError` subclasses pass through unwrapped.
+- **`GOODIE_DEBUG`**: When `GOODIE_DEBUG=true`, `transform()` prints the full bean graph, resolution order, and active plugins to stderr
 
 NOTE: `findSimilarTokens`/`levenshtein` in `transformer-errors.ts` are duplicated from `packages/core/src/application-context.ts` (separate packages, no shared util). Keep threshold logic in sync.

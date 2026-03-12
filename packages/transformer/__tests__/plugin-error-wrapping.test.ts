@@ -39,28 +39,6 @@ describe('Plugin error wrapping', () => {
     ).toThrow(/Error in plugin 'test-plugin' during afterResolve/);
   });
 
-  it('should wrap codegen errors with plugin name', () => {
-    const badPlugin: TransformerPlugin = {
-      name: 'codegen-plugin',
-      codegen() {
-        throw new Error('codegen broke');
-      },
-    };
-
-    const project = createProject({
-      '/src/decorators.ts': decoratorsFile,
-      '/src/Foo.ts': `
-        import { Singleton } from './decorators.js'
-        @Singleton()
-        export class Foo {}
-      `,
-    });
-
-    expect(() =>
-      transformInMemory(project, '/out/gen.ts', [badPlugin]),
-    ).toThrow(/Error in plugin 'codegen-plugin' during codegen/);
-  });
-
   it('should pass through TransformerErrors from plugins without wrapping', () => {
     const badPlugin: TransformerPlugin = {
       name: 'transparent-plugin',

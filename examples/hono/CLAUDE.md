@@ -5,6 +5,8 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 ## What It Demonstrates
 
 - `@Controller` / `@Get` / `@Post` for declarative HTTP routing (codegen via hono plugin)
+- `@Validated` + `@Introspected` DTOs with constraint decorators (`@NotBlank`, `@MaxLength`) for request body validation
+- `ValiExceptionHandler` auto-discovered via `baseTokens: [ExceptionHandler]` — returns 400 with structured errors
 - `KyselyDatabase` abstract base with `PostgresKyselyDatabase` conditionally selected via `@ConditionalOnProperty`
 - `PostgresDatasourceConfig` + `PoolConfig` library beans via `@ConfigurationProperties('datasource')`
 - `@Module` with `@Provides` for typed `Kysely<Database>` injection (single cast in module, no casts in consumers)
@@ -47,9 +49,10 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 | `src/db/schema.ts` | Kysely `Database` interface with typed table definitions |
 | `src/DatabaseModule.ts` | `@Module` providing typed `Kysely<Database>` from `KyselyDatabase` library bean |
 | `src/DatabaseHealthIndicator.ts` | `@Singleton` health check using `KyselyDatabase` with `sql\`SELECT 1\`` |
+| `src/dto.ts` | `@Introspected` DTOs: `CreateTodoDto` (`@NotBlank`, `@MaxLength(255)`), `UpdateTodoDto` (`@MaxLength(255)`) |
 | `src/TodoRepository.ts` | `@Singleton` repository injecting `Kysely<Database>` directly |
 | `src/TodoService.ts` | `@Singleton` business logic delegating to repository |
-| `src/TodoController.ts` | `@Controller('/api/todos')` with `@Get`, `@Post`, `@Patch`, `@Delete` routes |
+| `src/TodoController.ts` | `@Controller('/api/todos')` with `@Validated` on `create`/`update`, `@Get`, `@Post`, `@Patch`, `@Delete` routes |
 | `src/main.ts` | Bootstrap: `await app.start()` from generated file |
 | `config/default.json` | JSON config file for server, datasource, and pool settings |
 | `vite.config.ts` | Vite config with `diPlugin({ configDir: 'config' })` |

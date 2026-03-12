@@ -18,15 +18,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./plugin": {
-      "types": "./dist/plugin.d.ts",
-      "import": "./dist/plugin.js"
     }
   },
   "goodie": {
-    "beans": "dist/beans.json",
-    "plugin": "dist/plugin.js"
+    "beans": "dist/beans.json"
   },
   "scripts": {
     "build": "tsc && goodie generate --mode library",

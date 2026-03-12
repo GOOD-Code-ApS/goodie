@@ -44,6 +44,7 @@ const DECORATOR_NAMES = {
   PostProcessor: 'PostProcessor',
   RequestScoped: 'RequestScoped',
   Value: 'Value',
+  Order: 'Order',
 } as const;
 
 /** A public member of a @RequestScoped bean, used for compile-time scoped proxy generation. */
@@ -81,6 +82,8 @@ export interface ScannedBean {
   methodDecorators: Record<string, IRDecoratorEntry[]>;
   /** Public members for compile-time scoped proxy generation (only for request-scoped beans). */
   publicMembers?: ScannedPublicMember[];
+  /** Execution order from @Order() decorator — lower runs first, default 0. */
+  order: number | undefined;
   sourceLocation: SourceLocation;
 }
 
@@ -100,6 +103,8 @@ export interface ScannedConstructorParam {
   typeArguments: ScannedTypeArgument[];
   /** The resolved base type name (e.g. 'Repository' for Repository<User>). */
   resolvedBaseTypeName: string | undefined;
+  /** True when the parameter has a `?` modifier (e.g. `param?: Foo`). */
+  isOptional: boolean;
   /** True when the parameter is typed as T[] or Array<T>. */
   isCollection: boolean;
   /** When isCollection is true, the element type info for the array. */
@@ -342,6 +347,7 @@ function scanBean(
   if (!className) return undefined;
   const eager = hasDecorator(decorators, DECORATOR_NAMES.Eager);
   const name = getNamedValue(decorators);
+  const order = getOrderValue(decorators);
   const constructorParams = scanConstructorParams(cls, cache);
   const fieldInjections = scanFieldInjections(cls, cache);
   const lifecycle = scanLifecycleMethods(cls);
@@ -388,6 +394,7 @@ function scanBean(
     methodDecorators:
       Object.keys(methodDecorators).length > 0 ? methodDecorators : {},
     publicMembers,
+    order,
     sourceLocation: getSourceLocation(cls, sourceFile),
   };
 }
@@ -405,6 +412,7 @@ function scanConstructorParams(
     let typeSourceFile: SourceFile | undefined;
     let typeArguments: ScannedTypeArgument[] = [];
     let resolvedBaseTypeName: string | undefined;
+    const isOptional = param.hasQuestionToken();
     let isCollection = false;
     let elementTypeName: string | undefined;
     let elementTypeSourceFile: SourceFile | undefined;
@@ -413,7 +421,10 @@ function scanConstructorParams(
 
     if (typeNode) {
       typeName = typeNode.getText();
-      const paramType = param.getType();
+      // For optional params (param?: Foo), getType() returns Foo | undefined.
+      // Use getNonNullableType() to strip undefined so resolveTypeSymbol works.
+      const rawType = param.getType();
+      const paramType = isOptional ? rawType.getNonNullableType() : rawType;
 
       // Detect array types: T[] or Array<T>
       if (paramType.isArray()) {
@@ -442,6 +453,7 @@ function scanConstructorParams(
       typeSourceFile,
       typeArguments,
       resolvedBaseTypeName,
+      isOptional,
       isCollection,
       elementTypeName,
       elementTypeSourceFile,
@@ -564,6 +576,7 @@ function scanProvidesMethods(
         typeSourceFile,
         typeArguments,
         resolvedBaseTypeName,
+        isOptional: param.hasQuestionToken(),
         isCollection: false,
         elementTypeName: undefined,
         elementTypeSourceFile: undefined,
@@ -900,6 +913,18 @@ function getNamedValue(decorators: Decorator[]): string | undefined {
     return text.slice(1, -1);
   }
   return text;
+}
+
+function getOrderValue(decorators: Decorator[]): number | undefined {
+  const dec = findDecorator(decorators, DECORATOR_NAMES.Order);
+  if (!dec) return undefined;
+
+  const args = dec.getArguments();
+  if (args.length === 0) return 0;
+
+  const text = args[0].getText().replace(/_/g, '');
+  const value = Number(text);
+  return Number.isFinite(value) ? value : 0;
 }
 
 // ── Source location ──

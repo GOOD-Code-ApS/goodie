@@ -15,7 +15,7 @@ export type { ConditionalRule } from './builtin-conditional-plugin.js';
 export { createConditionalPlugin } from './builtin-conditional-plugin.js';
 export { createConfigPlugin } from './builtin-config-plugin.js';
 export { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
-export type { CodegenOptions } from './codegen.js';
+export type { CodegenOptions, TypeRegistration } from './codegen.js';
 // Code Generator
 export { generateCode } from './codegen.js';
 // Plugin discovery
@@ -54,8 +54,6 @@ export {
 // Options
 export type {
   ClassVisitorContext,
-  CodegenContext,
-  CodegenContribution,
   MethodVisitorContext,
   TransformerPlugin,
   TransformLibraryOptions,

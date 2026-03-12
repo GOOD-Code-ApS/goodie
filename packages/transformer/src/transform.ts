@@ -12,7 +12,12 @@ import { createAopPlugin } from './builtin-aop-plugin.js';
 import { createConditionalPlugin } from './builtin-conditional-plugin.js';
 import { createConfigPlugin } from './builtin-config-plugin.js';
 import { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
-import { computeIRHash, extractIRHash, generateCode } from './codegen.js';
+import {
+  computeIRHash,
+  extractIRHash,
+  generateCode,
+  type TypeRegistration,
+} from './codegen.js';
 import {
   discoverAll,
   discoverPlugins,
@@ -27,7 +32,6 @@ import {
   serializeBeans,
 } from './library-beans.js';
 import type {
-  CodegenContribution,
   TransformerPlugin,
   TransformLibraryOptions,
   TransformLibraryResult,
@@ -214,18 +218,8 @@ export async function transform(
     inlinedConfig = readAndFlattenConfigFiles(resolvedConfigDir);
   }
 
-  // 10. Collect codegen contributions (pass build-time config to plugins)
-  const codegenContext = { config: inlinedConfig ?? {} };
-  const contributions: CodegenContribution[] = [];
-  for (const plugin of activePlugins) {
-    if (plugin.codegen) {
-      contributions.push(
-        runPluginHook(plugin.name, 'codegen', () =>
-          plugin.codegen!(finalBeans, codegenContext),
-        ),
-      );
-    }
-  }
+  // 10. Extract type registrations from plugin metadata
+  const typeRegistrations = extractTypeRegistrations(scanResult.pluginMetadata);
 
   // 11. Check IR hash — skip codegen + write if DI graph unchanged
   const codegenOptions = {
@@ -234,7 +228,11 @@ export async function transform(
     configDir: resolvedConfigDir,
     inlinedConfig,
   };
-  const currentHash = computeIRHash(finalBeans, codegenOptions, contributions);
+  const currentHash = computeIRHash(
+    finalBeans,
+    codegenOptions,
+    typeRegistrations,
+  );
 
   let existingHash: string | undefined;
   try {
@@ -261,12 +259,12 @@ export async function transform(
   const code = generateCode(
     finalBeans,
     { ...codegenOptions, hash: currentHash },
-    contributions,
+    typeRegistrations,
   );
 
   // 11b. Debug output
   if (process.env.GOODIE_DEBUG === 'true') {
-    printDebugInfo(finalBeans, activePlugins, contributions);
+    printDebugInfo(finalBeans, activePlugins);
   }
 
   // 12. Write output
@@ -368,18 +366,8 @@ export function transformInMemory(
     }
   }
 
-  // 8. Collect codegen contributions (pass build-time config to plugins)
-  const codegenCtx = { config: options?.inlinedConfig ?? {} };
-  const contributions: CodegenContribution[] = [];
-  for (const plugin of activePlugins) {
-    if (plugin.codegen) {
-      contributions.push(
-        runPluginHook(plugin.name, 'codegen', () =>
-          plugin.codegen!(finalBeans, codegenCtx),
-        ),
-      );
-    }
-  }
+  // 8. Extract type registrations from plugin metadata
+  const typeRegistrations = extractTypeRegistrations(scanResult.pluginMetadata);
 
   // 9. Generate code
   const code = generateCode(
@@ -391,7 +379,7 @@ export function transformInMemory(
         ? { inlinedConfig: options.inlinedConfig }
         : {}),
     },
-    contributions,
+    typeRegistrations,
   );
 
   return {
@@ -495,21 +483,14 @@ export async function transformLibrary(
   // 10. Generate code (before rewriting import paths — code uses relative imports)
   let code: string | undefined;
   if (options.codeOutputPath) {
-    const contributions: CodegenContribution[] = [];
-    for (const plugin of activePlugins) {
-      if (plugin.codegen) {
-        contributions.push(
-          runPluginHook(plugin.name, 'codegen', () =>
-            plugin.codegen!(finalBeans),
-          ),
-        );
-      }
-    }
+    const typeRegistrations = extractTypeRegistrations(
+      scanResult.pluginMetadata,
+    );
 
     code = generateCode(
       finalBeans,
       { outputPath: options.codeOutputPath, version: PKG_VERSION },
-      contributions,
+      typeRegistrations,
     );
 
     const codeDir = path.dirname(options.codeOutputPath);
@@ -574,12 +555,29 @@ export async function transformLibrary(
 }
 
 /**
+ * Extract type registrations from plugin metadata.
+ * Entries with `__typeRegistration` represent non-bean types (e.g. @Introspected DTOs)
+ * that need MetadataRegistry.register() calls in the generated code.
+ */
+function extractTypeRegistrations(
+  pluginMetadata: Map<string, Record<string, unknown>> | undefined,
+): TypeRegistration[] {
+  if (!pluginMetadata) return [];
+  const result: TypeRegistration[] = [];
+  for (const meta of pluginMetadata.values()) {
+    if (meta.__typeRegistration) {
+      result.push(meta.__typeRegistration as TypeRegistration);
+    }
+  }
+  return result;
+}
+
+/**
  * Print bean graph and plugin contributions when GOODIE_DEBUG=true.
  */
 function printDebugInfo(
   beans: IRBeanDefinition[],
   plugins: TransformerPlugin[],
-  contributions: CodegenContribution[],
 ): void {
   console.log('[goodie] ══════════════════════════════════');
   console.log(`[goodie] Build-time debug info`);
@@ -606,12 +604,6 @@ function printDebugInfo(
   console.log('[goodie] ──────────────────────────────────');
   console.log(
     `[goodie] Active plugins: ${plugins.map((p) => p.name).join(', ')}`,
-  );
-  const codegenPlugins = contributions.filter(
-    (c) => (c.code && c.code.length > 0) || (c.imports && c.imports.length > 0),
-  );
-  console.log(
-    `[goodie] Plugin codegen contributions: ${codegenPlugins.length}`,
   );
   console.log('[goodie] ══════════════════════════════════');
 }
