@@ -27,17 +27,22 @@ function createMockConfig(
 
 function createMockContext(
   controllers: Array<{
+    name: string;
     metadata: ControllerMetadata;
   }>,
 ): ApplicationContext {
-  const definitions = controllers.map((ctrl) => ({
-    token: class {},
-    scope: 'singleton' as const,
-    dependencies: [],
-    factory: () => null,
-    eager: false,
-    metadata: { httpController: ctrl.metadata },
-  })) as BeanDefinition[];
+  const definitions = controllers.map((ctrl) => {
+    // Create a named class so discoverControllers() can extract the name
+    const NamedClass = { [ctrl.name]: class {} }[ctrl.name];
+    return {
+      token: NamedClass,
+      scope: 'singleton' as const,
+      dependencies: [],
+      factory: () => null,
+      eager: false,
+      metadata: { httpController: ctrl.metadata },
+    };
+  }) as BeanDefinition[];
 
   return {
     getDefinitions: vi.fn().mockReturnValue(definitions),
@@ -79,6 +84,7 @@ describe('OpenApiSpecBuilder', () => {
   it('generates paths from controller routes', () => {
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -100,12 +106,15 @@ describe('OpenApiSpecBuilder', () => {
 
     expect(spec.paths['/api/todos']).toBeDefined();
     expect(spec.paths['/api/todos'].get).toBeDefined();
-    expect(spec.paths['/api/todos'].get.operationId).toBe('list');
+    expect(spec.paths['/api/todos'].get.operationId).toBe(
+      'TodoController_list',
+    );
   });
 
   it('converts :param to {param} in paths', () => {
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -141,6 +150,7 @@ describe('OpenApiSpecBuilder', () => {
   it('includes query parameters', () => {
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -204,6 +214,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -274,6 +285,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -320,6 +332,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -357,6 +370,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -388,8 +402,7 @@ describe('OpenApiSpecBuilder', () => {
         'application/json'
       ].schema,
     ).toEqual({
-      $ref: '#/components/schemas/Todo',
-      nullable: true,
+      oneOf: [{ $ref: '#/components/schemas/Todo' }, { type: 'null' }],
     });
   });
 
@@ -437,6 +450,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api',
           routes: [
@@ -485,8 +499,8 @@ describe('OpenApiSpecBuilder', () => {
     expect(schema.properties.tags).toEqual({
       type: 'array',
       items: { type: 'string' },
-      minLength: 1,
-      maxLength: 5,
+      minItems: 1,
+      maxItems: 5,
     });
   });
 
@@ -526,6 +540,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api',
           routes: [
@@ -604,6 +619,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api',
           routes: [
@@ -665,6 +681,7 @@ describe('OpenApiSpecBuilder', () => {
 
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api',
           routes: [
@@ -716,6 +733,7 @@ describe('OpenApiSpecBuilder', () => {
   it('handles void return type with no response body', () => {
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -750,6 +768,7 @@ describe('OpenApiSpecBuilder', () => {
   it('uses custom status code from route metadata', () => {
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [
@@ -776,6 +795,7 @@ describe('OpenApiSpecBuilder', () => {
   it('merges multiple routes on the same path', () => {
     const ctx = createMockContext([
       {
+        name: 'TodoController',
         metadata: {
           basePath: '/api/todos',
           routes: [

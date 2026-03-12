@@ -6,11 +6,7 @@ import {
   Singleton,
   type TypeMetadata,
 } from '@goodie-ts/core';
-import type {
-  ControllerMetadata,
-  ParamMetadata,
-  RouteMetadata,
-} from '@goodie-ts/http';
+import type { ControllerMetadata, RouteMetadata } from '@goodie-ts/http';
 import {
   OpenApiBuilder,
   type OperationObject,
@@ -61,10 +57,12 @@ export class OpenApiSpecBuilder {
     const controllers = this.discoverControllers();
     const schemaNames = new Set<string>();
 
-    for (const { basePath, routes } of controllers) {
-      for (const route of routes) {
-        const fullPath = toOpenApiPath(normalizePath(basePath, route.path));
-        const operation = this.buildOperation(route, schemaNames);
+    for (const { name, metadata: ctrl } of controllers) {
+      for (const route of ctrl.routes) {
+        const fullPath = toOpenApiPath(
+          normalizePath(ctrl.basePath, route.path),
+        );
+        const operation = this.buildOperation(name, route, schemaNames);
 
         const existing =
           (builder.getSpec().paths?.[fullPath] as PathItemObject) ?? {};
@@ -84,26 +82,36 @@ export class OpenApiSpecBuilder {
     return builder.getSpec();
   }
 
-  private discoverControllers(): ControllerMetadata[] {
+  private discoverControllers(): Array<{
+    name: string;
+    metadata: ControllerMetadata;
+  }> {
     const definitions = this.context.getDefinitions();
-    const controllers: ControllerMetadata[] = [];
+    const controllers: Array<{
+      name: string;
+      metadata: ControllerMetadata;
+    }> = [];
 
     for (const def of definitions) {
       const httpCtrl = def.metadata.httpController as
         | ControllerMetadata
         | undefined;
-      if (httpCtrl) controllers.push(httpCtrl);
+      if (!httpCtrl) continue;
+
+      const name = typeof def.token === 'function' ? def.token.name : 'Unknown';
+      controllers.push({ name, metadata: httpCtrl });
     }
 
     return controllers;
   }
 
   private buildOperation(
+    controllerName: string,
     route: RouteMetadata,
     schemaNames: Set<string>,
   ): OperationObject {
     const operation: OperationObject = {
-      operationId: route.methodName,
+      operationId: `${controllerName}_${route.methodName}`,
       responses: {},
     };
 
@@ -210,7 +218,7 @@ export class OpenApiSpecBuilder {
       const hasNull = members.includes('null');
 
       if (schemas.length === 1 && hasNull) {
-        return { ...schemas[0], nullable: true } as SchemaObject;
+        return toNullable(schemas[0]);
       }
       if (schemas.length === 1) return schemas[0];
       return { oneOf: schemas };
@@ -283,10 +291,7 @@ export class OpenApiSpecBuilder {
       case 'optional':
         return this.fieldTypeToSchema(type.inner, schemaNames);
       case 'nullable':
-        return {
-          ...this.fieldTypeToSchema(type.inner, schemaNames),
-          nullable: true,
-        } as SchemaObject;
+        return toNullable(this.fieldTypeToSchema(type.inner, schemaNames));
     }
   }
 
@@ -335,6 +340,21 @@ function literalSchema(value: string): SchemaObject {
   return {};
 }
 
+/**
+ * Make a schema nullable using OAS 3.1 conventions.
+ * - For `$ref`: wraps in `oneOf: [$ref, { type: 'null' }]`
+ * - For inline schemas with `type`: converts to `type: [originalType, 'null']`
+ */
+function toNullable(schema: SchemaObject): SchemaObject {
+  if (schema.$ref) {
+    return { oneOf: [schema, { type: 'null' }] };
+  }
+  if (typeof schema.type === 'string') {
+    return { ...schema, type: [schema.type, 'null'] };
+  }
+  return { oneOf: [schema, { type: 'null' }] };
+}
+
 function isOptionalType(type: FieldType): boolean {
   return type.kind === 'optional';
 }
@@ -372,8 +392,14 @@ function applyConstraints(
         result.format = result.format ?? 'email';
         break;
       case 'Size': {
-        result.minLength = val as number;
-        result.maxLength = dec.args.value2 as number;
+        const isArray = result.type === 'array';
+        if (isArray) {
+          result.minItems = val as number;
+          result.maxItems = dec.args.value2 as number;
+        } else {
+          result.minLength = val as number;
+          result.maxLength = dec.args.value2 as number;
+        }
         break;
       }
     }
