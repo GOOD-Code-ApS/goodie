@@ -12,7 +12,7 @@ import type { SecurityInterceptor } from '../security-interceptor.js';
  * @Secured('ADMIN')             // requires ADMIN role
  * @Secured(['ADMIN', 'EDITOR']) // requires ADMIN or EDITOR
  *
- * Order `-95` ensures security runs early — after validation (-90) but before
+ * Order `-95` ensures security runs early — before validation (-90) and before
  * business logic interceptors like @Log (0), @Cacheable (0), etc.
  */
 export const Secured = createAopDecorator<{

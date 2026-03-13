@@ -181,22 +181,15 @@ function resolveServerConfig(
   }
 }
 
-/**
- * Duck-typed interfaces for @goodie-ts/security integration.
- * Avoids a hard dependency — the adapter discovers by convention.
- */
-interface SecurityProviderLike {
-  authenticate(
-    request: HttpContext,
-  ):
-    | Promise<Record<string, unknown> | undefined>
-    | Record<string, unknown>
-    | undefined;
-}
+/** Duck-typed security middleware from @goodie-ts/security. */
+type SecurityMiddlewareFn = (
+  request: HttpContext,
+  next: () => Promise<unknown>,
+) => Promise<unknown>;
 
-interface SecurityContextLike {
-  run<R>(principal: unknown, fn: () => R | Promise<R>): Promise<R>;
-}
+type CreateSecurityMiddlewareFn = (
+  providers: unknown[],
+) => SecurityMiddlewareFn;
 
 /**
  * Discover SecurityProvider beans and build Hono security middleware.
@@ -205,8 +198,9 @@ interface SecurityContextLike {
  * constructor name is 'SecurityProvider'. No direct dependency on
  * @goodie-ts/security — the adapter uses duck typing.
  *
- * If providers are found, also tries to dynamically import SecurityContext
- * from @goodie-ts/security to wrap requests in the security context.
+ * Delegates to `createSecurityMiddleware()` from @goodie-ts/security
+ * (dynamically imported) for the actual auth pipeline. This avoids
+ * duplicating authentication logic.
  */
 function buildSecurityMiddleware(
   ctx: ApplicationContext,
@@ -218,38 +212,31 @@ function buildSecurityMiddleware(
   );
   if (!providerBaseToken) return undefined;
 
-  const providers = ctx.getAll(providerBaseToken) as SecurityProviderLike[];
+  const providers = ctx.getAll(providerBaseToken);
   if (providers.length === 0) return undefined;
 
-  // Lazy-load SecurityContext — resolved on first request
-  let securityContext: SecurityContextLike | undefined | false;
+  // Lazy-load createSecurityMiddleware — resolved on first request
+  let securityMw: SecurityMiddlewareFn | false | undefined;
 
   return async (c: Context, next: Next) => {
-    const request = buildHttpContext(c);
-    let principal: unknown;
-
-    for (const provider of providers) {
-      principal = await provider.authenticate(request);
-      if (principal) break;
-    }
-
-    // Lazy-resolve SecurityContext on first request
-    if (securityContext === undefined) {
+    // Lazy-resolve createSecurityMiddleware on first request
+    if (securityMw === undefined) {
       try {
         // Dynamic import — @goodie-ts/security is an optional peer dep.
         // Use variable to prevent TypeScript from resolving the module.
         const securityPkg = '@goodie-ts/security';
         const mod = await import(/* @vite-ignore */ securityPkg);
-        securityContext =
-          (mod as { SecurityContext?: SecurityContextLike }).SecurityContext ??
-          false;
+        const factory = (
+          mod as { createSecurityMiddleware?: CreateSecurityMiddlewareFn }
+        ).createSecurityMiddleware;
+        securityMw = factory ? factory(providers) : false;
       } catch {
-        securityContext = false;
+        securityMw = false;
       }
     }
 
-    if (securityContext) {
-      await securityContext.run(principal, next);
+    if (securityMw) {
+      await securityMw(buildHttpContext(c), next);
     } else {
       await next();
     }

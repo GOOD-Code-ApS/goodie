@@ -1,14 +1,23 @@
 import type { Principal } from './principal.js';
 
 /**
+ * Sentinel wrapper so we can distinguish "not inside a security context"
+ * (getStore() === undefined) from "inside context but unauthenticated"
+ * (getStore() === { principal: undefined }).
+ */
+interface SecurityStore {
+  principal: Principal | undefined;
+}
+
+/**
  * Lazy-loaded AsyncLocalStorage for the security context.
  * Same pattern as RequestScopeManager in @goodie-ts/core.
  */
 let storage:
-  | import('node:async_hooks').AsyncLocalStorage<Principal | undefined>
+  | import('node:async_hooks').AsyncLocalStorage<SecurityStore>
   | undefined;
 let storagePromise:
-  | Promise<import('node:async_hooks').AsyncLocalStorage<Principal | undefined>>
+  | Promise<import('node:async_hooks').AsyncLocalStorage<SecurityStore>>
   | undefined;
 
 async function getStorage() {
@@ -16,7 +25,7 @@ async function getStorage() {
   if (!storagePromise) {
     storagePromise = import('node:async_hooks')
       .then(({ AsyncLocalStorage }) => {
-        storage = new AsyncLocalStorage<Principal | undefined>();
+        storage = new AsyncLocalStorage<SecurityStore>();
         return storage;
       })
       .catch(() => {
@@ -47,7 +56,7 @@ export const SecurityContext = {
     fn: () => R | Promise<R>,
   ): Promise<R> {
     const als = await getStorage();
-    return als.run(principal, fn);
+    return als.run({ principal }, fn);
   },
 
   /**
@@ -55,11 +64,13 @@ export const SecurityContext = {
    * Returns undefined if not authenticated or not inside a security context.
    */
   current(): Principal | undefined {
-    return storage?.getStore();
+    return storage?.getStore()?.principal;
   },
 
   /**
    * Check if code is running inside a security context.
+   * Returns true even for unauthenticated requests (principal is undefined)
+   * as long as the security middleware is active.
    */
   isActive(): boolean {
     return storage?.getStore() !== undefined;

@@ -130,6 +130,29 @@ describe('Security Plugin', () => {
     });
   });
 
+  it('records @Anonymous on non-@Secured class (creates security metadata)', () => {
+    const project = createProject({
+      '/src/decorators.ts': decoratorsFile,
+      '/src/OpenService.ts': `
+        import { Singleton, Anonymous } from './decorators.js'
+
+        @Singleton()
+        export class OpenService {
+          @Anonymous()
+          publicMethod() {}
+        }
+      `,
+    });
+
+    const result = scan(project, [createSecurityPlugin()]);
+
+    const security = getMetadata(result, 'OpenService');
+    expect(security?.security).toEqual({
+      classRoles: [],
+      anonymousMethods: ['publicMethod'],
+    });
+  });
+
   it('does not set metadata on non-@Secured classes', () => {
     const project = createProject({
       '/src/decorators.ts': decoratorsFile,

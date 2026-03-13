@@ -16,6 +16,11 @@ import { SecurityContext } from './security-context.js';
 @Singleton()
 export class SecurityInterceptor implements MethodInterceptor {
   intercept(ctx: InvocationContext): unknown | Promise<unknown> {
+    // @Anonymous methods skip all security checks
+    if (ctx.metadata?.anonymous === true) {
+      return ctx.proceed();
+    }
+
     const principal = SecurityContext.current();
 
     if (!principal) {

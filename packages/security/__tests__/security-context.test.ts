@@ -64,4 +64,22 @@ describe('SecurityContext', () => {
       expect(SecurityContext.current()).toBeUndefined();
     });
   });
+
+  it('isActive() returns true inside security context even when unauthenticated', async () => {
+    await SecurityContext.run(undefined, () => {
+      expect(SecurityContext.isActive()).toBe(true);
+      expect(SecurityContext.current()).toBeUndefined();
+    });
+  });
+
+  it('isActive() returns true when authenticated', async () => {
+    const principal: Principal = {
+      name: 'alice',
+      roles: [],
+      attributes: {},
+    };
+    await SecurityContext.run(principal, () => {
+      expect(SecurityContext.isActive()).toBe(true);
+    });
+  });
 });

@@ -81,6 +81,20 @@ describe('SecurityInterceptor', () => {
     });
   });
 
+  it('skips auth for @Anonymous methods (anonymous: true metadata)', () => {
+    // @Anonymous methods should bypass all auth — no principal needed
+    const ctx = makeCtx({ anonymous: true });
+    const result = interceptor.intercept(ctx);
+    expect(result).toBe('ok');
+  });
+
+  it('skips auth for @Anonymous even when roles are set', () => {
+    // Class-level @Secured('ADMIN') + method-level @Anonymous → anonymous wins
+    const ctx = makeCtx({ roles: 'ADMIN', anonymous: true });
+    const result = interceptor.intercept(ctx);
+    expect(result).toBe('ok');
+  });
+
   it('calls proceed() when authorized', async () => {
     const principal: Principal = {
       name: 'admin',
