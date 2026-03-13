@@ -72,6 +72,14 @@ export default defineConfig({
         __dirname,
         'packages/openapi/src/index.ts',
       ),
+      '@goodie-ts/security/plugin': path.resolve(
+        __dirname,
+        'packages/security/src/plugin.ts',
+      ),
+      '@goodie-ts/security': path.resolve(
+        __dirname,
+        'packages/security/src/index.ts',
+      ),
     },
   },
   test: {
