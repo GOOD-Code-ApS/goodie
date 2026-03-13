@@ -223,6 +223,7 @@ describe('TransformerPlugin API', () => {
         scope: 'singleton',
         eager: false,
         name: undefined,
+        primary: false,
         constructorDeps: [],
         fieldDeps: [],
         factoryKind: 'constructor',

@@ -1234,6 +1234,131 @@ describe('ApplicationContext — self-injection', () => {
   });
 });
 
+// ── @Primary ────────────────────────────────────────────────────────
+
+describe('ApplicationContext — @Primary', () => {
+  it('selects @Primary bean over last-registered bean', async () => {
+    const token = new InjectionToken<object>('Provider');
+
+    class PrimaryImpl {
+      id = 'primary';
+    }
+    class SecondaryImpl {
+      id = 'secondary';
+    }
+
+    const ctx = await ApplicationContext.create([
+      makeDef(PrimaryImpl, {
+        factory: () => new PrimaryImpl(),
+        metadata: { primary: true },
+      }),
+      makeDef(SecondaryImpl, { factory: () => new SecondaryImpl() }),
+    ]);
+
+    // PrimaryImpl should win even though SecondaryImpl was registered last
+    expect(ctx.get(PrimaryImpl)).toBeInstanceOf(PrimaryImpl);
+  });
+
+  it('selects @Primary bean under shared base token', async () => {
+    abstract class CacheProvider {}
+
+    class InMemoryCache extends CacheProvider {
+      type = 'memory';
+    }
+    class RedisCache extends CacheProvider {
+      type = 'redis';
+    }
+
+    const ctx = await ApplicationContext.create([
+      {
+        token: InMemoryCache,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new InMemoryCache(),
+        eager: false,
+        metadata: { primary: true },
+        baseTokens: [CacheProvider],
+      },
+      {
+        token: RedisCache,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new RedisCache(),
+        eager: false,
+        metadata: {},
+        baseTokens: [CacheProvider],
+      },
+    ]);
+
+    // InMemoryCache is @Primary, so get(CacheProvider) should return it
+    const provider = ctx.get(CacheProvider);
+    expect(provider).toBeInstanceOf(InMemoryCache);
+  });
+
+  it('getAll still returns all beans regardless of @Primary', async () => {
+    abstract class Handler {}
+
+    class HandlerA extends Handler {}
+    class HandlerB extends Handler {}
+
+    const ctx = await ApplicationContext.create([
+      {
+        token: HandlerA,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new HandlerA(),
+        eager: false,
+        metadata: { primary: true },
+        baseTokens: [Handler],
+      },
+      {
+        token: HandlerB,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new HandlerB(),
+        eager: false,
+        metadata: {},
+        baseTokens: [Handler],
+      },
+    ]);
+
+    const all = ctx.getAll(Handler);
+    expect(all).toHaveLength(2);
+  });
+
+  it('falls back to last-wins when no @Primary is set', async () => {
+    abstract class Formatter {}
+
+    class JsonFormatter extends Formatter {}
+    class XmlFormatter extends Formatter {}
+
+    const ctx = await ApplicationContext.create([
+      {
+        token: JsonFormatter,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new JsonFormatter(),
+        eager: false,
+        metadata: {},
+        baseTokens: [Formatter],
+      },
+      {
+        token: XmlFormatter,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new XmlFormatter(),
+        eager: false,
+        metadata: {},
+        baseTokens: [Formatter],
+      },
+    ]);
+
+    // Last registered wins when no @Primary
+    const formatter = ctx.get(Formatter);
+    expect(formatter).toBeInstanceOf(XmlFormatter);
+  });
+});
+
 // ── Helper ───────────────────────────────────────────────────────────
 
 function tokenDesc(token: unknown): string {

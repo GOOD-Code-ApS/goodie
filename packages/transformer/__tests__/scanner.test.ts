@@ -74,6 +74,46 @@ describe('Scanner', () => {
       expect(result.beans[0].name).toBe('primary');
     });
 
+    it('should detect @Primary flag', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Primary(t: any, c: any) {}
+        `,
+        '/src/DefaultRepo.ts': `
+          import { Singleton, Primary } from './decorators.js'
+
+          @Primary
+          @Singleton()
+          export class DefaultRepo {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].primary).toBe(true);
+    });
+
+    it('should default primary to false', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Repo.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Repo {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.beans).toHaveLength(1);
+      expect(result.beans[0].primary).toBe(false);
+    });
+
     it('should detect @Eager flag', () => {
       const project = createProject({
         '/src/decorators.ts': `

@@ -43,6 +43,9 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
   // Build name-based lookup for @Named → @Inject('name') matching
   resolveNamedQualifiers(allBeans, warnings);
 
+  // Validate: at most one @Primary per base token
+  validatePrimaryUniqueness(allBeans);
+
   // Validate: no missing providers (except optional)
   validateProviders(allBeans);
 
@@ -93,6 +96,44 @@ function resolveNamedQualifiers(
           bean.sourceLocation,
         );
       }
+    }
+  }
+}
+
+/**
+ * Validate that at most one bean is marked @Primary per base token.
+ * Multiple @Primary beans under the same base token is ambiguous.
+ */
+function validatePrimaryUniqueness(beans: IRBeanDefinition[]): void {
+  // Group beans by their base token refs — @Primary matters when
+  // multiple beans share a base type (e.g. both implement CacheProvider)
+  const primaryByBaseToken = new Map<string, IRBeanDefinition[]>();
+
+  for (const bean of beans) {
+    if (!bean.primary) continue;
+
+    // Register under each base token
+    if (bean.baseTokenRefs) {
+      for (const ref of bean.baseTokenRefs) {
+        const key = tokenRefKey(ref);
+        const existing = primaryByBaseToken.get(key) ?? [];
+        existing.push(bean);
+        primaryByBaseToken.set(key, existing);
+      }
+    }
+  }
+
+  for (const [_key, primaries] of primaryByBaseToken) {
+    if (primaries.length > 1) {
+      throw new AmbiguousProviderError(
+        '@Primary',
+        primaries.map((b) =>
+          b.tokenRef.kind === 'class'
+            ? b.tokenRef.className
+            : b.tokenRef.tokenName,
+        ),
+        primaries[1].sourceLocation,
+      );
     }
   }
 }

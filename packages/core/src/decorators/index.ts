@@ -24,6 +24,7 @@ export { Order } from './order.js';
 export { PostConstruct } from './post-construct.js';
 export { PostProcessor } from './post-processor.js';
 export { PreDestroy } from './pre-destroy.js';
+export { Primary } from './primary.js';
 export { Provides } from './provides.js';
 export { RequestScoped } from './request-scoped.js';
 export { Singleton } from './singleton.js';

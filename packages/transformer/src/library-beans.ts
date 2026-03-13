@@ -46,6 +46,7 @@ function serializeBean(bean: IRBeanDefinition): Record<string, unknown> {
     scope: bean.scope,
     eager: bean.eager,
     name: bean.name ?? null,
+    primary: bean.primary,
     constructorDeps: bean.constructorDeps.map((dep) => ({
       tokenRef: serializeTokenRef(dep.tokenRef),
       optional: dep.optional,
@@ -126,6 +127,7 @@ function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
     scope: raw.scope as IRBeanDefinition['scope'],
     eager: raw.eager as boolean,
     name: (raw.name as string) ?? undefined,
+    primary: (raw.primary as boolean) ?? false,
     constructorDeps: rawConstructorDeps.map((dep) => ({
       tokenRef: deserializeTokenRef(dep.tokenRef as Record<string, unknown>),
       optional: dep.optional as boolean,
