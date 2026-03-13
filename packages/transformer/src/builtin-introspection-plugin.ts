@@ -1,23 +1,15 @@
-import {
-  type ClassDeclaration,
-  type Decorator,
-  type Node,
-  SyntaxKind,
-  type Type,
-} from 'ts-morph';
+import type { ClassDeclaration, Type } from 'ts-morph';
+import { extractDecoratorMeta } from './decorator-utils.js';
 import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 
 // ── Scanned introspection data (intermediate representation) ──
 
-interface ScannedDecoratorMeta {
-  name: string;
-  args: Record<string, unknown>;
-}
+import type { ParsedDecoratorMeta } from './decorator-utils.js';
 
 interface ScannedIntrospectedField {
   name: string;
   type: ScannedFieldType;
-  decorators: ScannedDecoratorMeta[];
+  decorators: ParsedDecoratorMeta[];
 }
 
 type ScannedFieldType =
@@ -92,110 +84,15 @@ function scanClassFields(cls: ClassDeclaration): ScannedIntrospectedField[] {
     const fieldType = resolveFieldType(propType);
 
     // Extract all field decorators generically
-    const decorators = extractFieldDecorators(prop.getDecorators());
+    const decorators = extractDecoratorMeta(
+      prop.getDecorators(),
+      IGNORED_DECORATORS,
+    );
 
     fields.push({ name, type: fieldType, decorators });
   }
 
   return fields;
-}
-
-function extractFieldDecorators(
-  decorators: Decorator[],
-): ScannedDecoratorMeta[] {
-  const result: ScannedDecoratorMeta[] = [];
-
-  for (const dec of decorators) {
-    const name = dec.getName();
-    if (IGNORED_DECORATORS.has(name)) continue;
-
-    const callExpr = dec.getCallExpression();
-    const astArgs = callExpr ? callExpr.getArguments() : [];
-
-    const args = parseDecoratorArgs(astArgs);
-
-    result.push({ name, args });
-  }
-
-  return result;
-}
-
-function parseDecoratorArgs(args: Node[]): Record<string, unknown> {
-  if (args.length === 0) return {};
-
-  // Single object literal argument → parse its properties via AST
-  if (
-    args.length === 1 &&
-    args[0].getKind() === SyntaxKind.ObjectLiteralExpression
-  ) {
-    return parseObjectLiteralNode(args[0]);
-  }
-
-  // Single positional argument → { value: <parsed> }
-  if (args.length === 1) {
-    return { value: parseNodeValue(args[0]) };
-  }
-
-  // Multiple positional args → { value: first, value2: second, ... }
-  const result: Record<string, unknown> = {};
-  for (let i = 0; i < args.length; i++) {
-    result[i === 0 ? 'value' : `value${i + 1}`] = parseNodeValue(args[i]);
-  }
-  return result;
-}
-
-function parseNodeValue(node: Node): unknown {
-  const kind = node.getKind();
-
-  // String literal
-  if (kind === SyntaxKind.StringLiteral) {
-    const text = node.getText();
-    return text.slice(1, -1);
-  }
-
-  // Numeric literal
-  if (kind === SyntaxKind.NumericLiteral) {
-    return Number(node.getText());
-  }
-
-  // Negative number: PrefixUnaryExpression with minus + NumericLiteral
-  if (kind === SyntaxKind.PrefixUnaryExpression) {
-    const text = node.getText();
-    const num = Number(text);
-    if (!Number.isNaN(num)) return num;
-  }
-
-  // Boolean literals
-  if (kind === SyntaxKind.TrueKeyword) return true;
-  if (kind === SyntaxKind.FalseKeyword) return false;
-
-  // Array literal
-  if (kind === SyntaxKind.ArrayLiteralExpression) {
-    const arrayExpr = node.asKind(SyntaxKind.ArrayLiteralExpression)!;
-    return arrayExpr.getElements().map((el) => parseNodeValue(el));
-  }
-
-  // Object literal (nested)
-  if (kind === SyntaxKind.ObjectLiteralExpression) {
-    return parseObjectLiteralNode(node);
-  }
-
-  // Fallback: raw text
-  return node.getText();
-}
-
-function parseObjectLiteralNode(node: Node): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-
-  for (const prop of node.getChildrenOfKind(SyntaxKind.PropertyAssignment)) {
-    const key = prop.getChildAtIndex(0).getText();
-    const initializer = prop.getInitializer();
-    if (initializer) {
-      result[key] = parseNodeValue(initializer);
-    }
-  }
-
-  return result;
 }
 
 // ── Type resolution ──

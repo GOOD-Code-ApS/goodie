@@ -18,6 +18,9 @@ export { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
 export type { CodegenOptions, TypeRegistration } from './codegen.js';
 // Code Generator
 export { generateCode } from './codegen.js';
+// Decorator parsing utilities
+export type { ParsedDecoratorMeta } from './decorator-utils.js';
+export { extractDecoratorMeta } from './decorator-utils.js';
 // Plugin discovery
 export type { DiscoverAllResult } from './discover-plugins.js';
 export {
