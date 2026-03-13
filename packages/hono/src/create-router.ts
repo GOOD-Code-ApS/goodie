@@ -1,13 +1,14 @@
-import type { ApplicationContext } from '@goodie-ts/core';
+import type { ApplicationContext, BeanDefinition } from '@goodie-ts/core';
 import {
   type ControllerMetadata,
   ExceptionHandler,
+  type HttpContext,
   type HttpMethod,
   handleException,
   MappedException,
   type ParamMetadata,
 } from '@goodie-ts/http';
-import type { Context } from 'hono';
+import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 
 import {
@@ -49,6 +50,12 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
   // CORS middleware from ServerConfig
   if (serverConfig && hasCorsConfig(serverConfig.cors)) {
     router.use('*', corsMiddleware(serverConfig.cors));
+  }
+
+  // Security middleware — discover SecurityProvider beans via convention
+  const securityMiddleware = buildSecurityMiddleware(ctx, definitions);
+  if (securityMiddleware) {
+    router.use('*', securityMiddleware);
   }
 
   // Wire controllers
@@ -172,4 +179,82 @@ function resolveServerConfig(
   } catch {
     return undefined;
   }
+}
+
+/** Duck-typed security middleware from @goodie-ts/security. */
+type SecurityMiddlewareFn = (
+  request: HttpContext,
+  next: () => Promise<unknown>,
+) => Promise<unknown>;
+
+type CreateSecurityMiddlewareFn = (
+  providers: unknown[],
+) => SecurityMiddlewareFn;
+
+/**
+ * Discover SecurityProvider beans and build Hono security middleware.
+ *
+ * Uses convention-based discovery: finds beans with baseTokens whose
+ * constructor name is 'SecurityProvider'. No direct dependency on
+ * @goodie-ts/security — the adapter uses duck typing.
+ *
+ * Delegates to `createSecurityMiddleware()` from @goodie-ts/security
+ * (dynamically imported) for the actual auth pipeline. This avoids
+ * duplicating authentication logic.
+ */
+function buildSecurityMiddleware(
+  ctx: ApplicationContext,
+  definitions: readonly BeanDefinition[],
+): ((c: Context, next: Next) => Promise<Response | void>) | undefined {
+  const providerBaseToken = findBaseTokenByName(
+    definitions,
+    'SecurityProvider',
+  );
+  if (!providerBaseToken) return undefined;
+
+  const providers = ctx.getAll(providerBaseToken);
+  if (providers.length === 0) return undefined;
+
+  // Lazy-load createSecurityMiddleware — resolved on first request
+  let securityMw: SecurityMiddlewareFn | false | undefined;
+
+  return async (c: Context, next: Next) => {
+    // Lazy-resolve createSecurityMiddleware on first request
+    if (securityMw === undefined) {
+      try {
+        // Dynamic import — @goodie-ts/security is an optional peer dep.
+        // Use variable to prevent TypeScript from resolving the module.
+        const securityPkg = '@goodie-ts/security';
+        const mod = await import(/* @vite-ignore */ securityPkg);
+        const factory = (
+          mod as { createSecurityMiddleware?: CreateSecurityMiddlewareFn }
+        ).createSecurityMiddleware;
+        securityMw = factory ? factory(providers) : false;
+      } catch {
+        securityMw = false;
+      }
+    }
+
+    if (securityMw) {
+      await securityMw(buildHttpContext(c), next);
+    } else {
+      await next();
+    }
+  };
+}
+
+function findBaseTokenByName(
+  definitions: readonly BeanDefinition[],
+  className: string,
+): BeanDefinition['token'] | undefined {
+  for (const def of definitions) {
+    if (def.baseTokens) {
+      for (const baseToken of def.baseTokens) {
+        if (typeof baseToken === 'function' && baseToken.name === className) {
+          return baseToken as BeanDefinition['token'];
+        }
+      }
+    }
+  }
+  return undefined;
 }
