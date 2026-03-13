@@ -187,6 +187,9 @@ function expandProvides(
       sourceLocation: p.sourceLocation,
     };
 
+    // @Primary on the module class does NOT propagate to provided beans.
+    // Each @Provides bean is an independent definition — mark individual
+    // provided beans with @Primary via a separate decorator if needed.
     return {
       tokenRef,
       scope: 'singleton' as const,

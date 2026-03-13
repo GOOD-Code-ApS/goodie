@@ -1237,26 +1237,40 @@ describe('ApplicationContext — self-injection', () => {
 // ── @Primary ────────────────────────────────────────────────────────
 
 describe('ApplicationContext — @Primary', () => {
-  it('selects @Primary bean over last-registered bean', async () => {
-    const token = new InjectionToken<object>('Provider');
+  it('selects @Primary bean over last-registered bean via shared token', async () => {
+    abstract class Provider {}
 
-    class PrimaryImpl {
+    class PrimaryImpl extends Provider {
       id = 'primary';
     }
-    class SecondaryImpl {
+    class SecondaryImpl extends Provider {
       id = 'secondary';
     }
 
     const ctx = await ApplicationContext.create([
-      makeDef(PrimaryImpl, {
+      {
+        token: PrimaryImpl,
+        scope: 'singleton',
+        dependencies: [],
         factory: () => new PrimaryImpl(),
+        eager: false,
         metadata: { primary: true },
-      }),
-      makeDef(SecondaryImpl, { factory: () => new SecondaryImpl() }),
+        baseTokens: [Provider],
+      },
+      {
+        token: SecondaryImpl,
+        scope: 'singleton',
+        dependencies: [],
+        factory: () => new SecondaryImpl(),
+        eager: false,
+        metadata: {},
+        baseTokens: [Provider],
+      },
     ]);
 
     // PrimaryImpl should win even though SecondaryImpl was registered last
-    expect(ctx.get(PrimaryImpl)).toBeInstanceOf(PrimaryImpl);
+    const provider = ctx.get(Provider);
+    expect(provider).toBeInstanceOf(PrimaryImpl);
   });
 
   it('selects @Primary bean under shared base token', async () => {
