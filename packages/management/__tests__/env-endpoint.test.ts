@@ -136,8 +136,8 @@ describe('EnvEndpoint', () => {
     const result = endpoint.env();
 
     const body = result.body as { properties: Record<string, unknown> };
-    expect(body.properties['DB_PASSWORD']).toBe('******');
-    expect(body.properties['JWT_SECRET']).toBe('******');
+    expect(body.properties.DB_PASSWORD).toBe('******');
+    expect(body.properties.JWT_SECRET).toBe('******');
   });
 
   it('does not mask keys that only contain patterns as substrings', () => {

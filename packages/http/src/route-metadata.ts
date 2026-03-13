@@ -1,3 +1,5 @@
+import type { DecoratorMeta } from '@goodie-ts/core';
+
 /** HTTP method for a route. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
 
@@ -27,6 +29,8 @@ export interface RouteMetadata {
   params: ParamMetadata[];
   /** Return type text with Promise<T> and Response<T> unwrapped (e.g. 'Todo', 'Todo | null', 'void'). */
   returnType: string;
+  /** All non-route decorators on this method (e.g. @ApiResponse, @ApiOperation). Empty if none. */
+  decorators?: DecoratorMeta[];
 }
 
 /** Controller metadata stored on bean metadata by the http plugin. */

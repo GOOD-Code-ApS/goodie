@@ -44,7 +44,7 @@ export class ApplicationContext {
   private closed = false;
   private startupMetrics: StartupMetrics | undefined;
 
-  private constructor(private readonly sortedDefs: BeanDefinition[]) {
+  constructor(private readonly sortedDefs: BeanDefinition[]) {
     for (const def of sortedDefs) {
       const existing = this.defsByToken.get(def.token);
       if (existing) {
@@ -104,20 +104,17 @@ export class ApplicationContext {
     ctx.startupMetrics = metrics;
 
     // Self-register so beans can inject ApplicationContext.
-    // Cast needed because ApplicationContext has a private constructor,
-    // making typeof ApplicationContext incompatible with Constructor<T>.
-    const selfToken = ApplicationContext as unknown as Token;
-    ctx.singletonCache.set(selfToken, ctx);
+    ctx.singletonCache.set(ApplicationContext, ctx);
     const selfDef: BeanDefinition = {
-      token: selfToken as Constructor,
+      token: ApplicationContext,
       scope: 'singleton',
       dependencies: [],
       factory: () => ctx,
       eager: false,
       metadata: {},
     };
-    ctx.defsByToken.set(selfToken, [selfDef]);
-    ctx.primaryDef.set(selfToken, selfDef);
+    ctx.defsByToken.set(ApplicationContext, [selfDef]);
+    ctx.primaryDef.set(ApplicationContext, selfDef);
 
     if (metrics) {
       metrics.timeStageSync('validateDependencies', () =>
@@ -278,7 +275,7 @@ export class ApplicationContext {
    * including the self-registered ApplicationContext definition.
    */
   getDefinitions(): readonly BeanDefinition[] {
-    const selfDef = this.primaryDef.get(ApplicationContext as unknown as Token);
+    const selfDef = this.primaryDef.get(ApplicationContext);
     return selfDef ? [selfDef, ...this.sortedDefs] : [...this.sortedDefs];
   }
 

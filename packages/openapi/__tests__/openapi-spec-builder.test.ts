@@ -826,4 +826,178 @@ describe('OpenApiSpecBuilder', () => {
     expect(spec.paths['/api/todos'].get).toBeDefined();
     expect(spec.paths['/api/todos'].post).toBeDefined();
   });
+
+  it('applies @ApiOperation metadata to the operation', () => {
+    const ctx = createMockContext([
+      {
+        name: 'TodoController',
+        metadata: {
+          basePath: '/api/todos',
+          routes: [
+            {
+              methodName: 'list',
+              httpMethod: 'get',
+              path: '/',
+              status: 200,
+              params: [],
+              returnType: 'void',
+              decorators: [
+                {
+                  name: 'ApiOperation',
+                  args: {
+                    summary: 'List all todos',
+                    description: 'Returns all todo items',
+                    tags: ['todos'],
+                    deprecated: false,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+
+    const builder = new OpenApiSpecBuilder(ctx, createMockConfig());
+    const spec = builder.getSpec() as any;
+
+    const op = spec.paths['/api/todos'].get;
+    expect(op.summary).toBe('List all todos');
+    expect(op.description).toBe('Returns all todo items');
+    expect(op.tags).toEqual(['todos']);
+    expect(op.deprecated).toBe(false);
+  });
+
+  it('applies @ApiResponse decorators to add response entries', () => {
+    registerType({
+      type: Todo,
+      className: 'Todo',
+      fields: [],
+    });
+
+    const ctx = createMockContext([
+      {
+        name: 'TodoController',
+        metadata: {
+          basePath: '/api/todos',
+          routes: [
+            {
+              methodName: 'getById',
+              httpMethod: 'get',
+              path: '/:id',
+              status: 200,
+              params: [
+                {
+                  name: 'id',
+                  binding: 'path',
+                  typeName: 'string',
+                  optional: false,
+                },
+              ],
+              returnType: 'Todo',
+              decorators: [
+                {
+                  name: 'ApiResponse',
+                  args: {
+                    value: 200,
+                    value2: { description: 'The todo item' },
+                  },
+                },
+                {
+                  name: 'ApiResponse',
+                  args: {
+                    value: 404,
+                    value2: { description: 'Todo not found' },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+
+    const builder = new OpenApiSpecBuilder(ctx, createMockConfig());
+    const spec = builder.getSpec() as any;
+
+    const responses = spec.paths['/api/todos/{id}'].get.responses;
+    expect(responses['200'].description).toBe('The todo item');
+    expect(responses['200'].content['application/json'].schema).toEqual({
+      $ref: '#/components/schemas/Todo',
+    });
+    expect(responses['404']).toEqual({ description: 'Todo not found' });
+  });
+
+  it('applies @ApiResponse with type override', () => {
+    registerType({
+      type: Todo,
+      className: 'Todo',
+      fields: [],
+    });
+
+    class ErrorResponse {}
+    registerType({
+      type: ErrorResponse,
+      className: 'ErrorResponse',
+      fields: [
+        {
+          name: 'message',
+          type: { kind: 'primitive', type: 'string' },
+          decorators: [],
+        },
+      ],
+    });
+
+    const ctx = createMockContext([
+      {
+        name: 'TodoController',
+        metadata: {
+          basePath: '/api/todos',
+          routes: [
+            {
+              methodName: 'getById',
+              httpMethod: 'get',
+              path: '/:id',
+              status: 200,
+              params: [
+                {
+                  name: 'id',
+                  binding: 'path',
+                  typeName: 'string',
+                  optional: false,
+                },
+              ],
+              returnType: 'Todo',
+              decorators: [
+                {
+                  name: 'ApiResponse',
+                  args: {
+                    value: 500,
+                    value2: {
+                      description: 'Internal server error',
+                      type: 'ErrorResponse',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+
+    const builder = new OpenApiSpecBuilder(ctx, createMockConfig());
+    const spec = builder.getSpec() as any;
+
+    const responses = spec.paths['/api/todos/{id}'].get.responses;
+    expect(responses['500']).toEqual({
+      description: 'Internal server error',
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/ErrorResponse' },
+        },
+      },
+    });
+    expect(spec.components.schemas.ErrorResponse).toBeDefined();
+  });
 });

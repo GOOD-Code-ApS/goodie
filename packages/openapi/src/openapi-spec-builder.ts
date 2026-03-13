@@ -12,6 +12,7 @@ import {
   type OperationObject,
   type ParameterObject,
   type PathItemObject,
+  type ResponseObject,
   type SchemaObject,
 } from 'openapi3-ts/oas31';
 
@@ -152,7 +153,11 @@ export class OpenApiSpecBuilder {
       };
     }
 
-    // Response
+    // Apply @ApiOperation metadata
+    const routeDecorators = route.decorators ?? [];
+    applyApiOperation(operation, routeDecorators);
+
+    // Default response from return type
     const responseSchema = this.resolveReturnTypeSchema(
       route.returnType,
       schemaNames,
@@ -170,6 +175,9 @@ export class OpenApiSpecBuilder {
     } else {
       responses[statusCode] = { description: '' };
     }
+
+    // Apply @ApiResponse decorators (override or add response entries)
+    this.applyApiResponses(responses, routeDecorators, schemaNames);
 
     return operation;
   }
@@ -296,6 +304,46 @@ export class OpenApiSpecBuilder {
     }
   }
 
+  /**
+   * Apply @ApiResponse decorators to the responses object.
+   * Each decorator adds or overrides a response entry for the given status code.
+   */
+  private applyApiResponses(
+    responses: Record<string, ResponseObject>,
+    decorators: DecoratorMeta[],
+    schemaNames: Set<string>,
+  ): void {
+    for (const dec of decorators) {
+      if (dec.name !== 'ApiResponse') continue;
+
+      const status = String(dec.args.value);
+      const options = (dec.args.value2 ?? {}) as Record<string, unknown>;
+      const description = (options.description as string) ?? '';
+      const typeName = options.type as string | undefined;
+
+      if (typeName) {
+        if (!this.findMetadataByName(typeName)) {
+          console.warn(
+            `[openapi] @ApiResponse references type '${typeName}' which is not @Introspected — schema will be empty`,
+          );
+        }
+        const schema = this.resolveTypeSchema(typeName, schemaNames);
+        responses[status] = {
+          description,
+          content: { 'application/json': { schema } },
+        };
+      } else {
+        // Update description on existing response, or add a bodiless one
+        const existing = responses[status];
+        if (existing) {
+          existing.description = description;
+        } else {
+          responses[status] = { description };
+        }
+      }
+    }
+  }
+
   private findMetadataByName(className: string): TypeMetadata | undefined {
     return MetadataRegistry.INSTANCE.getAll().find(
       (m) => m.className === className,
@@ -304,6 +352,23 @@ export class OpenApiSpecBuilder {
 }
 
 // ── Helpers ──
+
+/** Apply `@ApiOperation` decorator metadata to the operation object. */
+function applyApiOperation(
+  operation: OperationObject,
+  decorators: DecoratorMeta[],
+): void {
+  const dec = decorators.find((d) => d.name === 'ApiOperation');
+  if (!dec) return;
+
+  const args = dec.args;
+  if (args.summary !== undefined) operation.summary = args.summary as string;
+  if (args.description !== undefined)
+    operation.description = args.description as string;
+  if (args.tags !== undefined) operation.tags = args.tags as string[];
+  if (args.deprecated !== undefined)
+    operation.deprecated = args.deprecated as boolean;
+}
 
 function normalizePath(basePath: string, routePath: string): string {
   const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;

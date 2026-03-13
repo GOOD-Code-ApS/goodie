@@ -3,7 +3,10 @@ import type {
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
-import { InvalidDecoratorUsageError } from '@goodie-ts/transformer';
+import {
+  extractDecoratorMeta,
+  InvalidDecoratorUsageError,
+} from '@goodie-ts/transformer';
 import type { MethodDeclaration, Type } from 'ts-morph';
 
 import type {
@@ -27,6 +30,13 @@ const BODY_METHODS = new Set<HttpMethod>(['post', 'put', 'patch']);
 
 /** Primitive types that map to query parameters. */
 const PRIMITIVE_TYPES = new Set(['string', 'number', 'boolean']);
+
+/** Decorators handled by the HTTP plugin or framework — not captured as generic metadata. */
+const IGNORED_METHOD_DECORATORS = new Set([
+  ...Object.keys(ROUTE_DECORATOR_MAP),
+  'Status',
+  'Validated',
+]);
 
 /**
  * HTTP scan-phase transformer plugin.
@@ -216,6 +226,12 @@ export default function createHttpPlugin(): TransformerPlugin {
 
       const returnType = extractReturnType(methodDeclaration);
 
+      // Capture all non-route decorators as generic metadata
+      const methodDecorators = extractDecoratorMeta(
+        decorators,
+        IGNORED_METHOD_DECORATORS,
+      );
+
       const route: RouteMetadata = {
         methodName,
         httpMethod,
@@ -223,6 +239,7 @@ export default function createHttpPlugin(): TransformerPlugin {
         status,
         params,
         returnType,
+        decorators: methodDecorators,
       };
 
       controller.routes.push(route);

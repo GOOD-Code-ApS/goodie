@@ -108,6 +108,7 @@ describe('HTTP Plugin', () => {
       status: 200,
       returnType: 'void',
       params: [],
+      decorators: [],
     });
     expect(httpController.routes[1]).toEqual({
       methodName: 'create',
@@ -116,6 +117,7 @@ describe('HTTP Plugin', () => {
       status: 200,
       returnType: 'void',
       params: [],
+      decorators: [],
     });
     expect(httpController.routes[2]).toEqual({
       methodName: 'update',
@@ -124,6 +126,7 @@ describe('HTTP Plugin', () => {
       status: 200,
       returnType: 'void',
       params: [],
+      decorators: [],
     });
     expect(httpController.routes[3]).toEqual({
       methodName: 'remove',
@@ -132,6 +135,7 @@ describe('HTTP Plugin', () => {
       status: 200,
       returnType: 'void',
       params: [],
+      decorators: [],
     });
     expect(httpController.routes[4]).toEqual({
       methodName: 'patch',
@@ -140,6 +144,7 @@ describe('HTTP Plugin', () => {
       status: 200,
       returnType: 'void',
       params: [],
+      decorators: [],
     });
   });
 
