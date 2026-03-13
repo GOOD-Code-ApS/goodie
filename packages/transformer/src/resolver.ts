@@ -89,6 +89,9 @@ function resolveBean(
   if (scanned.isModule) {
     metadata.isModule = true;
   }
+  if (scanned.primary) {
+    metadata.primary = true;
+  }
   if (scanned.order !== undefined) {
     metadata.order = scanned.order;
   }
@@ -98,6 +101,7 @@ function resolveBean(
     scope: scanned.scope,
     eager: scanned.eager,
     name: scanned.name,
+    primary: scanned.primary,
     constructorDeps,
     fieldDeps,
     factoryKind: 'constructor',
@@ -183,11 +187,15 @@ function expandProvides(
       sourceLocation: p.sourceLocation,
     };
 
+    // @Primary on the module class does NOT propagate to provided beans.
+    // Each @Provides bean is an independent definition — mark individual
+    // provided beans with @Primary via a separate decorator if needed.
     return {
       tokenRef,
       scope: 'singleton' as const,
       eager: p.eager,
       name: undefined,
+      primary: false,
       constructorDeps: [ownerDep, ...dependencies],
       fieldDeps: [],
       factoryKind: 'provides' as const,

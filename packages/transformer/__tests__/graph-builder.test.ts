@@ -32,6 +32,7 @@ const decoratorsFile = `
   export function Provides() { return (t: any, c: any) => {} }
   export function Inject(q: any) { return (t: any, c: any) => {} }
   export function Optional() { return (t: any, c: any) => {} }
+  export function Primary(t: any, c: any) {}
 `;
 
 describe('Graph Builder', () => {
@@ -297,6 +298,58 @@ describe('Graph Builder', () => {
         kind: 'class',
         className: 'Repo',
       });
+    });
+  });
+
+  describe('@Primary validation', () => {
+    it('should propagate primary flag through the pipeline', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/DefaultRepo.ts': `
+          import { Singleton, Primary } from './decorators.js'
+
+          @Primary
+          @Singleton()
+          export class DefaultRepo {}
+        `,
+      });
+
+      const bean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
+      )!;
+      expect(bean.primary).toBe(true);
+      expect(bean.metadata.primary).toBe(true);
+    });
+
+    it('should set primary metadata to true in generated code', () => {
+      const result = pipeline({
+        '/src/decorators.ts': decoratorsFile,
+        '/src/DefaultRepo.ts': `
+          import { Singleton, Primary } from './decorators.js'
+
+          @Primary
+          @Singleton()
+          export class DefaultRepo {}
+        `,
+        '/src/OtherRepo.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class OtherRepo {}
+        `,
+      });
+
+      const defaultBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
+      )!;
+      const otherBean = result.beans.find(
+        (b) =>
+          b.tokenRef.kind === 'class' && b.tokenRef.className === 'OtherRepo',
+      )!;
+      expect(defaultBean.metadata.primary).toBe(true);
+      expect(otherBean.metadata.primary).toBeUndefined();
     });
   });
 

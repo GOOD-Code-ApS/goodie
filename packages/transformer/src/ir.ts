@@ -93,6 +93,8 @@ export interface IRBeanDefinition {
   eager: boolean;
   /** Qualifier name from @Named(). */
   name: string | undefined;
+  /** Whether @Primary marks this bean as the default when multiple match. */
+  primary: boolean;
   /** Constructor parameter dependencies (in order). */
   constructorDeps: IRDependency[];
   /** Accessor field injections (in declaration order). */

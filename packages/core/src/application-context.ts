@@ -52,8 +52,15 @@ export class ApplicationContext {
       } else {
         this.defsByToken.set(def.token, [def]);
       }
-      // Last definition wins as primary (matches typical DI override semantics)
-      this.primaryDef.set(def.token, def);
+      // @Primary wins; otherwise last definition wins (typical DI override semantics)
+      const currentPrimary = this.primaryDef.get(def.token);
+      if (
+        !currentPrimary ||
+        def.metadata.primary ||
+        !currentPrimary.metadata.primary
+      ) {
+        this.primaryDef.set(def.token, def);
+      }
 
       // Register under base tokens so getAll(BaseClass) finds subtypes
       if (def.baseTokens) {
@@ -64,7 +71,14 @@ export class ApplicationContext {
           } else {
             this.defsByToken.set(baseToken, [def]);
           }
-          this.primaryDef.set(baseToken, def);
+          const currentBasePrimary = this.primaryDef.get(baseToken);
+          if (
+            !currentBasePrimary ||
+            def.metadata.primary ||
+            !currentBasePrimary.metadata.primary
+          ) {
+            this.primaryDef.set(baseToken, def);
+          }
         }
       }
     }

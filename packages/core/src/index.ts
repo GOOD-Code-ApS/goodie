@@ -44,6 +44,7 @@ export {
   PostConstruct,
   PostProcessor,
   PreDestroy,
+  Primary,
   Provides,
   RequestScoped,
   Singleton,

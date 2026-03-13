@@ -24,6 +24,7 @@ const kyselyDatabaseLibraryBean: IRBeanDefinition = {
   scope: 'singleton',
   eager: false,
   name: undefined,
+  primary: false,
   constructorDeps: [],
   fieldDeps: [],
   factoryKind: 'constructor',
@@ -46,6 +47,7 @@ const transactionManagerLibraryBean: IRBeanDefinition = {
   scope: 'singleton',
   eager: false,
   name: undefined,
+  primary: false,
   constructorDeps: [
     {
       tokenRef: {
@@ -79,6 +81,7 @@ const transactionalInterceptorLibraryBean: IRBeanDefinition = {
   scope: 'singleton',
   eager: false,
   name: undefined,
+  primary: false,
   constructorDeps: [
     {
       tokenRef: {
@@ -112,6 +115,7 @@ const migrationRunnerLibraryBean: IRBeanDefinition = {
   scope: 'singleton',
   eager: true,
   name: undefined,
+  primary: false,
   constructorDeps: [
     {
       tokenRef: {

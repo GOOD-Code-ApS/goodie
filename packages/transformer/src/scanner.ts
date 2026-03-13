@@ -45,6 +45,7 @@ const DECORATOR_NAMES = {
   RequestScoped: 'RequestScoped',
   Value: 'Value',
   Order: 'Order',
+  Primary: 'Primary',
 } as const;
 
 /** A public member of a @RequestScoped bean, used for compile-time scoped proxy generation. */
@@ -82,6 +83,8 @@ export interface ScannedBean {
   methodDecorators: Record<string, IRDecoratorEntry[]>;
   /** Public members for compile-time scoped proxy generation (only for request-scoped beans). */
   publicMembers?: ScannedPublicMember[];
+  /** Whether @Primary is present — marks this bean as the default when multiple match. */
+  primary: boolean;
   /** Execution order from @Order() decorator — lower runs first, default 0. */
   order: number | undefined;
   sourceLocation: SourceLocation;
@@ -346,6 +349,7 @@ function scanBean(
   const className = cls.getName();
   if (!className) return undefined;
   const eager = hasDecorator(decorators, DECORATOR_NAMES.Eager);
+  const primary = hasDecorator(decorators, DECORATOR_NAMES.Primary);
   const name = getNamedValue(decorators);
   const order = getOrderValue(decorators);
   const constructorParams = scanConstructorParams(cls, cache);
@@ -389,6 +393,7 @@ function scanBean(
     valueFields,
     baseClasses,
     isModule,
+    primary,
     provides,
     decorators: scannedDecorators,
     methodDecorators:

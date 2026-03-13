@@ -1,4 +1,4 @@
-import type { IRBeanDefinition, TokenRef } from './ir.js';
+import type { IRBeanDefinition, SourceLocation, TokenRef } from './ir.js';
 import type { ResolveResult } from './resolver.js';
 import {
   AmbiguousProviderError,
@@ -42,6 +42,9 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
 
   // Build name-based lookup for @Named → @Inject('name') matching
   resolveNamedQualifiers(allBeans, warnings);
+
+  // Validate: at most one @Primary per base token
+  validatePrimaryUniqueness(allBeans);
 
   // Validate: no missing providers (except optional)
   validateProviders(allBeans);
@@ -93,6 +96,52 @@ function resolveNamedQualifiers(
           bean.sourceLocation,
         );
       }
+    }
+  }
+}
+
+/**
+ * Validate that at most one bean is marked @Primary per base token.
+ * Multiple @Primary beans under the same base token is ambiguous.
+ */
+function validatePrimaryUniqueness(beans: IRBeanDefinition[]): void {
+  // Group @Primary beans by their token refs — checks both the direct token
+  // (e.g. two @Primary beans with the same class/injection token) and base
+  // token refs (e.g. both implement CacheProvider).
+  const primaryByToken = new Map<string, IRBeanDefinition[]>();
+
+  for (const bean of beans) {
+    if (!bean.primary) continue;
+
+    // Register under the direct token
+    const directKey = tokenRefKey(bean.tokenRef);
+    const directExisting = primaryByToken.get(directKey) ?? [];
+    directExisting.push(bean);
+    primaryByToken.set(directKey, directExisting);
+
+    // Register under each base token
+    if (bean.baseTokenRefs) {
+      for (const ref of bean.baseTokenRefs) {
+        const key = tokenRefKey(ref);
+        const existing = primaryByToken.get(key) ?? [];
+        existing.push(bean);
+        primaryByToken.set(key, existing);
+      }
+    }
+  }
+
+  for (const [_key, primaries] of primaryByToken) {
+    if (primaries.length > 1) {
+      throw new AmbiguousProviderError(
+        '@Primary',
+        primaries.map((b) =>
+          b.tokenRef.kind === 'class'
+            ? b.tokenRef.className
+            : b.tokenRef.tokenName,
+        ),
+        primaries[0].sourceLocation,
+        `Also declared @Primary at ${formatLocation(primaries[1].sourceLocation)}`,
+      );
     }
   }
 }
@@ -313,4 +362,8 @@ function tokenRefKey(ref: TokenRef): string {
 function tokenRefDisplayName(ref: TokenRef): string {
   if (ref.kind === 'class') return ref.className;
   return ref.tokenName;
+}
+
+function formatLocation(loc: SourceLocation): string {
+  return `${loc.filePath}:${loc.line}:${loc.column}`;
 }

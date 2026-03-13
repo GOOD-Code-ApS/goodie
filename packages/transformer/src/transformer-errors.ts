@@ -86,11 +86,13 @@ export class AmbiguousProviderError extends TransformerError {
     readonly tokenDescription: string,
     readonly candidates: string[],
     sourceLocation: SourceLocation,
+    customHint?: string,
   ) {
     super(
       `Ambiguous provider for "${tokenDescription}": found ${candidates.join(', ')}`,
       sourceLocation,
-      'Use @Named() on the providers and @Inject(name) on the injection point to disambiguate.',
+      customHint ??
+        'Use @Named() on the providers and @Inject(name) on the injection point to disambiguate.',
     );
     this.name = 'AmbiguousProviderError';
   }

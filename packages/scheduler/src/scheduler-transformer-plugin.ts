@@ -131,6 +131,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
         scope: 'singleton',
         eager: true,
         name: undefined,
+        primary: false,
         constructorDeps: [
           {
             tokenRef: {
