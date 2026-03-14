@@ -2,7 +2,7 @@
  * Marks a method to be called after the bean is fully constructed and
  * `beforeInit` post-processors have run, but before `afterInit` post-processors.
  *
- * Only effective on `@Singleton` / `@Injectable` classes.
+ * Only effective on `@Singleton` / `@Transient` classes.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
  * The transformer reads this decorator via AST inspection at build time.
@@ -10,13 +10,13 @@
  * @example
  * @Singleton()
  * class UserService {
- *   @PostConstruct()
+ *   @OnInit()
  *   init() {
  *     // called after construction + beforeInit
  *   }
  * }
  */
-export function PostConstruct(): MethodDecorator_Stage3 {
+export function OnInit(): MethodDecorator_Stage3 {
   return () => {};
 }
 

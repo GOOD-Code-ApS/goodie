@@ -1,5 +1,5 @@
 import {
-  type BeanDefinition,
+  type ComponentDefinition,
   type Dependency,
   InjectionToken,
   type Scope,
@@ -14,7 +14,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -22,7 +22,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -223,7 +223,7 @@ describe('createGoodieTest()', () => {
 
     function buildDefinitions(
       config?: Record<string, unknown>,
-    ): BeanDefinition[] {
+    ): ComponentDefinition[] {
       return [
         greeterDef,
         makeDef(CONFIG_TOKEN, {

@@ -1,4 +1,4 @@
-import type { BeanDefinition } from './bean-definition.js';
+import type { ComponentDefinition } from './component-definition.js';
 import { CircularDependencyError } from './errors.js';
 import type { InjectionToken } from './injection-token.js';
 import type { AbstractConstructor, Constructor } from './types.js';
@@ -12,8 +12,10 @@ type Token = InjectionToken<unknown> | Constructor | AbstractConstructor;
  * Optional dependencies are included in ordering when present but do not
  * cause failures when missing.
  */
-export function topoSort(definitions: BeanDefinition[]): BeanDefinition[] {
-  const defByToken = new Map<Token, BeanDefinition>();
+export function topoSort(
+  definitions: ComponentDefinition[],
+): ComponentDefinition[] {
+  const defByToken = new Map<Token, ComponentDefinition>();
   for (const def of definitions) {
     defByToken.set(def.token, def);
   }
@@ -22,12 +24,12 @@ export function topoSort(definitions: BeanDefinition[]): BeanDefinition[] {
   const DONE = 2;
 
   const state = new Map<Token, number>();
-  const sorted: BeanDefinition[] = [];
+  const sorted: ComponentDefinition[] = [];
 
   // Track the current DFS path for cycle reporting
   const pathStack: Token[] = [];
 
-  function visit(def: BeanDefinition): void {
+  function visit(def: ComponentDefinition): void {
     const token = def.token;
     const s = state.get(token);
 

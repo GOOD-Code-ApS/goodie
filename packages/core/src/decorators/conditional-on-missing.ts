@@ -10,7 +10,7 @@
  *
  * @param token - The class constructor to check for
  */
-export function ConditionalOnMissingBean(
+export function ConditionalOnMissing(
   _token: new (...args: any[]) => any,
 ): ClassDecorator_Stage3 {
   return () => {};

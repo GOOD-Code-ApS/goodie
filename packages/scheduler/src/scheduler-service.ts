@@ -23,7 +23,7 @@ interface ScheduledJob {
  * Manages scheduled tasks discovered via `@Scheduled` decorators.
  *
  * Synthesized by the scheduler transformer plugin as an eager singleton
- * with `postConstructMethods: ['start']` and `preDestroyMethods: ['stop']`.
+ * with `onInitMethods: ['start']` and `onDestroyMethods: ['stop']`.
  *
  * At startup, iterates all bean definitions looking for `metadata.scheduledMethods`,
  * resolves each bean, and starts the corresponding schedules.
@@ -34,7 +34,7 @@ export class SchedulerService {
 
   constructor(private readonly ctx: ApplicationContext) {}
 
-  /** Start all scheduled jobs. Called automatically via @PostConstruct. */
+  /** Start all scheduled jobs. Called automatically via @OnInit. */
   async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
@@ -72,7 +72,7 @@ export class SchedulerService {
     }
   }
 
-  /** Stop all scheduled jobs and await in-flight executions. Called automatically via @PreDestroy. */
+  /** Stop all scheduled jobs and await in-flight executions. Called automatically via @OnDestroy. */
   async stop(): Promise<void> {
     for (const job of this.jobs) {
       job.stop();

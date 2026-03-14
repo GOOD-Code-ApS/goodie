@@ -4,7 +4,7 @@ import type {
   AopDecoratorDeclaration,
   ResolvedAopMapping,
 } from './aop-plugin.js';
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 
 /** Manifest format for library-shipped bean definitions. */
 export interface LibraryBeansManifest {
@@ -12,7 +12,7 @@ export interface LibraryBeansManifest {
   version: number;
   /** npm package name (for diagnostics). */
   package: string;
-  /** Serialized IRBeanDefinition[]. */
+  /** Serialized IRComponentDefinition[]. */
   beans: Record<string, unknown>[];
   /** AOP decorator declarations, keyed by decorator name. */
   aop?: Record<string, AopDecoratorDeclaration>;
@@ -24,8 +24,8 @@ export interface LibraryBeansManifest {
  * - `undefined` values become `null` (JSON constraint)
  * - `typeImports` Maps become plain objects
  */
-export function serializeBeans(
-  beans: IRBeanDefinition[],
+export function serializeComponents(
+  beans: IRComponentDefinition[],
   packageName: string,
   aop?: Record<string, AopDecoratorDeclaration>,
 ): LibraryBeansManifest {
@@ -40,7 +40,7 @@ export function serializeBeans(
   return manifest;
 }
 
-function serializeBean(bean: IRBeanDefinition): Record<string, unknown> {
+function serializeBean(bean: IRComponentDefinition): Record<string, unknown> {
   return {
     tokenRef: serializeTokenRef(bean.tokenRef),
     scope: bean.scope,
@@ -70,7 +70,7 @@ function serializeBean(bean: IRBeanDefinition): Record<string, unknown> {
 }
 
 function serializeTokenRef(
-  tokenRef: IRBeanDefinition['tokenRef'],
+  tokenRef: IRComponentDefinition['tokenRef'],
 ): Record<string, unknown> {
   if (tokenRef.kind === 'class') {
     return {
@@ -91,15 +91,15 @@ function serializeTokenRef(
 }
 
 /**
- * Deserialize a manifest back into IRBeanDefinition[].
+ * Deserialize a manifest back into IRComponentDefinition[].
  *
  * - Validates the version field
  * - Converts `null` → `undefined` for optional fields
  * - Converts typeImports plain objects → Maps
  */
-export function deserializeBeans(
+export function deserializeComponents(
   manifest: LibraryBeansManifest,
-): IRBeanDefinition[] {
+): IRComponentDefinition[] {
   if (manifest.version !== 1) {
     throw new Error(
       `Unsupported beans.json version ${manifest.version} from package "${manifest.package}". ` +
@@ -110,7 +110,7 @@ export function deserializeBeans(
   return manifest.beans.map((raw) => deserializeBean(raw));
 }
 
-function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
+function deserializeBean(raw: Record<string, unknown>): IRComponentDefinition {
   const rawTokenRef = raw.tokenRef as Record<string, unknown>;
   const rawConstructorDeps = raw.constructorDeps as Record<string, unknown>[];
   const rawFieldDeps = raw.fieldDeps as Record<string, unknown>[];
@@ -124,7 +124,7 @@ function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
 
   return {
     tokenRef: deserializeTokenRef(rawTokenRef),
-    scope: raw.scope as IRBeanDefinition['scope'],
+    scope: raw.scope as IRComponentDefinition['scope'],
     eager: raw.eager as boolean,
     name: (raw.name as string) ?? undefined,
     primary: (raw.primary as boolean) ?? false,
@@ -132,18 +132,19 @@ function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
       tokenRef: deserializeTokenRef(dep.tokenRef as Record<string, unknown>),
       optional: dep.optional as boolean,
       collection: dep.collection as boolean,
-      sourceLocation: dep.sourceLocation as IRBeanDefinition['sourceLocation'],
+      sourceLocation:
+        dep.sourceLocation as IRComponentDefinition['sourceLocation'],
     })),
     fieldDeps: rawFieldDeps.map((dep) => ({
       fieldName: dep.fieldName as string,
       tokenRef: deserializeTokenRef(dep.tokenRef as Record<string, unknown>),
       optional: dep.optional as boolean,
     })),
-    factoryKind: raw.factoryKind as IRBeanDefinition['factoryKind'],
+    factoryKind: raw.factoryKind as IRComponentDefinition['factoryKind'],
     providesSource: rawProvidesSource
       ? {
           moduleTokenRef:
-            rawProvidesSource.moduleTokenRef as IRBeanDefinition['tokenRef'] & {
+            rawProvidesSource.moduleTokenRef as IRComponentDefinition['tokenRef'] & {
               kind: 'class';
             },
           methodName: rawProvidesSource.methodName as string,
@@ -152,25 +153,28 @@ function deserializeBean(raw: Record<string, unknown>): IRBeanDefinition {
     baseTokenRefs: rawBaseTokenRefs
       ? rawBaseTokenRefs.map(
           (ref) =>
-            deserializeTokenRef(ref) as IRBeanDefinition['tokenRef'] & {
+            deserializeTokenRef(ref) as IRComponentDefinition['tokenRef'] & {
               kind: 'class';
             },
         )
       : undefined,
-    decorators: (raw.decorators as IRBeanDefinition['decorators']) ?? undefined,
+    decorators:
+      (raw.decorators as IRComponentDefinition['decorators']) ?? undefined,
     methodDecorators:
-      (raw.methodDecorators as IRBeanDefinition['methodDecorators']) ??
+      (raw.methodDecorators as IRComponentDefinition['methodDecorators']) ??
       undefined,
     publicMembers:
-      (raw.publicMembers as IRBeanDefinition['publicMembers']) ?? undefined,
+      (raw.publicMembers as IRComponentDefinition['publicMembers']) ??
+      undefined,
     metadata: (raw.metadata as Record<string, unknown>) ?? {},
-    sourceLocation: raw.sourceLocation as IRBeanDefinition['sourceLocation'],
+    sourceLocation:
+      raw.sourceLocation as IRComponentDefinition['sourceLocation'],
   };
 }
 
 function deserializeTokenRef(
   raw: Record<string, unknown>,
-): IRBeanDefinition['tokenRef'] {
+): IRComponentDefinition['tokenRef'] {
   if (raw.kind === 'class') {
     return {
       kind: 'class',
@@ -200,7 +204,7 @@ export interface ScannedManifest {
 
 /**
  * Scan `node_modules` for packages with `"goodie": { "beans": "..." }` and
- * read their beans.json manifests. Shared by `discoverLibraryBeans` and
+ * read their beans.json manifests. Shared by `discoverLibraryComponents` and
  * `discoverAopMappings` to avoid duplicate filesystem scanning.
  */
 function scanLibraryManifests(
@@ -271,15 +275,15 @@ function scanLibraryManifests(
  * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
  * @param scanScopes - npm scopes to scan. Defaults to `['@goodie-ts']`.
  */
-export async function discoverLibraryBeans(
+export async function discoverLibraryComponents(
   baseDir?: string,
   scanScopes?: string[],
-): Promise<IRBeanDefinition[]> {
-  const allBeans: IRBeanDefinition[] = [];
+): Promise<IRComponentDefinition[]> {
+  const allBeans: IRComponentDefinition[] = [];
 
   for (const { manifest } of scanLibraryManifests(baseDir, scanScopes)) {
     try {
-      allBeans.push(...deserializeBeans(manifest));
+      allBeans.push(...deserializeComponents(manifest));
     } catch (err) {
       console.warn(
         `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
@@ -302,11 +306,11 @@ export async function discoverLibraryBeans(
  * @param crossPackageDirs - Additional root→packageName mappings for cross-package refs.
  */
 export function rewriteImportPaths(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   packageName: string,
   sourceRoot: string,
   crossPackageDirs?: Map<string, string>,
-): IRBeanDefinition[] {
+): IRComponentDefinition[] {
   return beans.map((bean) => ({
     ...bean,
     tokenRef: rewriteTokenRefPath(
@@ -398,11 +402,11 @@ function rewritePlainPath(
 }
 
 function rewriteTokenRefPath(
-  tokenRef: IRBeanDefinition['tokenRef'],
+  tokenRef: IRComponentDefinition['tokenRef'],
   packageName: string,
   sourceRoot: string,
   crossPackageDirs?: Map<string, string>,
-): IRBeanDefinition['tokenRef'] {
+): IRComponentDefinition['tokenRef'] {
   if (tokenRef.kind === 'class' && tokenRef.importPath.startsWith(sourceRoot)) {
     return { ...tokenRef, importPath: packageName };
   }
@@ -454,21 +458,21 @@ export function discoverAopMappings(
 
 /** Combined result from a single discovery pass. */
 export interface DiscoveryResult {
-  beans: IRBeanDefinition[];
+  beans: IRComponentDefinition[];
   aopMappings: ResolvedAopMapping[];
 }
 
 /**
  * Discover both library beans and AOP mappings in a single filesystem pass.
  *
- * Equivalent to calling `discoverLibraryBeans()` + `discoverAopMappings()`
+ * Equivalent to calling `discoverLibraryComponents()` + `discoverAopMappings()`
  * but reads each beans.json only once.
  */
 export function discoverLibraryManifests(
   baseDir?: string,
   scanScopes?: string[],
 ): DiscoveryResult {
-  const beans: IRBeanDefinition[] = [];
+  const beans: IRComponentDefinition[] = [];
   const aopMappings: ResolvedAopMapping[] = [];
 
   for (const { packageName, manifest } of scanLibraryManifests(
@@ -476,7 +480,7 @@ export function discoverLibraryManifests(
     scanScopes,
   )) {
     try {
-      beans.push(...deserializeBeans(manifest));
+      beans.push(...deserializeComponents(manifest));
     } catch (err) {
       console.warn(
         `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,

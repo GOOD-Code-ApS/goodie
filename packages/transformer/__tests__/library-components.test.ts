@@ -2,20 +2,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { IRBeanDefinition } from '../src/ir.js';
+import type { IRComponentDefinition } from '../src/ir.js';
 import {
-  deserializeBeans,
+  deserializeComponents,
   discoverAopMappings,
-  discoverLibraryBeans,
+  discoverLibraryComponents,
   type LibraryBeansManifest,
   rewriteImportPaths,
-  serializeBeans,
-} from '../src/library-beans.js';
+  serializeComponents,
+} from '../src/library-components.js';
 import { transformLibrary } from '../src/transform.js';
 
-describe('serializeBeans / deserializeBeans', () => {
+describe('serializeComponents / deserializeComponents', () => {
   it('should round-trip a simple class bean', () => {
-    const beans: IRBeanDefinition[] = [
+    const beans: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -34,11 +34,11 @@ describe('serializeBeans / deserializeBeans', () => {
       },
     ];
 
-    const manifest = serializeBeans(beans, '@acme/lib');
+    const manifest = serializeComponents(beans, '@acme/lib');
     expect(manifest.version).toBe(1);
     expect(manifest.package).toBe('@acme/lib');
 
-    const result = deserializeBeans(manifest);
+    const result = deserializeComponents(manifest);
     expect(result).toHaveLength(1);
     expect(result[0].tokenRef).toEqual(beans[0].tokenRef);
     expect(result[0].scope).toBe('singleton');
@@ -48,7 +48,7 @@ describe('serializeBeans / deserializeBeans', () => {
   });
 
   it('should round-trip a bean with constructorDeps and baseTokenRefs', () => {
-    const beans: IRBeanDefinition[] = [
+    const beans: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -113,8 +113,8 @@ describe('serializeBeans / deserializeBeans', () => {
       },
     ];
 
-    const manifest = serializeBeans(beans, '@goodie-ts/health');
-    const result = deserializeBeans(manifest);
+    const manifest = serializeComponents(beans, '@goodie-ts/health');
+    const result = deserializeComponents(manifest);
 
     expect(result).toHaveLength(2);
 
@@ -137,7 +137,7 @@ describe('serializeBeans / deserializeBeans', () => {
   });
 
   it('should handle typeImports Map <-> object conversion', () => {
-    const beans: IRBeanDefinition[] = [
+    const beans: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'injection-token',
@@ -161,7 +161,7 @@ describe('serializeBeans / deserializeBeans', () => {
       },
     ];
 
-    const manifest = serializeBeans(beans, '@acme/lib');
+    const manifest = serializeComponents(beans, '@acme/lib');
 
     // Verify serialized form has plain object, not Map
     const serializedToken = manifest.beans[0].tokenRef as Record<
@@ -173,7 +173,7 @@ describe('serializeBeans / deserializeBeans', () => {
       User: '@acme/models',
     });
 
-    const result = deserializeBeans(manifest);
+    const result = deserializeComponents(manifest);
     const tokenRef = result[0].tokenRef;
     expect(tokenRef.kind).toBe('injection-token');
     if (tokenRef.kind === 'injection-token') {
@@ -184,7 +184,7 @@ describe('serializeBeans / deserializeBeans', () => {
   });
 
   it('should handle undefined <-> null conversion for injection token fields', () => {
-    const beans: IRBeanDefinition[] = [
+    const beans: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'injection-token',
@@ -193,7 +193,7 @@ describe('serializeBeans / deserializeBeans', () => {
           typeAnnotation: undefined,
           typeImports: undefined,
         },
-        scope: 'prototype',
+        scope: 'transient',
         eager: false,
         name: undefined,
         constructorDeps: [],
@@ -205,7 +205,7 @@ describe('serializeBeans / deserializeBeans', () => {
       },
     ];
 
-    const manifest = serializeBeans(beans, 'test');
+    const manifest = serializeComponents(beans, 'test');
 
     // Verify null in serialized form
     const serializedToken = manifest.beans[0].tokenRef as Record<
@@ -216,7 +216,7 @@ describe('serializeBeans / deserializeBeans', () => {
     expect(serializedToken.typeAnnotation).toBeNull();
     expect(serializedToken.typeImports).toBeNull();
 
-    const result = deserializeBeans(manifest);
+    const result = deserializeComponents(manifest);
     const tokenRef = result[0].tokenRef;
     if (tokenRef.kind === 'injection-token') {
       expect(tokenRef.importPath).toBeUndefined();
@@ -232,13 +232,13 @@ describe('serializeBeans / deserializeBeans', () => {
       beans: [],
     };
 
-    expect(() => deserializeBeans(manifest)).toThrow(
+    expect(() => deserializeComponents(manifest)).toThrow(
       'Unsupported beans.json version 99 from package "@acme/lib"',
     );
   });
 
   it('should include aop section in manifest when provided', () => {
-    const beans: IRBeanDefinition[] = [
+    const beans: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -261,19 +261,19 @@ describe('serializeBeans / deserializeBeans', () => {
       Log: { interceptor: 'LoggingInterceptor', order: -100 },
     };
 
-    const manifest = serializeBeans(beans, '@goodie-ts/logging', aop);
+    const manifest = serializeComponents(beans, '@goodie-ts/logging', aop);
     expect(manifest.aop).toEqual(aop);
     expect(manifest.beans).toHaveLength(1);
   });
 
   it('should omit aop section when no aop mappings exist', () => {
-    const beans: IRBeanDefinition[] = [];
-    const manifest = serializeBeans(beans, '@acme/lib');
+    const beans: IRComponentDefinition[] = [];
+    const manifest = serializeComponents(beans, '@acme/lib');
     expect(manifest.aop).toBeUndefined();
   });
 });
 
-describe('discoverLibraryBeans', () => {
+describe('discoverLibraryComponents', () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -296,7 +296,7 @@ describe('discoverLibraryBeans', () => {
       }),
     );
 
-    const beans = await discoverLibraryBeans(tmpDir);
+    const beans = await discoverLibraryComponents(tmpDir);
     expect(beans).toEqual([]);
   });
 
@@ -350,7 +350,7 @@ describe('discoverLibraryBeans', () => {
       JSON.stringify(manifest),
     );
 
-    const beans = await discoverLibraryBeans(tmpDir);
+    const beans = await discoverLibraryComponents(tmpDir);
     expect(beans).toHaveLength(1);
     expect(beans[0].tokenRef).toEqual({
       kind: 'class',
@@ -410,7 +410,7 @@ describe('discoverLibraryBeans', () => {
     );
 
     // Only scan @acme, not @goodie-ts
-    const beans = await discoverLibraryBeans(tmpDir, ['@acme']);
+    const beans = await discoverLibraryComponents(tmpDir, ['@acme']);
     expect(beans).toHaveLength(1);
     expect(beans[0].tokenRef).toEqual({
       kind: 'class',
@@ -433,13 +433,13 @@ describe('discoverLibraryBeans', () => {
     // Write invalid JSON
     fs.writeFileSync(path.join(pkgDir, 'dist', 'beans.json'), '{ invalid }');
 
-    const beans = await discoverLibraryBeans(tmpDir);
+    const beans = await discoverLibraryComponents(tmpDir);
     expect(beans).toEqual([]);
   });
 
   it('should return empty array when node_modules does not exist', async () => {
     const nonExistent = path.join(tmpDir, 'does-not-exist');
-    const beans = await discoverLibraryBeans(nonExistent);
+    const beans = await discoverLibraryComponents(nonExistent);
     expect(beans).toEqual([]);
   });
 });
@@ -588,7 +588,7 @@ describe('discoverAopMappings', () => {
 
 describe('rewriteImportPaths', () => {
   it('should rewrite absolute paths to bare package specifiers', () => {
-    const beans: IRBeanDefinition[] = [
+    const beans: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -661,7 +661,7 @@ describe('rewriteImportPaths', () => {
   });
 
   it('should not rewrite paths that do not match sourceRoot', () => {
-    const beans: IRBeanDefinition[] = [
+    const beans: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -864,7 +864,7 @@ export class Service {}
     const manifest: LibraryBeansManifest = JSON.parse(
       fs.readFileSync(beansOutputPath, 'utf-8'),
     );
-    const beans = deserializeBeans(manifest);
+    const beans = deserializeComponents(manifest);
 
     expect(beans).toHaveLength(1);
     expect(beans[0].tokenRef).toEqual({
@@ -921,7 +921,7 @@ export class MyService {
     // Generated code should contain bean definitions
     const code = fs.readFileSync(codeOutputPath, 'utf-8');
     expect(code).toContain('MyService');
-    expect(code).toContain('BeanDefinition');
+    expect(code).toContain('ComponentDefinition');
   });
 
   it('should not emit code when codeOutputPath is omitted', async () => {

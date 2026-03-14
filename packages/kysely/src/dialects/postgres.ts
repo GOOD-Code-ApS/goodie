@@ -1,8 +1,8 @@
 import {
   ConditionalOnProperty,
-  ConfigurationProperties,
-  PostConstruct,
-  PreDestroy,
+  Config,
+  OnDestroy,
+  OnInit,
   Singleton,
 } from '@goodie-ts/core';
 import type { Kysely } from 'kysely';
@@ -16,7 +16,7 @@ import type { PoolConfig } from '../pool-config.js';
  * added to the config JSON and will be available in future versions.
  */
 @Singleton()
-@ConfigurationProperties('datasource')
+@Config('datasource')
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'postgres' })
 export class PostgresDatasourceConfig {
   dialect = '';
@@ -44,7 +44,7 @@ export class PostgresKyselyDatabase extends KyselyDatabase {
   get kysely(): Kysely<any> {
     if (!this._kysely) {
       throw new Error(
-        'PostgresKyselyDatabase: not initialized. Wait for @PostConstruct to complete.',
+        'PostgresKyselyDatabase: not initialized. Wait for @OnInit to complete.',
       );
     }
     return this._kysely;
@@ -54,7 +54,7 @@ export class PostgresKyselyDatabase extends KyselyDatabase {
     return true;
   }
 
-  @PostConstruct()
+  @OnInit()
   async init() {
     try {
       const { Pool } = await importOptional('pg');
@@ -82,7 +82,7 @@ export class PostgresKyselyDatabase extends KyselyDatabase {
     }
   }
 
-  @PreDestroy()
+  @OnDestroy()
   async destroy() {
     await this._kysely?.destroy();
   }

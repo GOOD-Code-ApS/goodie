@@ -21,13 +21,13 @@ export interface ConditionalRule {
 const CONDITIONAL_DECORATORS = [
   'ConditionalOnEnv',
   'ConditionalOnProperty',
-  'ConditionalOnMissingBean',
+  'ConditionalOnMissing',
 ] as const;
 
 /**
  * Built-in conditional bean transformer plugin.
  *
- * Scans @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissingBean
+ * Scans @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissing
  * decorators on classes. Stores the extracted rules in `metadata.conditionalRules`
  * so the graph builder can evaluate them and filter beans accordingly.
  */
@@ -118,7 +118,7 @@ export function createConditionalPlugin(): TransformerPlugin {
           } else {
             rules.push({ type: 'onProperty', key });
           }
-        } else if (name === 'ConditionalOnMissingBean') {
+        } else if (name === 'ConditionalOnMissing') {
           if (args.length === 0) continue;
           const tokenArg = args[0];
           let className = tokenArg.getText();
@@ -137,7 +137,7 @@ export function createConditionalPlugin(): TransformerPlugin {
 
           if (!importPath) {
             console.warn(
-              `[goodie] @ConditionalOnMissingBean(${className}): could not resolve import path for token class. ` +
+              `[goodie] @ConditionalOnMissing(${className}): could not resolve import path for token class. ` +
                 `The condition may not match correctly. Ensure the class is imported and resolvable.`,
             );
           }

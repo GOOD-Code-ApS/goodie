@@ -1,4 +1,4 @@
-import { ConfigurationProperties, Singleton } from '@goodie-ts/core';
+import { Config, Singleton } from '@goodie-ts/core';
 
 /**
  * Configuration for OpenAPI spec generation.
@@ -15,7 +15,7 @@ import { ConfigurationProperties, Singleton } from '@goodie-ts/core';
  * ```
  */
 @Singleton()
-@ConfigurationProperties('openapi')
+@Config('openapi')
 export class OpenApiConfig {
   accessor title: string = 'API';
   accessor version: string = '0.0.1';

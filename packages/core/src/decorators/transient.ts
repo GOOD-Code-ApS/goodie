@@ -5,10 +5,10 @@
  * The transformer reads this decorator via AST inspection at build time.
  *
  * @example
- * @Injectable()
+ * @Transient()
  * class UserRepository { ... }
  */
-export function Injectable(): ClassDecorator_Stage3 {
+export function Transient(): ClassDecorator_Stage3 {
   return () => {};
 }
 

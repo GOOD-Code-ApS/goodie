@@ -1,4 +1,4 @@
-import { Eager, PostConstruct, Singleton } from '@goodie-ts/core';
+import { Eager, OnInit, Singleton } from '@goodie-ts/core';
 import type { Migration as KyselyMigration } from 'kysely';
 import { Migrator } from 'kysely';
 import type { AbstractMigration } from './abstract-migration.js';
@@ -8,7 +8,7 @@ import type { KyselyDatabase } from './kysely-database.js';
 /**
  * Runs Kysely migrations at application startup.
  *
- * Library bean — eager singleton with `@PostConstruct migrate()`.
+ * Library bean — eager singleton with `@OnInit migrate()`.
  * Constructor receives `KyselyDatabase` and all `@Migration` instances
  * via collection injection on `AbstractMigration`.
  *
@@ -23,7 +23,7 @@ export class MigrationRunner {
     private readonly migrations: AbstractMigration[],
   ) {}
 
-  @PostConstruct()
+  @OnInit()
   async migrate(): Promise<void> {
     if (this.migrations.length === 0) return;
 

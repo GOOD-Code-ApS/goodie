@@ -87,7 +87,7 @@ export interface IRPublicMember {
 }
 
 /** Full intermediate representation of a single bean. */
-export interface IRBeanDefinition {
+export interface IRComponentDefinition {
   tokenRef: TokenRef;
   scope: Scope;
   eager: boolean;

@@ -4,9 +4,9 @@ import type { Kysely } from 'kysely';
  * Abstract base for Kysely database access.
  *
  * Non-generic (`Kysely<any>`) by design. Users bridge to their schema
- * type via a `@Module` with `@Provides`:
+ * type via a `@Factory` with `@Provides`:
  * ```typescript
- * @Module()
+ * @Factory()
  * class DatabaseModule {
  *   constructor(private db: KyselyDatabase) {}
  *

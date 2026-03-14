@@ -1,6 +1,6 @@
 import {
   InvalidDecoratorUsageError,
-  type IRBeanDefinition,
+  type IRComponentDefinition,
   type MethodVisitorContext,
   type TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -97,7 +97,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
           );
         }
 
-        // Store metadata on the bean — merged into IRBeanDefinition.metadata by the scanner
+        // Store metadata on the bean — merged into IRComponentDefinition.metadata by the scanner
         const existing = (ctx.classMetadata.scheduledMethods ??
           []) as ScheduledMethodMeta[];
         existing.push({
@@ -113,7 +113,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
       }
     },
 
-    beforeCodegen(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    beforeCodegen(beans: IRComponentDefinition[]): IRComponentDefinition[] {
       // Only create SchedulerService when @Scheduled methods are found
       const hasScheduledMethods = beans.some(
         (b) =>
@@ -122,7 +122,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
       );
       if (!hasScheduledMethods) return beans;
 
-      const schedulerServiceBean: IRBeanDefinition = {
+      const schedulerServiceBean: IRComponentDefinition = {
         tokenRef: {
           kind: 'class',
           className: 'SchedulerService',
@@ -152,8 +152,8 @@ export function createSchedulerPlugin(): TransformerPlugin {
         factoryKind: 'constructor',
         providesSource: undefined,
         metadata: {
-          postConstructMethods: ['start'],
-          preDestroyMethods: ['stop'],
+          onInitMethods: ['start'],
+          onDestroyMethods: ['stop'],
         },
         sourceLocation: {
           filePath: '@goodie-ts/scheduler',

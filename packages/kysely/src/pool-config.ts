@@ -1,8 +1,4 @@
-import {
-  ConditionalOnProperty,
-  ConfigurationProperties,
-  Singleton,
-} from '@goodie-ts/core';
+import { ConditionalOnProperty, Config, Singleton } from '@goodie-ts/core';
 
 /**
  * Connection pool configuration, bound from `datasource.pool.*` keys.
@@ -12,7 +8,7 @@ import {
  * don't use pooling.
  */
 @Singleton()
-@ConfigurationProperties('datasource.pool')
+@Config('datasource.pool')
 @ConditionalOnProperty('datasource.dialect', {
   havingValue: ['postgres', 'mysql'],
 })

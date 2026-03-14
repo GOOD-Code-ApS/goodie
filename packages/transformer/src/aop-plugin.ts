@@ -1,4 +1,4 @@
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import type { MethodVisitorContext, TransformerPlugin } from './options.js';
 
 /** Declaration for a single AOP decorator in `goodie.aop`. */
@@ -224,7 +224,7 @@ export function createDeclarativeAopPlugin(
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    afterResolve(beans: IRComponentDefinition[]): IRComponentDefinition[] {
       for (const bean of beans) {
         const className =
           bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;

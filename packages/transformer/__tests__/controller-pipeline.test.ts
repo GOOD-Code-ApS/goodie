@@ -174,15 +174,15 @@ describe('Controller as Plugin-Registered Bean', () => {
     ).toThrow(InvalidDecoratorUsageError);
   });
 
-  it('should throw when @Controller is combined with @Injectable', () => {
+  it('should throw when @Controller is combined with @Transient', () => {
     expect(() =>
       createTestProject(
         {
           '/src/UserController.ts': `
-          import { Controller, Injectable } from './decorators.js'
+          import { Controller, Transient } from './decorators.js'
 
           @Controller('/users')
-          @Injectable()
+          @Transient()
           export class UserController {}
         `,
         },
@@ -192,15 +192,15 @@ describe('Controller as Plugin-Registered Bean', () => {
     ).toThrow(InvalidDecoratorUsageError);
   });
 
-  it('should throw when @Controller is combined with @Module', () => {
+  it('should throw when @Controller is combined with @Factory', () => {
     expect(() =>
       createTestProject(
         {
           '/src/UserController.ts': `
-          import { Controller, Module } from './decorators.js'
+          import { Controller, Factory } from './decorators.js'
 
           @Controller('/users')
-          @Module()
+          @Factory()
           export class UserController {}
         `,
         },

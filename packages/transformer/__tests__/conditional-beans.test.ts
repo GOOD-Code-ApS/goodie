@@ -133,7 +133,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
     });
   });
 
-  describe('@ConditionalOnMissingBean', () => {
+  describe('@ConditionalOnMissing', () => {
     it('should record onMissingBean rule with resolved class info', () => {
       const result = createTestProject({
         '/src/ServiceA.ts': `
@@ -143,11 +143,11 @@ describe('Conditional Plugin — Metadata Recording', () => {
           export class ServiceA {}
         `,
         '/src/FallbackService.ts': `
-          import { Singleton, ConditionalOnMissingBean } from './decorators.js'
+          import { Singleton, ConditionalOnMissing } from './decorators.js'
           import { ServiceA } from './ServiceA.js'
 
           @Singleton()
-          @ConditionalOnMissingBean(ServiceA)
+          @ConditionalOnMissing(ServiceA)
           export class FallbackService {}
         `,
       });

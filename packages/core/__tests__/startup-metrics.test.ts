@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/component-definition.js';
 import type { Scope } from '../src/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -10,7 +13,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -18,7 +21,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',

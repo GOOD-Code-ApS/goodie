@@ -1,4 +1,4 @@
-import type { IRBeanDefinition } from '@goodie-ts/transformer';
+import type { IRComponentDefinition } from '@goodie-ts/transformer';
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
@@ -15,7 +15,7 @@ function createProject(files: Record<string, string>) {
 }
 
 /** Simulates the KyselyDatabase library bean that would come from beans.json. */
-const kyselyDatabaseLibraryBean: IRBeanDefinition = {
+const kyselyDatabaseLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
     className: 'KyselyDatabase',
@@ -38,7 +38,7 @@ const kyselyDatabaseLibraryBean: IRBeanDefinition = {
 };
 
 /** Simulates the TransactionManager library bean from beans.json. */
-const transactionManagerLibraryBean: IRBeanDefinition = {
+const transactionManagerLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
     className: 'TransactionManager',
@@ -72,7 +72,7 @@ const transactionManagerLibraryBean: IRBeanDefinition = {
 };
 
 /** Simulates the TransactionalInterceptor library bean from beans.json. */
-const transactionalInterceptorLibraryBean: IRBeanDefinition = {
+const transactionalInterceptorLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
     className: 'TransactionalInterceptor',
@@ -106,7 +106,7 @@ const transactionalInterceptorLibraryBean: IRBeanDefinition = {
 };
 
 /** Simulates the MigrationRunner library bean from beans.json. */
-const migrationRunnerLibraryBean: IRBeanDefinition = {
+const migrationRunnerLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
     className: 'MigrationRunner',
@@ -141,7 +141,7 @@ const migrationRunnerLibraryBean: IRBeanDefinition = {
   fieldDeps: [],
   factoryKind: 'constructor',
   providesSource: undefined,
-  metadata: { postConstructMethods: ['migrate'] },
+  metadata: { onInitMethods: ['migrate'] },
   sourceLocation: {
     filePath: '@goodie-ts/kysely',
     line: 0,
@@ -150,7 +150,7 @@ const migrationRunnerLibraryBean: IRBeanDefinition = {
 };
 
 /** All kysely library beans. */
-const allKyselyLibraryBeans: IRBeanDefinition[] = [
+const allKyselyLibraryBeans: IRComponentDefinition[] = [
   kyselyDatabaseLibraryBean,
   transactionManagerLibraryBean,
   transactionalInterceptorLibraryBean,

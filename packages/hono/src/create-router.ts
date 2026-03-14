@@ -1,4 +1,4 @@
-import type { ApplicationContext, BeanDefinition } from '@goodie-ts/core';
+import type { ApplicationContext, ComponentDefinition } from '@goodie-ts/core';
 import {
   type ControllerMetadata,
   ExceptionHandler,
@@ -204,7 +204,7 @@ type CreateSecurityMiddlewareFn = (
  */
 function buildSecurityMiddleware(
   ctx: ApplicationContext,
-  definitions: readonly BeanDefinition[],
+  definitions: readonly ComponentDefinition[],
 ): ((c: Context, next: Next) => Promise<Response | void>) | undefined {
   const providerBaseToken = findBaseTokenByName(
     definitions,
@@ -244,14 +244,14 @@ function buildSecurityMiddleware(
 }
 
 function findBaseTokenByName(
-  definitions: readonly BeanDefinition[],
+  definitions: readonly ComponentDefinition[],
   className: string,
-): BeanDefinition['token'] | undefined {
+): ComponentDefinition['token'] | undefined {
   for (const def of definitions) {
     if (def.baseTokens) {
       for (const baseToken of def.baseTokens) {
         if (typeof baseToken === 'function' && baseToken.name === className) {
-          return baseToken as BeanDefinition['token'];
+          return baseToken as ComponentDefinition['token'];
         }
       }
     }

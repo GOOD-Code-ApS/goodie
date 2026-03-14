@@ -2,7 +2,7 @@ import type {
   InterceptedMethodDescriptor,
   InterceptorRef,
 } from '@goodie-ts/core';
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import type { MethodVisitorContext, TransformerPlugin } from './options.js';
 
 /** Internal tracking of AOP annotations found during method visiting. */
@@ -89,7 +89,7 @@ export function createAopPlugin(): TransformerPlugin {
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    afterResolve(beans: IRComponentDefinition[]): IRComponentDefinition[] {
       for (const bean of beans) {
         const className =
           bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;

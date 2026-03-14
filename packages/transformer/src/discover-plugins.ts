@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { LibraryBeansManifest } from './library-beans.js';
+import type { LibraryBeansManifest } from './library-components.js';
 import type { TransformerPlugin } from './options.js';
 
 /** Result of a combined discovery pass (plugins + library manifests). */

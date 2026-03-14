@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { BeanDefinition } from '../src/bean-definition.js';
+import type { ComponentDefinition } from '../src/component-definition.js';
 import { CircularDependencyError } from '../src/errors.js';
 import { InjectionToken } from '../src/injection-token.js';
 import { topoSort } from '../src/topo-sort.js';
 
-/** Helper to create a minimal BeanDefinition for testing. */
+/** Helper to create a minimal ComponentDefinition for testing. */
 function def(
-  token: BeanDefinition['token'],
-  deps: BeanDefinition['dependencies'] = [],
-): BeanDefinition {
+  token: ComponentDefinition['token'],
+  deps: ComponentDefinition['dependencies'] = [],
+): ComponentDefinition {
   return {
     token,
     scope: 'singleton',
@@ -19,7 +19,7 @@ function def(
   };
 }
 
-function dep(token: BeanDefinition['token'], optional = false) {
+function dep(token: ComponentDefinition['token'], optional = false) {
   return { token, optional, collection: false };
 }
 

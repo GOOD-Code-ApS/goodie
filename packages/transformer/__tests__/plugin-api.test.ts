@@ -1,6 +1,6 @@
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
-import type { IRBeanDefinition } from '../src/ir.js';
+import type { IRComponentDefinition } from '../src/ir.js';
 import type { TransformerPlugin } from '../src/options.js';
 import { transformInMemory } from '../src/transform.js';
 import { DECORATOR_STUBS } from './helpers.js';
@@ -32,8 +32,8 @@ describe('TransformerPlugin API', () => {
           export class Foo {}
         `,
         '/src/Bar.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Bar {}
         `,
       });
@@ -214,7 +214,7 @@ describe('TransformerPlugin API', () => {
 
   describe('beforeCodegen', () => {
     it('can inject additional beans into the final list', () => {
-      const syntheticBean: IRBeanDefinition = {
+      const syntheticBean: IRComponentDefinition = {
         tokenRef: {
           kind: 'class',
           className: 'Foo',

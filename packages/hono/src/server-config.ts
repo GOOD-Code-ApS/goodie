@@ -1,4 +1,4 @@
-import { ConfigurationProperties, Singleton } from '@goodie-ts/core';
+import { Config, Singleton } from '@goodie-ts/core';
 
 /**
  * Supported server runtimes.
@@ -19,7 +19,7 @@ export interface CorsConfig {
 }
 
 @Singleton()
-@ConfigurationProperties('server')
+@Config('server')
 export class ServerConfig {
   host = 'localhost';
   port = 3000;

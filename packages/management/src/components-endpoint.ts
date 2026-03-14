@@ -11,7 +11,7 @@ import { Controller, Get, Response } from '@goodie-ts/http';
  * filtered out — only user and library beans are shown.
  */
 @Controller('/management')
-export class BeansEndpoint {
+export class ComponentsEndpoint {
   constructor(private readonly context: ApplicationContext) {}
 
   @Get('/beans')

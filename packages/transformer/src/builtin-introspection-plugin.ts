@@ -38,8 +38,7 @@ export function createIntrospectionPlugin(): TransformerPlugin {
 
     visitClass(ctx: ClassVisitorContext): void {
       const isIntrospected = ctx.decorators.some(
-        (d) =>
-          d.name === 'Introspected' || d.name === 'ConfigurationProperties',
+        (d) => d.name === 'Introspected' || d.name === 'Config',
       );
       if (!isIntrospected) return;
 

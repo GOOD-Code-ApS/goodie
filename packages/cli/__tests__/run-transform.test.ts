@@ -60,7 +60,7 @@ describe('runTransform', () => {
     const error = new TransformerError(
       'Missing provider',
       { filePath: 'foo.ts', line: 1, column: 0 },
-      'Add @Injectable()',
+      'Add @Transient()',
     );
     mockTransform.mockRejectedValue(error);
 
@@ -153,13 +153,13 @@ describe('logOutcome', () => {
       error: new TransformerError(
         'Missing provider',
         { filePath: 'foo.ts', line: 1, column: 0 },
-        'Add @Injectable()',
+        'Add @Transient()',
       ),
     };
 
     logOutcome(outcome);
 
-    expect(errorSpy).toHaveBeenCalledWith('[goodie] Hint: Add @Injectable()');
+    expect(errorSpy).toHaveBeenCalledWith('[goodie] Hint: Add @Transient()');
     errorSpy.mockRestore();
   });
 });

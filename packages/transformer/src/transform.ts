@@ -24,13 +24,13 @@ import {
   mergePlugins,
 } from './discover-plugins.js';
 import { buildGraph } from './graph-builder.js';
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import {
-  deserializeBeans,
+  deserializeComponents,
   discoverAopMappings,
   rewriteImportPaths,
-  serializeBeans,
-} from './library-beans.js';
+  serializeComponents,
+} from './library-components.js';
 import type {
   TransformerPlugin,
   TransformLibraryOptions,
@@ -104,12 +104,12 @@ export async function transform(
     : discovery.plugins;
 
   // Extract library beans and AOP mappings from manifests
-  const libraryBeans: IRBeanDefinition[] = [];
+  const libraryBeans: IRComponentDefinition[] = [];
   const aopMappings: import('./aop-plugin.js').ResolvedAopMapping[] = [];
   if (!options.disableLibraryBeanDiscovery) {
     for (const { packageName, manifest } of discovery.manifests) {
       try {
-        libraryBeans.push(...deserializeBeans(manifest));
+        libraryBeans.push(...deserializeComponents(manifest));
       } catch (err) {
         console.warn(
           `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
@@ -289,7 +289,7 @@ export function transformInMemory(
   project: Project,
   outputPath: string,
   plugins?: TransformerPlugin[],
-  libraryBeans?: IRBeanDefinition[],
+  libraryBeans?: IRComponentDefinition[],
   aopMappings?: ResolvedAopMapping[],
   options?: { configDir?: string; inlinedConfig?: Record<string, string> },
 ): TransformResult {
@@ -529,7 +529,7 @@ export async function transformLibrary(
   );
 
   // 13. Serialize to manifest
-  const manifest = serializeBeans(
+  const manifest = serializeComponents(
     rewrittenBeans,
     options.packageName,
     aopDeclarations,
@@ -576,7 +576,7 @@ function extractTypeRegistrations(
  * Print bean graph and plugin contributions when GOODIE_DEBUG=true.
  */
 function printDebugInfo(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   plugins: TransformerPlugin[],
 ): void {
   console.log('[goodie] ══════════════════════════════════');
@@ -621,14 +621,14 @@ function printDebugInfo(
  * import path when the className matches.
  */
 function reconcileLibraryImportPaths(
-  allBeans: IRBeanDefinition[],
-  libraryBeans: IRBeanDefinition[],
+  allBeans: IRComponentDefinition[],
+  libraryBeans: IRComponentDefinition[],
   packageDirs?: Map<string, string>,
 ): void {
   // Build className → library tokenRef map (skip ambiguous names)
   const libraryClassMap = new Map<
     string,
-    IRBeanDefinition['tokenRef'] | null
+    IRComponentDefinition['tokenRef'] | null
   >();
   for (const lib of libraryBeans) {
     if (lib.tokenRef.kind !== 'class') continue;
@@ -642,8 +642,8 @@ function reconcileLibraryImportPaths(
   }
 
   function reconcileRef(
-    ref: IRBeanDefinition['tokenRef'],
-  ): IRBeanDefinition['tokenRef'] {
+    ref: IRComponentDefinition['tokenRef'],
+  ): IRComponentDefinition['tokenRef'] {
     if (ref.kind !== 'class') return ref;
     const libRef = libraryClassMap.get(ref.className);
     if (libRef && libRef.kind === 'class') {
@@ -685,7 +685,7 @@ function reconcileLibraryImportPaths(
  * Keys are "filePath:className" to avoid collisions between same-named classes in different files.
  */
 function mergePluginMetadata(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   pluginMetadata: Map<string, Record<string, unknown>>,
 ): void {
   for (const bean of beans) {
