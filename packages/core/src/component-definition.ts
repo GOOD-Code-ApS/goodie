@@ -12,7 +12,7 @@ export interface Dependency {
 }
 
 /** Full metadata describing how to create and manage a bean. */
-export interface BeanDefinition<T = unknown> {
+export interface ComponentDefinition<T = unknown> {
   /** The token this bean is registered under. */
   token: InjectionToken<T> | Constructor<T>;
   /** Singleton (cached) or prototype (new instance per get). */

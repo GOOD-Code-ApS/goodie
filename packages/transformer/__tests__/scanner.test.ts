@@ -12,16 +12,16 @@ function createProject(files: Record<string, string>): Project {
 }
 
 describe('Scanner', () => {
-  describe('@Injectable / @Singleton classes', () => {
-    it('should discover a basic @Injectable class', () => {
+  describe('@Transient / @Singleton classes', () => {
+    it('should discover a basic @Transient class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/UserRepo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class UserRepo {}
         `,
       });
@@ -30,7 +30,7 @@ describe('Scanner', () => {
 
       expect(result.beans).toHaveLength(1);
       expect(result.beans[0].classTokenRef.className).toBe('UserRepo');
-      expect(result.beans[0].scope).toBe('prototype');
+      expect(result.beans[0].scope).toBe('transient');
       expect(result.beans[0].eager).toBe(false);
     });
 
@@ -139,12 +139,12 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -220,16 +220,16 @@ describe('Scanner', () => {
     });
   });
 
-  describe('@Module classes', () => {
-    it('should discover a @Module class', () => {
+  describe('@Factory classes', () => {
+    it('should discover a @Factory class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {}
         `,
       });
@@ -244,13 +244,13 @@ describe('Scanner', () => {
     it('should scan @Provides methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -276,21 +276,21 @@ describe('Scanner', () => {
     it('should scan @Provides method parameters', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repo } from './Repo.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             service(repo: Repo): string { return 'ok' }
@@ -311,14 +311,14 @@ describe('Scanner', () => {
     it('should detect @Eager on @Provides methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
           export function Eager() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides, Eager } from './decorators.js'
+          import { Factory, Provides, Eager } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Eager()
             @Provides()
@@ -342,7 +342,7 @@ describe('Scanner', () => {
       expect(appModule.provides[1].eager).toBe(false);
     });
 
-    it('should scan @Provides on a @Singleton bean (not just @Module)', () => {
+    it('should scan @Provides on a @Singleton bean (not just @Factory)', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -364,26 +364,26 @@ describe('Scanner', () => {
       expect(result.beans).toHaveLength(1);
       expect(result.beans[0].classTokenRef.className).toBe('AppConfig');
       expect(result.beans[0].scope).toBe('singleton');
-      expect(result.beans[0].isModule).toBe(false);
+      expect(result.beans[0].isFactory).toBe(false);
       expect(result.beans[0].provides).toHaveLength(1);
       expect(result.beans[0].provides[0].methodName).toBe('dbUrl');
     });
 
-    it('should scan @Module as a singleton bean', () => {
+    it('should scan @Factory as a singleton bean', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/DbModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class DbModule {}
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {}
         `,
       });
@@ -400,14 +400,14 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/User.ts': `
           export class User { name = '' }
         `,
         '/src/Repository.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/Service.ts': `
@@ -515,11 +515,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -545,7 +545,7 @@ describe('Scanner', () => {
     it('should extract generic type arguments for @Provides return type', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/User.ts': `
@@ -555,11 +555,11 @@ describe('Scanner', () => {
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -580,19 +580,19 @@ describe('Scanner', () => {
     });
   });
 
-  describe('@PreDestroy methods', () => {
-    it('should discover @PreDestroy method on a bean', () => {
+  describe('@OnDestroy methods', () => {
+    it('should discover @OnDestroy method on a bean', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PreDestroy() { return (t: any, c: any) => {} }
+          export function OnDestroy() { return (t: any, c: any) => {} }
         `,
         '/src/Pool.ts': `
-          import { Singleton, PreDestroy } from './decorators.js'
+          import { Singleton, OnDestroy } from './decorators.js'
 
           @Singleton()
           export class Pool {
-            @PreDestroy()
+            @OnDestroy()
             shutdown() {}
           }
         `,
@@ -601,24 +601,24 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].preDestroyMethods).toEqual(['shutdown']);
+      expect(result.beans[0].onDestroyMethods).toEqual(['shutdown']);
     });
 
-    it('should discover multiple @PreDestroy methods', () => {
+    it('should discover multiple @OnDestroy methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PreDestroy() { return (t: any, c: any) => {} }
+          export function OnDestroy() { return (t: any, c: any) => {} }
         `,
         '/src/Service.ts': `
-          import { Singleton, PreDestroy } from './decorators.js'
+          import { Singleton, OnDestroy } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PreDestroy()
+            @OnDestroy()
             closeConnections() {}
 
-            @PreDestroy()
+            @OnDestroy()
             flushBuffers() {}
           }
         `,
@@ -627,13 +627,13 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].preDestroyMethods).toEqual([
+      expect(result.beans[0].onDestroyMethods).toEqual([
         'closeConnections',
         'flushBuffers',
       ]);
     });
 
-    it('should return empty array when no @PreDestroy methods', () => {
+    it('should return empty array when no @OnDestroy methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -649,23 +649,23 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].preDestroyMethods).toEqual([]);
+      expect(result.beans[0].onDestroyMethods).toEqual([]);
     });
   });
 
-  describe('@PostConstruct methods', () => {
-    it('should discover @PostConstruct method on a bean', () => {
+  describe('@OnInit methods', () => {
+    it('should discover @OnInit method on a bean', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PostConstruct() { return (t: any, c: any) => {} }
+          export function OnInit() { return (t: any, c: any) => {} }
         `,
         '/src/Service.ts': `
-          import { Singleton, PostConstruct } from './decorators.js'
+          import { Singleton, OnInit } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PostConstruct()
+            @OnInit()
             init() {}
           }
         `,
@@ -674,24 +674,24 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].postConstructMethods).toEqual(['init']);
+      expect(result.beans[0].onInitMethods).toEqual(['init']);
     });
 
-    it('should discover multiple @PostConstruct methods', () => {
+    it('should discover multiple @OnInit methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PostConstruct() { return (t: any, c: any) => {} }
+          export function OnInit() { return (t: any, c: any) => {} }
         `,
         '/src/Service.ts': `
-          import { Singleton, PostConstruct } from './decorators.js'
+          import { Singleton, OnInit } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PostConstruct()
+            @OnInit()
             initCache() {}
 
-            @PostConstruct()
+            @OnInit()
             loadConfig() {}
           }
         `,
@@ -700,13 +700,13 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].postConstructMethods).toEqual([
+      expect(result.beans[0].onInitMethods).toEqual([
         'initCache',
         'loadConfig',
       ]);
     });
 
-    it('should return empty array when no @PostConstruct methods', () => {
+    it('should return empty array when no @OnInit methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -722,7 +722,7 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].postConstructMethods).toEqual([]);
+      expect(result.beans[0].onInitMethods).toEqual([]);
     });
   });
 
@@ -745,10 +745,10 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].isBeanPostProcessor).toBe(true);
+      expect(result.beans[0].isComponentPostProcessor).toBe(true);
     });
 
-    it('should default isBeanPostProcessor to false', () => {
+    it('should default isComponentPostProcessor to false', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -764,29 +764,29 @@ describe('Scanner', () => {
       const result = scan(project);
 
       expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].isBeanPostProcessor).toBe(false);
+      expect(result.beans[0].isComponentPostProcessor).toBe(false);
     });
   });
 
-  describe('@PostProcessor + @Injectable rejection', () => {
-    it('throws InvalidDecoratorUsageError when combining @PostProcessor with @Injectable', () => {
+  describe('@PostProcessor + @Transient rejection', () => {
+    it('throws InvalidDecoratorUsageError when combining @PostProcessor with @Transient', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
           export function PostProcessor() { return (t: any, c: any) => {} }
         `,
         '/src/BadProcessor.ts': `
-          import { Injectable, PostProcessor } from './decorators.js'
+          import { Transient, PostProcessor } from './decorators.js'
 
           @PostProcessor()
-          @Injectable()
+          @Transient()
           export class BadProcessor {}
         `,
       });
 
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
       expect(() => scan(project)).toThrow(
-        /@PostProcessor cannot be combined with @Injectable/,
+        /@PostProcessor cannot be combined with @Transient/,
       );
     });
   });
@@ -796,11 +796,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/Service.ts': `
@@ -828,11 +828,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/Service.ts': `
@@ -859,11 +859,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -992,22 +992,22 @@ describe('Scanner', () => {
   });
 
   describe('abstract class rejection', () => {
-    it('throws InvalidDecoratorUsageError for abstract @Injectable class', () => {
+    it('throws InvalidDecoratorUsageError for abstract @Transient class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/AbstractRepo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export abstract class AbstractRepo {}
         `,
       });
 
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
       expect(() => scan(project)).toThrow(
-        /Cannot apply @Injectable\(\) to abstract class "AbstractRepo"/,
+        /Cannot apply @Transient\(\) to abstract class "AbstractRepo"/,
       );
     });
 
@@ -1030,22 +1030,22 @@ describe('Scanner', () => {
       );
     });
 
-    it('throws InvalidDecoratorUsageError for abstract @Module class', () => {
+    it('throws InvalidDecoratorUsageError for abstract @Factory class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/AbstractModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export abstract class AbstractModule {}
         `,
       });
 
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
       expect(() => scan(project)).toThrow(
-        /Cannot apply @Module\(\) to abstract class "AbstractModule"/,
+        /Cannot apply @Factory\(\) to abstract class "AbstractModule"/,
       );
     });
 
@@ -1175,14 +1175,14 @@ describe('Scanner', () => {
     it('should scan across multiple source files', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -1192,9 +1192,9 @@ describe('Scanner', () => {
           export class Service {}
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {}
         `,
       });
@@ -1207,15 +1207,15 @@ describe('Scanner', () => {
     it('should ignore classes without decorators', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Plain.ts': `
           export class Plain {}
         `,
         '/src/Decorated.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Decorated {}
         `,
       });

@@ -1,7 +1,7 @@
 import type {
   AbstractConstructor,
   ApplicationContext,
-  BeanDefinition,
+  ComponentDefinition,
   Constructor,
   InjectionToken,
 } from '@goodie-ts/core';
@@ -11,10 +11,10 @@ import { TestContext, type TestContextBuilder } from './test-context.js';
 /** A function that builds bean definitions, optionally accepting config overrides. */
 type DefinitionsFactory = (
   config?: Record<string, unknown>,
-) => BeanDefinition[];
+) => ComponentDefinition[];
 
 /** Input accepted by `createGoodieTest()` — either a definitions factory or a raw array. */
-type DefinitionsInput = DefinitionsFactory | BeanDefinition[];
+type DefinitionsInput = DefinitionsFactory | ComponentDefinition[];
 
 /**
  * Configuration options for `createGoodieTest()`.
@@ -119,12 +119,12 @@ export function createGoodieTest<
   const rollback = options?.rollback ?? !!transactional;
 
   // Resolve definitions once (lazily on first test) and reuse across all tests.
-  // This ensures all tests share the same BeanDefinition[] reference, which is
+  // This ensures all tests share the same ComponentDefinition[] reference, which is
   // critical for transactional rollback — tests must share the same connection pool.
   // When definitions is a factory, config() is evaluated once here and frozen for all tests.
   // When definitions is a raw array, config is applied per-test via builder.withConfig().
-  let cachedDefs: BeanDefinition[] | undefined;
-  function resolveDefinitions(): BeanDefinition[] {
+  let cachedDefs: ComponentDefinition[] | undefined;
+  function resolveDefinitions(): ComponentDefinition[] {
     if (cachedDefs) return cachedDefs;
 
     if (typeof definitions === 'function') {

@@ -65,8 +65,8 @@ describe('Scheduler Transformer Plugin', () => {
     expect(scheduler!.scope).toBe('singleton');
     expect(scheduler!.eager).toBe(true);
     expect(scheduler!.metadata).toEqual({
-      postConstructMethods: ['start'],
-      preDestroyMethods: ['stop'],
+      onInitMethods: ['start'],
+      onDestroyMethods: ['stop'],
     });
 
     // Single dep: ApplicationContext (not the scheduled beans)

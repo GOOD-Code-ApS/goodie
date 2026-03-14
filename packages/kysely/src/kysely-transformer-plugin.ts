@@ -1,6 +1,6 @@
 import type {
   ClassVisitorContext,
-  IRBeanDefinition,
+  IRComponentDefinition,
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -68,7 +68,7 @@ export function createKyselyPlugin(
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    afterResolve(beans: IRComponentDefinition[]): IRComponentDefinition[] {
       // Wire @Transactional interceptor metadata onto beans
       for (const bean of beans) {
         const className =

@@ -52,7 +52,7 @@ describe('Events Transformer Plugin', () => {
     expect(eventBus!.scope).toBe('singleton');
     expect(eventBus!.eager).toBe(true);
     expect(eventBus!.metadata).toEqual({
-      postConstructMethods: ['init'],
+      onInitMethods: ['init'],
     });
     expect(eventBus!.baseTokenRefs).toEqual([
       {

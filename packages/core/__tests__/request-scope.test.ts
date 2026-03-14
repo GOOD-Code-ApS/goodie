@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/component-definition.js';
 import { RequestScopeManager } from '../src/request-scope.js';
 import type { Scope } from '../src/types.js';
 
@@ -61,14 +64,14 @@ function buildScopedProxyFactory(
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T;
     scope?: Scope;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -231,13 +234,13 @@ describe('Request-scoped beans', () => {
     });
   });
 
-  it('should support async @PostConstruct on request-scoped beans via getAsync', async () => {
+  it('should support async @OnInit on request-scoped beans via getAsync', async () => {
     const ctx = await ApplicationContext.create([
       makeDef(AsyncRequestService, {
         scope: 'request',
         factory: () => new AsyncRequestService(),
         metadata: {
-          postConstructMethods: ['init'],
+          onInitMethods: ['init'],
         },
       }),
     ]);
@@ -263,7 +266,7 @@ describe('Request-scoped beans', () => {
         scope: 'request',
         factory: () => new AsyncRequestService(),
         metadata: {
-          postConstructMethods: ['init'],
+          onInitMethods: ['init'],
         },
       }),
     ]);

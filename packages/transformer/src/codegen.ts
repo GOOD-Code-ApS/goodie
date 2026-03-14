@@ -7,7 +7,7 @@ import {
   QuoteKind,
   VariableDeclarationKind,
 } from 'ts-morph';
-import type { IRBeanDefinition, IRPublicMember, TokenRef } from './ir.js';
+import type { IRComponentDefinition, IRPublicMember, TokenRef } from './ir.js';
 
 /** Info about an auto-generated InjectionToken. */
 interface TokenInfo {
@@ -50,7 +50,7 @@ export interface TypeRegistration {
  * Used to skip codegen + file write when the DI graph hasn't changed.
  */
 export function computeIRHash(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   options: CodegenOptions,
   typeRegistrations?: TypeRegistration[],
 ): string {
@@ -104,7 +104,7 @@ function createWriter(): CodeBlockWriter {
  * Generate the AppContext.generated.ts source from topologically sorted beans.
  */
 export function generateCode(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   options: CodegenOptions,
   typeRegistrations?: TypeRegistration[],
 ): string {
@@ -185,7 +185,7 @@ export function generateCode(
   });
   sf.addImportDeclaration({
     moduleSpecifier: '@goodie-ts/core',
-    namedImports: ['BeanDefinition'],
+    namedImports: ['ComponentDefinition'],
     isTypeOnly: true,
   });
 
@@ -293,7 +293,7 @@ export function generateCode(
     (b) =>
       b.scope === 'request' && b.publicMembers && b.publicMembers.length > 0,
   );
-  const scopedProxyNames = new Map<IRBeanDefinition, string>();
+  const scopedProxyNames = new Map<IRComponentDefinition, string>();
   for (const bean of scopedProxyBeans) {
     const className =
       bean.tokenRef.kind === 'class'
@@ -322,9 +322,9 @@ export function generateCode(
         hasQuestionToken: true,
       },
     ],
-    returnType: 'BeanDefinition[]',
+    returnType: 'ComponentDefinition[]',
     statements: (writer) => {
-      writeBeanDefinitionsBody(
+      writeComponentDefinitionsBody(
         writer,
         beans,
         needsConfigBean,
@@ -420,25 +420,25 @@ export function generateCode(
  * Write the body of `buildDefinitions()` using CodeBlockWriter.
  * Each bean definition is an object literal in the returned array.
  */
-function writeBeanDefinitionsBody(
+function writeComponentDefinitionsBody(
   writer: CodeBlockWriter,
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   needsConfigBean: boolean,
   options: CodegenOptions,
   resolveTokenRef: (ref: TokenRef) => string,
   interceptorDepsPerBean: Map<
-    IRBeanDefinition,
+    IRComponentDefinition,
     Map<string, InterceptorRefMeta>
   >,
-  scopedProxyNames: Map<IRBeanDefinition, string>,
+  scopedProxyNames: Map<IRComponentDefinition, string>,
 ): void {
   writer.write('return [').newLine();
   writer.indent(() => {
     if (needsConfigBean) {
-      writeConfigBeanDefinition(writer, options);
+      writeConfigComponentDefinition(writer, options);
     }
     for (const bean of beans) {
-      writeBeanDefinition(
+      writeComponentDefinition(
         writer,
         bean,
         resolveTokenRef,
@@ -451,7 +451,7 @@ function writeBeanDefinitionsBody(
   writer.write(']');
 }
 
-function writeConfigBeanDefinition(
+function writeConfigComponentDefinition(
   writer: CodeBlockWriter,
   options: CodegenOptions,
 ): void {
@@ -481,16 +481,16 @@ function writeConfigBeanDefinition(
   writer.writeLine('},');
 }
 
-function writeBeanDefinition(
+function writeComponentDefinition(
   writer: CodeBlockWriter,
-  bean: IRBeanDefinition,
+  bean: IRComponentDefinition,
   resolveTokenRef: (ref: TokenRef) => string,
   needsConfigBean: boolean,
   interceptorDepsPerBean: Map<
-    IRBeanDefinition,
+    IRComponentDefinition,
     Map<string, InterceptorRefMeta>
   >,
-  scopedProxyNames: Map<IRBeanDefinition, string>,
+  scopedProxyNames: Map<IRComponentDefinition, string>,
 ): void {
   writer.writeLine('{');
   writer.indent(() => {
@@ -550,7 +550,7 @@ interface CollectedImports {
   injectionTokens: TokenInfo[];
   typeOnlyImports: Map<string, string>;
   interceptorDepsPerBean: Map<
-    IRBeanDefinition,
+    IRComponentDefinition,
     Map<string, InterceptorRefMeta>
   >;
 }
@@ -560,7 +560,7 @@ interface CollectedImports {
  * class imports, injection tokens, type-only imports, and per-bean interceptor deps.
  */
 function collectAllImports(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   outputDir: string,
   relativeImport?: (absolutePath: string) => string,
 ): CollectedImports {
@@ -568,7 +568,7 @@ function collectAllImports(
   const tokensSeen = new Map<string, TokenInfo>();
   const rawTypeImports: Array<[string, string]> = [];
   const interceptorDepsPerBean = new Map<
-    IRBeanDefinition,
+    IRComponentDefinition,
     Map<string, InterceptorRefMeta>
   >();
 
@@ -733,7 +733,7 @@ interface InterceptedMethodMeta {
 
 /** Collect unique interceptor class tokens from bean metadata, in stable order. */
 function collectInterceptorDeps(
-  bean: IRBeanDefinition,
+  bean: IRComponentDefinition,
 ): Map<string, InterceptorRefMeta> {
   const interceptedMethods = bean.metadata.interceptedMethods as
     | InterceptedMethodMeta[]
@@ -756,10 +756,13 @@ function collectInterceptorDeps(
 
 /** Convert all dependencies of a bean (constructor + field + interceptor) to code. */
 function depsToCode(
-  bean: IRBeanDefinition,
+  bean: IRComponentDefinition,
   resolveTokenRef: (ref: TokenRef) => string,
   needsConfigBean: boolean,
-  cachedInterceptorDeps: Map<IRBeanDefinition, Map<string, InterceptorRefMeta>>,
+  cachedInterceptorDeps: Map<
+    IRComponentDefinition,
+    Map<string, InterceptorRefMeta>
+  >,
 ): string {
   const allDeps = [
     ...bean.constructorDeps.map((d) => ({
@@ -816,8 +819,11 @@ function depsToCode(
 
 /** Generate the factory function code for a bean. */
 function factoryToCode(
-  bean: IRBeanDefinition,
-  cachedInterceptorDeps: Map<IRBeanDefinition, Map<string, InterceptorRefMeta>>,
+  bean: IRComponentDefinition,
+  cachedInterceptorDeps: Map<
+    IRComponentDefinition,
+    Map<string, InterceptorRefMeta>
+  >,
 ): string {
   if (bean.factoryKind === 'provides') {
     return providesFactoryToCode(bean);
@@ -827,8 +833,11 @@ function factoryToCode(
 }
 
 function constructorFactoryToCode(
-  bean: IRBeanDefinition,
-  cachedInterceptorDeps: Map<IRBeanDefinition, Map<string, InterceptorRefMeta>>,
+  bean: IRComponentDefinition,
+  cachedInterceptorDeps: Map<
+    IRComponentDefinition,
+    Map<string, InterceptorRefMeta>
+  >,
 ): string {
   const className =
     bean.tokenRef.kind === 'class'
@@ -937,7 +946,7 @@ function constructorFactoryToCode(
   return w.toString();
 }
 
-function providesFactoryToCode(bean: IRBeanDefinition): string {
+function providesFactoryToCode(bean: IRComponentDefinition): string {
   const w = createWriter();
 
   if (!bean.providesSource) {

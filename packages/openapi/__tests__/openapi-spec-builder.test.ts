@@ -1,6 +1,6 @@
 import type {
   ApplicationContext,
-  BeanDefinition,
+  ComponentDefinition,
   TypeMetadata,
 } from '@goodie-ts/core';
 import { MetadataRegistry } from '@goodie-ts/core';
@@ -42,7 +42,7 @@ function createMockContext(
       eager: false,
       metadata: { httpController: ctrl.metadata },
     };
-  }) as BeanDefinition[];
+  }) as ComponentDefinition[];
 
   return {
     getDefinitions: vi.fn().mockReturnValue(definitions),

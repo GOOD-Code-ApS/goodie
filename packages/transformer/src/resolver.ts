@@ -1,5 +1,5 @@
 import type {
-  IRBeanDefinition,
+  IRComponentDefinition,
   IRDependency,
   IRFieldInjection,
   SourceLocation,
@@ -16,7 +16,7 @@ import { UnresolvableTypeError } from './transformer-errors.js';
 
 /** Result of the resolver stage. */
 export interface ResolveResult {
-  beans: IRBeanDefinition[];
+  beans: IRComponentDefinition[];
   warnings: string[];
 }
 
@@ -46,7 +46,7 @@ const PRIMITIVE_TYPES = new Set([
  */
 export function resolve(scanResult: ScanResult): ResolveResult {
   const warnings: string[] = [...scanResult.warnings];
-  const beans: IRBeanDefinition[] = [];
+  const beans: IRComponentDefinition[] = [];
 
   for (const scanned of scanResult.beans) {
     beans.push(...resolveBean(scanned, warnings));
@@ -58,7 +58,7 @@ export function resolve(scanResult: ScanResult): ResolveResult {
 function resolveBean(
   scanned: ScannedBean,
   _warnings: string[],
-): IRBeanDefinition[] {
+): IRComponentDefinition[] {
   const constructorDeps = resolveConstructorParams(
     scanned.constructorParams,
     scanned.classTokenRef.className,
@@ -70,14 +70,14 @@ function resolveBean(
   );
 
   const metadata: Record<string, unknown> = {};
-  if (scanned.preDestroyMethods.length > 0) {
-    metadata.preDestroyMethods = scanned.preDestroyMethods;
+  if (scanned.onDestroyMethods.length > 0) {
+    metadata.onDestroyMethods = scanned.onDestroyMethods;
   }
-  if (scanned.postConstructMethods.length > 0) {
-    metadata.postConstructMethods = scanned.postConstructMethods;
+  if (scanned.onInitMethods.length > 0) {
+    metadata.onInitMethods = scanned.onInitMethods;
   }
-  if (scanned.isBeanPostProcessor) {
-    metadata.isBeanPostProcessor = true;
+  if (scanned.isComponentPostProcessor) {
+    metadata.isComponentPostProcessor = true;
   }
   if (scanned.valueFields.length > 0) {
     metadata.valueFields = scanned.valueFields.map((vf) => ({
@@ -86,8 +86,8 @@ function resolveBean(
       default: vf.defaultValue,
     }));
   }
-  if (scanned.isModule) {
-    metadata.isModule = true;
+  if (scanned.isFactory) {
+    metadata.isFactory = true;
   }
   if (scanned.primary) {
     metadata.primary = true;
@@ -96,7 +96,7 @@ function resolveBean(
     metadata.order = scanned.order;
   }
 
-  const beanDef: IRBeanDefinition = {
+  const beanDef: IRComponentDefinition = {
     tokenRef: scanned.classTokenRef,
     scope: scanned.scope,
     eager: scanned.eager,
@@ -118,7 +118,7 @@ function resolveBean(
     sourceLocation: scanned.sourceLocation,
   };
 
-  const result: IRBeanDefinition[] = [beanDef];
+  const result: IRComponentDefinition[] = [beanDef];
 
   // Expand @Provides methods into separate beans
   if (scanned.provides.length > 0) {
@@ -130,14 +130,14 @@ function resolveBean(
 }
 
 /**
- * Expand @Provides methods on a bean into separate IRBeanDefinition entries.
+ * Expand @Provides methods on a bean into separate IRComponentDefinition entries.
  * Each @Provides method becomes a bean with `factoryKind: 'provides'` whose
  * first constructor dependency is the owning bean instance.
  */
 function expandProvides(
   scanned: ScannedBean,
-  ownerBean: IRBeanDefinition,
-): IRBeanDefinition[] {
+  ownerBean: IRComponentDefinition,
+): IRComponentDefinition[] {
   const className = scanned.classTokenRef.className;
 
   // Two-pass provides resolution:

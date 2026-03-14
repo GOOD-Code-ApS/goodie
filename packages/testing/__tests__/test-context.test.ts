@@ -1,6 +1,6 @@
 import {
   ApplicationContext,
-  type BeanDefinition,
+  type ComponentDefinition,
   type Dependency,
   DIError,
   InjectionToken,
@@ -17,7 +17,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -25,7 +25,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -39,7 +39,7 @@ function makeDef<T>(
 // ── TestContext.from() ───────────────────────────────────────────────
 
 describe('TestContext.from()', () => {
-  it('creates a builder from BeanDefinition[]', async () => {
+  it('creates a builder from ComponentDefinition[]', async () => {
     class Foo {
       value = 'original';
     }
@@ -374,7 +374,7 @@ describe('build()', () => {
       value = 'other';
     }
     const ctx = await TestContext.from([
-      makeDef(Proto, { scope: 'prototype', factory: () => new Proto() }),
+      makeDef(Proto, { scope: 'transient', factory: () => new Proto() }),
       makeDef(Other, { factory: () => new Other() }),
     ])
       .override(Other)
@@ -461,9 +461,9 @@ describe('withDeps()', () => {
     const defs = [
       makeDef(Foo, {
         factory: () => new Foo(),
-        scope: 'prototype',
+        scope: 'transient',
         eager: true,
-        metadata: { isBeanPostProcessor: true },
+        metadata: { isComponentPostProcessor: true },
       }),
     ];
 
@@ -473,9 +473,9 @@ describe('withDeps()', () => {
       .build();
 
     const overriddenDef = ctx.getDefinitions().find((d) => d.token === Foo)!;
-    expect(overriddenDef.scope).toBe('prototype');
+    expect(overriddenDef.scope).toBe('transient');
     expect(overriddenDef.eager).toBe(true);
-    expect(overriddenDef.metadata).toEqual({ isBeanPostProcessor: true });
+    expect(overriddenDef.metadata).toEqual({ isComponentPostProcessor: true });
   });
 
   it('works with InjectionToken-based provides beans', async () => {
@@ -535,7 +535,9 @@ describe('withConfig()', () => {
     '__Goodie_Config',
   );
 
-  function makeConfigDefs(config: Record<string, unknown>): BeanDefinition[] {
+  function makeConfigDefs(
+    config: Record<string, unknown>,
+  ): ComponentDefinition[] {
     return [
       {
         token: CONFIG_TOKEN,
@@ -597,7 +599,7 @@ describe('withConfig()', () => {
       constructor(readonly name: string) {}
     }
 
-    const defs: BeanDefinition[] = [
+    const defs: ComponentDefinition[] = [
       ...makeConfigDefs({ DB_URL: 'postgres://prod' }),
       makeDef(Service, { factory: () => new Service('real') }),
     ];

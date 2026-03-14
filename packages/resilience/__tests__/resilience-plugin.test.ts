@@ -1,5 +1,5 @@
 import type {
-  IRBeanDefinition,
+  IRComponentDefinition,
   ResolvedAopMapping,
 } from '@goodie-ts/transformer';
 import {
@@ -45,7 +45,7 @@ const RESILIENCE_MAPPINGS: ResolvedAopMapping[] = [
   },
 ];
 
-function makeInterceptorBean(className: string): IRBeanDefinition {
+function makeInterceptorBean(className: string): IRComponentDefinition {
   return {
     tokenRef: {
       kind: 'class',
@@ -68,7 +68,7 @@ function makeInterceptorBean(className: string): IRBeanDefinition {
   };
 }
 
-const RESILIENCE_LIBRARY_BEANS: IRBeanDefinition[] = [
+const RESILIENCE_LIBRARY_BEANS: IRComponentDefinition[] = [
   makeInterceptorBean('RetryInterceptor'),
   makeInterceptorBean('CircuitBreakerInterceptor'),
   makeInterceptorBean('TimeoutInterceptor'),

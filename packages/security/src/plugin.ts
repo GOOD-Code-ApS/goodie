@@ -1,6 +1,6 @@
 import type {
   ClassVisitorContext,
-  IRBeanDefinition,
+  IRComponentDefinition,
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -49,7 +49,7 @@ export default function createSecurityPlugin(): TransformerPlugin {
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    afterResolve(beans: IRComponentDefinition[]): IRComponentDefinition[] {
       // Mark anonymous methods in the AOP interceptor metadata so
       // SecurityInterceptor can skip auth for @Anonymous methods.
       for (const bean of beans) {
