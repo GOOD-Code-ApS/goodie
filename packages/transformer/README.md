@@ -18,12 +18,12 @@ Scans your TypeScript source for decorated classes at build time using [ts-morph
 Scanner → Resolver → GraphBuilder → Codegen
 ```
 
-1. **Scanner** — reads ts-morph AST, discovers `@Singleton`, `@Injectable`, `@Module`, `@Provides`
+1. **Scanner** — reads ts-morph AST, discovers `@Singleton`, `@Transient`, `@Module`, `@Provides`
 2. **Resolver** — resolves types, constructor params, field injections, and `InjectionToken` references
 3. **GraphBuilder** — validates the dependency graph, expands modules, detects cycles
-4. **Codegen** — emits typed `BeanDefinition[]`, factory functions, and token exports
+4. **Codegen** — emits typed `ComponentDefinition[]`, factory functions, and token exports
 
-The transformer includes built-in plugins for **AOP** (`@Around`, `@Before`, `@After`) and **config** (`@ConfigurationProperties`) that are always active — no manual plugin configuration needed.
+The transformer includes built-in plugins for **AOP** (`@Around`, `@Before`, `@After`) and **config** (`@Config`) that are always active — no manual plugin configuration needed.
 
 ## Usage
 
@@ -42,7 +42,7 @@ await transform({
 
 The generated file exports:
 - Typed `InjectionToken` declarations for interfaces, generics, and primitives
-- A `definitions` array of `BeanDefinition[]`
+- A `definitions` array of `ComponentDefinition[]`
 - `createContext()` — async factory returning an `ApplicationContext`
 - `app` — a `Goodie.build(definitions)` instance ready to `.start()`
 
@@ -52,7 +52,7 @@ Missing provider errors include fuzzy matching suggestions ("Did you mean: UserS
 
 ## Library Mode
 
-For packages that ship pre-scanned beans, use `transformLibrary()` (via `goodie generate --mode library`). It serializes all bean definitions (including conditional ones) to `beans.json` and also scans for `createAopDecorator<{...}>()` calls, including AOP config in the manifest. Conditional beans are not filtered at build time -- evaluation of `@ConditionalOnProperty`, `@ConditionalOnEnv`, and `@ConditionalOnMissingBean` happens at runtime in `ApplicationContext.create()`. Consumers auto-discover beans and AOP mappings at build time.
+For packages that ship pre-scanned beans, use `transformLibrary()` (via `goodie generate --mode library`). It serializes all bean definitions (including conditional ones) to `beans.json` and also scans for `createAopDecorator<{...}>()` calls, including AOP config in the manifest. Conditional beans are not filtered at build time -- evaluation of `@ConditionalOnProperty`, `@ConditionalOnEnv`, and `@ConditionalOnMissing` happens at runtime in `ApplicationContext.create()`. Consumers auto-discover beans and AOP mappings at build time.
 
 ## License
 

@@ -1,4 +1,4 @@
-import type { BeanDefinition } from '@goodie-ts/core';
+import type { ComponentDefinition } from '@goodie-ts/core';
 import { ApplicationContext } from '@goodie-ts/core';
 import { describe, expect, it, vi } from 'vitest';
 import { ApplicationEvent } from '../src/application-event.js';
@@ -21,7 +21,7 @@ class OrderPlacedEvent extends ApplicationEvent {
 async function createEventBusContext(
   listeners: ApplicationEventListener[],
 ): Promise<EventBus> {
-  const definitions: BeanDefinition[] = listeners.map((listener) => ({
+  const definitions: ComponentDefinition[] = listeners.map((listener) => ({
     token: listener.constructor as new (...args: any[]) => unknown,
     scope: 'singleton' as const,
     dependencies: [],

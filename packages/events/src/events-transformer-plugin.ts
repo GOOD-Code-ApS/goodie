@@ -1,6 +1,6 @@
 import type {
   ClassVisitorContext,
-  IRBeanDefinition,
+  IRComponentDefinition,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
 
@@ -12,7 +12,7 @@ import type {
  * them via `getAll(ApplicationEventListener)`.
  *
  * Synthesizes an `EventBus` bean that depends on `ApplicationContext` and
- * discovers listeners at startup via `@PostConstruct`.
+ * discovers listeners at startup via `@OnInit`.
  */
 export function createEventsPlugin(): TransformerPlugin {
   return {
@@ -34,7 +34,7 @@ export function createEventsPlugin(): TransformerPlugin {
       ctx.metadata.__isEventListener = true;
     },
 
-    beforeCodegen(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    beforeCodegen(beans: IRComponentDefinition[]): IRComponentDefinition[] {
       // Add baseTokenRefs for ApplicationEventListener subclasses
       for (const bean of beans) {
         if (!bean.metadata.__isEventListener) continue;
@@ -67,7 +67,7 @@ export function createEventsPlugin(): TransformerPlugin {
 
       // Always create EventBus when the plugin is installed — allows
       // @Inject() accessor events!: EventPublisher even with zero listeners
-      const eventBusBean: IRBeanDefinition = {
+      const eventBusBean: IRComponentDefinition = {
         tokenRef: {
           kind: 'class',
           className: 'EventBus',
@@ -103,7 +103,7 @@ export function createEventsPlugin(): TransformerPlugin {
           },
         ],
         metadata: {
-          postConstructMethods: ['init'],
+          onInitMethods: ['init'],
         },
         sourceLocation: {
           filePath: '@goodie-ts/events',

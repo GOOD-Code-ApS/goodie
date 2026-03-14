@@ -28,7 +28,7 @@ export class TransactionManager {
   constructor(kyselyOrProvider?: Kysely<any> | KyselyProvider) {
     if (kyselyOrProvider) {
       if ('kysely' in kyselyOrProvider) {
-        // Capture the current value (may already be set if @PostConstruct ran)
+        // Capture the current value (may already be set if @OnInit ran)
         this.kyselyRef = kyselyOrProvider.kysely;
         // Read supportsReturning from the provider (e.g. KyselyDatabase subclass)
         if (kyselyOrProvider.supportsReturning !== undefined) {
@@ -37,7 +37,7 @@ export class TransactionManager {
         // Make the provider's .kysely property transaction-aware.
         // Any code accessing provider.kysely (e.g. database.kysely) will
         // automatically use the active transaction when inside one.
-        // The setter ensures @PostConstruct can still assign the value.
+        // The setter ensures @OnInit can still assign the value.
         const tm = this;
         Object.defineProperty(kyselyOrProvider, 'kysely', {
           get() {
@@ -56,7 +56,7 @@ export class TransactionManager {
 
   /**
    * Configure the Kysely instance used for transactions.
-   * Called manually or after @PostConstruct creates the Kysely instance.
+   * Called manually or after @OnInit creates the Kysely instance.
    */
   configure(kysely: Kysely<any>, supportsReturning?: boolean): void {
     this.kyselyRef = kysely;

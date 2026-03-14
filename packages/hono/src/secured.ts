@@ -8,7 +8,7 @@
  * to enforce authentication via the user-provided `SecurityProvider`.
  *
  * This decorator is a compile-time marker (no-op at runtime). The transformer
- * records it in `IRBeanDefinition.decorators` / `methodDecorators` and the
+ * records it in `IRComponentDefinition.decorators` / `methodDecorators` and the
  * hono plugin uses it to decide which routes need auth middleware.
  *
  * @example

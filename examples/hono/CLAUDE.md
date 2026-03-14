@@ -6,11 +6,11 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 
 - `@Controller` / `@Get` / `@Post` for declarative HTTP routing (codegen via hono plugin)
 - `KyselyDatabase` abstract base with `PostgresKyselyDatabase` conditionally selected via `@ConditionalOnProperty`
-- `PostgresDatasourceConfig` + `PoolConfig` library beans via `@ConfigurationProperties('datasource')`
+- `PostgresDatasourceConfig` + `PoolConfig` library beans via `@Config('datasource')`
 - `@Module` with `@Provides` for typed `Kysely<Database>` injection (single cast in module, no casts in consumers)
 - `@Singleton` classes with constructor injection for repository and service layers
 - `configDir: 'config'` in vite config for JSON-based configuration files
-- `ServerConfig` from `@goodie-ts/hono` library beans (host/port via `@ConfigurationProperties`)
+- `ServerConfig` from `@goodie-ts/hono` library beans (host/port via `@Config`)
 - `createRouter(ctx)` pattern for testing — generates a Hono app from the DI context
 - `withConfig()` testing API to override config values in integration tests
 - Hono's built-in `.request()` for HTTP testing without a live server
@@ -19,8 +19,8 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 
 ```
 Library beans: PostgresKyselyDatabase(@Singleton, conditional on dialect=postgres)
-  ├── PostgresDatasourceConfig(@ConfigurationProperties('datasource'))
-  ├── PoolConfig(@ConfigurationProperties('datasource.pool'))
+  ├── PostgresDatasourceConfig(@Config('datasource'))
+  ├── PoolConfig(@Config('datasource.pool'))
   └── config/default.json: { "datasource": { "url": "...", "dialect": "postgres", "pool": {...} } }
 │
 @Module DatabaseModule(KyselyDatabase)
@@ -36,7 +36,7 @@ Library beans: PostgresKyselyDatabase(@Singleton, conditional on dialect=postgre
 Generated: createRouter(ctx) → wires controllers to Hono app
 Generated: app.onStart()     → hook that starts EmbeddedServer with the router
 │
-Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer(@Singleton)
+Library beans: ServerConfig(@Config('server')) + EmbeddedServer(@Singleton)
   └── config/default.json: { "server": { "host": "localhost", "port": 3000 } }
 ```
 
@@ -59,7 +59,7 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 
 `AppContext.generated.ts` exports:
 - `__Goodie_Config` — `InjectionToken<Record<string, unknown>>` for config map
-- `buildDefinitions(config?)` — factory that returns `BeanDefinition[]` with optional config overrides
+- `buildDefinitions(config?)` — factory that returns `ComponentDefinition[]` with optional config overrides
 - `createContext(config?)` — async factory for testing with config overrides
 - `app` — `Goodie.build(definitions)` with `onStart` hook that starts the HTTP server
 - `createRouter(ctx)` — wires `@Controller` beans to Hono routes (contributed by hono plugin)

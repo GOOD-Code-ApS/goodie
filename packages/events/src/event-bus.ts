@@ -25,7 +25,7 @@ export class EventBus extends EventPublisher {
     super();
   }
 
-  /** Discover and cache all listeners. Called automatically via @PostConstruct. */
+  /** Discover and cache all listeners. Called automatically via @OnInit. */
   async init(): Promise<void> {
     const listeners = await this.ctx.getAllAsync(ApplicationEventListener);
 

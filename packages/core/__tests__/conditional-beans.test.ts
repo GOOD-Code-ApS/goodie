@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/bean-definition.js';
 import { InjectionToken } from '../src/injection-token.js';
 import type { Scope } from '../src/types.js';
 
@@ -9,16 +12,16 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
     scope?: Scope;
     eager?: boolean;
     metadata?: Record<string, unknown>;
-    baseTokens?: BeanDefinition<T>['baseTokens'];
+    baseTokens?: ComponentDefinition<T>['baseTokens'];
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -33,7 +36,7 @@ function makeDef<T>(
 /** Creates a __Goodie_Config bean with the given flattened config values. */
 function makeConfigDef(
   config: Record<string, string>,
-): BeanDefinition<Record<string, unknown>> {
+): ComponentDefinition<Record<string, unknown>> {
   const configToken = new InjectionToken<Record<string, unknown>>(
     '__Goodie_Config',
   );
@@ -346,7 +349,7 @@ describe('Runtime Conditional Bean Filtering', () => {
     });
   });
 
-  describe('@ConditionalOnMissingBean', () => {
+  describe('@ConditionalOnMissing', () => {
     it('should exclude bean when target bean exists', async () => {
       class ServiceA {}
       class FallbackService {}

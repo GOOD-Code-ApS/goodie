@@ -1,5 +1,5 @@
 import { ApplicationContext } from './application-context.js';
-import type { BeanDefinition } from './bean-definition.js';
+import type { ComponentDefinition } from './component-definition.js';
 
 /**
  * Fluent builder for bootstrapping an ApplicationContext.
@@ -18,7 +18,7 @@ export class GoodieBuilder {
   private readonly hooks: Array<(ctx: ApplicationContext) => Promise<void>> =
     [];
 
-  constructor(private readonly definitions: BeanDefinition[]) {}
+  constructor(private readonly definitions: ComponentDefinition[]) {}
 
   /**
    * Register a hook that runs after the ApplicationContext is created.
@@ -57,7 +57,7 @@ export class Goodie {
   private constructor() {}
 
   /** Create a builder pre-loaded with the given bean definitions. */
-  static build(definitions: BeanDefinition[]): GoodieBuilder {
+  static build(definitions: ComponentDefinition[]): GoodieBuilder {
     return new GoodieBuilder(definitions);
   }
 }

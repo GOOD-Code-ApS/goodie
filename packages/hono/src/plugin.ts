@@ -3,7 +3,7 @@ import {
   type CodegenContext,
   type CodegenContribution,
   InvalidDecoratorUsageError,
-  type IRBeanDefinition,
+  type IRComponentDefinition,
   type MethodVisitorContext,
   type TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -205,7 +205,7 @@ export default function createHonoPlugin(): TransformerPlugin {
     },
 
     codegen(
-      beans: IRBeanDefinition[],
+      beans: IRComponentDefinition[],
       context?: CodegenContext,
     ): CodegenContribution {
       const controllerBeans = extractControllerBeans(beans);
@@ -443,7 +443,9 @@ function scanCorsDecorator(
   return args[0].getText();
 }
 
-function extractControllerBeans(beans: IRBeanDefinition[]): ControllerBean[] {
+function extractControllerBeans(
+  beans: IRComponentDefinition[],
+): ControllerBean[] {
   const result: ControllerBean[] = [];
   for (const bean of beans) {
     const ctrl = bean.metadata.controller as ControllerMeta | undefined;
@@ -748,7 +750,7 @@ function collectSchemaImports(
  * `onEnv` and `onMissingBean` are conservatively treated as active.
  */
 function isConditionallyActive(
-  bean: IRBeanDefinition,
+  bean: IRComponentDefinition,
   config: Record<string, string>,
 ): boolean {
   const rules = bean.metadata.conditionalRules as

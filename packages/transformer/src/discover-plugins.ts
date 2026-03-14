@@ -1,12 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { LibraryBeansManifest } from './library-beans.js';
+import type { LibraryComponentsManifest } from './library-components.js';
 import type { TransformerPlugin } from './options.js';
 
 /** Result of a combined discovery pass (plugins + library manifests). */
 export interface DiscoverAllResult {
   plugins: TransformerPlugin[];
-  manifests: Array<{ packageName: string; manifest: LibraryBeansManifest }>;
+  manifests: Array<{
+    packageName: string;
+    manifest: LibraryComponentsManifest;
+  }>;
   /** Maps resolved real directory path → bare package name for each discovered library package. */
   packageDirs: Map<string, string>;
 }
@@ -107,7 +110,7 @@ export async function discoverAll(
         const beansJsonPath = path.resolve(scopeDir, entry, goodieField.beans);
         try {
           const beansRaw = fs.readFileSync(beansJsonPath, 'utf-8');
-          const manifest: LibraryBeansManifest = JSON.parse(beansRaw);
+          const manifest: LibraryComponentsManifest = JSON.parse(beansRaw);
           manifests.push({ packageName, manifest });
         } catch (err) {
           console.warn(

@@ -3,14 +3,14 @@ import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 /**
  * Built-in config transformer plugin.
  *
- * Scans `@ConfigurationProperties(prefix)` on classes that also have
- * `@Singleton` (or `@Injectable`). For each public class field, generates a
+ * Scans `@Config(prefix)` on classes that also have
+ * `@Singleton` (or `@Transient`). For each public class field, generates a
  * `valueFields` metadata entry with key `prefix.fieldName` and the
  * field initializer as the default value.
  *
  * Private and protected fields (by TypeScript modifier or underscore prefix)
- * are excluded. A warning is emitted if `@ConfigurationProperties` is used
- * without a companion `@Singleton` or `@Injectable` decorator.
+ * are excluded. A warning is emitted if `@Config` is used
+ * without a companion `@Singleton` or `@Transient` decorator.
  *
  * The existing codegen automatically handles `valueFields` — it creates
  * the `__Goodie_Config` token, adds it as a dependency, and generates
@@ -24,9 +24,7 @@ export function createConfigPlugin(): TransformerPlugin {
     visitClass(ctx: ClassVisitorContext): void {
       const decorators = ctx.classDeclaration.getDecorators();
 
-      const configDec = decorators.find(
-        (d) => d.getName() === 'ConfigurationProperties',
-      );
+      const configDec = decorators.find((d) => d.getName() === 'Config');
       if (!configDec) return;
 
       // Validate that a bean decorator is present
@@ -34,14 +32,14 @@ export function createConfigPlugin(): TransformerPlugin {
         const name = d.getName();
         return (
           name === 'Singleton' ||
-          name === 'Injectable' ||
+          name === 'Transient' ||
           name === 'RequestScoped'
         );
       });
       if (!hasBeanDecorator) {
         const className = ctx.classDeclaration.getName() ?? '<anonymous>';
         console.warn(
-          `[config] @ConfigurationProperties on '${className}' requires @Singleton or @Injectable — config values will not be injected.`,
+          `[config] @Config on '${className}' requires @Singleton or @Transient — config values will not be injected.`,
         );
         return;
       }
@@ -51,7 +49,7 @@ export function createConfigPlugin(): TransformerPlugin {
       if (args.length === 0) {
         const className = ctx.classDeclaration.getName() ?? '<anonymous>';
         console.warn(
-          `[config] @ConfigurationProperties on '${className}' is missing a prefix argument — config values will not be injected.`,
+          `[config] @Config on '${className}' is missing a prefix argument — config values will not be injected.`,
         );
         return;
       }
@@ -67,7 +65,7 @@ export function createConfigPlugin(): TransformerPlugin {
       ) {
         const className = ctx.classDeclaration.getName() ?? '<anonymous>';
         console.warn(
-          `[config] @ConfigurationProperties on '${className}' has a non-literal prefix argument '${prefixArg}' — only single-quoted or double-quoted string literals are supported. Skipping config generation for this class.`,
+          `[config] @Config on '${className}' has a non-literal prefix argument '${prefixArg}' — only single-quoted or double-quoted string literals are supported. Skipping config generation for this class.`,
         );
         return;
       }

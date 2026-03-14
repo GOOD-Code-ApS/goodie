@@ -1,6 +1,6 @@
 # @goodie-ts/transformer
 
-Compile-time scanning, type resolution, and code generation. Turns decorated TypeScript source into a generated `BeanDefinition[]` file.
+Compile-time scanning, type resolution, and code generation. Turns decorated TypeScript source into a generated `ComponentDefinition[]` file.
 
 ## Pipeline
 
@@ -13,7 +13,7 @@ Scanner → Resolver → GraphBuilder → Codegen
 | Scanner | `src/scanner.ts` | ts-morph `Project` → `ScanResult` (AST-level beans) |
 | Resolver | `src/resolver.ts` | `ScanResult` → `ResolveResult` (typed IR with TokenRefs) |
 | GraphBuilder | `src/graph-builder.ts` | `ResolveResult` → `GraphResult` (validated, topo-sorted) |
-| Codegen | `src/codegen.ts` | `IRBeanDefinition[]` → generated TypeScript string |
+| Codegen | `src/codegen.ts` | `IRComponentDefinition[]` → generated TypeScript string |
 
 Entry points: `transform(options)` for file-based, `transformInMemory(project, outputPath, options?)` for tests.
 
@@ -27,14 +27,14 @@ When `configDir` is set, the transformer reads JSON config files at build time a
 
 | File | Role |
 |------|------|
-| `src/ir.ts` | IR types: `IRBeanDefinition`, `TokenRef`, `IRDependency`, `IRProvides`, etc. |
+| `src/ir.ts` | IR types: `IRComponentDefinition`, `TokenRef`, `IRDependency`, `IRProvides`, etc. |
 | `src/transform.ts` | `transform()`, `transformInMemory()`, and `transformLibrary()` orchestrators |
 | `src/aop-scanner.ts` | `scanAopDecoratorDefinitions()` — scans `createAopDecorator<{...}>()` calls, extracts config from type parameters via type checker |
 | `src/aop-plugin.ts` | `createDeclarativeAopPlugin()` — generic AOP plugin driven by `AopDecoratorDeclaration` mappings |
 | `src/builtin-aop-plugin.ts` | `createAopPlugin()` — built-in plugin scanning `@Around/@Before/@After` decorators |
-| `src/builtin-config-plugin.ts` | `createConfigPlugin()` — built-in plugin scanning `@ConfigurationProperties` |
+| `src/builtin-config-plugin.ts` | `createConfigPlugin()` — built-in plugin scanning `@Config` |
 | `src/builtin-introspection-plugin.ts` | `createIntrospectionPlugin()` — built-in plugin scanning `@Introspected`, extracting field types and decorator metadata |
-| `src/library-beans.ts` | `serializeBeans()`, `deserializeBeans()`, `discoverLibraryBeans()`, `discoverAopMappings()` |
+| `src/library-beans.ts` | `serializeComponents()`, `deserializeComponents()`, `discoverLibraryComponents()`, `discoverAopMappings()` |
 | `src/discover-plugins.ts` | `discoverAll()` — single-pass plugin + library manifest discovery from `node_modules` |
 | `src/transformer-errors.ts` | `TransformerError` subclasses with source locations |
 
@@ -42,7 +42,7 @@ When `configDir` is set, the transformer reads JSON config files at build time a
 
 - **`TokenRef`** — union: `ClassTokenRef { kind: 'class', className, importPath }` or `InjectionTokenRef { kind: 'injection-token', tokenName, importPath?, typeAnnotation?, typeImports? }`
 - **`IRDecoratorEntry`** — `{ name: string, importPath: string }` — a decorator recorded on a class or method
-- **`IRBeanDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, decorators, methodDecorators, metadata, sourceLocation
+- **`IRComponentDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, decorators, methodDecorators, metadata, sourceLocation
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
 - **`IRProvides`** — module factory method descriptor (used during resolver expansion)
 
@@ -85,7 +85,7 @@ The built-in introspection plugin scans `@Introspected()` classes and generates 
 - Resolves `@Named()` qualifiers to match `@Inject('name')`
 - Topological sort for dependency ordering
 - Note: `@Provides` expansion now happens in the resolver stage, not the graph builder
-- Conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) pass through unfiltered — the conditional plugin records rules in `metadata.conditionalRules`, but evaluation happens at runtime in `ApplicationContext.create()`
+- Conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissing`) pass through unfiltered — the conditional plugin records rules in `metadata.conditionalRules`, but evaluation happens at runtime in `ApplicationContext.create()`
 
 ## Library Import Path Reconciliation
 

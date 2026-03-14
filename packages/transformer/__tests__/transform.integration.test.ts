@@ -8,19 +8,19 @@ import { createTestProject } from './helpers.js';
 
 describe('Transform Pipeline (Integration)', () => {
   describe('basic injectable (no deps)', () => {
-    it('should generate a bean definition for a simple @Injectable class', () => {
+    it('should generate a bean definition for a simple @Transient class', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
       });
 
       expect(result.beans).toHaveLength(1);
       expect(result.code).toContain('token: Repo');
-      expect(result.code).toContain("scope: 'prototype'");
+      expect(result.code).toContain("scope: 'transient'");
       expect(result.code).toContain('() => new Repo()');
       expect(result.code).toContain('dependencies: []');
     });
@@ -30,9 +30,9 @@ describe('Transform Pipeline (Integration)', () => {
     it('should generate ordered beans with correct factory', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -65,14 +65,14 @@ describe('Transform Pipeline (Integration)', () => {
     it('should order C, B, A in topological order', () => {
       const result = createTestProject({
         '/src/C.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class C {}
         `,
         '/src/B.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
           import { C } from './C.js'
-          @Injectable()
+          @Transient()
           export class B { constructor(private c: C) {} }
         `,
         '/src/A.ts': `
@@ -94,13 +94,13 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
-  describe('@Module with @Provides methods', () => {
+  describe('@Factory with @Provides methods', () => {
     it('should generate module bean + provides beans', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -129,15 +129,15 @@ describe('Transform Pipeline (Integration)', () => {
     it('should handle @Provides with parameter dependencies', () => {
       const result = createTestProject({
         '/src/Config.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Config {}
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Config } from './Config.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(config: Config): string { return 'postgres://localhost' }
@@ -152,23 +152,23 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
-  describe('@Module({ imports: [...] })', () => {
+  describe('@Factory({ imports: [...] })', () => {
     it('should expand imported modules', () => {
       const result = createTestProject({
         '/src/DbModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class DbModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
           }
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
           import { DbModule } from './DbModule.js'
 
-          @Module({ imports: [DbModule] })
+          @Factory({ imports: [DbModule] })
           export class AppModule {}
         `,
       });
@@ -184,26 +184,26 @@ describe('Transform Pipeline (Integration)', () => {
     it('should expand transitive module imports end-to-end', () => {
       const result = createTestProject({
         '/src/DbModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          @Module()
+          import { Factory, Provides } from './decorators.js'
+          @Factory()
           export class DbModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
           }
         `,
         '/src/CacheModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { DbModule } from './DbModule.js'
-          @Module({ imports: [DbModule] })
+          @Factory({ imports: [DbModule] })
           export class CacheModule {
             @Provides()
             cacheUrl(): string { return 'redis://localhost' }
           }
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
           import { CacheModule } from './CacheModule.js'
-          @Module({ imports: [CacheModule] })
+          @Factory({ imports: [CacheModule] })
           export class AppModule {}
         `,
       });
@@ -221,10 +221,10 @@ describe('Transform Pipeline (Integration)', () => {
     it('should handle @Inject on accessor field', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
-          import { Injectable, Named } from './decorators.js'
+          import { Transient, Named } from './decorators.js'
 
           @Named('primary')
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -333,14 +333,14 @@ describe('Transform Pipeline (Integration)', () => {
     it('should handle both constructor deps and field deps', () => {
       const result = createTestProject({
         '/src/A.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class A {}
         `,
         '/src/B.ts': `
-          import { Injectable, Named } from './decorators.js'
+          import { Transient, Named } from './decorators.js'
           @Named('special')
-          @Injectable()
+          @Transient()
           export class B {}
         `,
         '/src/Service.ts': `
@@ -378,11 +378,11 @@ describe('Transform Pipeline (Integration)', () => {
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -422,12 +422,12 @@ describe('Transform Pipeline (Integration)', () => {
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
           import { Order } from './Order.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -476,11 +476,11 @@ describe('Transform Pipeline (Integration)', () => {
           export type UserRepo = Repository<User>
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -519,10 +519,10 @@ describe('Transform Pipeline (Integration)', () => {
           export { User } from './User.js'
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository, User } from './index.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -551,9 +551,9 @@ describe('Transform Pipeline (Integration)', () => {
     it('should set eager: true on @Provides bean when @Eager is present', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
-          import { Module, Provides, Eager } from './decorators.js'
+          import { Factory, Provides, Eager } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Eager()
             @Provides()
@@ -592,11 +592,11 @@ describe('Transform Pipeline (Integration)', () => {
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -609,15 +609,15 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
-  describe('@PostConstruct metadata', () => {
-    it('should emit postConstructMethods in metadata for decorated class', () => {
+  describe('@OnInit metadata', () => {
+    it('should emit onInitMethods in metadata for decorated class', () => {
       const result = createTestProject({
         '/src/Service.ts': `
-          import { Singleton, PostConstruct } from './decorators.js'
+          import { Singleton, OnInit } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PostConstruct()
+            @OnInit()
             init() {}
           }
         `,
@@ -625,59 +625,57 @@ describe('Transform Pipeline (Integration)', () => {
 
       expect(result.beans).toHaveLength(1);
       expect(result.beans[0].metadata).toEqual({
-        postConstructMethods: ['init'],
+        onInitMethods: ['init'],
       });
-      expect(result.code).toContain(
-        'metadata: { postConstructMethods: ["init"] }',
-      );
+      expect(result.code).toContain('metadata: { onInitMethods: ["init"] }');
     });
 
-    it('should emit multiple postConstructMethods', () => {
+    it('should emit multiple onInitMethods', () => {
       const result = createTestProject({
         '/src/Service.ts': `
-          import { Singleton, PostConstruct } from './decorators.js'
+          import { Singleton, OnInit } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PostConstruct()
+            @OnInit()
             initCache() {}
 
-            @PostConstruct()
+            @OnInit()
             loadConfig() {}
           }
         `,
       });
 
       expect(result.beans[0].metadata).toEqual({
-        postConstructMethods: ['initCache', 'loadConfig'],
+        onInitMethods: ['initCache', 'loadConfig'],
       });
     });
 
-    it('should coexist with @PreDestroy metadata', () => {
+    it('should coexist with @OnDestroy metadata', () => {
       const result = createTestProject({
         '/src/Service.ts': `
-          import { Singleton, PostConstruct, PreDestroy } from './decorators.js'
+          import { Singleton, OnInit, OnDestroy } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PostConstruct()
+            @OnInit()
             init() {}
 
-            @PreDestroy()
+            @OnDestroy()
             shutdown() {}
           }
         `,
       });
 
       expect(result.beans[0].metadata).toEqual({
-        postConstructMethods: ['init'],
-        preDestroyMethods: ['shutdown'],
+        onInitMethods: ['init'],
+        onDestroyMethods: ['shutdown'],
       });
     });
   });
 
   describe('@PostProcessor metadata', () => {
-    it('should emit isBeanPostProcessor in metadata for @PostProcessor class', () => {
+    it('should emit isComponentPostProcessor in metadata for @PostProcessor class', () => {
       const result = createTestProject({
         '/src/LoggingBPP.ts': `
           import { Singleton, PostProcessor } from './decorators.js'
@@ -690,12 +688,12 @@ describe('Transform Pipeline (Integration)', () => {
 
       expect(result.beans).toHaveLength(1);
       expect(result.beans[0].metadata).toEqual({
-        isBeanPostProcessor: true,
+        isComponentPostProcessor: true,
       });
-      expect(result.code).toContain('isBeanPostProcessor: true');
+      expect(result.code).toContain('isComponentPostProcessor: true');
     });
 
-    it('should not emit isBeanPostProcessor for regular beans', () => {
+    it('should not emit isComponentPostProcessor for regular beans', () => {
       const result = createTestProject({
         '/src/Service.ts': `
           import { Singleton } from './decorators.js'
@@ -709,15 +707,15 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
-  describe('@PreDestroy metadata', () => {
-    it('should emit preDestroyMethods in metadata for decorated class', () => {
+  describe('@OnDestroy metadata', () => {
+    it('should emit onDestroyMethods in metadata for decorated class', () => {
       const result = createTestProject({
         '/src/Pool.ts': `
-          import { Singleton, PreDestroy } from './decorators.js'
+          import { Singleton, OnDestroy } from './decorators.js'
 
           @Singleton()
           export class Pool {
-            @PreDestroy()
+            @OnDestroy()
             shutdown() {}
           }
         `,
@@ -725,35 +723,35 @@ describe('Transform Pipeline (Integration)', () => {
 
       expect(result.beans).toHaveLength(1);
       expect(result.beans[0].metadata).toEqual({
-        preDestroyMethods: ['shutdown'],
+        onDestroyMethods: ['shutdown'],
       });
       expect(result.code).toContain(
-        'metadata: { preDestroyMethods: ["shutdown"] }',
+        'metadata: { onDestroyMethods: ["shutdown"] }',
       );
     });
 
-    it('should emit multiple preDestroyMethods', () => {
+    it('should emit multiple onDestroyMethods', () => {
       const result = createTestProject({
         '/src/Service.ts': `
-          import { Singleton, PreDestroy } from './decorators.js'
+          import { Singleton, OnDestroy } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PreDestroy()
+            @OnDestroy()
             closeDb() {}
 
-            @PreDestroy()
+            @OnDestroy()
             flushCache() {}
           }
         `,
       });
 
       expect(result.beans[0].metadata).toEqual({
-        preDestroyMethods: ['closeDb', 'flushCache'],
+        onDestroyMethods: ['closeDb', 'flushCache'],
       });
     });
 
-    it('should emit empty metadata when no @PreDestroy', () => {
+    it('should emit empty metadata when no @OnDestroy', () => {
       const result = createTestProject({
         '/src/Service.ts': `
           import { Singleton } from './decorators.js'
@@ -772,8 +770,8 @@ describe('Transform Pipeline (Integration)', () => {
     it('should generate collection: true for T[] constructor param', () => {
       const result = createTestProject({
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/Service.ts': `
@@ -798,8 +796,8 @@ describe('Transform Pipeline (Integration)', () => {
     it('should handle Array<T> syntax', () => {
       const result = createTestProject({
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/Service.ts': `
@@ -906,15 +904,15 @@ describe('Transform Pipeline (Integration)', () => {
 
       expect(result.code).not.toContain('__Goodie_Config');
       expect(result.code).toContain(
-        'export function buildDefinitions(_config?: Record<string, unknown>): BeanDefinition[]',
+        'export function buildDefinitions(_config?: Record<string, unknown>): ComponentDefinition[]',
       );
     });
 
     it('should add config token as dependency only for beans with @Value', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -1023,9 +1021,9 @@ describe('Transform Pipeline (Integration)', () => {
     it('should wire a primitive param to the single matching @Provides', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -1049,9 +1047,9 @@ describe('Transform Pipeline (Integration)', () => {
     it('should disambiguate multiple same-type providers by param name', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -1074,9 +1072,9 @@ describe('Transform Pipeline (Integration)', () => {
       expect(() =>
         createTestProject({
           '/src/AppModule.ts': `
-            import { Module, Provides } from './decorators.js'
+            import { Factory, Provides } from './decorators.js'
 
-            @Module()
+            @Factory()
             export class AppModule {
               @Provides()
               dbUrl(): string { return 'postgres://localhost' }
@@ -1097,9 +1095,9 @@ describe('Transform Pipeline (Integration)', () => {
     it('should export token declarations with export const', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -1119,11 +1117,11 @@ describe('Transform Pipeline (Integration)', () => {
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -1142,9 +1140,9 @@ describe('Transform Pipeline (Integration)', () => {
     it('should type primitive return type tokens', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             port(): number { return 8080 }
@@ -1238,8 +1236,8 @@ describe('Transform Pipeline (Integration)', () => {
     it('should include header comment', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
       });
@@ -1252,8 +1250,8 @@ describe('Transform Pipeline (Integration)', () => {
     it('should include ApplicationContext import', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
       });
@@ -1266,8 +1264,8 @@ describe('Transform Pipeline (Integration)', () => {
     it('should export createContext and app', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
       });
@@ -1277,7 +1275,7 @@ describe('Transform Pipeline (Integration)', () => {
         'export const app = Goodie.build(buildDefinitions())',
       );
       expect(result.code).toContain(
-        'export function buildDefinitions(_config?: Record<string, unknown>): BeanDefinition[]',
+        'export function buildDefinitions(_config?: Record<string, unknown>): ComponentDefinition[]',
       );
       expect(result.code).not.toContain('export function createApp');
     });

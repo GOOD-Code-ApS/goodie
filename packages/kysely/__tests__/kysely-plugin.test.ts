@@ -1,4 +1,4 @@
-import type { IRBeanDefinition } from '@goodie-ts/transformer';
+import type { IRComponentDefinition } from '@goodie-ts/transformer';
 import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it, vi } from 'vitest';
@@ -15,7 +15,7 @@ function createProject(files: Record<string, string>) {
 }
 
 /** Simulates the KyselyDatabase library bean that would come from beans.json. */
-const kyselyDatabaseLibraryBean: IRBeanDefinition = {
+const kyselyDatabaseLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
     className: 'KyselyDatabase',
@@ -259,8 +259,8 @@ describe('Kysely Transformer Plugin', () => {
     expect(result.code).toContain('token: CreateTodos');
     // MigrationRunner should be eager
     expect(result.code).toContain('eager: true');
-    // MigrationRunner should have postConstructMethods metadata
-    expect(result.code).toContain('postConstructMethods: ["migrate"]');
+    // MigrationRunner should have onInitMethods metadata
+    expect(result.code).toContain('onInitMethods: ["migrate"]');
   });
 
   it('should wire MigrationRunner with KyselyDatabase dependency and individual migration deps', () => {

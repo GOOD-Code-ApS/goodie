@@ -1,20 +1,20 @@
-import type { IRBeanDefinition } from '@goodie-ts/transformer';
+import type { IRComponentDefinition } from '@goodie-ts/transformer';
 import {
-  deserializeBeans,
-  serializeBeans,
+  deserializeComponents,
+  serializeComponents,
   transformInMemory,
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 
 const DECORATOR_STUBS = `
-export function Injectable() { return (t: any, c: any) => {} }
+export function Transient() { return (t: any, c: any) => {} }
 export function Singleton() { return (t: any, c: any) => {} }
 `;
 
 const HEALTH_IMPORT_PATH = '@goodie-ts/health';
 
-const libraryBeans: IRBeanDefinition[] = [
+const libraryBeans: IRComponentDefinition[] = [
   {
     tokenRef: {
       kind: 'class',
@@ -89,9 +89,9 @@ function createProject(files: Record<string, string>) {
 }
 
 function findBean(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   className: string,
-): IRBeanDefinition | undefined {
+): IRComponentDefinition | undefined {
   return beans.find(
     (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === className,
   );
@@ -325,8 +325,8 @@ describe('Health Library Beans', () => {
   });
 
   it('should round-trip library beans through serialize/deserialize', () => {
-    const manifest = serializeBeans(libraryBeans, HEALTH_IMPORT_PATH);
-    const roundTripped = deserializeBeans(manifest);
+    const manifest = serializeComponents(libraryBeans, HEALTH_IMPORT_PATH);
+    const roundTripped = deserializeComponents(manifest);
 
     expect(roundTripped).toHaveLength(2);
 

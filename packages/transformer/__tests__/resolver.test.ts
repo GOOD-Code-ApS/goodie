@@ -24,12 +24,12 @@ describe('Resolver', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -78,16 +78,16 @@ describe('Resolver', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/A.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class A {}
         `,
         '/src/B.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class B {}
         `,
         '/src/C.ts': `
@@ -177,20 +177,20 @@ describe('Resolver', () => {
     it('should resolve @Provides with class return type to ClassTokenRef', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Client.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Client {}
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Client } from './Client.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             client(): Client { return new Client() }
@@ -213,13 +213,13 @@ describe('Resolver', () => {
     it('should resolve @Provides with primitive return type to method-name InjectionToken', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -242,14 +242,14 @@ describe('Resolver', () => {
     it('should preserve @Eager flag on @Provides method', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
           export function Eager() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides, Eager } from './decorators.js'
+          import { Factory, Provides, Eager } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Eager()
             @Provides()
@@ -278,13 +278,13 @@ describe('Resolver', () => {
     it('should default @Provides scope to singleton', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -301,20 +301,20 @@ describe('Resolver', () => {
     it('should resolve @Provides method parameter dependencies', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Config.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Config {}
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Config } from './Config.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(config: Config): string { return 'postgres://localhost' }
@@ -339,8 +339,8 @@ describe('Resolver', () => {
     });
   });
 
-  describe('@Provides on non-@Module beans', () => {
-    it('should expand @Provides on a @Singleton without setting isModule', () => {
+  describe('@Provides on non-@Factory beans', () => {
+    it('should expand @Provides on a @Singleton without setting isFactory', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -357,14 +357,14 @@ describe('Resolver', () => {
         `,
       });
 
-      // The @Singleton bean itself should NOT have isModule metadata
+      // The @Singleton bean itself should NOT have isFactory metadata
       const configBean = result.beans.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'AppConfig' &&
           b.factoryKind === 'constructor',
       )!;
-      expect(configBean.metadata.isModule).toBeUndefined();
+      expect(configBean.metadata.isFactory).toBeUndefined();
 
       // The @Provides method should still expand into a separate bean
       const providesBeans = result.beans.filter(
@@ -385,16 +385,16 @@ describe('Resolver', () => {
   });
 
   describe('module bean resolution', () => {
-    it('should register @Module class as a bean with isModule metadata', () => {
+    it('should register @Factory class as a bean with isFactory metadata', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -403,7 +403,7 @@ describe('Resolver', () => {
       });
 
       const moduleBeans = result.beans.filter(
-        (b) => b.factoryKind === 'constructor' && b.metadata.isModule,
+        (b) => b.factoryKind === 'constructor' && b.metadata.isFactory,
       );
       expect(moduleBeans).toHaveLength(1);
       expect(moduleBeans[0].tokenRef).toMatchObject({
@@ -414,7 +414,7 @@ describe('Resolver', () => {
   });
 
   describe('@PostProcessor metadata', () => {
-    it('should set isBeanPostProcessor in metadata when @PostProcessor is present', () => {
+    it('should set isComponentPostProcessor in metadata when @PostProcessor is present', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -433,10 +433,10 @@ describe('Resolver', () => {
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'LoggingBPP',
       )!;
-      expect(bpp.metadata.isBeanPostProcessor).toBe(true);
+      expect(bpp.metadata.isComponentPostProcessor).toBe(true);
     });
 
-    it('should not set isBeanPostProcessor for regular beans', () => {
+    it('should not set isComponentPostProcessor for regular beans', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -449,7 +449,7 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.beans[0].metadata.isBeanPostProcessor).toBeUndefined();
+      expect(result.beans[0].metadata.isComponentPostProcessor).toBeUndefined();
     });
   });
 
@@ -458,14 +458,14 @@ describe('Resolver', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/User.ts': `
           export class User { name = '' }
         `,
         '/src/Repository.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/Service.ts': `
@@ -541,7 +541,7 @@ describe('Resolver', () => {
     it('should resolve @Provides with generic return type to canonical InjectionTokenRef', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/User.ts': `
@@ -551,11 +551,11 @@ describe('Resolver', () => {
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -583,11 +583,11 @@ describe('Resolver', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -674,11 +674,11 @@ describe('Resolver', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/Service.ts': `
@@ -706,19 +706,19 @@ describe('Resolver', () => {
   });
 
   describe('bean metadata', () => {
-    it('should preserve scope from @Injectable (prototype)', () => {
+    it('should preserve scope from @Transient (prototype)', () => {
       const result = scanAndResolve({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
       });
 
-      expect(result.beans[0].scope).toBe('prototype');
+      expect(result.beans[0].scope).toBe('transient');
     });
 
     it('should preserve scope from @Singleton', () => {

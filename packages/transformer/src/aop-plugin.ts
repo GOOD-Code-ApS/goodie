@@ -1,4 +1,4 @@
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import type {
   CodegenContribution,
   MethodVisitorContext,
@@ -228,7 +228,7 @@ export function createDeclarativeAopPlugin(
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    afterResolve(beans: IRComponentDefinition[]): IRComponentDefinition[] {
       for (const bean of beans) {
         const className =
           bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
@@ -280,7 +280,7 @@ export function createDeclarativeAopPlugin(
       return beans;
     },
 
-    codegen(beans: IRBeanDefinition[]): CodegenContribution {
+    codegen(beans: IRComponentDefinition[]): CodegenContribution {
       // Collect all used interceptor classes from AOP-wired beans
       const usedImports = new Map<string, Set<string>>(); // importPath → Set<className>
       let hasAnyInterceptor = false;

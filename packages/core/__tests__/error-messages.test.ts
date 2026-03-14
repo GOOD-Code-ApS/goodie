@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/bean-definition.js';
 import { MissingDependencyError } from '../src/errors.js';
 
 function dep(token: Dependency['token'], optional = false): Dependency {
@@ -8,14 +11,14 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
     metadata?: Record<string, unknown>;
     eager?: boolean;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: 'singleton',
@@ -61,7 +64,7 @@ describe('Error messages', () => {
     });
   });
 
-  describe('@PostConstruct error wrapping', () => {
+  describe('@OnInit error wrapping', () => {
     it('should include bean name and method in error', async () => {
       class Broken {
         init() {
@@ -72,7 +75,7 @@ describe('Error messages', () => {
         await ApplicationContext.create([
           makeDef(Broken, {
             factory: () => new Broken(),
-            metadata: { postConstructMethods: ['init'] },
+            metadata: { onInitMethods: ['init'] },
             eager: true,
           }),
         ]);
@@ -81,11 +84,11 @@ describe('Error messages', () => {
         expect((err as Error).message).toContain('Broken');
         expect((err as Error).message).toContain('init');
         expect((err as Error).message).toContain('init failed');
-        expect((err as Error).message).toContain('@PostConstruct');
+        expect((err as Error).message).toContain('@OnInit');
       }
     });
 
-    it('should include bean name for async @PostConstruct errors', async () => {
+    it('should include bean name for async @OnInit errors', async () => {
       class AsyncBroken {
         async init() {
           throw new Error('async init failed');
@@ -95,7 +98,7 @@ describe('Error messages', () => {
         await ApplicationContext.create([
           makeDef(AsyncBroken, {
             factory: () => new AsyncBroken(),
-            metadata: { postConstructMethods: ['init'] },
+            metadata: { onInitMethods: ['init'] },
             eager: true,
           }),
         ]);
@@ -107,7 +110,7 @@ describe('Error messages', () => {
     });
   });
 
-  describe('@PreDestroy error wrapping', () => {
+  describe('@OnDestroy error wrapping', () => {
     it('should include bean name and method in error', async () => {
       class Destroyable {
         cleanup() {
@@ -117,7 +120,7 @@ describe('Error messages', () => {
       const ctx = await ApplicationContext.create([
         makeDef(Destroyable, {
           factory: () => new Destroyable(),
-          metadata: { preDestroyMethods: ['cleanup'] },
+          metadata: { onDestroyMethods: ['cleanup'] },
         }),
       ]);
       // Force instantiation
@@ -129,7 +132,7 @@ describe('Error messages', () => {
       } catch (err) {
         expect((err as Error).message).toContain('Destroyable');
         expect((err as Error).message).toContain('cleanup');
-        expect((err as Error).message).toContain('@PreDestroy');
+        expect((err as Error).message).toContain('@OnDestroy');
       }
     });
   });

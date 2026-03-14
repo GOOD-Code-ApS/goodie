@@ -10,7 +10,7 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, OpenAP
 | `src/controller.ts` | `@Controller(basePath?)` — marks class as HTTP controller (compile-time no-op) |
 | `src/route.ts` | `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch` — method decorators with optional OpenAPI options (compile-time no-ops) |
 | `src/openapi-types.ts` | `DescribeRouteOptions` — typed OpenAPI options for route decorators |
-| `src/openapi-config.ts` | `OpenApiConfig` — `@ConfigurationProperties('openapi')` bean (title, version, description) |
+| `src/openapi-config.ts` | `OpenApiConfig` — `@Config('openapi')` bean (title, version, description) |
 | `src/secured.ts` | `@Secured()` — marks controller/method as requiring authentication (compile-time no-op) |
 | `src/anonymous.ts` | `@Anonymous()` — exempts method from class-level `@Secured` (compile-time no-op) |
 | `src/security-provider.ts` | `SecurityProvider` interface + `SECURITY_PROVIDER` injection token |
@@ -18,7 +18,7 @@ Hono HTTP integration for goodie-ts. Provides route decorators, security, OpenAP
 | `src/principal.ts` | `Principal` type — `{ name, attributes }` |
 | `src/errors.ts` | `UnauthorizedError` |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
-| `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host`, `port`, `runtime` |
+| `src/server-config.ts` | `ServerConfig` — `@Config('server')` bean with `host`, `port`, `runtime` |
 | `src/cors.ts` | `@Cors(options?)` — Hono-specific CORS marker (generates `hono/cors` middleware) |
 | `src/router-helpers.ts` | Runtime helpers (`handleResult`, `securityMiddleware`, `validationMiddleware`, `openApiMiddleware`, `mountOpenApiSpec`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate all Hono/hono-openapi API calls so generated code depends only on stable goodie-ts interfaces |
 | `src/validate.ts` | `@Validate` — Hono-specific validation decorator |
@@ -94,9 +94,9 @@ function __createCtrlRoutes(ctrl: Ctrl, __securityProvider: SecurityProvider | u
 ## Library Beans (beans.json)
 
 3 singleton beans:
-- **ServerConfig** — `@ConfigurationProperties('server')` with host/port/runtime (`ServerRuntime`: `'node' | 'bun' | 'deno'`)
+- **ServerConfig** — `@Config('server')` with host/port/runtime (`ServerRuntime`: `'node' | 'bun' | 'deno'`)
 - **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`. Dispatches to `@hono/node-server` (Node), `Bun.serve()` (Bun), `Deno.serve()` (Deno). Not used for serverless runtimes (`cloudflare`).
-- **OpenApiConfig** — `@ConfigurationProperties('openapi')` with title/version/description
+- **OpenApiConfig** — `@Config('openapi')` with title/version/description
 
 ## Design Decisions
 

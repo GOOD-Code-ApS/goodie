@@ -16,7 +16,7 @@ The hono transformer plugin scans controller metadata on beans and generates a `
 
 `@Controller` implicitly registers the class as a singleton bean — no need to add `@Singleton`.
 
-The package also ships `ServerConfig` (configurable via `@ConfigurationProperties('server')`) and `EmbeddedServer` as library beans, auto-discovered at build time.
+The package also ships `ServerConfig` (configurable via `@Config('server')`) and `EmbeddedServer` as library beans, auto-discovered at build time.
 
 ## Usage
 

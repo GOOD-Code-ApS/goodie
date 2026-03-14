@@ -5,7 +5,7 @@ import {
   SyntaxKind,
   type Type,
 } from 'ts-morph';
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import type {
   ClassVisitorContext,
   CodegenContext,
@@ -75,7 +75,7 @@ export function createIntrospectionPlugin(): TransformerPlugin {
     },
 
     codegen(
-      _beans: IRBeanDefinition[],
+      _beans: IRComponentDefinition[],
       _context?: CodegenContext,
     ): CodegenContribution {
       if (introspectedClasses.length === 0) {

@@ -1,4 +1,4 @@
-import type { BeanDefinition } from '@goodie-ts/core';
+import type { ComponentDefinition } from '@goodie-ts/core';
 import { ApplicationContext } from '@goodie-ts/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ScheduledMethodMeta } from '../src/scheduler-service.js';
@@ -12,7 +12,7 @@ async function createSchedulerContext(
     scheduledMethods: ScheduledMethodMeta[];
   }>,
 ): Promise<{ ctx: ApplicationContext; service: SchedulerService }> {
-  const definitions: BeanDefinition[] = beans.map((b) => ({
+  const definitions: ComponentDefinition[] = beans.map((b) => ({
     token: b.token,
     scope: 'singleton' as const,
     dependencies: [],
@@ -252,7 +252,7 @@ describe('SchedulerService', () => {
     }
     class PlainService {}
 
-    const definitions: BeanDefinition[] = [
+    const definitions: ComponentDefinition[] = [
       {
         token: PlainService,
         scope: 'singleton',

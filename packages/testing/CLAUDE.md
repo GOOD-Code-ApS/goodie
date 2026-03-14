@@ -28,7 +28,7 @@ test('GET /todos', async ({ app, resolve }) => {
 });
 ```
 
-- Accepts `DefinitionsFactory | BeanDefinition[]` — when a function, config is passed through before bean construction
+- Accepts `DefinitionsFactory | ComponentDefinition[]` — when a function, config is passed through before bean construction
 - `fixtures` option: custom fixtures derived from the ApplicationContext (e.g. `app: (ctx) => createRouter(ctx)`)
 - `setup` option: customise the builder (`.override()`, `.mock()`, `.provide()`)
 - `transactional` option: wrap each test in a rollback transaction
@@ -74,4 +74,4 @@ class MockUserRepository extends Repository<User> {
 - All overrides produce zero-dependency singleton beans (the override replaces the full factory)
 - `override()` validates the token exists — you can't add new beans, only replace existing ones (use `provide()` for that)
 - Each `build()` is independent — overrides in one builder don't affect others
-- When `createGoodieTest` receives a `DefinitionsFactory`, config is passed to the factory directly — `withConfig()` is only used for the raw `BeanDefinition[]` path
+- When `createGoodieTest` receives a `DefinitionsFactory`, config is passed to the factory directly — `withConfig()` is only used for the raw `ComponentDefinition[]` path

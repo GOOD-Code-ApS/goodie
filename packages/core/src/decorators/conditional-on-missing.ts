@@ -1,7 +1,7 @@
 /**
- * Conditionally register a bean only if no other bean provides the given token.
+ * Conditionally register a component only if no other component provides the given token.
  *
- * If another bean already provides the specified class token, this bean
+ * If another component already provides the specified class token, this component
  * is filtered out during graph building. Useful for providing default
  * implementations that can be overridden.
  *
@@ -10,7 +10,7 @@
  *
  * @param token - The class constructor to check for
  */
-export function ConditionalOnMissingBean(
+export function ConditionalOnMissing(
   _token: new (...args: any[]) => any,
 ): ClassDecorator_Stage3 {
   return () => {};

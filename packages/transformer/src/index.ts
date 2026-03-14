@@ -32,7 +32,7 @@ export { buildGraph } from './graph-builder.js';
 export type {
   ClassTokenRef,
   InjectionTokenRef,
-  IRBeanDefinition,
+  IRComponentDefinition,
   IRDecoratorEntry,
   IRDependency,
   IRFieldInjection,
@@ -42,15 +42,18 @@ export type {
   TokenRef,
 } from './ir.js';
 // Library bean discovery
-export type { DiscoveryResult, LibraryBeansManifest } from './library-beans.js';
+export type {
+  DiscoveryResult,
+  LibraryComponentsManifest,
+} from './library-components.js';
 export {
-  deserializeBeans,
+  deserializeComponents,
   discoverAopMappings,
-  discoverLibraryBeans,
+  discoverLibraryComponents,
   discoverLibraryManifests,
   rewriteImportPaths,
-  serializeBeans,
-} from './library-beans.js';
+  serializeComponents,
+} from './library-components.js';
 // Options
 export type {
   ClassVisitorContext,

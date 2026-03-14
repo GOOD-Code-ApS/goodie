@@ -1,5 +1,8 @@
-import type { BeanDefinition, Dependency } from './bean-definition.js';
-import type { BeanPostProcessor } from './bean-post-processor.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from './component-definition.js';
+import type { ComponentPostProcessor } from './component-post-processor.js';
 import {
   AsyncBeanNotReadyError,
   ContextClosedError,
@@ -29,22 +32,22 @@ const UNRESOLVED = Symbol('UNRESOLVED');
 /**
  * The runtime dependency injection container.
  *
- * Created from an array of BeanDefinitions (produced by the compile-time
+ * Created from an array of ComponentDefinitions (produced by the compile-time
  * transformer or built manually). Manages scoping, lazy/eager instantiation,
- * async deduplication, and BeanPostProcessor hooks.
+ * async deduplication, and ComponentPostProcessor hooks.
  */
 export class ApplicationContext {
-  private readonly defsByToken = new Map<Token, BeanDefinition[]>();
-  private readonly primaryDef = new Map<Token, BeanDefinition>();
+  private readonly defsByToken = new Map<Token, ComponentDefinition[]>();
+  private readonly primaryDef = new Map<Token, ComponentDefinition>();
   private readonly singletonCache = new Map<Token, unknown>();
   private readonly asyncInFlight = new Map<Token, Promise<unknown>>();
-  private readonly postProcessors: BeanPostProcessor[] = [];
+  private readonly postProcessors: ComponentPostProcessor[] = [];
   /** Names of beans excluded by conditional rules, with reason strings. */
   private readonly filteredOutBeans = new Map<string, string>();
   private closed = false;
   private startupMetrics: StartupMetrics | undefined;
 
-  private constructor(private readonly sortedDefs: BeanDefinition[]) {
+  private constructor(private readonly sortedDefs: ComponentDefinition[]) {
     for (const def of sortedDefs) {
       const existing = this.defsByToken.get(def.token);
       if (existing) {
@@ -75,11 +78,11 @@ export class ApplicationContext {
    *
    * 1. Topologically sorts definitions
    * 2. Validates required dependencies exist
-   * 3. Discovers and initializes BeanPostProcessors
+   * 3. Discovers and initializes ComponentPostProcessors
    * 4. Eagerly resolves beans marked with `eager: true`
    */
   static async create(
-    definitions: BeanDefinition[],
+    definitions: ComponentDefinition[],
     options?: { preSorted?: boolean },
   ): Promise<ApplicationContext> {
     const metrics = isMetricsEnabled() ? new StartupMetrics() : undefined;
@@ -108,7 +111,7 @@ export class ApplicationContext {
     // making typeof ApplicationContext incompatible with Constructor<T>.
     const selfToken = ApplicationContext as unknown as Token;
     ctx.singletonCache.set(selfToken, ctx);
-    const selfDef: BeanDefinition = {
+    const selfDef: ComponentDefinition = {
       token: selfToken as Constructor,
       scope: 'singleton',
       dependencies: [],
@@ -277,7 +280,7 @@ export class ApplicationContext {
    * Returns a shallow defensive copy of the bean definitions used to build this context,
    * including the self-registered ApplicationContext definition.
    */
-  getDefinitions(): readonly BeanDefinition[] {
+  getDefinitions(): readonly ComponentDefinition[] {
     const selfDef = this.primaryDef.get(ApplicationContext as unknown as Token);
     return selfDef ? [selfDef, ...this.sortedDefs] : [...this.sortedDefs];
   }
@@ -291,7 +294,7 @@ export class ApplicationContext {
   }
 
   /**
-   * Close the context. Calls `@PreDestroy` methods on instantiated singletons
+   * Close the context. Calls `@OnDestroy` methods on instantiated singletons
    * in reverse-topological order (dependents destroyed before dependencies),
    * then clears caches and rejects further calls.
    */
@@ -301,7 +304,7 @@ export class ApplicationContext {
     const errors: Error[] = [];
     for (const def of [...this.sortedDefs].reverse()) {
       if (def.scope !== 'singleton') continue;
-      const methods = def.metadata.preDestroyMethods as string[] | undefined;
+      const methods = def.metadata.onDestroyMethods as string[] | undefined;
       if (!methods || methods.length === 0) continue;
 
       const instance = this.singletonCache.get(def.token);
@@ -315,7 +318,7 @@ export class ApplicationContext {
           const original = err instanceof Error ? err.message : String(err);
           errors.push(
             new Error(
-              `Failed to execute @PreDestroy on ${name}.${methodName}(): ${original}`,
+              `Failed to execute @OnDestroy on ${name}.${methodName}(): ${original}`,
               { cause: err },
             ),
           );
@@ -358,16 +361,16 @@ export class ApplicationContext {
 
   private async initPostProcessors(): Promise<void> {
     for (const def of this.sortedDefs) {
-      if (def.metadata.isBeanPostProcessor) {
+      if (def.metadata.isComponentPostProcessor) {
         const processor = await this.resolveAsyncRaw(def, true);
-        this.postProcessors.push(processor as BeanPostProcessor);
+        this.postProcessors.push(processor as ComponentPostProcessor);
       }
     }
   }
 
   private async initEagerBeans(): Promise<void> {
     for (const def of this.sortedDefs) {
-      if (def.eager && !def.metadata.isBeanPostProcessor) {
+      if (def.eager && !def.metadata.isComponentPostProcessor) {
         if (this.startupMetrics) {
           const start = performance.now();
           await this.resolveAsyncRaw(def, false);
@@ -384,7 +387,7 @@ export class ApplicationContext {
 
   private resolveDepsSync(
     deps: Dependency[],
-    parentDef?: BeanDefinition,
+    parentDef?: ComponentDefinition,
   ): unknown[] {
     return deps.map((dep) => {
       if (dep.collection) {
@@ -419,7 +422,7 @@ export class ApplicationContext {
 
   private async resolveDepsAsync(
     deps: Dependency[],
-    parentDef?: BeanDefinition,
+    parentDef?: ComponentDefinition,
   ): Promise<unknown[]> {
     const resolved: unknown[] = [];
     for (const dep of deps) {
@@ -462,7 +465,7 @@ export class ApplicationContext {
     return resolved;
   }
 
-  private resolveSync<T>(def: BeanDefinition): T {
+  private resolveSync<T>(def: ComponentDefinition): T {
     const deps = this.resolveDepsSync(def.dependencies, def);
     const raw = def.factory(...deps);
     if (raw instanceof Promise) {
@@ -479,7 +482,7 @@ export class ApplicationContext {
     return instance;
   }
 
-  private async resolveAsync<T>(def: BeanDefinition): Promise<T> {
+  private async resolveAsync<T>(def: ComponentDefinition): Promise<T> {
     return this.resolveAsyncRaw(def, false) as Promise<T>;
   }
 
@@ -487,7 +490,7 @@ export class ApplicationContext {
    * @param skipPostProcessors - true when resolving post-processors themselves
    */
   private async resolveAsyncRaw(
-    def: BeanDefinition,
+    def: ComponentDefinition,
     skipPostProcessors: boolean,
   ): Promise<unknown> {
     // Check cache again (may have been resolved while awaiting)
@@ -513,7 +516,7 @@ export class ApplicationContext {
    * Resolve a request-scoped bean from the current request's store.
    * Creates and caches the instance if not yet created in this scope.
    */
-  private getRequestScopedInstance<T>(def: BeanDefinition): T {
+  private getRequestScopedInstance<T>(def: ComponentDefinition): T {
     const store = RequestScopeManager.getStore();
     if (!store) {
       throw new Error(
@@ -536,10 +539,10 @@ export class ApplicationContext {
 
   /**
    * Async variant of getRequestScopedInstance. Supports beans with async
-   * factories or async @PostConstruct (e.g. D1KyselyDatabase).
+   * factories or async @OnInit (e.g. D1KyselyDatabase).
    */
   private async getRequestScopedInstanceAsync<T>(
-    def: BeanDefinition,
+    def: ComponentDefinition,
   ): Promise<T> {
     const store = RequestScopeManager.getStore();
     if (!store) {
@@ -564,7 +567,7 @@ export class ApplicationContext {
    * The factory creates an Object.create-based delegation object with the correct
    * prototype chain — no runtime Proxy or reflection needed.
    */
-  private createRequestScopeProxy(def: BeanDefinition): unknown {
+  private createRequestScopeProxy(def: ComponentDefinition): unknown {
     const resolve = () => this.getRequestScopedInstance(def);
     const factory = def.metadata.scopedProxyFactory as
       | ((resolve: () => unknown) => unknown)
@@ -578,11 +581,11 @@ export class ApplicationContext {
     );
   }
 
-  private applyPostProcessorsSync<T>(bean: T, def: BeanDefinition): T {
+  private applyPostProcessorsSync<T>(bean: T, def: ComponentDefinition): T {
     let current = bean;
     for (const pp of this.postProcessors) {
       if (pp.beforeInit) {
-        const result = pp.beforeInit(current, def as BeanDefinition<T>);
+        const result = pp.beforeInit(current, def as ComponentDefinition<T>);
         if (result instanceof Promise) {
           result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
@@ -590,12 +593,10 @@ export class ApplicationContext {
         current = result as T;
       }
     }
-    // @PostConstruct — runs after beforeInit, before afterInit
-    const postConstructMethods = def.metadata.postConstructMethods as
-      | string[]
-      | undefined;
-    if (postConstructMethods) {
-      for (const methodName of postConstructMethods) {
+    // @OnInit — runs after beforeInit, before afterInit
+    const onInitMethods = def.metadata.onInitMethods as string[] | undefined;
+    if (onInitMethods) {
+      for (const methodName of onInitMethods) {
         let result: unknown;
         try {
           result = (current as Record<string, () => unknown>)[methodName]();
@@ -603,7 +604,7 @@ export class ApplicationContext {
           const name = tokenName(def.token);
           const original = err instanceof Error ? err.message : String(err);
           throw new Error(
-            `Failed to execute @PostConstruct on ${name}.${methodName}(): ${original}`,
+            `Failed to execute @OnInit on ${name}.${methodName}(): ${original}`,
             { cause: err },
           );
         }
@@ -615,7 +616,7 @@ export class ApplicationContext {
     }
     for (const pp of this.postProcessors) {
       if (pp.afterInit) {
-        const result = pp.afterInit(current, def as BeanDefinition<T>);
+        const result = pp.afterInit(current, def as ComponentDefinition<T>);
         if (result instanceof Promise) {
           result.catch(() => {});
           throw new AsyncBeanNotReadyError(tokenName(def.token));
@@ -628,7 +629,7 @@ export class ApplicationContext {
 
   private async applyPostProcessorsAsync(
     bean: unknown,
-    def: BeanDefinition,
+    def: ComponentDefinition,
   ): Promise<unknown> {
     let current = bean;
     for (const pp of this.postProcessors) {
@@ -636,19 +637,17 @@ export class ApplicationContext {
         current = await pp.beforeInit(current, def);
       }
     }
-    // @PostConstruct — runs after beforeInit, before afterInit
-    const postConstructMethods = def.metadata.postConstructMethods as
-      | string[]
-      | undefined;
-    if (postConstructMethods) {
-      for (const methodName of postConstructMethods) {
+    // @OnInit — runs after beforeInit, before afterInit
+    const onInitMethods = def.metadata.onInitMethods as string[] | undefined;
+    if (onInitMethods) {
+      for (const methodName of onInitMethods) {
         try {
           await (current as Record<string, () => unknown>)[methodName]();
         } catch (err) {
           const name = tokenName(def.token);
           const original = err instanceof Error ? err.message : String(err);
           throw new Error(
-            `Failed to execute @PostConstruct on ${name}.${methodName}(): ${original}`,
+            `Failed to execute @OnInit on ${name}.${methodName}(): ${original}`,
             { cause: err },
           );
         }
@@ -737,8 +736,8 @@ function levenshtein(a: string, b: string): number {
  * Order: onEnv → onProperty → onMissingBean (since missingBean depends on what remains).
  * All conditions on a single bean use AND logic.
  */
-function filterConditionalBeans(definitions: BeanDefinition[]): {
-  beans: BeanDefinition[];
+function filterConditionalBeans(definitions: ComponentDefinition[]): {
+  beans: ComponentDefinition[];
   filteredOut: Map<string, string>;
 } {
   const filteredOut = new Map<string, string>();
@@ -846,7 +845,7 @@ function filterConditionalBeans(definitions: BeanDefinition[]): {
       ) {
         filteredOut.set(
           tokenName(def.token),
-          `@ConditionalOnMissingBean(${rule.tokenClassName}) — bean '${rule.tokenClassName}' is present`,
+          `@ConditionalOnMissing(${rule.tokenClassName}) — bean '${rule.tokenClassName}' is present`,
         );
         return false;
       }
@@ -864,7 +863,7 @@ function filterConditionalBeans(definitions: BeanDefinition[]): {
  * Falls back to process.env if no config bean exists.
  */
 function resolveConfigFromDefinitions(
-  definitions: BeanDefinition[],
+  definitions: ComponentDefinition[],
 ): Record<string, unknown> {
   const configDef = definitions.find(
     (d) =>

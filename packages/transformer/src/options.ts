@@ -1,6 +1,6 @@
 import type { Scope } from '@goodie-ts/core';
 import type { ClassDeclaration, MethodDeclaration } from 'ts-morph';
-import type { IRBeanDefinition, IRDecoratorEntry } from './ir.js';
+import type { IRComponentDefinition, IRDecoratorEntry } from './ir.js';
 
 /** Options for the compile-time transform pipeline. */
 export interface TransformOptions {
@@ -66,11 +66,11 @@ export interface TransformLibraryOptions {
 /** Result returned by the library transform pipeline. */
 export interface TransformLibraryResult {
   /** The serialized beans.json manifest. */
-  manifest: import('./library-beans.js').LibraryBeansManifest;
+  manifest: import('./library-components.js').LibraryComponentsManifest;
   /** Absolute path where the manifest was written. */
   outputPath: string;
   /** All discovered bean definitions (with rewritten import paths). */
-  beans: import('./ir.js').IRBeanDefinition[];
+  beans: import('./ir.js').IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** Generated TypeScript code (only when `codeOutputPath` is set). */
@@ -86,7 +86,7 @@ export interface TransformResult {
   /** Absolute path where the file was written. */
   outputPath: string;
   /** All discovered bean definitions in topological order. */
-  beans: IRBeanDefinition[];
+  beans: IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** True when codegen was skipped because the IR hash matched the existing file. */
@@ -112,7 +112,7 @@ export interface ClassVisitorContext {
    * Allows plugins to make decorated classes into beans without the scanner
    * hardcoding knowledge of plugin-specific decorators (e.g. `@Controller`).
    *
-   * @param options.scope - Bean scope ('singleton' or 'prototype')
+   * @param options.scope - Bean scope ('singleton' or 'transient')
    * @param options.decoratorName - Name of the decorator for error messages (e.g. 'Controller')
    * @throws If another plugin has already registered this class as a bean
    */
@@ -184,12 +184,12 @@ export interface TransformerPlugin {
    * into each bean's `metadata` before this hook runs, so you can read
    * visitor-produced tags here.
    *
-   * **Note:** This hook receives only `@Injectable`/`@Singleton` beans.
-   * Beans created by `@Provides` methods inside `@Module` classes are expanded
+   * **Note:** This hook receives only `@Transient`/`@Singleton` beans.
+   * Beans created by `@Provides` methods inside `@Factory` classes are expanded
    * during graph building (the next pipeline stage) and are not visible here.
    * Use `beforeCodegen` if you need to see the full expanded bean set.
    */
-  afterResolve?(beans: IRBeanDefinition[]): IRBeanDefinition[];
+  afterResolve?(beans: IRComponentDefinition[]): IRComponentDefinition[];
 
   /**
    * Inject or modify bean definitions before code generation.
@@ -201,7 +201,7 @@ export interface TransformerPlugin {
    * topological sorting. Ensure any injected beans have their dependencies
    * already present in the bean list, or are self-contained (no dependencies).
    */
-  beforeCodegen?(beans: IRBeanDefinition[]): IRBeanDefinition[];
+  beforeCodegen?(beans: IRComponentDefinition[]): IRComponentDefinition[];
 
   /**
    * Contribute additional imports and code to the generated file.
@@ -209,7 +209,7 @@ export interface TransformerPlugin {
    * automatically deduplicated.
    */
   codegen?(
-    beans: IRBeanDefinition[],
+    beans: IRComponentDefinition[],
     context?: CodegenContext,
   ): CodegenContribution;
 }

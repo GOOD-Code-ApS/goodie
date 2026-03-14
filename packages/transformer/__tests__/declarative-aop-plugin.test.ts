@@ -1,5 +1,5 @@
 import type {
-  IRBeanDefinition,
+  IRComponentDefinition,
   ResolvedAopMapping,
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
@@ -169,7 +169,7 @@ const LOGGING_MAPPINGS: ResolvedAopMapping[] = [
   },
 ];
 
-const LOGGING_LIBRARY_BEANS: IRBeanDefinition[] = [
+const LOGGING_LIBRARY_BEANS: IRComponentDefinition[] = [
   {
     tokenRef: {
       kind: 'class',
@@ -293,7 +293,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       },
     ];
 
-    const libraryBeans: IRBeanDefinition[] = [
+    const libraryBeans: IRComponentDefinition[] = [
       ...LOGGING_LIBRARY_BEANS,
       {
         tokenRef: {

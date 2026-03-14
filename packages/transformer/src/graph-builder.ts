@@ -1,4 +1,4 @@
-import type { IRBeanDefinition, TokenRef } from './ir.js';
+import type { IRComponentDefinition, TokenRef } from './ir.js';
 import type { ResolveResult } from './resolver.js';
 import {
   AmbiguousProviderError,
@@ -14,7 +14,7 @@ const RESERVED_CONFIG_TOKEN = '__Goodie_Config';
 /** Result of the graph builder stage. */
 export interface GraphResult {
   /** Bean definitions in topological order (dependencies before dependents). */
-  beans: IRBeanDefinition[];
+  beans: IRComponentDefinition[];
   warnings: string[];
 }
 
@@ -24,7 +24,7 @@ export interface GraphResult {
  */
 export function buildGraph(resolveResult: ResolveResult): GraphResult {
   const warnings: string[] = [...resolveResult.warnings];
-  const allBeans: IRBeanDefinition[] = [...resolveResult.beans];
+  const allBeans: IRComponentDefinition[] = [...resolveResult.beans];
 
   // Guard: no user-defined bean may use the reserved config token name
   for (const bean of allBeans) {
@@ -57,11 +57,11 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
  * Rewrites the tokenRef on matching field injections.
  */
 function resolveNamedQualifiers(
-  beans: IRBeanDefinition[],
+  beans: IRComponentDefinition[],
   _warnings: string[],
 ): void {
   // Build lookup: name → bean tokenRef
-  const namedBeans = new Map<string, IRBeanDefinition[]>();
+  const namedBeans = new Map<string, IRComponentDefinition[]>();
   for (const bean of beans) {
     if (bean.name) {
       const existing = namedBeans.get(bean.name) ?? [];
@@ -98,7 +98,7 @@ function resolveNamedQualifiers(
 }
 
 /** Validate that all required dependencies have a registered provider. */
-function validateProviders(beans: IRBeanDefinition[]): void {
+function validateProviders(beans: IRComponentDefinition[]): void {
   const registered = new Set<string>();
   const registeredNames: string[] = [];
   for (const bean of beans) {
@@ -185,19 +185,19 @@ function validateProviders(beans: IRBeanDefinition[]): void {
 
 // ── Topological sort with source-location-enriched cycle errors ──
 
-function topoSort(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+function topoSort(beans: IRComponentDefinition[]): IRComponentDefinition[] {
   // Map tokenRef key → bean definition
-  const beanMap = new Map<string, IRBeanDefinition>();
+  const beanMap = new Map<string, IRComponentDefinition>();
   for (const bean of beans) {
     beanMap.set(tokenRefKey(bean.tokenRef), bean);
   }
 
-  const sorted: IRBeanDefinition[] = [];
+  const sorted: IRComponentDefinition[] = [];
   const visited = new Set<string>();
   const visiting = new Set<string>();
   const pathStack: string[] = [];
 
-  function visit(bean: IRBeanDefinition): void {
+  function visit(bean: IRComponentDefinition): void {
     const key = tokenRefKey(bean.tokenRef);
     if (visited.has(key)) return;
 
@@ -237,7 +237,7 @@ function topoSort(beans: IRBeanDefinition[]): IRBeanDefinition[] {
 
 /** Get all dependencies of a bean (constructor + field + interceptor). */
 function* getAllDependencies(
-  bean: IRBeanDefinition,
+  bean: IRComponentDefinition,
 ): Generator<{ tokenRef: TokenRef }> {
   yield* bean.constructorDeps;
   for (const f of bean.fieldDeps) yield { tokenRef: f.tokenRef };
@@ -249,7 +249,7 @@ function* getAllDependencies(
  * Returns ClassTokenRef objects that the graph validator and topo sort can use.
  */
 function getInterceptorDependencies(
-  bean: IRBeanDefinition,
+  bean: IRComponentDefinition,
 ): Array<{ tokenRef: TokenRef }> {
   const interceptedMethods = bean.metadata.interceptedMethods as
     | Array<{

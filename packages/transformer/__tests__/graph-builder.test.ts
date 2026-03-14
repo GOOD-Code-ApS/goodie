@@ -24,11 +24,11 @@ function pipeline(files: Record<string, string>) {
 }
 
 const decoratorsFile = `
-  export function Injectable() { return (t: any, c: any) => {} }
+  export function Transient() { return (t: any, c: any) => {} }
   export function Singleton() { return (t: any, c: any) => {} }
   export function Named(n: string) { return (t: any, c: any) => {} }
   export function Eager() { return (t: any, c: any) => {} }
-  export function Module(opts?: any) { return (t: any, c: any) => {} }
+  export function Factory(opts?: any) { return (t: any, c: any) => {} }
   export function Provides() { return (t: any, c: any) => {} }
   export function Inject(q: any) { return (t: any, c: any) => {} }
   export function Optional() { return (t: any, c: any) => {} }
@@ -40,8 +40,8 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
       });
@@ -54,8 +54,8 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -82,14 +82,14 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/C.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class C {}
         `,
         '/src/B.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
           import { C } from './C.js'
-          @Injectable()
+          @Transient()
           export class B { constructor(private c: C) {} }
         `,
         '/src/A.ts': `
@@ -110,7 +110,7 @@ describe('Graph Builder', () => {
     });
   });
 
-  describe('@Provides on non-@Module beans', () => {
+  describe('@Provides on non-@Factory beans', () => {
     it('should expand @Provides on @Singleton and wire dependencies', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
@@ -143,12 +143,12 @@ describe('Graph Builder', () => {
       expect(names).toContain('dbUrl');
       expect(names).toContain('Service');
 
-      // AppConfig should NOT have isModule metadata
+      // AppConfig should NOT have isFactory metadata
       const configBean = result.beans.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'AppConfig',
       )!;
-      expect(configBean.metadata.isModule).toBeUndefined();
+      expect(configBean.metadata.isFactory).toBeUndefined();
 
       // dbUrl provides bean should have AppConfig as first dep
       const dbUrlBean = result.beans.find(
@@ -168,8 +168,8 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
-          @Module()
+          import { Factory } from './decorators.js'
+          @Factory()
           export class AppModule {}
         `,
       });
@@ -179,16 +179,16 @@ describe('Graph Builder', () => {
         className: 'AppModule',
       });
       expect(result.beans[0].scope).toBe('singleton');
-      expect(result.beans[0].metadata.isModule).toBe(true);
+      expect(result.beans[0].metadata.isFactory).toBe(true);
     });
 
     it('should register @Provides methods as beans with module as first dep', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -214,9 +214,9 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -236,15 +236,15 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Config.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Config {}
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Config } from './Config.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(config: Config): string { return 'postgres://localhost' }
@@ -305,16 +305,16 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/CModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          @Module()
+          import { Factory, Provides } from './decorators.js'
+          @Factory()
           export class CModule {
             @Provides()
             cValue(): string { return 'c' }
           }
         `,
         '/src/BModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          @Module()
+          import { Factory, Provides } from './decorators.js'
+          @Factory()
           export class BModule {
             @Provides()
             bValue(): number { return 2 }
@@ -338,15 +338,15 @@ describe('Graph Builder', () => {
         pipeline({
           '/src/decorators.ts': decoratorsFile,
           '/src/AModule.ts': `
-            import { Module } from './decorators.js'
+            import { Factory } from './decorators.js'
             import { BModule } from './BModule.js'
-            @Module()
+            @Factory()
             export class AModule { constructor(private b: BModule) {} }
           `,
           '/src/BModule.ts': `
-            import { Module } from './decorators.js'
+            import { Factory } from './decorators.js'
             import { AModule } from './AModule.js'
-            @Module()
+            @Factory()
             export class BModule { constructor(private a: AModule) {} }
           `,
         });
@@ -433,14 +433,14 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/HandlerB.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
           import { Handler } from './Handler.js'
-          @Injectable()
+          @Transient()
           export class HandlerB extends Handler {}
         `,
         '/src/Service.ts': `

@@ -68,7 +68,7 @@ describe('runRebuild', () => {
     const transformerError = new TransformerError(
       'Missing provider',
       { filePath: 'foo.ts', line: 1, column: 0 },
-      'Add @Injectable()',
+      'Add @Transient()',
     );
     mockTransform.mockRejectedValue(transformerError);
 

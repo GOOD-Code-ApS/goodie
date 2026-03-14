@@ -31,7 +31,7 @@ The package ships two beans in `beans.json`:
 - `CacheManager` (singleton) — the cache store
 - `CacheInterceptor` (singleton, depends on `CacheManager`) — the AOP interceptor
 
-Consumers auto-discover them at build time via `discoverLibraryBeans()`.
+Consumers auto-discover them at build time via `discoverLibraryComponents()`.
 
 ## Gotchas
 

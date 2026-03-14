@@ -1,13 +1,13 @@
 # @goodie-ts/core
 
-Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefinition[]` and provides the interceptor chain for AOP.
+Runtime DI container, decorators, and AOP runtime. Resolves pre-built `ComponentDefinition[]` and provides the interceptor chain for AOP.
 
 ## Key Files
 
 | File | Role |
 |------|------|
 | `src/application-context.ts` | Container: `create()`, `get()`, `getAsync()`, `getAll()`, `close()` |
-| `src/bean-definition.ts` | `BeanDefinition<T>` and `Dependency` interfaces |
+| `src/bean-definition.ts` | `ComponentDefinition<T>` and `Dependency` interfaces |
 | `src/injection-token.ts` | `InjectionToken<T>` — typed token with phantom type field |
 | `src/goodie.ts` | `Goodie.build(defs)` → `GoodieBuilder` → `.start()` bootstrap |
 | `src/topo-sort.ts` | DFS topological sort with cycle detection |
@@ -15,16 +15,16 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 | `src/aop-types.ts` | AOP types: `MethodInterceptor`, `InvocationContext`, `BeforeAdvice`, `AfterAdvice`, `InterceptorRef`, `InterceptedMethodDescriptor` |
 | `src/interceptor-chain.ts` | `buildInterceptorChain()` — chains interceptors with proceed/original-method fallback |
 | `src/advice-wrappers.ts` | `wrapBeforeAdvice()`, `wrapAfterAdvice()` — adapt advice to `MethodInterceptor` |
-| `src/decorators/` | All decorators: `@Singleton`, `@Injectable`, `@Inject`, `@Module`, `@Provides`, `@Value`, `@Around`, `@Before`, `@After`, `@ConfigurationProperties`, `@Introspected`, `createAopDecorator()`, lifecycle hooks |
+| `src/decorators/` | All decorators: `@Singleton`, `@Transient`, `@Inject`, `@Module`, `@Provides`, `@Value`, `@Around`, `@Before`, `@After`, `@Config`, `@Introspected`, `createAopDecorator()`, lifecycle hooks |
 | `src/introspection.ts` | `TypeMetadata`, `IntrospectedField`, `FieldType` (recursive tree), `DecoratorMeta`, `MetadataRegistry` |
 
 ## Core Types
 
-- **`Scope`**: `'singleton' | 'prototype'`
-- **`BeanDefinition<T>`**: `{ token, scope, dependencies, factory, eager, metadata }`
+- **`Scope`**: `'singleton' | 'transient'`
+- **`ComponentDefinition<T>`**: `{ token, scope, dependencies, factory, eager, metadata }`
 - **`Dependency`**: `{ token, optional }`
 - **`InjectionToken<T>`**: class with `description` string and phantom `__type` for type safety
-- **`BeanPostProcessor`**: `{ beforeInit?, afterInit? }` — hooks called during instantiation. Discovered via `metadata.isBeanPostProcessor = true`.
+- **`ComponentPostProcessor`**: `{ beforeInit?, afterInit? }` — hooks called during instantiation. Discovered via `metadata.isComponentPostProcessor = true`.
 - **`TypeMetadata<T>`**: `{ type, className, fields }` — compile-time generated introspection for `@Introspected` classes (NOT beans — value objects/DTOs)
 - **`IntrospectedField`**: `{ name, type: FieldType, decorators: DecoratorMeta[] }` — field with recursive type tree and generic decorator metadata
 - **`FieldType`**: recursive union: `primitive | literal | array | reference | union | optional | nullable`
@@ -33,7 +33,7 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 
 ## ApplicationContext API
 
-- `ApplicationContext.create(defs, options?)` — async factory, evaluates `metadata.conditionalRules` to filter conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) before topo sort, validates, eagerly inits marked beans
+- `ApplicationContext.create(defs, options?)` — async factory, evaluates `metadata.conditionalRules` to filter conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissing`) before topo sort, validates, eagerly inits marked beans
 - `get(token)` — sync, throws `AsyncBeanNotReadyError` if bean is async and unresolved
 - `getAsync(token)` — always safe for async beans
 - `getAll(token)` — returns all beans registered under a token
@@ -44,7 +44,7 @@ Runtime DI container, decorators, and AOP runtime. Resolves pre-built `BeanDefin
 - **Fuzzy suggestions**: All `MissingDependencyError` throws (startup validation, `get()`/`getAsync()`, dep resolution) suggest similar registered token names via Levenshtein distance ("Did you mean: UserService?")
 - **Conditional bean hints**: When a missing dependency was excluded by a conditional rule, the error explains why ("bean exists but was excluded by: @ConditionalOnProperty('datasource.dialect', 'postgres') — property is 'mysql'")
 - **`requiredBy` context**: All missing dependency errors include which bean required the missing dep
-- **Lifecycle error wrapping**: `@PostConstruct` and `@PreDestroy` errors include bean name, method name, and the original error via `{ cause }`
+- **Lifecycle error wrapping**: `@OnInit` and `@OnDestroy` errors include bean name, method name, and the original error via `{ cause }`
 - **`MissingDependencyError`**: has `tokenDescription`, `requiredBy?`, and `hint?` fields
 
 ## Gotchas

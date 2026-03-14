@@ -76,7 +76,7 @@ class CreateTodosTable extends AbstractMigration {
 }
 ```
 
-Migrations run automatically at startup via `MigrationRunner` (`@PostConstruct`), sorted by name.
+Migrations run automatically at startup via `MigrationRunner` (`@OnInit`), sorted by name.
 
 ## Supported Dialects
 

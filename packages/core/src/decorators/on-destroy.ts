@@ -1,7 +1,7 @@
 /**
  * Marks a method to be called when the ApplicationContext is closed.
  *
- * Only effective on `@Singleton` / `@Injectable` classes. The method
+ * Only effective on `@Singleton` / `@Transient` classes. The method
  * will be invoked during `close()` in reverse-topological order
  * (dependents destroyed before their dependencies).
  *
@@ -11,13 +11,13 @@
  * @example
  * @Singleton()
  * class DatabasePool {
- *   @PreDestroy()
+ *   @OnDestroy()
  *   async shutdown() {
  *     await this.pool.end();
  *   }
  * }
  */
-export function PreDestroy(): MethodDecorator_Stage3 {
+export function OnDestroy(): MethodDecorator_Stage3 {
   return () => {};
 }
 

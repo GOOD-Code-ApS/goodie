@@ -1,5 +1,5 @@
 import type {
-  IRBeanDefinition,
+  IRComponentDefinition,
   ResolvedAopMapping,
 } from '@goodie-ts/transformer';
 import {
@@ -18,7 +18,7 @@ const LOGGING_MAPPINGS: ResolvedAopMapping[] = [
   },
 ];
 
-const LOGGING_LIBRARY_BEANS: IRBeanDefinition[] = [
+const LOGGING_LIBRARY_BEANS: IRComponentDefinition[] = [
   {
     tokenRef: {
       kind: 'class',

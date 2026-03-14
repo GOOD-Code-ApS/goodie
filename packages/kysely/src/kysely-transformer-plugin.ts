@@ -1,7 +1,7 @@
 import type {
   ClassVisitorContext,
   CodegenContribution,
-  IRBeanDefinition,
+  IRComponentDefinition,
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -29,7 +29,7 @@ interface MigrationClassInfo {
  * TransactionalInterceptor as an AOP interceptor dependency at compile time.
  *
  * Scans @Migration decorated classes and wires a MigrationRunner that
- * executes all migrations at startup via @PostConstruct.
+ * executes all migrations at startup via @OnInit.
  *
  * Wires TransactionManager and MigrationRunner using `KyselyDatabase` from
  * library beans — no manual `database` option needed.
@@ -87,8 +87,8 @@ export function createKyselyPlugin(
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
-      const syntheticBeans: IRBeanDefinition[] = [];
+    afterResolve(beans: IRComponentDefinition[]): IRComponentDefinition[] {
+      const syntheticBeans: IRComponentDefinition[] = [];
 
       // --- @Transactional interception ---
       let needsInterceptor = false;
@@ -160,13 +160,13 @@ export function createKyselyPlugin(
               b.tokenRef.importPath === '@goodie-ts/kysely')),
       );
 
-      const kyselyDatabaseTokenRef: IRBeanDefinition['tokenRef'] = {
+      const kyselyDatabaseTokenRef: IRComponentDefinition['tokenRef'] = {
         kind: 'class',
         className: 'KyselyDatabase',
         importPath: '@goodie-ts/kysely',
       };
 
-      const kyselyProviderDep: IRBeanDefinition['constructorDeps'] =
+      const kyselyProviderDep: IRComponentDefinition['constructorDeps'] =
         hasKyselyDatabase
           ? [
               {
@@ -256,7 +256,7 @@ export function createKyselyPlugin(
           );
 
           // Synthetic bean per @Migration class (no baseTokenRefs — wired as individual deps)
-          const migrationDeps: IRBeanDefinition['constructorDeps'] = [];
+          const migrationDeps: IRComponentDefinition['constructorDeps'] = [];
           for (const m of migrationClasses) {
             syntheticBeans.push({
               tokenRef: {
@@ -309,7 +309,7 @@ export function createKyselyPlugin(
             fieldDeps: [],
             factoryKind: 'constructor',
             providesSource: undefined,
-            metadata: { postConstructMethods: ['migrate'] },
+            metadata: { onInitMethods: ['migrate'] },
             sourceLocation: {
               filePath: '@goodie-ts/kysely',
               line: 0,
@@ -322,7 +322,7 @@ export function createKyselyPlugin(
       return [...beans, ...syntheticBeans];
     },
 
-    codegen(beans: IRBeanDefinition[]): CodegenContribution {
+    codegen(beans: IRComponentDefinition[]): CodegenContribution {
       const hasTransactional = beans.some((b) => {
         const methods = b.metadata.interceptedMethods as
           | Array<{

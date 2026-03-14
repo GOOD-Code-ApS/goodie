@@ -8,7 +8,7 @@ import type { KyselyProvider } from './transaction-manager.js';
  * Runs Kysely migrations at application startup.
  *
  * Auto-wired by the Kysely transformer plugin as an eager singleton
- * with `@PostConstruct` on `migrate()`. Constructor receives the
+ * with `@OnInit` on `migrate()`. Constructor receives the
  * KyselyProvider and all discovered @Migration instances.
  */
 export class MigrationRunner {

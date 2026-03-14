@@ -74,7 +74,7 @@ export class MissingProviderError extends TransformerError {
       `No provider found for "${tokenDescription}" (required by ${requiredBy})`,
       sourceLocation,
       customHint ??
-        'Ensure the dependency is decorated with @Injectable(), @Singleton(), or provided by a @Module.',
+        'Ensure the dependency is decorated with @Transient(), @Singleton(), or provided by a @Factory.',
     );
     this.name = 'MissingProviderError';
   }
