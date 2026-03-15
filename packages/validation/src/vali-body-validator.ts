@@ -22,9 +22,9 @@ export class ValiBodyValidator extends BodyValidator {
     super();
   }
 
-  validate(type: new (...args: any[]) => unknown, body: unknown): unknown {
+  validate<T>(type: new (...args: any[]) => T, body: unknown): T {
     const schema = this.schemaFactory.getSchema(type);
-    if (!schema) return body;
-    return v.parse(schema, body);
+    if (!schema) return body as T;
+    return v.parse(schema, body) as T;
   }
 }

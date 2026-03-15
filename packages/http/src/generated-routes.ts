@@ -44,3 +44,10 @@ export function getGeneratedRouteWirer<TRouter>():
   | undefined {
   return _generatedRouteWirer as GeneratedRouteWirer<TRouter> | undefined;
 }
+
+/**
+ * Clear the registered route wirer. For test isolation.
+ */
+export function resetGeneratedRoutes(): void {
+  _generatedRouteWirer = undefined;
+}

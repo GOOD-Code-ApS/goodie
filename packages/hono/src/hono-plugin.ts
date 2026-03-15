@@ -278,7 +278,7 @@ function generateParamExtraction(
         return {
           declaration:
             `const ${rawVar} = await c.req.json();\n` +
-            `const ${param.name} = __bodyValidator ? __bodyValidator.validate(${param.typeName}, ${rawVar}) : ${rawVar};`,
+            `const ${param.name} = __bodyValidator ? await __bodyValidator.validate(${param.typeName}, ${rawVar}) : ${rawVar};`,
           argExpr: param.name,
         };
       }

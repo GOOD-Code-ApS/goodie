@@ -13,6 +13,7 @@ export type { GeneratedRouteWirer } from './generated-routes.js';
 export {
   getGeneratedRouteWirer,
   registerGeneratedRoutes,
+  resetGeneratedRoutes,
 } from './generated-routes.js';
 // Types
 export { HttpContext } from './http-context.js';

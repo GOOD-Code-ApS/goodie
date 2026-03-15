@@ -247,11 +247,14 @@ function constraintToCode(dec: {
       const max = dec.args.value2;
       return [`v.minLength(${min})`, `v.maxLength(${max})`];
     }
-    default:
+    default: {
       // Custom constraint via createConstraint() — look up from runtime registry
+      const key = JSON.stringify(dec.name);
+      const errMsg = `"Custom constraint '${dec.name}' not registered. Did you call createConstraint('${dec.name}', ...)?"`;
       return [
-        `v.check(customConstraintRegistry.get(${JSON.stringify(dec.name)})!, "Custom constraint '${dec.name}' failed")`,
+        `v.check((() => { const fn = customConstraintRegistry.get(${key}); if (!fn) throw new Error(${errMsg}); return fn; })(), "Custom constraint '${dec.name}' failed")`,
       ];
+    }
   }
 }
 

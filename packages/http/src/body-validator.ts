@@ -20,8 +20,8 @@ export abstract class BodyValidator {
    * @returns The validated body (may be the same object or a transformed copy)
    * @throws If validation fails (e.g. ValiError from Valibot)
    */
-  abstract validate(
-    type: new (...args: any[]) => unknown,
+  abstract validate<T>(
+    type: new (...args: any[]) => T,
     body: unknown,
-  ): unknown;
+  ): T | Promise<T>;
 }
