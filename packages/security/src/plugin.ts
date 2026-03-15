@@ -4,7 +4,7 @@ import type {
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
-import { Node, SyntaxKind } from 'ts-morph';
+import { Node } from 'ts-morph';
 
 /**
  * Security transformer plugin.
