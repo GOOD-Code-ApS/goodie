@@ -59,10 +59,15 @@ export abstract class HttpServerFilter {
 export function matchesPattern(path: string, pattern: string): boolean {
   if (pattern === '/**') return true;
 
-  // Convert ANT pattern to regex
+  // Convert ANT pattern to regex:
+  // 1. Replace ** and * with placeholders
+  // 2. Escape regex metacharacters in the rest
+  // 3. Restore placeholders as regex patterns
   const regexStr = pattern
     .replace(/\*\*/g, '§GLOBSTAR§')
-    .replace(/\*/g, '[^/]+')
+    .replace(/\*/g, '§WILDCARD§')
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/§WILDCARD§/g, '[^/]+')
     .replace(/§GLOBSTAR§/g, '.*');
   const regex = new RegExp(`^${regexStr}$`);
   return regex.test(path);

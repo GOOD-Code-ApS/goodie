@@ -18,8 +18,5 @@ export { SecurityFilter } from './security-filter.js';
 // Interceptor
 export { SecurityInterceptor } from './security-interceptor.js';
 
-// Middleware (deprecated — use SecurityFilter instead)
-export { createSecurityMiddleware } from './security-middleware.js';
-
 // Provider
 export { SECURITY_PROVIDER, SecurityProvider } from './security-provider.js';

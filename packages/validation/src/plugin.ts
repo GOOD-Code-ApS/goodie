@@ -83,11 +83,17 @@ export default function createValidationPlugin(): TransformerPlugin {
           : ['ValiSchemaFactory'],
       });
 
-      // Import each @Introspected class
+      // Build alias map for duplicate class names
+      const aliasMap = buildAliasMap(ctx.typeRegistrations);
+
+      // Import each @Introspected class (with alias if name collides)
       for (const reg of ctx.typeRegistrations) {
+        const alias = aliasMap.get(reg);
         sf.addImportDeclaration({
           moduleSpecifier: ctx.relativeImport(reg.importPath),
-          namedImports: [reg.className],
+          namedImports: alias
+            ? [{ name: reg.className, alias }]
+            : [reg.className],
         });
       }
 
@@ -101,7 +107,8 @@ export default function createValidationPlugin(): TransformerPlugin {
           decorators: Array<{ name: string; args: Record<string, unknown> }>;
         }>;
 
-        const schemaVar = `${reg.className}$schema`;
+        const localName = aliasMap.get(reg) ?? reg.className;
+        const schemaVar = `${localName}$schema`;
         writer.write(`const ${schemaVar} = v.object(`).block(() => {
           for (const field of fields) {
             writer.writeLine(
@@ -111,7 +118,7 @@ export default function createValidationPlugin(): TransformerPlugin {
         });
         writer.write(');').newLine();
         writer.writeLine(
-          `ValiSchemaFactory.registerSchema(${reg.className}, ${schemaVar} as v.GenericSchema);`,
+          `ValiSchemaFactory.registerSchema(${localName}, ${schemaVar} as v.GenericSchema);`,
         );
         writer.blankLine();
       }
@@ -282,4 +289,33 @@ function hasCustomConstraints(
     }
   }
   return false;
+}
+
+interface TypeReg {
+  className: string;
+  importPath: string;
+}
+
+/**
+ * Build an alias map for type registrations with duplicate class names.
+ * Only entries that collide get aliases (e.g. `CreateUser` → `CreateUser$1`).
+ */
+function buildAliasMap(
+  registrations: ReadonlyArray<TypeReg>,
+): Map<TypeReg, string> {
+  const nameCount = new Map<string, number>();
+  for (const reg of registrations) {
+    nameCount.set(reg.className, (nameCount.get(reg.className) ?? 0) + 1);
+  }
+
+  const aliases = new Map<TypeReg, string>();
+  const seen = new Map<string, number>();
+  for (const reg of registrations) {
+    if ((nameCount.get(reg.className) ?? 0) > 1) {
+      const idx = (seen.get(reg.className) ?? 0) + 1;
+      seen.set(reg.className, idx);
+      aliases.set(reg, `${reg.className}$${idx}`);
+    }
+  }
+  return aliases;
 }

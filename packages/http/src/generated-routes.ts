@@ -30,6 +30,13 @@ let _generatedRouteWirer: GeneratedRouteWirer | undefined;
 export function registerGeneratedRoutes<TRouter>(
   wirer: GeneratedRouteWirer<TRouter>,
 ): void {
+  if (_generatedRouteWirer) {
+    throw new Error(
+      'registerGeneratedRoutes() called twice. ' +
+        'Multiple apps in the same process are not supported. ' +
+        'Call resetGeneratedRoutes() between test runs.',
+    );
+  }
   _generatedRouteWirer = wirer as GeneratedRouteWirer;
 }
 
