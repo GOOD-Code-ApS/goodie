@@ -54,6 +54,7 @@ export class ValiSchemaFactory {
   /** Clear the instance schema cache. Useful in tests after `MetadataRegistry.reset()`. */
   clearCache(): void {
     this.cache.clear();
+    this.metadataByName = undefined;
   }
 
   /**
@@ -165,18 +166,27 @@ export class ValiSchemaFactory {
     return v.unknown() as GenericSchema;
   }
 
+  private metadataByName: Map<string, TypeMetadata> | undefined;
+
   private referenceToVali(className: string): GenericSchema {
-    // Look up by className in registry — warn if duplicates found
-    const allMetadata = MetadataRegistry.INSTANCE.getAll();
-    const matches = allMetadata.filter((m) => m.className === className);
-    if (matches.length === 0) return v.unknown() as GenericSchema;
-    if (matches.length > 1) {
-      console.warn(
-        `[validation] Multiple @Introspected classes named '${className}' found. Using first match. Consider renaming to avoid ambiguity.`,
-      );
+    if (!this.metadataByName) {
+      this.metadataByName = new Map();
+      const seen = new Set<string>();
+      for (const m of MetadataRegistry.INSTANCE.getAll()) {
+        if (seen.has(m.className)) {
+          console.warn(
+            `[validation] Multiple @Introspected classes named '${m.className}' found. Using first match. Consider renaming to avoid ambiguity.`,
+          );
+          continue;
+        }
+        seen.add(m.className);
+        this.metadataByName.set(m.className, m);
+      }
     }
 
-    return this.getSchema(matches[0].type) ?? (v.unknown() as GenericSchema);
+    const metadata = this.metadataByName.get(className);
+    if (!metadata) return v.unknown() as GenericSchema;
+    return this.getSchema(metadata.type) ?? (v.unknown() as GenericSchema);
   }
 
   private unionToVali(members: FieldType[]): GenericSchema {
