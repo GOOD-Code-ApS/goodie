@@ -205,7 +205,7 @@ type CreateSecurityMiddlewareFn = (
 function buildSecurityMiddleware(
   ctx: ApplicationContext,
   definitions: readonly ComponentDefinition[],
-): ((c: Context, next: Next) => Promise<Response | void>) | undefined {
+): ((c: Context, next: Next) => Promise<void>) | undefined {
   const providerBaseToken = findBaseTokenByName(
     definitions,
     'SecurityProvider',
