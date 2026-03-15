@@ -34,6 +34,12 @@ export class HttpContext {
     const match = cookieHeader.match(
       new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`),
     );
-    return match ? decodeURIComponent(match[1]) : undefined;
+    if (!match) return undefined;
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      // Malformed percent-encoding (e.g. "%ZZ") — return raw value
+      return match[1];
+    }
   }
 }

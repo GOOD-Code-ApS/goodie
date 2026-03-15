@@ -344,10 +344,16 @@ export class OpenApiSpecBuilder {
     }
   }
 
+  private metadataByName: Map<string, TypeMetadata> | undefined;
+
   private findMetadataByName(className: string): TypeMetadata | undefined {
-    return MetadataRegistry.INSTANCE.getAll().find(
-      (m) => m.className === className,
-    );
+    if (!this.metadataByName) {
+      this.metadataByName = new Map();
+      for (const m of MetadataRegistry.INSTANCE.getAll()) {
+        this.metadataByName.set(m.className, m);
+      }
+    }
+    return this.metadataByName.get(className);
   }
 }
 
