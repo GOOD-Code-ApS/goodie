@@ -203,7 +203,7 @@ export interface ScannedManifest {
 }
 
 /**
- * Scan `node_modules` for packages with `"goodie": { "beans": "..." }` and
+ * Scan `node_modules` for packages with `"goodie": { "components": "..." }` and
  * read their components.json manifests. Shared by `discoverLibraryComponents` and
  * `discoverAopMappings` to avoid duplicate filesystem scanning.
  */
@@ -273,7 +273,7 @@ function scanLibraryManifests(
  * Discover library beans from installed packages.
  *
  * Scans `node_modules` for packages in the given scopes (default: `['@goodie-ts']`)
- * that declare a `"goodie": { "beans": "..." }` field in their `package.json`.
+ * that declare a `"goodie": { "components": "..." }` field in their `package.json`.
  * Reads and deserializes each components.json manifest.
  *
  * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
@@ -290,7 +290,7 @@ export async function discoverLibraryComponents(
       allBeans.push(...deserializeComponents(manifest));
     } catch (err) {
       console.warn(
-        `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
+        `[@goodie-ts] Failed to deserialize components from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
@@ -487,7 +487,7 @@ export function discoverLibraryManifests(
       beans.push(...deserializeComponents(manifest));
     } catch (err) {
       console.warn(
-        `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
+        `[@goodie-ts] Failed to deserialize components from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
       );
     }
 

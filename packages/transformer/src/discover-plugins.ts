@@ -15,12 +15,12 @@ export interface DiscoverAllResult {
 }
 
 /**
- * Auto-discover transformer plugins AND library bean manifests from installed packages
+ * Auto-discover transformer plugins AND library component manifests from installed packages
  * in a single filesystem scan.
  *
  * For each package in `node_modules` within the given scopes:
  * - If `"goodie": { "plugin": "..." }` exists → load and call the plugin factory
- * - If `"goodie": { "beans": "..." }` exists → read the components.json manifest
+ * - If `"goodie": { "components": "..." }` exists → read the components.json manifest
  *
  * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
  * @param scanScopes - npm scopes to scan. Defaults to `['@goodie-ts']`.

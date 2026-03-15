@@ -284,8 +284,8 @@ describe('discoverLibraryComponents', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('should skip packages without goodie.beans field', async () => {
-    // Create a package with only a plugin field (no beans)
+  it('should skip packages without goodie.components field', async () => {
+    // Create a package with only a plugin field (no components)
     const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'some-pkg');
     fs.mkdirSync(pkgDir, { recursive: true });
     fs.writeFileSync(
@@ -300,7 +300,7 @@ describe('discoverLibraryComponents', () => {
     expect(beans).toEqual([]);
   });
 
-  it('should discover and deserialize beans from packages with goodie.beans field', async () => {
+  it('should discover and deserialize components from packages with goodie.components field', async () => {
     const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'health');
     fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
     fs.writeFileSync(

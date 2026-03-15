@@ -112,7 +112,7 @@ export async function transform(
         libraryBeans.push(...deserializeComponents(manifest));
       } catch (err) {
         console.warn(
-          `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
+          `[@goodie-ts] Failed to deserialize components from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
         );
       }
       if (!options.disablePluginDiscovery && manifest.aop) {

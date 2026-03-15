@@ -102,9 +102,9 @@ export class ApplicationContext {
     const metrics = isMetricsEnabled() ? new StartupMetrics() : undefined;
     const totalStart = metrics ? performance.now() : 0;
 
-    // Evaluate conditional rules at runtime (env, config properties, missing beans)
-    const { beans: filtered, filteredOut } =
-      filterConditionalBeans(definitions);
+    // Evaluate conditional rules at runtime (env, config properties, missing components)
+    const { components: filtered, filteredOut } =
+      filterConditionalComponents(definitions);
 
     const sorted = metrics
       ? metrics.timeStageSync('topoSort', () =>
@@ -524,14 +524,14 @@ export class ApplicationContext {
   }
 
   /**
-   * Resolve a request-scoped bean from the current request's store.
+   * Resolve a request-scoped component from the current request's store.
    * Creates and caches the instance if not yet created in this scope.
    */
   private getRequestScopedInstance<T>(def: ComponentDefinition): T {
     const store = RequestScopeManager.getStore();
     if (!store) {
       throw new Error(
-        `No active request scope for bean '${tokenName(def.token)}'. ` +
+        `No active request scope for component '${tokenName(def.token)}'. ` +
           `Ensure the request is running inside RequestScopeManager.run().`,
       );
     }
@@ -549,7 +549,7 @@ export class ApplicationContext {
   }
 
   /**
-   * Async variant of getRequestScopedInstance. Supports beans with async
+   * Async variant of getRequestScopedInstance. Supports components with async
    * factories or async @OnInit (e.g. D1KyselyDatabase).
    */
   private async getRequestScopedInstanceAsync<T>(
@@ -558,7 +558,7 @@ export class ApplicationContext {
     const store = RequestScopeManager.getStore();
     if (!store) {
       throw new Error(
-        `No active request scope for bean '${tokenName(def.token)}'. ` +
+        `No active request scope for component '${tokenName(def.token)}'. ` +
           `Ensure the request is running inside RequestScopeManager.run().`,
       );
     }
@@ -587,8 +587,8 @@ export class ApplicationContext {
       return factory(resolve);
     }
     throw new Error(
-      `No scoped proxy factory for request-scoped bean '${tokenName(def.token)}'. ` +
-        `Ensure the transformer generated a scopedProxyFactory in the bean metadata.`,
+      `No scoped proxy factory for request-scoped component '${tokenName(def.token)}'. ` +
+        `Ensure the transformer generated a scopedProxyFactory in the component metadata.`,
     );
   }
 
@@ -687,7 +687,7 @@ export class ApplicationContext {
     // Check if the bean was excluded by a conditional rule
     const conditionalReason = this.filteredOutComponents.get(name);
     if (conditionalReason) {
-      return `A bean '${name}' exists but was excluded by: ${conditionalReason}`;
+      return `A component '${name}' exists but was excluded by: ${conditionalReason}`;
     }
     const registered = Array.from(this.primaryDef.keys()).map(tokenName);
     const similar = findSimilar(name, registered);
@@ -740,26 +740,26 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Filter beans based on conditional rules stored in `metadata.conditionalRules`.
+ * Filter components based on conditional rules stored in `metadata.conditionalRules`.
  * Evaluated at runtime following the Micronaut pattern — the transformer records
  * the rules, the container evaluates them.
  *
- * Order: onEnv → onProperty → onMissingBean (since missingBean depends on what remains).
- * All conditions on a single bean use AND logic.
+ * Order: onEnv → onProperty → onMissing (since onMissing depends on what remains).
+ * All conditions on a single component use AND logic.
  */
-function filterConditionalBeans(definitions: ComponentDefinition[]): {
-  beans: ComponentDefinition[];
+function filterConditionalComponents(definitions: ComponentDefinition[]): {
+  components: ComponentDefinition[];
   filteredOut: Map<string, string>;
 } {
   const filteredOut = new Map<string, string>();
 
-  // Quick exit if no beans have conditional rules
+  // Quick exit if no components have conditional rules
   const hasAnyRules = definitions.some(
     (d) =>
       d.metadata.conditionalRules &&
       (d.metadata.conditionalRules as ConditionalRule[]).length > 0,
   );
-  if (!hasAnyRules) return { beans: definitions, filteredOut };
+  if (!hasAnyRules) return { components: definitions, filteredOut };
 
   // Lazily resolve config for @ConditionalOnProperty
   let config: Record<string, unknown> | undefined;
@@ -849,14 +849,14 @@ function filterConditionalBeans(definitions: ComponentDefinition[]): {
       if (rule.type !== 'onMissingBean') continue;
 
       const ownName = tokenName(def.token);
-      // Bean is excluded when the target bean IS present (it's "on *missing* bean")
+      // Component is excluded when the target IS present (it's "on *missing*")
       if (
         registeredNames.has(rule.tokenClassName!) &&
         rule.tokenClassName !== ownName
       ) {
         filteredOut.set(
           tokenName(def.token),
-          `@ConditionalOnMissing(${rule.tokenClassName}) — bean '${rule.tokenClassName}' is present`,
+          `@ConditionalOnMissing(${rule.tokenClassName}) — component '${rule.tokenClassName}' is present`,
         );
         return false;
       }
@@ -864,7 +864,7 @@ function filterConditionalBeans(definitions: ComponentDefinition[]): {
     return true;
   });
 
-  return { beans: remaining, filteredOut };
+  return { components: remaining, filteredOut };
 }
 
 /**
