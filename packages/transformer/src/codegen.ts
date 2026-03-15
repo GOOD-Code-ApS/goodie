@@ -399,8 +399,11 @@ export function generateCode(
       if (hasTypeRegistrations) {
         for (const reg of typeRegistrations!) {
           const fieldsJson = JSON.stringify(reg.fields);
+          const importPathProp = reg.importPath
+            ? `, importPath: '${reg.importPath}'`
+            : '';
           writer.writeLine(
-            `MetadataRegistry.INSTANCE.register({ type: ${reg.className}, className: '${reg.className}', fields: ${fieldsJson} });`,
+            `MetadataRegistry.INSTANCE.register({ type: ${reg.className}, className: '${reg.className}'${importPathProp}, fields: ${fieldsJson} });`,
           );
         }
       }

@@ -54,6 +54,7 @@ export class ValiSchemaFactory {
   /** Clear the instance schema cache. Useful in tests after `MetadataRegistry.reset()`. */
   clearCache(): void {
     this.cache.clear();
+    this.metadataByImportPath = undefined;
     this.metadataByName = undefined;
   }
 
@@ -131,7 +132,7 @@ export class ValiSchemaFactory {
       case 'array':
         return v.array(this.fieldTypeToVali(type.elementType)) as GenericSchema;
       case 'reference':
-        return this.referenceToVali(type.className);
+        return this.referenceToVali(type.className, type.importPath);
       case 'union':
         return this.unionToVali(type.types);
       case 'optional':
@@ -166,25 +167,34 @@ export class ValiSchemaFactory {
     return v.unknown() as GenericSchema;
   }
 
+  /** Lazily-built lookup maps for metadata by importPath and by className. */
+  private metadataByImportPath: Map<string, TypeMetadata> | undefined;
   private metadataByName: Map<string, TypeMetadata> | undefined;
 
-  private referenceToVali(className: string): GenericSchema {
-    if (!this.metadataByName) {
-      this.metadataByName = new Map();
-      const seen = new Set<string>();
-      for (const m of MetadataRegistry.INSTANCE.getAll()) {
-        if (seen.has(m.className)) {
-          console.warn(
-            `[validation] Multiple @Introspected classes named '${m.className}' found. Using first match. Consider renaming to avoid ambiguity.`,
-          );
-          continue;
-        }
-        seen.add(m.className);
+  private buildMetadataLookups(): void {
+    this.metadataByImportPath = new Map();
+    this.metadataByName = new Map();
+    for (const m of MetadataRegistry.INSTANCE.getAll()) {
+      if (m.importPath) {
+        this.metadataByImportPath.set(m.importPath, m);
+      }
+      // First-wins for className — importPath lookup is preferred when available
+      if (!this.metadataByName.has(m.className)) {
         this.metadataByName.set(m.className, m);
       }
     }
+  }
 
-    const metadata = this.metadataByName.get(className);
+  private referenceToVali(
+    className: string,
+    importPath?: string,
+  ): GenericSchema {
+    if (!this.metadataByName) this.buildMetadataLookups();
+
+    // Prefer exact match by importPath (disambiguates same-named classes)
+    const metadata =
+      (importPath && this.metadataByImportPath!.get(importPath)) ||
+      this.metadataByName!.get(className);
     if (!metadata) return v.unknown() as GenericSchema;
     return this.getSchema(metadata.type) ?? (v.unknown() as GenericSchema);
   }

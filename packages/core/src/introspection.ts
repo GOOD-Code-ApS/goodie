@@ -40,6 +40,8 @@ export interface ReferenceFieldType {
   kind: 'reference';
   /** The class name of the referenced @Introspected type. */
   className: string;
+  /** Source file path of the referenced type. Used to disambiguate same-named classes. */
+  importPath?: string;
 }
 
 export interface UnionFieldType {
@@ -98,6 +100,8 @@ export interface TypeMetadata<T = unknown> {
   ) => T;
   /** Fully-qualified class name. */
   className: string;
+  /** Source file path. Used to disambiguate same-named classes from different modules. */
+  importPath?: string;
   /** All fields with type and decorator metadata. */
   fields: IntrospectedField[];
 }

@@ -220,7 +220,7 @@ function resolveFieldType(type: Type): ScannedFieldType {
 
 // ── Serialization helpers ──
 
-/** Serialize ScannedFieldType to the runtime FieldType shape (strip importPath from references). */
+/** Serialize ScannedFieldType to the runtime FieldType shape. */
 function serializeFieldType(type: ScannedFieldType): Record<string, unknown> {
   switch (type.kind) {
     case 'primitive':
@@ -233,7 +233,11 @@ function serializeFieldType(type: ScannedFieldType): Record<string, unknown> {
         elementType: serializeFieldType(type.elementType),
       };
     case 'reference':
-      return { kind: 'reference', className: type.className };
+      return {
+        kind: 'reference',
+        className: type.className,
+        importPath: type.importPath,
+      };
     case 'union':
       return { kind: 'union', types: type.types.map(serializeFieldType) };
     case 'optional':
