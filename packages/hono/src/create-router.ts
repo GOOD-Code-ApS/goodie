@@ -2,6 +2,7 @@ import type { ApplicationContext, ComponentDefinition } from '@goodie-ts/core';
 import {
   type ControllerMetadata,
   ExceptionHandler,
+  filterMatchesPath,
   getGeneratedRouteWirer,
   type HttpMethod,
   HttpServerFilter,
@@ -51,11 +52,16 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
     router.use('*', corsMiddleware(serverConfig.cors));
   }
 
-  // HttpServerFilter middleware — generic filter chain (security, logging, etc.)
+  // HttpServerFilter middleware — getAll() returns sorted by @Order(), with path pattern matching
   const filters = ctx.getAll(HttpServerFilter);
   for (const filter of filters) {
     router.use('*', async (c, next) => {
-      await filter.doFilter(buildHttpContext(c), next);
+      const path = new URL(c.req.url).pathname;
+      if (filterMatchesPath(filter, path)) {
+        await filter.doFilter(buildHttpContext(c), next);
+      } else {
+        await next();
+      }
     });
   }
 

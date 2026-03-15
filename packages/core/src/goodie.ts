@@ -40,18 +40,9 @@ export class GoodieBuilder {
         await hook(ctx);
       }
 
-      // Discover OnStart components via baseTokens, sort by @Order() metadata
-      const defs = ctx.getDefinitions();
-      const onStartDefs = defs
-        .filter((def) => def.baseTokens?.includes(OnStart as any))
-        .sort((a, b) => {
-          const orderA = (a.metadata.order as number) ?? 0;
-          const orderB = (b.metadata.order as number) ?? 0;
-          return orderA - orderB;
-        });
-
-      for (const def of onStartDefs) {
-        const component = ctx.get(def.token) as OnStart;
+      // Discover OnStart components via baseTokens (sorted by @Order() via getAll)
+      const onStartComponents = ctx.getAll(OnStart);
+      for (const component of onStartComponents) {
         await component.onStart(ctx);
       }
     } catch (err) {

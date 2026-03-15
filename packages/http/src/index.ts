@@ -18,7 +18,10 @@ export {
 // Types
 export { HttpContext } from './http-context.js';
 // Filters
-export { HttpServerFilter } from './http-server-filter.js';
+export {
+  filterMatchesPath,
+  HttpServerFilter,
+} from './http-server-filter.js';
 export { Response } from './response.js';
 export { Delete, Get, Patch, Post, Put } from './route.js';
 export type {
