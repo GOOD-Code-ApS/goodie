@@ -4,7 +4,7 @@
  */
 export class StartupMetrics {
   private readonly timings = new Map<string, number>();
-  private readonly beanTimings = new Map<string, number>();
+  private readonly componentTimings = new Map<string, number>();
   private totalMs = 0;
 
   /**
@@ -31,7 +31,7 @@ export class StartupMetrics {
    * Record a per-bean resolution time.
    */
   recordBean(name: string, ms: number): void {
-    this.beanTimings.set(name, ms);
+    this.componentTimings.set(name, ms);
   }
 
   /**
@@ -51,8 +51,8 @@ export class StartupMetrics {
   /**
    * Get per-bean resolution timings.
    */
-  getBeanTimings(): ReadonlyMap<string, number> {
-    return this.beanTimings;
+  getComponentTimings(): ReadonlyMap<string, number> {
+    return this.componentTimings;
   }
 
   /**
@@ -76,11 +76,11 @@ export class StartupMetrics {
     console.log(`[goodie] ──────────────────────────────`);
     console.log(`[goodie]   total: ${this.totalMs.toFixed(2)}ms`);
 
-    if (this.beanTimings.size > 0) {
+    if (this.componentTimings.size > 0) {
       console.log('[goodie]');
       console.log('[goodie] Eager bean resolution');
       console.log('[goodie] ──────────────────────────────');
-      for (const [name, ms] of this.beanTimings) {
+      for (const [name, ms] of this.componentTimings) {
         console.log(`[goodie]   ${name}: ${ms.toFixed(2)}ms`);
       }
     }

@@ -42,7 +42,7 @@ describe('AOP Integration — Generated Code', () => {
     expect(result.code).not.toContain('AopPostProcessor');
 
     // No synthetic AopPostProcessor bean
-    const postProcessorBean = result.beans.find(
+    const postProcessorBean = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'AopPostProcessor',

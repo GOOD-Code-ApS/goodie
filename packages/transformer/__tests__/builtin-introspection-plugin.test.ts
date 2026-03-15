@@ -201,7 +201,7 @@ describe('builtin-introspection-plugin', () => {
       `,
     });
 
-    expect(result.beans).toHaveLength(0);
+    expect(result.components).toHaveLength(0);
     expect(result.code).toContain('MetadataRegistry.INSTANCE');
   });
 
@@ -261,8 +261,8 @@ describe('builtin-introspection-plugin', () => {
       `,
     });
 
-    expect(result.beans).toHaveLength(1);
-    expect(result.beans[0].tokenRef).toMatchObject({
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].tokenRef).toMatchObject({
       kind: 'class',
       className: 'TodoService',
     });

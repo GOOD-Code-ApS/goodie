@@ -14,7 +14,7 @@ function createProject(files: Record<string, string>) {
   return project;
 }
 
-/** Simulates the KyselyDatabase library bean that would come from beans.json. */
+/** Simulates the KyselyDatabase library bean that would come from components.json. */
 const kyselyDatabaseLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
@@ -37,7 +37,7 @@ const kyselyDatabaseLibraryBean: IRComponentDefinition = {
   },
 };
 
-/** Simulates the TransactionManager library bean from beans.json. */
+/** Simulates the TransactionManager library bean from components.json. */
 const transactionManagerLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
@@ -71,7 +71,7 @@ const transactionManagerLibraryBean: IRComponentDefinition = {
   },
 };
 
-/** Simulates the TransactionalInterceptor library bean from beans.json. */
+/** Simulates the TransactionalInterceptor library bean from components.json. */
 const transactionalInterceptorLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
@@ -105,7 +105,7 @@ const transactionalInterceptorLibraryBean: IRComponentDefinition = {
   },
 };
 
-/** Simulates the MigrationRunner library bean from beans.json. */
+/** Simulates the MigrationRunner library bean from components.json. */
 const migrationRunnerLibraryBean: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',

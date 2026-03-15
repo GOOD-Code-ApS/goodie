@@ -14,8 +14,8 @@ import { Controller, Get, Response } from '@goodie-ts/http';
 export class ComponentsEndpoint {
   constructor(private readonly context: ApplicationContext) {}
 
-  @Get('/beans')
-  beans() {
+  @Get('/components')
+  components() {
     const definitions = this.context
       .getDefinitions()
       .filter((def) =>
@@ -54,6 +54,6 @@ export class ComponentsEndpoint {
       };
     });
 
-    return Response.ok({ beans });
+    return Response.ok({ components: beans });
   }
 }

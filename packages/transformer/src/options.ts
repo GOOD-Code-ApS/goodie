@@ -38,17 +38,17 @@ export interface TransformOptions {
   configDir?: string;
 }
 
-/** Options for building a library's beans.json manifest. */
+/** Options for building a library's components.json manifest. */
 export interface TransformLibraryOptions {
   /** Path to the tsconfig.json used to create the ts-morph Project. */
   tsConfigFilePath: string;
   /** npm package name (e.g. `'@goodie-ts/health'`). Used in the manifest and to rewrite import paths. */
   packageName: string;
-  /** Absolute path for the generated beans.json file. */
-  beansOutputPath: string;
+  /** Absolute path for the generated components.json file. */
+  componentsOutputPath: string;
   /**
    * Absolute path for the generated TypeScript code file.
-   * When set, library mode emits both beans.json AND generated code
+   * When set, library mode emits both components.json AND generated code
    * (useful for the library's own integration tests).
    */
   codeOutputPath?: string;
@@ -65,12 +65,12 @@ export interface TransformLibraryOptions {
 
 /** Result returned by the library transform pipeline. */
 export interface TransformLibraryResult {
-  /** The serialized beans.json manifest. */
-  manifest: import('./library-components.js').LibraryBeansManifest;
+  /** The serialized components.json manifest. */
+  manifest: import('./library-components.js').LibraryComponentsManifest;
   /** Absolute path where the manifest was written. */
   outputPath: string;
   /** All discovered bean definitions (with rewritten import paths). */
-  beans: import('./ir.js').IRComponentDefinition[];
+  components: import('./ir.js').IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** Generated TypeScript code (only when `codeOutputPath` is set). */
@@ -86,7 +86,7 @@ export interface TransformResult {
   /** Absolute path where the file was written. */
   outputPath: string;
   /** All discovered bean definitions in topological order. */
-  beans: IRComponentDefinition[];
+  components: IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** True when codegen was skipped because the IR hash matched the existing file. */

@@ -37,7 +37,7 @@ Exponential backoff with random jitter (50–100% of computed delay) to prevent 
 
 ## Library Beans
 
-The package ships three singleton interceptor beans in `beans.json` (`RetryInterceptor`, `CircuitBreakerInterceptor`, `TimeoutInterceptor`). AOP decorator config is also included in the manifest's `aop` section. Consumers auto-discover both at build time.
+The package ships three singleton interceptor beans in `components.json` (`RetryInterceptor`, `CircuitBreakerInterceptor`, `TimeoutInterceptor`). AOP decorator config is also included in the manifest's `aop` section. Consumers auto-discover both at build time.
 
 ## Gotchas
 

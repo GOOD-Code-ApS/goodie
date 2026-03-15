@@ -34,7 +34,7 @@ describe('HTTP Controller Metadata', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
@@ -67,7 +67,7 @@ describe('HTTP Controller Metadata', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpCtrl = bean!.metadata.httpController as {
@@ -125,7 +125,7 @@ describe('HTTP Controller Metadata', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpCtrl = bean!.metadata.httpController as {

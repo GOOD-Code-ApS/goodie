@@ -108,12 +108,12 @@ describe('StartupMetrics', () => {
     ]);
 
     const metrics = ctx.getStartupMetrics()!;
-    const beanTimings = metrics.getBeanTimings();
+    const componentTimings = metrics.getComponentTimings();
 
-    expect(beanTimings.has('ServiceA')).toBe(true);
-    expect(beanTimings.has('ServiceB')).toBe(true);
-    expect(beanTimings.get('ServiceA')).toBeTypeOf('number');
-    expect(beanTimings.get('ServiceB')).toBeTypeOf('number');
+    expect(componentTimings.has('ServiceA')).toBe(true);
+    expect(componentTimings.has('ServiceB')).toBe(true);
+    expect(componentTimings.get('ServiceA')).toBeTypeOf('number');
+    expect(componentTimings.get('ServiceB')).toBeTypeOf('number');
 
     consoleSpy.mockRestore();
   });
@@ -127,7 +127,7 @@ describe('StartupMetrics', () => {
     ]);
 
     const metrics = ctx.getStartupMetrics()!;
-    expect(metrics.getBeanTimings().size).toBe(0);
+    expect(metrics.getComponentTimings().size).toBe(0);
 
     consoleSpy.mockRestore();
   });

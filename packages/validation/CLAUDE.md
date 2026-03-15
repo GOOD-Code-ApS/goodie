@@ -43,7 +43,7 @@ This bridges the compile-time type information to runtime, enabling the `Validat
 
 Constraints applied via `v.pipe(schema, ...actions)`. The `Size` constraint maps to `v.minLength()` + `v.maxLength()`.
 
-## Library Beans (beans.json)
+## Library Beans (components.json)
 
 3 singleton beans:
 - **ValiSchemaFactory** — schema builder + cache

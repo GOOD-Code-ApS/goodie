@@ -31,7 +31,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
@@ -52,7 +52,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
@@ -85,7 +85,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
@@ -157,7 +157,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
     );
     expect(bean!.metadata.httpController).toBeUndefined();
@@ -175,7 +175,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -198,7 +198,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -248,7 +248,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -275,7 +275,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -306,7 +306,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -332,7 +332,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -365,7 +365,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -396,7 +396,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -417,7 +417,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -455,7 +455,7 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {
@@ -471,7 +471,7 @@ describe('HTTP Plugin — return type extraction', () => {
     routeIndex = 0,
   ): string {
     const result = createProject(files);
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
     const httpController = bean!.metadata.httpController as {

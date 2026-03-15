@@ -7,13 +7,13 @@ import type {
 import type { IRComponentDefinition } from './ir.js';
 
 /** Manifest format for library-shipped bean definitions. */
-export interface LibraryBeansManifest {
+export interface LibraryComponentsManifest {
   /** Schema version. Currently must be 1. */
   version: number;
   /** npm package name (for diagnostics). */
   package: string;
   /** Serialized IRComponentDefinition[]. */
-  beans: Record<string, unknown>[];
+  components: Record<string, unknown>[];
   /** AOP decorator declarations, keyed by decorator name. */
   aop?: Record<string, AopDecoratorDeclaration>;
 }
@@ -25,14 +25,14 @@ export interface LibraryBeansManifest {
  * - `typeImports` Maps become plain objects
  */
 export function serializeComponents(
-  beans: IRComponentDefinition[],
+  components: IRComponentDefinition[],
   packageName: string,
   aop?: Record<string, AopDecoratorDeclaration>,
-): LibraryBeansManifest {
-  const manifest: LibraryBeansManifest = {
+): LibraryComponentsManifest {
+  const manifest: LibraryComponentsManifest = {
     version: 1,
     package: packageName,
-    beans: beans.map((bean) => serializeBean(bean)),
+    components: components.map((bean) => serializeBean(bean)),
   };
   if (aop && Object.keys(aop).length > 0) {
     manifest.aop = aop;
@@ -98,16 +98,16 @@ function serializeTokenRef(
  * - Converts typeImports plain objects → Maps
  */
 export function deserializeComponents(
-  manifest: LibraryBeansManifest,
+  manifest: LibraryComponentsManifest,
 ): IRComponentDefinition[] {
   if (manifest.version !== 1) {
     throw new Error(
-      `Unsupported beans.json version ${manifest.version} from package "${manifest.package}". ` +
+      `Unsupported components.json version ${manifest.version} from package "${manifest.package}". ` +
         'Expected version 1. Update @goodie-ts/transformer to support this version.',
     );
   }
 
-  return manifest.beans.map((raw) => deserializeBean(raw));
+  return manifest.components.map((raw) => deserializeBean(raw));
 }
 
 function deserializeBean(raw: Record<string, unknown>): IRComponentDefinition {
@@ -196,15 +196,15 @@ function deserializeTokenRef(
   };
 }
 
-/** Result of scanning a single package's beans.json manifest. */
+/** Result of scanning a single package's components.json manifest. */
 export interface ScannedManifest {
   packageName: string;
-  manifest: LibraryBeansManifest;
+  manifest: LibraryComponentsManifest;
 }
 
 /**
  * Scan `node_modules` for packages with `"goodie": { "beans": "..." }` and
- * read their beans.json manifests. Shared by `discoverLibraryComponents` and
+ * read their components.json manifests. Shared by `discoverLibraryComponents` and
  * `discoverAopMappings` to avoid duplicate filesystem scanning.
  */
 function scanLibraryManifests(
@@ -245,18 +245,22 @@ function scanLibraryManifests(
       const packageName = pkgJson.name as string | undefined;
       if (!packageName) continue;
 
-      const goodieField = pkgJson.goodie as { beans?: string } | undefined;
-      if (!goodieField?.beans) continue;
+      const goodieField = pkgJson.goodie as { components?: string } | undefined;
+      if (!goodieField?.components) continue;
 
-      const beansJsonPath = path.resolve(scopeDir, entry, goodieField.beans);
+      const componentsJsonPath = path.resolve(
+        scopeDir,
+        entry,
+        goodieField.components,
+      );
 
       try {
-        const beansRaw = fs.readFileSync(beansJsonPath, 'utf-8');
-        const manifest: LibraryBeansManifest = JSON.parse(beansRaw);
+        const componentsRaw = fs.readFileSync(componentsJsonPath, 'utf-8');
+        const manifest: LibraryComponentsManifest = JSON.parse(componentsRaw);
         results.push({ packageName, manifest });
       } catch (err) {
         console.warn(
-          `[@goodie-ts] Failed to load beans.json from ${scope}/${entry}: ${err instanceof Error ? err.message : String(err)}`,
+          `[@goodie-ts] Failed to load components.json from ${scope}/${entry}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
@@ -270,7 +274,7 @@ function scanLibraryManifests(
  *
  * Scans `node_modules` for packages in the given scopes (default: `['@goodie-ts']`)
  * that declare a `"goodie": { "beans": "..." }` field in their `package.json`.
- * Reads and deserializes each beans.json manifest.
+ * Reads and deserializes each components.json manifest.
  *
  * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
  * @param scanScopes - npm scopes to scan. Defaults to `['@goodie-ts']`.
@@ -306,12 +310,12 @@ export async function discoverLibraryComponents(
  * @param crossPackageDirs - Additional root→packageName mappings for cross-package refs.
  */
 export function rewriteImportPaths(
-  beans: IRComponentDefinition[],
+  components: IRComponentDefinition[],
   packageName: string,
   sourceRoot: string,
   crossPackageDirs?: Map<string, string>,
 ): IRComponentDefinition[] {
-  return beans.map((bean) => ({
+  return components.map((bean) => ({
     ...bean,
     tokenRef: rewriteTokenRefPath(
       bean.tokenRef,
@@ -430,7 +434,7 @@ function rewriteTokenRefPath(
 /**
  * Discover AOP decorator mappings from installed packages.
  *
- * Scans `node_modules` for packages with beans.json manifests and extracts
+ * Scans `node_modules` for packages with components.json manifests and extracts
  * the `aop` section from each.
  *
  * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
@@ -458,7 +462,7 @@ export function discoverAopMappings(
 
 /** Combined result from a single discovery pass. */
 export interface DiscoveryResult {
-  beans: IRComponentDefinition[];
+  components: IRComponentDefinition[];
   aopMappings: ResolvedAopMapping[];
 }
 
@@ -466,7 +470,7 @@ export interface DiscoveryResult {
  * Discover both library beans and AOP mappings in a single filesystem pass.
  *
  * Equivalent to calling `discoverLibraryComponents()` + `discoverAopMappings()`
- * but reads each beans.json only once.
+ * but reads each components.json only once.
  */
 export function discoverLibraryManifests(
   baseDir?: string,
@@ -494,5 +498,5 @@ export function discoverLibraryManifests(
     }
   }
 
-  return { beans, aopMappings };
+  return { components: beans, aopMappings };
 }

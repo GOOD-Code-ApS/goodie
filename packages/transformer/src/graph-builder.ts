@@ -14,7 +14,7 @@ const RESERVED_CONFIG_TOKEN = '__Goodie_Config';
 /** Result of the graph builder stage. */
 export interface GraphResult {
   /** Bean definitions in topological order (dependencies before dependents). */
-  beans: IRComponentDefinition[];
+  components: IRComponentDefinition[];
   warnings: string[];
 }
 
@@ -24,7 +24,7 @@ export interface GraphResult {
  */
 export function buildGraph(resolveResult: ResolveResult): GraphResult {
   const warnings: string[] = [...resolveResult.warnings];
-  const allBeans: IRComponentDefinition[] = [...resolveResult.beans];
+  const allBeans: IRComponentDefinition[] = [...resolveResult.components];
 
   // Guard: no user-defined bean may use the reserved config token name
   for (const bean of allBeans) {
@@ -52,7 +52,7 @@ export function buildGraph(resolveResult: ResolveResult): GraphResult {
   // Topological sort with cycle detection
   const sorted = topoSort(allBeans);
 
-  return { beans: sorted, warnings };
+  return { components: sorted, warnings };
 }
 
 /**

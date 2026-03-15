@@ -46,7 +46,7 @@ describe('Security Plugin', () => {
 
     const result = scan(project, [createSecurityPlugin()]);
 
-    const bean = result.beans.find(
+    const bean = result.components.find(
       (b) => b.classTokenRef.className === 'AdminService',
     )!;
     expect(bean).toBeDefined();

@@ -43,7 +43,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -102,7 +102,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const c = result.beans.find(
+      const c = result.components.find(
         (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'C',
       )!;
       expect(c.constructorDeps).toHaveLength(2);
@@ -128,7 +128,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans[0];
+      const service = result.components[0];
       expect(service.fieldDeps).toHaveLength(1);
       expect(service.fieldDeps[0].fieldName).toBe('repo');
       expect(service.fieldDeps[0].tokenRef).toEqual({
@@ -160,7 +160,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -199,7 +199,7 @@ describe('Resolver', () => {
       });
 
       // @Provides is expanded into a separate bean with factoryKind: 'provides'
-      const providesBeans = result.beans.filter(
+      const providesBeans = result.components.filter(
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans).toHaveLength(1);
@@ -227,7 +227,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const providesBeans = result.beans.filter(
+      const providesBeans = result.components.filter(
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans).toHaveLength(1);
@@ -261,7 +261,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const providesBeans = result.beans.filter(
+      const providesBeans = result.components.filter(
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans).toHaveLength(2);
@@ -292,7 +292,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const providesBeans = result.beans.filter(
+      const providesBeans = result.components.filter(
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans[0].scope).toBe('singleton');
@@ -322,7 +322,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const providesBeans = result.beans.filter(
+      const providesBeans = result.components.filter(
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans).toHaveLength(1);
@@ -358,7 +358,7 @@ describe('Resolver', () => {
       });
 
       // The @Singleton bean itself should NOT have isFactory metadata
-      const configBean = result.beans.find(
+      const configBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'AppConfig' &&
@@ -367,7 +367,7 @@ describe('Resolver', () => {
       expect(configBean.metadata.isFactory).toBeUndefined();
 
       // The @Provides method should still expand into a separate bean
-      const providesBeans = result.beans.filter(
+      const providesBeans = result.components.filter(
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans).toHaveLength(1);
@@ -402,7 +402,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const moduleBeans = result.beans.filter(
+      const moduleBeans = result.components.filter(
         (b) => b.factoryKind === 'constructor' && b.metadata.isFactory,
       );
       expect(moduleBeans).toHaveLength(1);
@@ -429,7 +429,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const bpp = result.beans.find(
+      const bpp = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'LoggingBPP',
       )!;
@@ -449,7 +449,9 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.beans[0].metadata.isComponentPostProcessor).toBeUndefined();
+      expect(
+        result.components[0].metadata.isComponentPostProcessor,
+      ).toBeUndefined();
     });
   });
 
@@ -480,7 +482,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -521,7 +523,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -563,7 +565,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const providesBeans = result.beans.filter(
+      const providesBeans = result.components.filter(
         (b) => b.factoryKind === 'provides',
       );
       expect(providesBeans).toHaveLength(1);
@@ -601,7 +603,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -642,7 +644,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -692,7 +694,7 @@ describe('Resolver', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -718,7 +720,7 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.beans[0].scope).toBe('transient');
+      expect(result.components[0].scope).toBe('transient');
     });
 
     it('should preserve scope from @Singleton', () => {
@@ -733,7 +735,7 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.beans[0].scope).toBe('singleton');
+      expect(result.components[0].scope).toBe('singleton');
     });
 
     it('should preserve @Named qualifier', () => {
@@ -750,7 +752,7 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.beans[0].name).toBe('primary');
+      expect(result.components[0].name).toBe('primary');
     });
 
     it('should preserve @Eager flag', () => {
@@ -767,7 +769,7 @@ describe('Resolver', () => {
         `,
       });
 
-      expect(result.beans[0].eager).toBe(true);
+      expect(result.components[0].eager).toBe(true);
     });
   });
 });

@@ -30,7 +30,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'ProdService',
       );
@@ -51,7 +51,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'FeatureService',
@@ -74,7 +74,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'PgService',
       );
@@ -98,7 +98,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'ConnStringDb',
@@ -123,7 +123,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DbService',
       );
@@ -152,7 +152,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'FallbackService',
@@ -181,7 +181,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'MultiCondService',
@@ -213,11 +213,11 @@ describe('Conditional Plugin — Metadata Recording', () => {
       });
 
       // Both beans should be in the output — runtime will filter
-      const prod = result.beans.find(
+      const prod = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'ProdService',
       );
-      const dev = result.beans.find(
+      const dev = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DevService',
       );

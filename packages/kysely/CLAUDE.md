@@ -7,7 +7,7 @@ Kysely database integration for goodie-ts: abstract `KyselyDatabase` with per-di
 | File | Role |
 |------|------|
 | `src/kysely-database.ts` | `KyselyDatabase` — abstract base class with `kysely` and `supportsReturning` abstract properties |
-| `src/pool-config.ts` | `PoolConfig` — `@ConfigurationProperties('datasource.pool')`, conditional on postgres/mysql |
+| `src/pool-config.ts` | `PoolConfig` — `@Config('datasource.pool')`, conditional on postgres/mysql |
 | `src/dialects/postgres.ts` | `PostgresDatasourceConfig` + `PostgresKyselyDatabase` — `@ConditionalOnProperty('datasource.dialect', { havingValue: 'postgres' })` |
 | `src/dialects/mysql.ts` | `MysqlDatasourceConfig` + `MysqlKyselyDatabase` — conditional on `mysql` |
 | `src/dialects/sqlite.ts` | `SqliteDatasourceConfig` + `SqliteKyselyDatabase` — conditional on `sqlite` |
@@ -18,7 +18,7 @@ Kysely database integration for goodie-ts: abstract `KyselyDatabase` with per-di
 | `src/dialect.ts` | `Dialect` type union and `DIALECTS` array |
 | `src/transaction-manager.ts` | `TransactionManager` — `AsyncLocalStorage`-based transaction propagation, `KyselyProvider` interface |
 | `src/transactional-interceptor.ts` | `TransactionalInterceptor` — AOP interceptor wrapping methods in transactions (order `-40`) |
-| `src/migration-runner.ts` | `MigrationRunner` — runs `@Migration` classes in sorted order via `@PostConstruct` |
+| `src/migration-runner.ts` | `MigrationRunner` — runs `@Migration` classes in sorted order via `@OnInit` |
 | `src/abstract-migration.ts` | `AbstractMigration` — base class with `up(db)` / `down?(db)` |
 | `src/kysely-transformer-plugin.ts` | `createKyselyPlugin()` — wires `TransactionManager` via abstract `KyselyDatabase` token, synthesizes interceptor |
 | `src/decorators/transactional.ts` | `@Transactional({ propagation? })` — `REQUIRED` (default) or `REQUIRES_NEW` |
@@ -28,17 +28,17 @@ Kysely database integration for goodie-ts: abstract `KyselyDatabase` with per-di
 
 Abstract base class — concrete implementations are conditionally selected at build time based on `datasource.dialect`:
 
-- Each dialect has its own `DatasourceConfig` class with `@ConfigurationProperties('datasource')` + `@ConditionalOnProperty`
-- Each dialect has its own `KyselyDatabase` subclass with `@PostConstruct init()` for async driver initialization
+- Each dialect has its own `DatasourceConfig` class with `@Config('datasource')` + `@ConditionalOnProperty`
+- Each dialect has its own `KyselyDatabase` subclass with `@OnInit init()` for async driver initialization
 - `supportsReturning` is an abstract property on `KyselyDatabase`, implemented per dialect
 - `PoolConfig` (`datasource.pool.*`) is only active for pooled dialects (postgres, mysql)
 - D1 is `@RequestScoped` (bindings come from per-request `env`), all others are `@Singleton`
 - Runtime resolves the concrete impl via `baseTokenRefs` on the abstract `KyselyDatabase` token
 
-Non-generic (`Kysely<any>`) by design. For typed access, use `@Module` with `@Provides`:
+Non-generic (`Kysely<any>`) by design. For typed access, use `@Factory` with `@Provides`:
 
 ```typescript
-@Module()
+@Factory()
 class DatabaseModule {
   constructor(private db: KyselyDatabase) {}
 
@@ -56,7 +56,7 @@ class TodoRepository {
 
 ## Per-Dialect Config
 
-Each dialect has a typed config class with `@ConfigurationProperties('datasource')`. Common fields are typed per dialect; the driver validates at init time and errors are wrapped with context.
+Each dialect has a typed config class with `@Config('datasource')`. Common fields are typed per dialect; the driver validates at init time and errors are wrapped with context.
 
 Config via `config/default.json`:
 ```json
@@ -94,11 +94,11 @@ No configuration needed — the plugin discovers `KyselyDatabase` automatically 
 
 ## Migration Ordering
 
-`MigrationRunner` sorts migrations by their `@Migration('name')` string. Convention: prefix with numbers (e.g. `001_create_users`). Runs at startup via `@PostConstruct`.
+`MigrationRunner` sorts migrations by their `@Migration('name')` string. Convention: prefix with numbers (e.g. `001_create_users`). Runs at startup via `@OnInit`.
 
 ## Gotchas
 
-- `KyselyDatabase` is abstract and non-generic — inject for untyped access, or use `@Module` + `@Provides` for typed `Kysely<DB>`
+- `KyselyDatabase` is abstract and non-generic — inject for untyped access, or use `@Factory` + `@Provides` for typed `Kysely<DB>`
 - Concrete dialect selection happens at build time via `@ConditionalOnProperty` — requires `configDir` to be set (e.g. via vite plugin)
 - Test transactions skip nested transactions to avoid Kysely's "already in transaction" error
 - Dialect drivers are optional peer dependencies — only the configured dialect needs to be installed

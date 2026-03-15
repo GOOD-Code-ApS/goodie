@@ -52,8 +52,8 @@ describe('Controller as Plugin-Registered Bean', () => {
       [createControllerPlugin()],
     );
 
-    expect(result.beans).toHaveLength(1);
-    const bean = result.beans[0];
+    expect(result.components).toHaveLength(1);
+    const bean = result.components[0];
     expect(bean.tokenRef).toMatchObject({
       kind: 'class',
       className: 'UserController',
@@ -87,8 +87,8 @@ describe('Controller as Plugin-Registered Bean', () => {
       [createControllerPlugin()],
     );
 
-    expect(result.beans).toHaveLength(2);
-    const names = result.beans.map((b) =>
+    expect(result.components).toHaveLength(2);
+    const names = result.components.map((b) =>
       b.tokenRef.kind === 'class' ? b.tokenRef.className : b.tokenRef.tokenName,
     );
     expect(names.indexOf('UserService')).toBeLessThan(
@@ -122,7 +122,7 @@ describe('Controller as Plugin-Registered Bean', () => {
       [createControllerPlugin()],
     );
 
-    expect(result.beans).toHaveLength(2);
+    expect(result.components).toHaveLength(2);
   });
 
   it('should not produce controller metadata for non-controller classes', () => {
@@ -135,8 +135,8 @@ describe('Controller as Plugin-Registered Bean', () => {
       `,
     });
 
-    expect(result.beans).toHaveLength(1);
-    expect(result.beans[0].metadata.controller).toBeUndefined();
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].metadata.controller).toBeUndefined();
   });
 
   it('should not register @Controller without a plugin', () => {
@@ -153,7 +153,7 @@ describe('Controller as Plugin-Registered Bean', () => {
     });
 
     // Without a plugin calling registerBean, @Controller alone does nothing
-    expect(result.beans).toHaveLength(0);
+    expect(result.components).toHaveLength(0);
   });
 
   it('should throw when @Controller is combined with @Singleton', () => {

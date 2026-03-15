@@ -125,7 +125,7 @@ describe('Health Library Beans', () => {
       libraryBeans,
     );
 
-    const aggregator = findBean(result.beans, 'HealthAggregator');
+    const aggregator = findBean(result.components, 'HealthAggregator');
     expect(aggregator).toBeDefined();
     expect(aggregator!.tokenRef).toEqual({
       kind: 'class',
@@ -172,7 +172,7 @@ describe('Health Library Beans', () => {
       libraryBeans,
     );
 
-    const uptime = findBean(result.beans, 'UptimeHealthIndicator');
+    const uptime = findBean(result.components, 'UptimeHealthIndicator');
     expect(uptime).toBeDefined();
     expect(uptime!.tokenRef).toEqual({
       kind: 'class',
@@ -200,9 +200,11 @@ describe('Health Library Beans', () => {
 
     const result = transformInMemory(project, '/out/AppContext.generated.ts');
 
-    expect(findBean(result.beans, 'HealthAggregator')).toBeUndefined();
-    expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeUndefined();
-    expect(result.beans).toHaveLength(1);
+    expect(findBean(result.components, 'HealthAggregator')).toBeUndefined();
+    expect(
+      findBean(result.components, 'UptimeHealthIndicator'),
+    ).toBeUndefined();
+    expect(result.components).toHaveLength(1);
   });
 
   it('should generate imports for health classes from library beans', () => {
@@ -277,9 +279,9 @@ describe('Health Library Beans', () => {
     );
 
     // DbIndicator + CacheIndicator + UptimeHealthIndicator + HealthAggregator
-    expect(result.beans).toHaveLength(4);
-    expect(findBean(result.beans, 'HealthAggregator')).toBeDefined();
-    expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeDefined();
+    expect(result.components).toHaveLength(4);
+    expect(findBean(result.components, 'HealthAggregator')).toBeDefined();
+    expect(findBean(result.components, 'UptimeHealthIndicator')).toBeDefined();
   });
 
   it('should not create duplicate beans when library beans are present', () => {
@@ -309,12 +311,12 @@ describe('Health Library Beans', () => {
       libraryBeans,
     );
 
-    const uptimeBeans = result.beans.filter(
+    const uptimeBeans = result.components.filter(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UptimeHealthIndicator',
     );
-    const aggregatorBeans = result.beans.filter(
+    const aggregatorBeans = result.components.filter(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'HealthAggregator',

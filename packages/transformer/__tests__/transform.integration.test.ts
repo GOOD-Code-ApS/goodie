@@ -18,7 +18,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
+      expect(result.components).toHaveLength(1);
       expect(result.code).toContain('token: Repo');
       expect(result.code).toContain("scope: 'transient'");
       expect(result.code).toContain('() => new Repo()');
@@ -46,10 +46,10 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(2);
+      expect(result.components).toHaveLength(2);
 
       // Repo before Service (topo order)
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -83,8 +83,8 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(3);
-      const names = result.beans.map((b) =>
+      expect(result.components).toHaveLength(3);
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -111,7 +111,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(3); // AppModule + dbUrl + port
+      expect(result.components).toHaveLength(3); // AppModule + dbUrl + port
       expect(result.code).toContain(
         "export const Db_Url_Token = new InjectionToken<string>('dbUrl')",
       );
@@ -145,7 +145,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(3); // Config + AppModule + dbUrl
+      expect(result.components).toHaveLength(3); // Config + AppModule + dbUrl
       expect(result.code).toContain(
         '(dep0: any, dep1: any) => (dep0 as AppModule).dbUrl(dep1)',
       );
@@ -174,7 +174,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       // DbModule + dbUrl + AppModule
-      expect(result.beans.length).toBeGreaterThanOrEqual(3);
+      expect(result.components.length).toBeGreaterThanOrEqual(3);
       expect(result.code).toContain('DbModule');
       expect(result.code).toContain('Db_Url_Token');
     });
@@ -237,8 +237,8 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(2);
-      const service = result.beans.find(
+      expect(result.components).toHaveLength(2);
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -266,7 +266,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -300,7 +300,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -324,7 +324,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans[0].eager).toBe(true);
+      expect(result.components[0].eager).toBe(true);
       expect(result.code).toContain('eager: true');
     });
   });
@@ -355,7 +355,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -401,7 +401,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       // AppModule + Repository<User> provides bean + Service
-      expect(result.beans.length).toBeGreaterThanOrEqual(3);
+      expect(result.components.length).toBeGreaterThanOrEqual(3);
       expect(result.code).toContain(
         "export const Repository_User_Token = new InjectionToken<Repository<User>>('Repository<User>')",
       );
@@ -498,7 +498,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       // Should not throw MissingProviderError — alias resolves to same canonical token
-      expect(result.beans.length).toBeGreaterThanOrEqual(3);
+      expect(result.components.length).toBeGreaterThanOrEqual(3);
       expect(result.code).toContain(
         "new InjectionToken<Repository<User>>('Repository<User>')",
       );
@@ -540,7 +540,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       // Should resolve to same canonical token even through re-exports
-      expect(result.beans.length).toBeGreaterThanOrEqual(3);
+      expect(result.components.length).toBeGreaterThanOrEqual(3);
       expect(result.code).toContain(
         "new InjectionToken<Repository<User>>('Repository<User>')",
       );
@@ -565,12 +565,12 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      const eagerBean = result.beans.find(
+      const eagerBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'startupService',
       )!;
-      const lazyBean = result.beans.find(
+      const lazyBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'lazyService',
@@ -623,8 +623,8 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].metadata).toEqual({
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].metadata).toEqual({
         onInitMethods: ['init'],
       });
       expect(result.code).toContain('metadata: { onInitMethods: ["init"] }');
@@ -646,7 +646,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans[0].metadata).toEqual({
+      expect(result.components[0].metadata).toEqual({
         onInitMethods: ['initCache', 'loadConfig'],
       });
     });
@@ -667,7 +667,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans[0].metadata).toEqual({
+      expect(result.components[0].metadata).toEqual({
         onInitMethods: ['init'],
         onDestroyMethods: ['shutdown'],
       });
@@ -686,8 +686,8 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].metadata).toEqual({
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].metadata).toEqual({
         isComponentPostProcessor: true,
       });
       expect(result.code).toContain('isComponentPostProcessor: true');
@@ -703,7 +703,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans[0].metadata).toEqual({});
+      expect(result.components[0].metadata).toEqual({});
     });
   });
 
@@ -721,8 +721,8 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].metadata).toEqual({
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].metadata).toEqual({
         onDestroyMethods: ['shutdown'],
       });
       expect(result.code).toContain(
@@ -746,7 +746,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans[0].metadata).toEqual({
+      expect(result.components[0].metadata).toEqual({
         onDestroyMethods: ['closeDb', 'flushCache'],
       });
     });
@@ -761,7 +761,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans[0].metadata).toEqual({});
+      expect(result.components[0].metadata).toEqual({});
       expect(result.code).toContain('metadata: {}');
     });
   });
@@ -786,7 +786,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       expect(result.code).toContain('collection: true');
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -831,7 +831,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       // Should succeed with empty collection
-      expect(result.beans).toHaveLength(1);
+      expect(result.components).toHaveLength(1);
       expect(result.code).toContain('collection: true');
     });
   });
@@ -1035,7 +1035,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       // dbUrl provides string, pgPool takes string → auto-wired
-      expect(result.beans.length).toBeGreaterThanOrEqual(3);
+      expect(result.components.length).toBeGreaterThanOrEqual(3);
       expect(result.code).toContain('Db_Url_Token');
       expect(result.code).toContain('Pg_Pool_Token');
       // pgPool factory should receive the module + dbUrl deps
@@ -1064,7 +1064,7 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       // Two string providers (dbUrl, appName), param name 'appName' matches method name
-      expect(result.beans.length).toBeGreaterThanOrEqual(4);
+      expect(result.components.length).toBeGreaterThanOrEqual(4);
       expect(result.code).toContain('Greeting_Token');
     });
 
@@ -1173,8 +1173,8 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      const bean = result.beans[0];
+      expect(result.components).toHaveLength(1);
+      const bean = result.components[0];
       expect(bean.baseTokenRefs).toHaveLength(1);
       expect(bean.baseTokenRefs![0].className).toBe('HealthIndicator');
 
@@ -1218,8 +1218,8 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(2);
-      for (const bean of result.beans) {
+      expect(result.components).toHaveLength(2);
+      for (const bean of result.components) {
         expect(bean.baseTokenRefs).toHaveLength(1);
         expect(bean.baseTokenRefs![0].className).toBe('HealthIndicator');
       }

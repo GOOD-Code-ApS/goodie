@@ -154,7 +154,7 @@ export async function transform(
   const resolveResult = resolve(scanResult);
 
   // 5. Merge visitor metadata into beans (before afterResolve so plugins can read it)
-  let beans = resolveResult.beans;
+  let beans = resolveResult.components;
   if (scanResult.pluginMetadata) {
     mergePluginMetadata(beans, scanResult.pluginMetadata);
   }
@@ -200,10 +200,10 @@ export async function transform(
       ? options.configDir
       : path.resolve(baseDir, options.configDir)
     : undefined;
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph({ ...resolveResult, components: beans });
 
   // 8. beforeCodegen hook
-  let finalBeans = graphResult.beans;
+  let finalBeans = graphResult.components;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
       finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
@@ -248,7 +248,7 @@ export async function transform(
     return {
       code,
       outputPath: options.outputPath,
-      beans: finalBeans,
+      components: finalBeans,
       warnings: graphResult.warnings,
       skipped: true,
       discoveryCache: discovery,
@@ -275,7 +275,7 @@ export async function transform(
   return {
     code,
     outputPath: options.outputPath,
-    beans: finalBeans,
+    components: finalBeans,
     warnings: graphResult.warnings,
     discoveryCache: discovery,
   };
@@ -322,7 +322,7 @@ export function transformInMemory(
   const resolveResult = resolve(scanResult);
 
   // 4. Merge visitor metadata into beans (before afterResolve so plugins can read it)
-  let beans = resolveResult.beans;
+  let beans = resolveResult.components;
   if (scanResult.pluginMetadata) {
     mergePluginMetadata(beans, scanResult.pluginMetadata);
   }
@@ -354,10 +354,10 @@ export function transformInMemory(
   }
 
   // 6. Build graph (validate + topo sort)
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph({ ...resolveResult, components: beans });
 
   // 7. beforeCodegen hook
-  let finalBeans = graphResult.beans;
+  let finalBeans = graphResult.components;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
       finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
@@ -385,7 +385,7 @@ export function transformInMemory(
   return {
     code,
     outputPath,
-    beans: finalBeans,
+    components: finalBeans,
     warnings: graphResult.warnings,
   };
 }
@@ -394,7 +394,7 @@ export function transformInMemory(
  * Run the transform pipeline in library mode.
  *
  * Scans decorated source, runs the full pipeline (including plugins),
- * then serializes the discovered beans to a `beans.json` manifest instead
+ * then serializes the discovered beans to a `components.json` manifest instead
  * of emitting generated code. Import paths are rewritten to use the
  * bare package specifier.
  *
@@ -452,7 +452,7 @@ export async function transformLibrary(
   const resolveResult = resolve(scanResult);
 
   // 5. Merge visitor metadata
-  let beans = resolveResult.beans;
+  let beans = resolveResult.components;
   if (scanResult.pluginMetadata) {
     mergePluginMetadata(beans, scanResult.pluginMetadata);
   }
@@ -468,10 +468,10 @@ export async function transformLibrary(
 
   // 8. Build graph (validate + topo sort)
   // Conditional rules are evaluated at runtime by ApplicationContext, not at build time.
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph({ ...resolveResult, components: beans });
 
   // 9. beforeCodegen hook (plugins may add synthetic beans)
-  let finalBeans = graphResult.beans;
+  let finalBeans = graphResult.components;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
       finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
@@ -535,19 +535,19 @@ export async function transformLibrary(
     aopDeclarations,
   );
 
-  // 14. Write beans.json
-  const outputDir = path.dirname(options.beansOutputPath);
+  // 14. Write components.json
+  const outputDir = path.dirname(options.componentsOutputPath);
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(
-    options.beansOutputPath,
+    options.componentsOutputPath,
     JSON.stringify(manifest, null, 2),
     'utf-8',
   );
 
   return {
     manifest,
-    outputPath: options.beansOutputPath,
-    beans: rewrittenBeans,
+    outputPath: options.componentsOutputPath,
+    components: rewrittenBeans,
     warnings: graphResult.warnings,
     code,
     codeOutputPath: options.codeOutputPath,
@@ -713,7 +713,7 @@ function mergePluginMetadata(
  * Scans `node_modules/@goodie-ts/` under the library base dir for sibling packages.
  * Returns a map of real directory path → bare package name. This enables
  * `rewriteImportPaths` to convert absolute cross-package references
- * (e.g. `ServerConfig` from `@goodie-ts/hono`) to bare specifiers in `beans.json`.
+ * (e.g. `ServerConfig` from `@goodie-ts/hono`) to bare specifiers in `components.json`.
  */
 function discoverCrossPackageDirs(
   libBaseDir: string,

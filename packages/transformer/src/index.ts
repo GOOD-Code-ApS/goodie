@@ -47,7 +47,7 @@ export type {
 // Library bean discovery
 export type {
   DiscoveryResult,
-  LibraryBeansManifest,
+  LibraryComponentsManifest,
 } from './library-components.js';
 export {
   deserializeComponents,

@@ -16,7 +16,7 @@ import { UnresolvableTypeError } from './transformer-errors.js';
 
 /** Result of the resolver stage. */
 export interface ResolveResult {
-  beans: IRComponentDefinition[];
+  components: IRComponentDefinition[];
   warnings: string[];
 }
 
@@ -48,11 +48,11 @@ export function resolve(scanResult: ScanResult): ResolveResult {
   const warnings: string[] = [...scanResult.warnings];
   const beans: IRComponentDefinition[] = [];
 
-  for (const scanned of scanResult.beans) {
+  for (const scanned of scanResult.components) {
     beans.push(...resolveBean(scanned, warnings));
   }
 
-  return { beans, warnings };
+  return { components: beans, warnings };
 }
 
 function resolveBean(

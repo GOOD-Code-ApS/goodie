@@ -14,7 +14,7 @@ Task scheduling for goodie-ts. `@Scheduled` decorator with compile-time discover
 ## How It Works
 
 1. **Compile time:** The `createSchedulerPlugin()` transformer plugin scans methods for `@Scheduled` decorators via `visitMethod`. It extracts `cron`, `fixedRate`, `fixedDelay`, and `concurrent` from the decorator's object literal argument. The plugin validates at compile time that exactly one scheduling mode is specified and that cron expressions are non-empty. Metadata is stored on the bean's `classMetadata.scheduledMethods` array. In `beforeCodegen`, it synthesizes a `SchedulerService` bean that depends on `ApplicationContext`.
-2. **Runtime:** `SchedulerService` takes `ApplicationContext` as a constructor dep. In `start()` (via `@PostConstruct`), it iterates `ctx.getDefinitions()` looking for beans with `metadata.scheduledMethods`, resolves each bean, and starts the corresponding cron/interval/delay jobs. On shutdown, `stop()` (via `@PreDestroy`) cleans up all timers and awaits in-flight executions.
+2. **Runtime:** `SchedulerService` takes `ApplicationContext` as a constructor dep. In `start()` (via `@OnInit`), it iterates `ctx.getDefinitions()` looking for beans with `metadata.scheduledMethods`, resolves each bean, and starts the corresponding cron/interval/delay jobs. On shutdown, `stop()` (via `@OnDestroy`) cleans up all timers and awaits in-flight executions.
 
 ## Scheduling Modes
 

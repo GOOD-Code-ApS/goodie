@@ -25,10 +25,10 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
     async buildStart() {
       const outcome = await runRebuild(resolved);
       if (outcome.success) {
-        const count = outcome.result.beans.length;
+        const count = outcome.result.components.length;
         const warnings = outcome.result.warnings;
         console.log(
-          `[goodie] Transform complete: ${count} bean(s) registered.`,
+          `[goodie] Transform complete: ${count} component(s) registered.`,
         );
         for (const w of warnings) {
           console.warn(`[goodie] Warning: ${w}`);
@@ -59,9 +59,9 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
         debounceTimer = undefined;
         runRebuild(resolved).then((outcome) => {
           if (outcome.success) {
-            const count = outcome.result.beans.length;
+            const count = outcome.result.components.length;
             console.log(
-              `[goodie] Rebuild complete: ${count} bean(s) registered.`,
+              `[goodie] Rebuild complete: ${count} component(s) registered.`,
             );
             for (const w of outcome.result.warnings) {
               console.warn(`[goodie] Warning: ${w}`);

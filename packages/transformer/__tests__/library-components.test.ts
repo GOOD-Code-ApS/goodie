@@ -7,7 +7,7 @@ import {
   deserializeComponents,
   discoverAopMappings,
   discoverLibraryComponents,
-  type LibraryBeansManifest,
+  type LibraryComponentsManifest,
   rewriteImportPaths,
   serializeComponents,
 } from '../src/library-components.js';
@@ -164,7 +164,7 @@ describe('serializeComponents / deserializeComponents', () => {
     const manifest = serializeComponents(beans, '@acme/lib');
 
     // Verify serialized form has plain object, not Map
-    const serializedToken = manifest.beans[0].tokenRef as Record<
+    const serializedToken = manifest.components[0].tokenRef as Record<
       string,
       unknown
     >;
@@ -208,7 +208,7 @@ describe('serializeComponents / deserializeComponents', () => {
     const manifest = serializeComponents(beans, 'test');
 
     // Verify null in serialized form
-    const serializedToken = manifest.beans[0].tokenRef as Record<
+    const serializedToken = manifest.components[0].tokenRef as Record<
       string,
       unknown
     >;
@@ -226,14 +226,14 @@ describe('serializeComponents / deserializeComponents', () => {
   });
 
   it('should reject unknown version with clear error', () => {
-    const manifest: LibraryBeansManifest = {
+    const manifest: LibraryComponentsManifest = {
       version: 99,
       package: '@acme/lib',
-      beans: [],
+      components: [],
     };
 
     expect(() => deserializeComponents(manifest)).toThrow(
-      'Unsupported beans.json version 99 from package "@acme/lib"',
+      'Unsupported components.json version 99 from package "@acme/lib"',
     );
   });
 
@@ -263,7 +263,7 @@ describe('serializeComponents / deserializeComponents', () => {
 
     const manifest = serializeComponents(beans, '@goodie-ts/logging', aop);
     expect(manifest.aop).toEqual(aop);
-    expect(manifest.beans).toHaveLength(1);
+    expect(manifest.components).toHaveLength(1);
   });
 
   it('should omit aop section when no aop mappings exist', () => {
@@ -307,14 +307,14 @@ describe('discoverLibraryComponents', () => {
       path.join(pkgDir, 'package.json'),
       JSON.stringify({
         name: '@goodie-ts/health',
-        goodie: { beans: 'dist/beans.json' },
+        goodie: { components: 'dist/components.json' },
       }),
     );
 
-    const manifest: LibraryBeansManifest = {
+    const manifest: LibraryComponentsManifest = {
       version: 1,
       package: '@goodie-ts/health',
-      beans: [
+      components: [
         {
           tokenRef: {
             kind: 'class',
@@ -346,7 +346,7 @@ describe('discoverLibraryComponents', () => {
     };
 
     fs.writeFileSync(
-      path.join(pkgDir, 'dist', 'beans.json'),
+      path.join(pkgDir, 'dist', 'components.json'),
       JSON.stringify(manifest),
     );
 
@@ -373,14 +373,14 @@ describe('discoverLibraryComponents', () => {
       path.join(pkgDir, 'package.json'),
       JSON.stringify({
         name: '@acme/my-lib',
-        goodie: { beans: 'dist/beans.json' },
+        goodie: { components: 'dist/components.json' },
       }),
     );
 
-    const manifest: LibraryBeansManifest = {
+    const manifest: LibraryComponentsManifest = {
       version: 1,
       package: '@acme/my-lib',
-      beans: [
+      components: [
         {
           tokenRef: {
             kind: 'class',
@@ -405,7 +405,7 @@ describe('discoverLibraryComponents', () => {
     };
 
     fs.writeFileSync(
-      path.join(pkgDir, 'dist', 'beans.json'),
+      path.join(pkgDir, 'dist', 'components.json'),
       JSON.stringify(manifest),
     );
 
@@ -419,19 +419,22 @@ describe('discoverLibraryComponents', () => {
     });
   });
 
-  it('should warn on malformed beans.json and continue', async () => {
+  it('should warn on malformed components.json and continue', async () => {
     const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'broken');
     fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
     fs.writeFileSync(
       path.join(pkgDir, 'package.json'),
       JSON.stringify({
         name: '@goodie-ts/broken',
-        goodie: { beans: 'dist/beans.json' },
+        goodie: { components: 'dist/components.json' },
       }),
     );
 
     // Write invalid JSON
-    fs.writeFileSync(path.join(pkgDir, 'dist', 'beans.json'), '{ invalid }');
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'components.json'),
+      '{ invalid }',
+    );
 
     const beans = await discoverLibraryComponents(tmpDir);
     expect(beans).toEqual([]);
@@ -455,28 +458,28 @@ describe('discoverAopMappings', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('should discover aop mappings from beans.json manifest', () => {
+  it('should discover aop mappings from components.json manifest', () => {
     const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'logging');
     fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
     fs.writeFileSync(
       path.join(pkgDir, 'package.json'),
       JSON.stringify({
         name: '@goodie-ts/logging',
-        goodie: { beans: 'dist/beans.json' },
+        goodie: { components: 'dist/components.json' },
       }),
     );
 
-    const manifest: LibraryBeansManifest = {
+    const manifest: LibraryComponentsManifest = {
       version: 1,
       package: '@goodie-ts/logging',
-      beans: [],
+      components: [],
       aop: {
         Log: { interceptor: 'LoggingInterceptor', order: -100 },
       },
     };
 
     fs.writeFileSync(
-      path.join(pkgDir, 'dist', 'beans.json'),
+      path.join(pkgDir, 'dist', 'components.json'),
       JSON.stringify(manifest),
     );
 
@@ -508,18 +511,18 @@ describe('discoverAopMappings', () => {
       path.join(pkgDir, 'package.json'),
       JSON.stringify({
         name: '@goodie-ts/health',
-        goodie: { beans: 'dist/beans.json' },
+        goodie: { components: 'dist/components.json' },
       }),
     );
 
-    const manifest: LibraryBeansManifest = {
+    const manifest: LibraryComponentsManifest = {
       version: 1,
       package: '@goodie-ts/health',
-      beans: [],
+      components: [],
     };
 
     fs.writeFileSync(
-      path.join(pkgDir, 'dist', 'beans.json'),
+      path.join(pkgDir, 'dist', 'components.json'),
       JSON.stringify(manifest),
     );
 
@@ -534,14 +537,14 @@ describe('discoverAopMappings', () => {
       path.join(pkgDir, 'package.json'),
       JSON.stringify({
         name: '@goodie-ts/cache',
-        goodie: { beans: 'dist/beans.json' },
+        goodie: { components: 'dist/components.json' },
       }),
     );
 
-    const manifest: LibraryBeansManifest = {
+    const manifest: LibraryComponentsManifest = {
       version: 1,
       package: '@goodie-ts/cache',
-      beans: [],
+      components: [],
       aop: {
         Cacheable: {
           interceptor: 'CacheInterceptor',
@@ -559,7 +562,7 @@ describe('discoverAopMappings', () => {
     };
 
     fs.writeFileSync(
-      path.join(pkgDir, 'dist', 'beans.json'),
+      path.join(pkgDir, 'dist', 'components.json'),
       JSON.stringify(manifest),
     );
 
@@ -569,17 +572,20 @@ describe('discoverAopMappings', () => {
     expect(names).toEqual(['CacheEvict', 'Cacheable']);
   });
 
-  it('should return empty array when beans.json is malformed', () => {
+  it('should return empty array when components.json is malformed', () => {
     const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'broken');
     fs.mkdirSync(path.join(pkgDir, 'dist'), { recursive: true });
     fs.writeFileSync(
       path.join(pkgDir, 'package.json'),
       JSON.stringify({
         name: '@goodie-ts/broken',
-        goodie: { beans: 'dist/beans.json' },
+        goodie: { components: 'dist/components.json' },
       }),
     );
-    fs.writeFileSync(path.join(pkgDir, 'dist', 'beans.json'), '{ invalid }');
+    fs.writeFileSync(
+      path.join(pkgDir, 'dist', 'components.json'),
+      '{ invalid }',
+    );
 
     const mappings = discoverAopMappings(tmpDir);
     expect(mappings).toEqual([]);
@@ -713,7 +719,7 @@ describe('transformLibrary', () => {
     }
   }
 
-  it('should scan decorated source and produce a beans.json manifest', async () => {
+  it('should scan decorated source and produce a components.json manifest', async () => {
     writeFiles({
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
@@ -739,29 +745,29 @@ export class MyService {
       `,
     });
 
-    const beansOutputPath = path.join(tmpDir, 'dist', 'beans.json');
+    const componentsOutputPath = path.join(tmpDir, 'dist', 'components.json');
     const result = await transformLibrary({
       tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
       packageName: '@acme/my-lib',
-      beansOutputPath,
+      componentsOutputPath,
       disablePluginDiscovery: true,
     });
 
     // Should have discovered MyService
-    expect(result.beans).toHaveLength(1);
-    expect(result.beans[0].tokenRef).toEqual({
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].tokenRef).toEqual({
       kind: 'class',
       className: 'MyService',
       importPath: '@acme/my-lib',
     });
-    expect(result.beans[0].sourceLocation.filePath).toBe('@acme/my-lib');
+    expect(result.components[0].sourceLocation.filePath).toBe('@acme/my-lib');
 
     // Manifest should be written to disk
-    expect(fs.existsSync(beansOutputPath)).toBe(true);
-    const written = JSON.parse(fs.readFileSync(beansOutputPath, 'utf-8'));
+    expect(fs.existsSync(componentsOutputPath)).toBe(true);
+    const written = JSON.parse(fs.readFileSync(componentsOutputPath, 'utf-8'));
     expect(written.version).toBe(1);
     expect(written.package).toBe('@acme/my-lib');
-    expect(written.beans).toHaveLength(1);
+    expect(written.components).toHaveLength(1);
   });
 
   it('should rewrite import paths including constructor dep sourceLocations', async () => {
@@ -800,11 +806,11 @@ export class Consumer {
     const result = await transformLibrary({
       tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
       packageName: '@acme/my-lib',
-      beansOutputPath: path.join(tmpDir, 'dist', 'beans.json'),
+      componentsOutputPath: path.join(tmpDir, 'dist', 'components.json'),
       disablePluginDiscovery: true,
     });
 
-    const consumer = result.beans.find(
+    const consumer = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Consumer',
     );
     expect(consumer).toBeDefined();
@@ -852,17 +858,17 @@ export class Service {}
       `,
     });
 
-    const beansOutputPath = path.join(tmpDir, 'dist', 'beans.json');
+    const componentsOutputPath = path.join(tmpDir, 'dist', 'components.json');
     await transformLibrary({
       tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
       packageName: '@acme/lib',
-      beansOutputPath,
+      componentsOutputPath,
       disablePluginDiscovery: true,
     });
 
     // Read manifest from disk and deserialize
-    const manifest: LibraryBeansManifest = JSON.parse(
-      fs.readFileSync(beansOutputPath, 'utf-8'),
+    const manifest: LibraryComponentsManifest = JSON.parse(
+      fs.readFileSync(componentsOutputPath, 'utf-8'),
     );
     const beans = deserializeComponents(manifest);
 
@@ -900,18 +906,18 @@ export class MyService {
       `,
     });
 
-    const beansOutputPath = path.join(tmpDir, 'dist', 'beans.json');
+    const componentsOutputPath = path.join(tmpDir, 'dist', 'components.json');
     const codeOutputPath = path.join(tmpDir, 'src', 'AppContext.generated.ts');
     const result = await transformLibrary({
       tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
       packageName: '@acme/my-lib',
-      beansOutputPath,
+      componentsOutputPath,
       codeOutputPath,
       disablePluginDiscovery: true,
     });
 
-    // beans.json should be written
-    expect(fs.existsSync(beansOutputPath)).toBe(true);
+    // components.json should be written
+    expect(fs.existsSync(componentsOutputPath)).toBe(true);
 
     // Generated code should be written
     expect(fs.existsSync(codeOutputPath)).toBe(true);
@@ -951,7 +957,7 @@ export class Service {}
     const result = await transformLibrary({
       tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
       packageName: '@acme/lib',
-      beansOutputPath: path.join(tmpDir, 'dist', 'beans.json'),
+      componentsOutputPath: path.join(tmpDir, 'dist', 'components.json'),
       disablePluginDiscovery: true,
     });
 
@@ -994,11 +1000,11 @@ export class ImplService extends BaseService {
     const result = await transformLibrary({
       tsConfigFilePath: path.join(tmpDir, 'tsconfig.json'),
       packageName: '@acme/lib',
-      beansOutputPath: path.join(tmpDir, 'dist', 'beans.json'),
+      componentsOutputPath: path.join(tmpDir, 'dist', 'components.json'),
       disablePluginDiscovery: true,
     });
 
-    const impl = result.beans.find(
+    const impl = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'ImplService',
     );

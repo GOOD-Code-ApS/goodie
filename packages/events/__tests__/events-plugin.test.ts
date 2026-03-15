@@ -45,7 +45,7 @@ describe('Events Transformer Plugin', () => {
       `,
     });
 
-    const eventBus = result.beans.find(
+    const eventBus = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
     );
     expect(eventBus).toBeDefined();
@@ -73,7 +73,7 @@ describe('Events Transformer Plugin', () => {
       `,
     });
 
-    const eventBus = result.beans.find(
+    const eventBus = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'EventBus',
     );
     expect(eventBus!.constructorDeps).toHaveLength(1);
@@ -106,7 +106,7 @@ describe('Events Transformer Plugin', () => {
       `,
     });
 
-    const listener = result.beans.find(
+    const listener = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'UserListener',
     );
@@ -148,11 +148,11 @@ describe('Events Transformer Plugin', () => {
       `,
     });
 
-    const listenerA = result.beans.find(
+    const listenerA = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'ListenerA',
     );
-    const listenerB = result.beans.find(
+    const listenerB = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'ListenerB',
     );
@@ -181,7 +181,7 @@ describe('Events Transformer Plugin', () => {
       `,
     });
 
-    const plain = result.beans.find(
+    const plain = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'PlainService',
     );
@@ -249,7 +249,7 @@ describe('Events Transformer Plugin', () => {
     );
 
     const getListener = (r: typeof result1) =>
-      r.beans.find(
+      r.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Listener',
       );

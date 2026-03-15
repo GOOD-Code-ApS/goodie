@@ -26,7 +26,7 @@ describe('runTransform', () => {
     const fakeResult = {
       code: '// generated',
       outputPath: defaultOptions.outputPath,
-      beans: [{ id: 'A' }, { id: 'B' }],
+      components: [{ id: 'A' }, { id: 'B' }],
       warnings: [],
     };
     mockTransform.mockResolvedValue(fakeResult as any);
@@ -44,7 +44,7 @@ describe('runTransform', () => {
     mockTransform.mockResolvedValue({
       code: '',
       outputPath: '',
-      beans: [],
+      components: [],
       warnings: [],
     } as any);
 
@@ -94,7 +94,7 @@ describe('logOutcome', () => {
       result: {
         code: '// generated',
         outputPath: '/project/src/AppContext.generated.ts',
-        beans: [{ id: 'A' }, { id: 'B' }] as any,
+        components: [{ id: 'A' }, { id: 'B' }] as any,
         warnings: [],
       },
       durationMs: 123.456,
@@ -103,7 +103,7 @@ describe('logOutcome', () => {
     logOutcome(outcome);
 
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('2 bean(s) in 123ms'),
+      expect.stringContaining('2 component(s) in 123ms'),
     );
     logSpy.mockRestore();
   });
@@ -117,7 +117,7 @@ describe('logOutcome', () => {
       result: {
         code: '',
         outputPath: '/project/src/out.ts',
-        beans: [] as any,
+        components: [] as any,
         warnings: ['Unused bean: Foo'],
       },
       durationMs: 50,

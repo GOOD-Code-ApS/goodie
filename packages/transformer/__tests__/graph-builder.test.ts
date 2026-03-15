@@ -47,8 +47,10 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].tokenRef).toMatchObject({ className: 'Repo' });
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].tokenRef).toMatchObject({
+        className: 'Repo',
+      });
     });
 
     it('should order dependency before dependent', () => {
@@ -70,8 +72,8 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(2);
-      const names = result.beans.map((b) =>
+      expect(result.components).toHaveLength(2);
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -101,7 +103,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -135,7 +137,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -145,14 +147,14 @@ describe('Graph Builder', () => {
       expect(names).toContain('Service');
 
       // AppConfig should NOT have isFactory metadata
-      const configBean = result.beans.find(
+      const configBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'AppConfig',
       )!;
       expect(configBean.metadata.isFactory).toBeUndefined();
 
       // dbUrl provides bean should have AppConfig as first dep
-      const dbUrlBean = result.beans.find(
+      const dbUrlBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
@@ -175,12 +177,12 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].tokenRef).toMatchObject({
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].tokenRef).toMatchObject({
         className: 'AppModule',
       });
-      expect(result.beans[0].scope).toBe('singleton');
-      expect(result.beans[0].metadata.isFactory).toBe(true);
+      expect(result.components[0].scope).toBe('singleton');
+      expect(result.components[0].metadata.isFactory).toBe(true);
     });
 
     it('should register @Provides methods as beans with module as first dep', () => {
@@ -197,8 +199,8 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(2);
-      const dbUrlBean = result.beans.find(
+      expect(result.components).toHaveLength(2);
+      const dbUrlBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
@@ -225,7 +227,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -253,7 +255,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const dbUrlBean = result.beans.find(
+      const dbUrlBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
@@ -290,7 +292,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -314,7 +316,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
       )!;
@@ -340,11 +342,11 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const defaultBean = result.beans.find(
+      const defaultBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
       )!;
-      const otherBean = result.beans.find(
+      const otherBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'OtherRepo',
       )!;
@@ -375,7 +377,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -508,7 +510,7 @@ describe('Graph Builder', () => {
       });
 
       // Should not throw AmbiguousProviderError
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -533,7 +535,7 @@ describe('Graph Builder', () => {
       });
 
       // Should not throw MissingProviderError for collection dep
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -554,7 +556,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans[0].eager).toBe(true);
+      expect(result.components[0].eager).toBe(true);
     });
   });
 });

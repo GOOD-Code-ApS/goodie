@@ -43,7 +43,7 @@ export class ApplicationContext {
   private readonly asyncInFlight = new Map<Token, Promise<unknown>>();
   private readonly postProcessors: ComponentPostProcessor[] = [];
   /** Names of beans excluded by conditional rules, with reason strings. */
-  private readonly filteredOutBeans = new Map<string, string>();
+  private readonly filteredOutComponents = new Map<string, string>();
   private closed = false;
   private startupMetrics: StartupMetrics | undefined;
 
@@ -116,7 +116,7 @@ export class ApplicationContext {
 
     const ctx = new ApplicationContext(sorted);
     for (const [name, reason] of filteredOut) {
-      ctx.filteredOutBeans.set(name, reason);
+      ctx.filteredOutComponents.set(name, reason);
     }
     ctx.startupMetrics = metrics;
 
@@ -342,7 +342,7 @@ export class ApplicationContext {
 
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1)
-      throw new AggregateError(errors, 'Errors during bean destruction');
+      throw new AggregateError(errors, 'Errors during component destruction');
   }
 
   private assertOpen(): void {
@@ -685,7 +685,7 @@ export class ApplicationContext {
 
   private buildSuggestionHint(name: string): string | undefined {
     // Check if the bean was excluded by a conditional rule
-    const conditionalReason = this.filteredOutBeans.get(name);
+    const conditionalReason = this.filteredOutComponents.get(name);
     if (conditionalReason) {
       return `A bean '${name}' exists but was excluded by: ${conditionalReason}`;
     }

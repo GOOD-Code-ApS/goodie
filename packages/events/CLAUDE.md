@@ -16,7 +16,7 @@ Event publishing and listener support for goodie-ts. `ApplicationEventListener` 
 ## How It Works
 
 1. **Compile time:** The `createEventsPlugin()` transformer plugin detects classes extending `ApplicationEventListener` via `visitClass`. It marks them with `__isEventListener` metadata. In `beforeCodegen`, it adds `baseTokenRefs` pointing to `ApplicationEventListener` (so `getAll()` can discover them) and synthesizes an `EventBus` bean that depends on `ApplicationContext`.
-2. **Runtime:** `EventBus` takes `ApplicationContext` as a constructor dep. In `init()` (via `@PostConstruct`), it calls `ctx.getAllAsync(ApplicationEventListener)` to discover all listener beans, groups them by `eventType`, and sorts by `order`. When `publish(event)` is called, it matches by `event.constructor` identity, filters by `supports()`, then dispatches sequentially.
+2. **Runtime:** `EventBus` takes `ApplicationContext` as a constructor dep. In `init()` (via `@OnInit`), it calls `ctx.getAllAsync(ApplicationEventListener)` to discover all listener beans, groups them by `eventType`, and sorts by `order`. When `publish(event)` is called, it matches by `event.constructor` identity, filters by `supports()`, then dispatches sequentially.
 
 ## Design Decisions
 

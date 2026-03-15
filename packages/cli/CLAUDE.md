@@ -39,7 +39,7 @@ The CLI calls `transform()` directly (full rebuild every time). No `ts-morph` Pr
 - `TransformSuccess` — `{ success: true, result: TransformResult, durationMs: number }`
 - `TransformFailure` — `{ success: false, error: Error }`
 
-`logOutcome()` handles both cases, printing bean count + timing on success, error + hint on failure.
+`logOutcome()` handles both cases, printing component count + timing on success, error + hint on failure.
 
 ## Watch Behavior
 
@@ -50,7 +50,7 @@ The CLI calls `transform()` directly (full rebuild every time). No `ts-morph` Pr
 
 ## Library Mode Warning
 
-When `goodie generate --mode library` succeeds and produces beans (count > 0), the CLI checks whether `package.json` contains a `"goodie": { "beans": "..." }` field. If missing, it prints a warning reminding the user to add it so consumers can discover the library's beans. The warning is silent when the field already exists or when no beans were produced.
+When `goodie generate --mode library` succeeds and produces components (count > 0), the CLI checks whether `package.json` contains a `"goodie": { "components": "..." }` field. If missing, it prints a warning reminding the user to add it so consumers can discover the library's components. The warning is silent when the field already exists or when no components were produced.
 
 ## Gotchas
 

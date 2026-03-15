@@ -28,7 +28,9 @@ function successResult(beanCount: number, warnings: string[] = []) {
     result: {
       code: '// generated',
       outputPath: '/project/src/AppContext.generated.ts',
-      beans: Array.from({ length: beanCount }, (_, i) => ({ id: `Bean${i}` })),
+      components: Array.from({ length: beanCount }, (_, i) => ({
+        id: `Component${i}`,
+      })),
       warnings,
     },
   };
@@ -121,7 +123,7 @@ describe('diPlugin', () => {
       await plugin.buildStart();
 
       expect(console.log).toHaveBeenCalledWith(
-        '[goodie] Transform complete: 5 bean(s) registered.',
+        '[goodie] Transform complete: 5 component(s) registered.',
       );
     });
 
@@ -158,7 +160,7 @@ describe('diPlugin', () => {
 
       expect(mockRunRebuild).toHaveBeenCalledTimes(1);
       expect(console.log).toHaveBeenCalledWith(
-        '[goodie] Rebuild complete: 3 bean(s) registered.',
+        '[goodie] Rebuild complete: 3 component(s) registered.',
       );
     });
 

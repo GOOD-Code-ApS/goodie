@@ -35,7 +35,7 @@ describe('Scheduler Transformer Plugin', () => {
       `,
     });
 
-    const scheduler = result.beans.find(
+    const scheduler = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'SchedulerService',
@@ -56,7 +56,7 @@ describe('Scheduler Transformer Plugin', () => {
       `,
     });
 
-    const scheduler = result.beans.find(
+    const scheduler = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'SchedulerService',
@@ -91,7 +91,7 @@ describe('Scheduler Transformer Plugin', () => {
       `,
     });
 
-    const myTask = result.beans.find(
+    const myTask = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyTask',
     );
     expect(myTask).toBeDefined();
@@ -122,7 +122,7 @@ describe('Scheduler Transformer Plugin', () => {
       `,
     });
 
-    const multiTask = result.beans.find(
+    const multiTask = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'MultiTask',
     );
@@ -166,17 +166,17 @@ describe('Scheduler Transformer Plugin', () => {
       `,
     });
 
-    const taskA = result.beans.find(
+    const taskA = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'TaskA',
     );
-    const taskB = result.beans.find(
+    const taskB = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'TaskB',
     );
     expect(taskA!.metadata.scheduledMethods).toHaveLength(1);
     expect(taskB!.metadata.scheduledMethods).toHaveLength(1);
 
     // SchedulerService should exist with only ApplicationContext dep
-    const scheduler = result.beans.find(
+    const scheduler = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'SchedulerService',
@@ -206,7 +206,7 @@ describe('Scheduler Transformer Plugin', () => {
       `,
     });
 
-    const plain = result.beans.find(
+    const plain = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'PlainService',
     );
@@ -266,7 +266,7 @@ describe('Scheduler Transformer Plugin', () => {
     );
 
     const getTask = (r: typeof result1) =>
-      r.beans.find(
+      r.components.find(
         (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Task',
       );
 

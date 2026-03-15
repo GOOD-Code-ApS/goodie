@@ -28,10 +28,10 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('UserRepo');
-      expect(result.beans[0].scope).toBe('transient');
-      expect(result.beans[0].eager).toBe(false);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('UserRepo');
+      expect(result.components[0].scope).toBe('transient');
+      expect(result.components[0].eager).toBe(false);
     });
 
     it('should discover a @Singleton class', () => {
@@ -49,8 +49,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].scope).toBe('singleton');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].scope).toBe('singleton');
     });
 
     it('should detect @Named qualifier', () => {
@@ -70,8 +70,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].name).toBe('primary');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].name).toBe('primary');
     });
 
     it('should detect @Primary flag', () => {
@@ -91,8 +91,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].primary).toBe(true);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].primary).toBe(true);
     });
 
     it('should default primary to false', () => {
@@ -110,8 +110,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].primary).toBe(false);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].primary).toBe(false);
     });
 
     it('should detect @Eager flag', () => {
@@ -131,8 +131,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].eager).toBe(true);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].eager).toBe(true);
     });
 
     it('should scan constructor parameters', () => {
@@ -159,7 +159,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -188,11 +188,11 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].fieldInjections).toHaveLength(1);
-      expect(result.beans[0].fieldInjections[0].fieldName).toBe('repo');
-      expect(result.beans[0].fieldInjections[0].qualifier).toBe('primary');
-      expect(result.beans[0].fieldInjections[0].optional).toBe(false);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].fieldInjections).toHaveLength(1);
+      expect(result.components[0].fieldInjections[0].fieldName).toBe('repo');
+      expect(result.components[0].fieldInjections[0].qualifier).toBe('primary');
+      expect(result.components[0].fieldInjections[0].optional).toBe(false);
     });
 
     it('should scan @Optional on accessor fields', () => {
@@ -213,10 +213,10 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].fieldInjections).toHaveLength(1);
-      expect(result.beans[0].fieldInjections[0].fieldName).toBe('tracer');
-      expect(result.beans[0].fieldInjections[0].optional).toBe(true);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].fieldInjections).toHaveLength(1);
+      expect(result.components[0].fieldInjections[0].fieldName).toBe('tracer');
+      expect(result.components[0].fieldInjections[0].optional).toBe(true);
     });
   });
 
@@ -236,9 +236,9 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('AppModule');
-      expect(result.beans[0].scope).toBe('singleton');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('AppModule');
+      expect(result.components[0].scope).toBe('singleton');
     });
 
     it('should scan @Provides methods', () => {
@@ -263,7 +263,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       expect(appModule.provides).toHaveLength(2);
@@ -300,7 +300,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       expect(appModule.provides[0].params).toHaveLength(1);
@@ -332,7 +332,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       expect(appModule.provides).toHaveLength(2);
@@ -361,12 +361,12 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('AppConfig');
-      expect(result.beans[0].scope).toBe('singleton');
-      expect(result.beans[0].isFactory).toBe(false);
-      expect(result.beans[0].provides).toHaveLength(1);
-      expect(result.beans[0].provides[0].methodName).toBe('dbUrl');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('AppConfig');
+      expect(result.components[0].scope).toBe('singleton');
+      expect(result.components[0].isFactory).toBe(false);
+      expect(result.components[0].provides).toHaveLength(1);
+      expect(result.components[0].provides[0].methodName).toBe('dbUrl');
     });
 
     it('should scan @Factory as a singleton bean', () => {
@@ -390,8 +390,10 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(2);
-      expect(result.beans.every((b) => b.scope === 'singleton')).toBe(true);
+      expect(result.components).toHaveLength(2);
+      expect(result.components.every((b) => b.scope === 'singleton')).toBe(
+        true,
+      );
     });
   });
 
@@ -423,7 +425,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -463,7 +465,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -501,7 +503,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -534,7 +536,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -568,7 +570,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       const provides = appModule.provides[0];
@@ -600,8 +602,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].onDestroyMethods).toEqual(['shutdown']);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onDestroyMethods).toEqual(['shutdown']);
     });
 
     it('should discover multiple @OnDestroy methods', () => {
@@ -626,8 +628,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].onDestroyMethods).toEqual([
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onDestroyMethods).toEqual([
         'closeConnections',
         'flushBuffers',
       ]);
@@ -648,8 +650,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].onDestroyMethods).toEqual([]);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onDestroyMethods).toEqual([]);
     });
   });
 
@@ -673,8 +675,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].onInitMethods).toEqual(['init']);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onInitMethods).toEqual(['init']);
     });
 
     it('should discover multiple @OnInit methods', () => {
@@ -699,8 +701,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].onInitMethods).toEqual([
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onInitMethods).toEqual([
         'initCache',
         'loadConfig',
       ]);
@@ -721,8 +723,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].onInitMethods).toEqual([]);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onInitMethods).toEqual([]);
     });
   });
 
@@ -744,8 +746,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].isComponentPostProcessor).toBe(true);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].isComponentPostProcessor).toBe(true);
     });
 
     it('should default isComponentPostProcessor to false', () => {
@@ -763,8 +765,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].isComponentPostProcessor).toBe(false);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].isComponentPostProcessor).toBe(false);
     });
   });
 
@@ -815,7 +817,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -847,7 +849,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -878,7 +880,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -905,10 +907,10 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].valueFields).toHaveLength(1);
-      expect(result.beans[0].valueFields[0].fieldName).toBe('dbUrl');
-      expect(result.beans[0].valueFields[0].key).toBe('DB_URL');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].valueFields).toHaveLength(1);
+      expect(result.components[0].valueFields[0].fieldName).toBe('dbUrl');
+      expect(result.components[0].valueFields[0].key).toBe('DB_URL');
     });
 
     it('should discover @Value with default value', () => {
@@ -929,8 +931,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans[0].valueFields[0].key).toBe('PORT');
-      expect(result.beans[0].valueFields[0].defaultValue).toBe('3000');
+      expect(result.components[0].valueFields[0].key).toBe('PORT');
+      expect(result.components[0].valueFields[0].defaultValue).toBe('3000');
     });
 
     it('should throw InvalidDecoratorUsageError for @Value on non-accessor property', () => {
@@ -987,7 +989,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans[0].valueFields).toEqual([]);
+      expect(result.components[0].valueFields).toEqual([]);
     });
   });
 
@@ -1086,8 +1088,8 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('ConcreteRepo');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('ConcreteRepo');
     });
   });
 
@@ -1114,7 +1116,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const bean = result.beans.find(
+      const bean = result.components.find(
         (b) => b.classTokenRef.className === 'UptimeIndicator',
       )!;
 
@@ -1138,7 +1140,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      expect(result.beans[0].baseClasses).toEqual([]);
+      expect(result.components[0].baseClasses).toEqual([]);
     });
 
     it('should extract base class when both parent and child are decorated', () => {
@@ -1162,7 +1164,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const userRepo = result.beans.find(
+      const userRepo = result.components.find(
         (b) => b.classTokenRef.className === 'UserRepo',
       )!;
 
@@ -1201,7 +1203,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(3);
+      expect(result.components).toHaveLength(3);
     });
 
     it('should ignore classes without decorators', () => {
@@ -1222,8 +1224,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('Decorated');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('Decorated');
     });
   });
 });

@@ -1,6 +1,6 @@
 # @goodie-ts/transformer
 
-Compile-time scanning, type resolution, and code generation. Turns decorated TypeScript source into a generated `BeanDefinition[]` file.
+Compile-time scanning, type resolution, and code generation. Turns decorated TypeScript source into a generated `ComponentDefinition[]` file.
 
 ## Pipeline
 
@@ -13,7 +13,7 @@ Scanner → Resolver → GraphBuilder → Codegen
 | Scanner | `src/scanner.ts` | ts-morph `Project` → `ScanResult` (AST-level beans) |
 | Resolver | `src/resolver.ts` | `ScanResult` → `ResolveResult` (typed IR with TokenRefs) |
 | GraphBuilder | `src/graph-builder.ts` | `ResolveResult` → `GraphResult` (validated, topo-sorted) |
-| Codegen | `src/codegen.ts` | `IRBeanDefinition[]` → generated TypeScript string |
+| Codegen | `src/codegen.ts` | `IRComponentDefinition[]` → generated TypeScript string |
 
 Entry points: `transform(options)` for file-based, `transformInMemory(project, outputPath, options?)` for tests.
 
@@ -27,14 +27,14 @@ When `configDir` is set, the transformer reads JSON config files at build time a
 
 | File | Role |
 |------|------|
-| `src/ir.ts` | IR types: `IRBeanDefinition`, `TokenRef`, `IRDependency`, `IRProvides`, etc. |
+| `src/ir.ts` | IR types: `IRComponentDefinition`, `TokenRef`, `IRDependency`, `IRProvides`, etc. |
 | `src/transform.ts` | `transform()`, `transformInMemory()`, and `transformLibrary()` orchestrators |
 | `src/aop-scanner.ts` | `scanAopDecoratorDefinitions()` — scans `createAopDecorator<{...}>()` calls, extracts config from type parameters via type checker |
 | `src/aop-plugin.ts` | `createDeclarativeAopPlugin()` — generic AOP plugin driven by `AopDecoratorDeclaration` mappings |
 | `src/builtin-aop-plugin.ts` | `createAopPlugin()` — built-in plugin scanning `@Around/@Before/@After` decorators |
-| `src/builtin-config-plugin.ts` | `createConfigPlugin()` — built-in plugin reading introspection metadata for `@ConfigurationProperties` |
+| `src/builtin-config-plugin.ts` | `createConfigPlugin()` — built-in plugin reading introspection metadata for `@Config` |
 | `src/builtin-introspection-plugin.ts` | `createIntrospectionPlugin()` — built-in plugin scanning `@Introspected`, extracting field types and decorator metadata |
-| `src/library-beans.ts` | `serializeBeans()`, `deserializeBeans()`, `discoverLibraryBeans()`, `discoverAopMappings()` |
+| `src/library-components.ts` | `serializeComponents()`, `deserializeComponents()`, `discoverLibraryComponents()`, `discoverAopMappings()` |
 | `src/discover-plugins.ts` | `discoverAll()` — single-pass plugin + library manifest discovery from `node_modules` |
 | `src/transformer-errors.ts` | `TransformerError` subclasses with source locations |
 
@@ -42,7 +42,7 @@ When `configDir` is set, the transformer reads JSON config files at build time a
 
 - **`TokenRef`** — union: `ClassTokenRef { kind: 'class', className, importPath }` or `InjectionTokenRef { kind: 'injection-token', tokenName, importPath?, typeAnnotation?, typeImports? }`
 - **`IRDecoratorEntry`** — `{ name: string, importPath: string }` — a decorator recorded on a class or method
-- **`IRBeanDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, decorators, methodDecorators, metadata, sourceLocation
+- **`IRComponentDefinition`** — full bean: token, scope, eager, name, constructorDeps, fieldDeps, factoryKind, providesSource, decorators, methodDecorators, metadata, sourceLocation
 - **`IRDependency`** / **`IRFieldInjection`** — dependency descriptors
 - **`IRProvides`** — module factory method descriptor (used during resolver expansion)
 
@@ -59,7 +59,7 @@ Plugins can register classes as beans via `ctx.registerBean({ scope })` in their
 - **Imports**: type-only imports (`import type`) for types used only in generics
 - **Factory patterns**: constructor → `new Cls(dep0, dep1)`, provides → `(dep0 as Module).method(dep1)`
 - **Field injection**: factory body creates instance, assigns fields, returns instance
-- **Module metadata**: `{ isModule: true }` on module bean definitions
+- **Module metadata**: `{ isFactory: true }` on module bean definitions
 
 ## Plugin System
 
@@ -69,14 +69,14 @@ External packages can extend the transformer via the `TransformerPlugin` interfa
 - `afterResolve(beans)` — post-resolution hook, can filter/mutate IR beans
 - `beforeCodegen(beans)` — pre-codegen hook, can inject synthetic beans
 
-Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, introspection, config, conditional) are always active — introspection runs before config since `@ConfigurationProperties` implies `@Introspected`.
+Plugins are auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json. Built-in plugins (AOP, introspection, config, conditional) are always active — introspection runs before config since `@Config` implies `@Introspected`.
 
 ## Introspection Plugin
 
-The built-in introspection plugin scans `@Introspected()` and `@ConfigurationProperties()` classes and generates `MetadataRegistry` registration code. Key points:
+The built-in introspection plugin scans `@Introspected()` and `@Config()` classes and generates `MetadataRegistry` registration code. Key points:
 
 - **NOT beans** — `@Introspected` classes are value objects (DTOs, request/response types). The plugin does NOT call `ctx.registerBean()`.
-- **`@ConfigurationProperties` implies `@Introspected`** — config classes are automatically introspected. The config plugin reads field metadata from `ctx.metadata.introspectedFields` rather than doing its own AST scanning.
+- **`@Config` implies `@Introspected`** — config classes are automatically introspected. The config plugin reads field metadata from `ctx.metadata.introspectedFields` rather than doing its own AST scanning.
 - **Inter-plugin metadata sharing** — stores scanned fields in `ctx.metadata.introspectedFields` so downstream plugins (e.g. config) can consume the data without duplicating scanning logic.
 - **Field type resolution** — builds a recursive `FieldType` tree: primitive, literal, array, reference, union, optional, nullable. Handles `boolean` correctly (ts-morph represents it as `false | true` union).
 - **Generic decorator metadata** — records ALL field decorators as `DecoratorMeta { name, args }`. The plugin doesn't interpret decorators — downstream consumers (validation, OpenAPI) do.
@@ -89,7 +89,7 @@ The built-in introspection plugin scans `@Introspected()` and `@ConfigurationPro
 - Resolves `@Named()` qualifiers to match `@Inject('name')`
 - Topological sort for dependency ordering
 - Note: `@Provides` expansion now happens in the resolver stage, not the graph builder
-- Conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) pass through unfiltered — the conditional plugin records rules in `metadata.conditionalRules`, but evaluation happens at runtime in `ApplicationContext.create()`
+- Conditional beans (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissing`) pass through unfiltered — the conditional plugin records rules in `metadata.conditionalRules`, but evaluation happens at runtime in `ApplicationContext.create()`
 
 ## Library Import Path Reconciliation
 
@@ -100,12 +100,12 @@ Library beans use bare package specifiers (`@goodie-ts/kysely`) in their tokenRe
 
 ## Library Mode (`transformLibrary`)
 
-`transformLibrary()` scans library source, runs the full pipeline, then serializes all beans (including conditional ones) to `beans.json`. Conditional filtering is deferred to the consumer's `ApplicationContext` at runtime. It also:
+`transformLibrary()` scans library source, runs the full pipeline, then serializes all beans (including conditional ones) to `components.json`. Conditional filtering is deferred to the consumer's `ApplicationContext` at runtime. It also:
 1. Runs `scanAopDecoratorDefinitions()` to find `createAopDecorator<{...}>()` calls
 2. Extracts AOP config from type parameters (interceptor class, order, metadata, argMapping, defaults)
 3. Includes the config in the manifest's `aop` section
 
-Consumers discover AOP mappings via `discoverAopMappings()`, which reads beans.json manifests (not package.json).
+Consumers discover AOP mappings via `discoverAopMappings()`, which reads components.json manifests (not package.json).
 
 ## Performance Optimizations
 

@@ -113,7 +113,7 @@ export interface IRComponentDefinition {
   baseTokenRefs?: ClassTokenRef[];
   /** Decorators found on this class (for DecoratorMetadata queries).
    * Optional because beans from @Provides methods or library beans without
-   * decorators don't have any — omitted to keep serialized beans.json compact. */
+   * decorators don't have any — omitted to keep serialized components.json compact. */
   decorators?: IRDecoratorEntry[];
   /** Decorators found on methods, keyed by method name.
    * Optional for the same reason as `decorators` — most beans have no

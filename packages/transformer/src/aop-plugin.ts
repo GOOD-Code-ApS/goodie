@@ -272,7 +272,7 @@ export function createDeclarativeAopPlugin(
         bean.metadata.interceptedMethods = existing;
       }
 
-      // No synthetic beans — library beans.json already contains them
+      // No synthetic beans — library components.json already contains them
       return beans;
     },
   };

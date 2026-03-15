@@ -57,13 +57,13 @@ describe('ComponentsEndpoint', () => {
     ]);
 
     const endpoint = new ComponentsEndpoint(ctx);
-    const result = endpoint.beans();
+    const result = endpoint.components();
 
     expect(result).toBeInstanceOf(Response);
     expect(result.status).toBe(200);
 
     const body = result.body as {
-      beans: Array<{
+      components: Array<{
         token: string;
         scope: string;
         eager: boolean;
@@ -75,18 +75,18 @@ describe('ComponentsEndpoint', () => {
         conditional: unknown;
       }>;
     };
-    expect(body.beans).toHaveLength(2);
+    expect(body.components).toHaveLength(2);
 
-    expect(body.beans[0].token).toBe('TodoService');
-    expect(body.beans[0].scope).toBe('singleton');
-    expect(body.beans[0].eager).toBe(false);
-    expect(body.beans[0].dependencies).toEqual([
+    expect(body.components[0].token).toBe('TodoService');
+    expect(body.components[0].scope).toBe('singleton');
+    expect(body.components[0].eager).toBe(false);
+    expect(body.components[0].dependencies).toEqual([
       { token: 'TodoRepository', optional: false, collection: false },
     ]);
-    expect(body.beans[0].conditional).toBeNull();
+    expect(body.components[0].conditional).toBeNull();
 
-    expect(body.beans[1].token).toBe('TodoRepository');
-    expect(body.beans[1].dependencies).toEqual([]);
+    expect(body.components[1].token).toBe('TodoRepository');
+    expect(body.components[1].dependencies).toEqual([]);
   });
 
   it('includes conditional rules when present', () => {
@@ -98,10 +98,10 @@ describe('ComponentsEndpoint', () => {
     ]);
 
     const endpoint = new ComponentsEndpoint(ctx);
-    const result = endpoint.beans();
+    const result = endpoint.components();
 
     const body = result.body as { beans: Array<{ conditional: unknown }> };
-    expect(body.beans[0].conditional).toEqual(rules);
+    expect(body.components[0].conditional).toEqual(rules);
   });
 
   it('filters out internal framework beans', () => {
@@ -134,11 +134,11 @@ describe('ComponentsEndpoint', () => {
     ]);
 
     const endpoint = new ComponentsEndpoint(ctx);
-    const result = endpoint.beans();
+    const result = endpoint.components();
 
     const body = result.body as { beans: Array<{ token: string }> };
-    expect(body.beans).toHaveLength(1);
-    expect(body.beans[0].token).toBe('TodoService');
+    expect(body.components).toHaveLength(1);
+    expect(body.components[0].token).toBe('TodoService');
   });
 
   it('shows eager status', () => {
@@ -147,9 +147,9 @@ describe('ComponentsEndpoint', () => {
     ]);
 
     const endpoint = new ComponentsEndpoint(ctx);
-    const result = endpoint.beans();
+    const result = endpoint.components();
 
     const body = result.body as { beans: Array<{ eager: boolean }> };
-    expect(body.beans[0].eager).toBe(true);
+    expect(body.components[0].eager).toBe(true);
   });
 });

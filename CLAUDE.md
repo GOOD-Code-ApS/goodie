@@ -8,7 +8,7 @@ Build-time validated application framework for TypeScript. No reflection, no run
 Decorators (user code) → Transformer (compile-time) → Generated code → Runtime (ApplicationContext)
 ```
 
-The transformer uses ts-morph to scan decorated classes at build time, producing a generated file with typed `BeanDefinition[]` and factory functions. At runtime, `ApplicationContext` resolves the dependency graph — no reflect-metadata needed.
+The transformer uses ts-morph to scan decorated classes at build time, producing a generated file with typed `ComponentDefinition[]` and factory functions. At runtime, `ApplicationContext` resolves the dependency graph — no reflect-metadata needed.
 
 ## Package Dependency Graph
 
@@ -44,7 +44,7 @@ pnpm clean          # Clean all dist/
 
 | Package | Purpose |
 |---------|---------|
-| `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), BeanDefinition, InjectionToken, topoSort, `OnStart` lifecycle, `@Order()` |
+| `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), ComponentDefinition, InjectionToken, topoSort, `OnStart` lifecycle, `@Order()` |
 | `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config + introspection plugins. Framework-agnostic — no HTTP knowledge. |
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |

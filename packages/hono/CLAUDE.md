@@ -8,13 +8,13 @@ Hono adapter for goodie-ts. Thin I/O bridge between `@goodie-ts/http`'s generic 
 |------|------|
 | `src/hono-server-bootstrap.ts` | `HonoServerBootstrap` — `@Singleton` library bean extending `AbstractServerBootstrap`, creates Hono router and starts `EmbeddedServer` on `onStart()` |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
-| `src/server-config.ts` | `ServerConfig` — `@ConfigurationProperties('server')` bean with `host`, `port`, `runtime`, `cors` |
+| `src/server-config.ts` | `ServerConfig` — `@Config('server')` bean with `host`, `port`, `runtime`, `cors` |
 | `src/router-helpers.ts` | Runtime helpers (`toHonoResponse`, `toHonoErrorResponse`, `buildHttpContext`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
 | `src/index.ts` | Public exports — adapter-specific beans and helpers only (no decorator re-exports) |
 
 ## HonoServerBootstrap
 
-`HonoServerBootstrap` is a library bean (in `beans.json`) that extends `AbstractServerBootstrap` (from `@goodie-ts/http`) which extends `OnStart` (from `@goodie-ts/core`). It is discovered at runtime via the `baseTokens` mechanism.
+`HonoServerBootstrap` is a library bean (in `components.json`) that extends `AbstractServerBootstrap` (from `@goodie-ts/http`) which extends `OnStart` (from `@goodie-ts/core`). It is discovered at runtime via the `baseTokens` mechanism.
 
 - **`@ConditionalOnProperty('server.runtime', { havingValue: ['node', 'bun', 'deno'] })`** — excluded on Cloudflare Workers (serverless deployments call `createHonoRouter(ctx)` directly)
 - **`onStart(ctx)`** — calls `createHonoRouter(ctx)` to build the Hono app, then `embeddedServer.listen(router)` to start serving
@@ -86,10 +86,10 @@ function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])
 
 `handleException` throws `MappedException` if a handler matches — caught by `.onError()` on the router chain and translated via `toHonoErrorResponse`. This keeps the catch block throw-only, preserving RPC type inference.
 
-## Library Beans (beans.json)
+## Library Beans (components.json)
 
 3 singleton beans:
-- **ServerConfig** — `@ConfigurationProperties('server')` with host/port/runtime/cors
+- **ServerConfig** — `@Config('server')` with host/port/runtime/cors
 - **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`
 - **HonoServerBootstrap** — extends `AbstractServerBootstrap → OnStart`, conditional on `server.runtime` being `node`/`bun`/`deno`, depends on `EmbeddedServer`
 

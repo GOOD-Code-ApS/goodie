@@ -14,7 +14,7 @@ In-memory caching for goodie-ts via `@Cacheable`, `@CacheEvict`, and `@CachePut`
 
 ## How It Works
 
-1. **Compile time:** Cache decorators are defined via `createAopDecorator()` with AOP config in the type parameter. The transformer's AOP scanner extracts config and includes it in `beans.json`. The declarative AOP plugin parses decorator args at consumer build time using `argMapping` and `metadata`.
+1. **Compile time:** Cache decorators are defined via `createAopDecorator()` with AOP config in the type parameter. The transformer's AOP scanner extracts config and includes it in `components.json`. The declarative AOP plugin parses decorator args at consumer build time using `argMapping` and `metadata`.
 2. **Runtime:** `CacheInterceptor` reads `ctx.metadata` to determine the action. Cache keys are `className#methodName:arg1,arg2,...`.
 
 ## Cache Key Strategy
@@ -27,11 +27,11 @@ Keys include the class name to avoid collisions across classes: `ClassName#metho
 
 ## Library Beans
 
-The package ships two beans in `beans.json`:
+The package ships two beans in `components.json`:
 - `CacheManager` (singleton) — the cache store
 - `CacheInterceptor` (singleton, depends on `CacheManager`) — the AOP interceptor
 
-Consumers auto-discover them at build time via `discoverLibraryBeans()`.
+Consumers auto-discover them at build time via `discoverLibraryComponents()`.
 
 ## Gotchas
 

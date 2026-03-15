@@ -179,8 +179,8 @@ describe('TransformerPlugin API', () => {
       );
       // If metadata wasn't merged before afterResolve, the filter would
       // remove all beans and the result would be empty
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].metadata.myTag).toBe('tagged');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].metadata.myTag).toBe('tagged');
     });
 
     it('can mutate IR bean metadata', () => {
@@ -207,7 +207,7 @@ describe('TransformerPlugin API', () => {
         '/out/AppContext.generated.ts',
         [plugin],
       );
-      expect(result.beans[0].metadata.customFlag).toBe(true);
+      expect(result.components[0].metadata.customFlag).toBe(true);
       expect(result.code).toContain('customFlag: true');
     });
   });
@@ -256,7 +256,7 @@ describe('TransformerPlugin API', () => {
         [plugin],
       );
       // The synthetic bean should appear in the final beans list
-      expect(result.beans.some((b) => b.metadata.synthetic === true)).toBe(
+      expect(result.components.some((b) => b.metadata.synthetic === true)).toBe(
         true,
       );
       // The generated code should reference the synthetic bean's class
@@ -357,7 +357,7 @@ describe('TransformerPlugin API', () => {
         [noopPlugin],
       );
 
-      expect(withPlugin.beans).toHaveLength(baseline.beans.length);
+      expect(withPlugin.components).toHaveLength(baseline.components.length);
       // Warnings count should match
       expect(withPlugin.warnings).toHaveLength(baseline.warnings.length);
     });
@@ -385,7 +385,7 @@ describe('TransformerPlugin API', () => {
         '/out/AppContext.generated.ts',
         [plugin],
       );
-      const serviceBean = result.beans.find(
+      const serviceBean = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       );
@@ -420,7 +420,7 @@ describe('TransformerPlugin API', () => {
         [plugin],
       );
 
-      const serviceBeans = result.beans.filter(
+      const serviceBeans = result.components.filter(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       );
@@ -510,7 +510,7 @@ describe('TransformerPlugin API', () => {
         '/out/AppContext.generated.ts',
         [plugin],
       );
-      const beanNames = result.beans.map((b) =>
+      const beanNames = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,

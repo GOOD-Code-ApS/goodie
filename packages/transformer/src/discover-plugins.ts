@@ -1,12 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { LibraryBeansManifest } from './library-components.js';
+import type { LibraryComponentsManifest } from './library-components.js';
 import type { TransformerPlugin } from './options.js';
 
 /** Result of a combined discovery pass (plugins + library manifests). */
 export interface DiscoverAllResult {
   plugins: TransformerPlugin[];
-  manifests: Array<{ packageName: string; manifest: LibraryBeansManifest }>;
+  manifests: Array<{
+    packageName: string;
+    manifest: LibraryComponentsManifest;
+  }>;
   /** Maps resolved real directory path → bare package name for each discovered library package. */
   packageDirs: Map<string, string>;
 }
@@ -17,7 +20,7 @@ export interface DiscoverAllResult {
  *
  * For each package in `node_modules` within the given scopes:
  * - If `"goodie": { "plugin": "..." }` exists → load and call the plugin factory
- * - If `"goodie": { "beans": "..." }` exists → read the beans.json manifest
+ * - If `"goodie": { "beans": "..." }` exists → read the components.json manifest
  *
  * @param baseDir - Directory to resolve `node_modules` from. Defaults to `process.cwd()`.
  * @param scanScopes - npm scopes to scan. Defaults to `['@goodie-ts']`.
@@ -60,7 +63,7 @@ export async function discoverAll(
       }
 
       const goodieField = pkgJson.goodie as
-        | { plugin?: string; beans?: string }
+        | { plugin?: string; components?: string }
         | undefined;
       if (!goodieField) continue;
 
@@ -101,17 +104,21 @@ export async function discoverAll(
       }
 
       // Library manifest discovery
-      if (goodieField.beans) {
+      if (goodieField.components) {
         if (!packageName) continue;
 
-        const beansJsonPath = path.resolve(scopeDir, entry, goodieField.beans);
+        const componentsJsonPath = path.resolve(
+          scopeDir,
+          entry,
+          goodieField.components,
+        );
         try {
-          const beansRaw = fs.readFileSync(beansJsonPath, 'utf-8');
-          const manifest: LibraryBeansManifest = JSON.parse(beansRaw);
+          const componentsRaw = fs.readFileSync(componentsJsonPath, 'utf-8');
+          const manifest: LibraryComponentsManifest = JSON.parse(componentsRaw);
           manifests.push({ packageName, manifest });
         } catch (err) {
           console.warn(
-            `[@goodie-ts] Failed to load beans.json from ${scope}/${entry}: ${err instanceof Error ? err.message : String(err)}`,
+            `[@goodie-ts] Failed to load components.json from ${scope}/${entry}: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
       }

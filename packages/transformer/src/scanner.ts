@@ -161,7 +161,7 @@ export interface ScannedProvides {
 
 /** Result of scanning source files. */
 export interface ScanResult {
-  beans: ScannedBean[];
+  components: ScannedBean[];
   warnings: string[];
   /** Plugin-accumulated class metadata, keyed by "filePath:className". Only populated when plugins with visitor hooks are provided. */
   pluginMetadata?: Map<string, Record<string, unknown>>;
@@ -332,7 +332,7 @@ export function scan(
   }
 
   return {
-    beans,
+    components: beans,
     warnings,
     ...(hasVisitors ? { pluginMetadata } : {}),
   };
