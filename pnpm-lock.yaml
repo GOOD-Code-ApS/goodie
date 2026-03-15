@@ -185,10 +185,10 @@ importers:
   packages/hono:
     dependencies:
       '@hono/node-server':
-        specifier: '>=1.0.0'
+        specifier: ^1.0.0
         version: 1.19.9(hono@4.12.2)
       hono:
-        specifier: '>=4.0.0'
+        specifier: ^4.0.0
         version: 4.12.2
     devDependencies:
       '@goodie-ts/cli':
