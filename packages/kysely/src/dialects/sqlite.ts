@@ -1,6 +1,7 @@
 import {
   ConditionalOnProperty,
   Config,
+  Eager,
   OnDestroy,
   OnInit,
   Singleton,
@@ -18,6 +19,7 @@ export class SqliteDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'sqlite' })
 export class SqliteKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;

@@ -1,6 +1,7 @@
 import {
   ConditionalOnProperty,
   Config,
+  Eager,
   OnDestroy,
   OnInit,
   Singleton,
@@ -24,6 +25,7 @@ export class MysqlDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'mysql' })
 export class MysqlKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;

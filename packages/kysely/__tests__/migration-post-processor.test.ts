@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AbstractMigration } from '../src/abstract-migration.js';
 import { Migration } from '../src/decorators/migration.js';
-import { MigrationRunner } from '../src/migration-runner.js';
+import { KyselyDatabase } from '../src/kysely-database.js';
+import { MigrationPostProcessor } from '../src/migration-post-processor.js';
 
 // Mock the Migrator class from kysely
 vi.mock('kysely', () => ({
@@ -10,8 +11,16 @@ vi.mock('kysely', () => ({
 
 import { Migrator } from 'kysely';
 
-function createMockKyselyProvider() {
-  return { kysely: { __brand: 'mock-kysely' } as any };
+/** Create a mock KyselyDatabase instance. */
+function createMockKyselyDatabase() {
+  const mock = Object.create(KyselyDatabase.prototype);
+  mock.kysely = { __brand: 'mock-kysely' } as any;
+  return mock as KyselyDatabase;
+}
+
+/** Create a mock ApplicationContext with getAll returning the given migrations. */
+function createMockContext(migrations: AbstractMigration[]) {
+  return { getAll: vi.fn().mockReturnValue(migrations) } as any;
 }
 
 /** Create a migration class extending AbstractMigration with @Migration decorator applied. */
@@ -24,23 +33,29 @@ function createMigrationClass(name: string) {
   return new TestMigration();
 }
 
-describe('MigrationRunner', () => {
-  it('should call migrateToLatest with all migration instances', async () => {
+const dummyDef = {} as any;
+
+describe('MigrationPostProcessor', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should run migrations when KyselyDatabase is initialized', async () => {
     const migrateToLatest = vi.fn().mockResolvedValue({ results: [] });
     vi.mocked(Migrator).mockImplementation(() => ({ migrateToLatest }) as any);
 
-    const provider = createMockKyselyProvider();
+    const db = createMockKyselyDatabase();
     const migration1 = createMigrationClass('001_create_users');
     const migration2 = createMigrationClass('002_create_todos');
+    const ctx = createMockContext([migration1, migration2]);
 
-    const runner = new MigrationRunner(provider as any, [
-      migration1,
-      migration2,
-    ]);
-    await runner.migrate();
+    const processor = new MigrationPostProcessor(ctx);
+    const result = await processor.afterInit(db, dummyDef);
 
+    expect(result).toBe(db);
+    expect(ctx.getAll).toHaveBeenCalledWith(AbstractMigration);
     expect(Migrator).toHaveBeenCalledWith({
-      db: provider.kysely,
+      db: db.kysely,
       provider: { getMigrations: expect.any(Function) },
     });
     expect(migrateToLatest).toHaveBeenCalled();
@@ -54,25 +69,44 @@ describe('MigrationRunner', () => {
       return { migrateToLatest } as any;
     });
 
-    const provider = createMockKyselyProvider();
+    const db = createMockKyselyDatabase();
     const migration1 = createMigrationClass('001_create_users');
     const migration2 = createMigrationClass('002_create_todos');
+    const ctx = createMockContext([migration1, migration2]);
 
-    const runner = new MigrationRunner(provider as any, [
-      migration1,
-      migration2,
-    ]);
-    await runner.migrate();
+    const processor = new MigrationPostProcessor(ctx);
+    await processor.afterInit(db, dummyDef);
 
     const migrations = await capturedProvider.getMigrations();
     expect(Object.keys(migrations)).toEqual([
       '001_create_users',
       '002_create_todos',
     ]);
-    // Migrations are wrapped with bound methods (Kysely spreads objects, losing prototype methods)
     expect(migrations['001_create_users'].up).toBeTypeOf('function');
     expect(migrations['001_create_users'].down).toBeTypeOf('function');
     expect(migrations['002_create_todos'].up).toBeTypeOf('function');
+  });
+
+  it('should skip non-KyselyDatabase components', async () => {
+    const ctx = createMockContext([]);
+    const processor = new MigrationPostProcessor(ctx);
+
+    const component = { notADatabase: true };
+    const result = await processor.afterInit(component, dummyDef);
+
+    expect(result).toBe(component);
+    expect(ctx.getAll).not.toHaveBeenCalled();
+  });
+
+  it('should skip when no migrations are registered', async () => {
+    const db = createMockKyselyDatabase();
+    const ctx = createMockContext([]);
+
+    const processor = new MigrationPostProcessor(ctx);
+    const result = await processor.afterInit(db, dummyDef);
+
+    expect(result).toBe(db);
+    expect(Migrator).not.toHaveBeenCalled();
   });
 
   it('should throw when Migrator returns an error', async () => {
@@ -85,30 +119,32 @@ describe('MigrationRunner', () => {
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const provider = createMockKyselyProvider();
+    const db = createMockKyselyDatabase();
     const migration = createMigrationClass('001_bad');
-    const runner = new MigrationRunner(provider as any, [migration]);
+    const ctx = createMockContext([migration]);
 
-    await expect(runner.migrate()).rejects.toThrow('migration failed');
+    const processor = new MigrationPostProcessor(ctx);
+
+    await expect(processor.afterInit(db, dummyDef)).rejects.toThrow(
+      'migration failed',
+    );
     expect(errorSpy).toHaveBeenCalledWith('Migration "001_bad" failed');
 
     errorSpy.mockRestore();
   });
 
   it('should throw when a migration instance lacks @Migration metadata', async () => {
-    const migrateToLatest = vi.fn().mockResolvedValue({ results: [] });
-    vi.mocked(Migrator).mockImplementation(() => ({ migrateToLatest }) as any);
-
-    const provider = createMockKyselyProvider();
-    // AbstractMigration subclass without @Migration decorator
     class UndecoratedMigration extends AbstractMigration {
       async up() {}
     }
     const badMigration = new UndecoratedMigration();
 
-    const runner = new MigrationRunner(provider as any, [badMigration]);
+    const db = createMockKyselyDatabase();
+    const ctx = createMockContext([badMigration]);
 
-    await expect(runner.migrate()).rejects.toThrow(
+    const processor = new MigrationPostProcessor(ctx);
+
+    await expect(processor.afterInit(db, dummyDef)).rejects.toThrow(
       'without @Migration metadata',
     );
   });

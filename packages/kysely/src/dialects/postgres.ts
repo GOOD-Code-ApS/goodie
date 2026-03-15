@@ -1,6 +1,7 @@
 import {
   ConditionalOnProperty,
   Config,
+  Eager,
   OnDestroy,
   OnInit,
   Singleton,
@@ -30,6 +31,7 @@ export class PostgresDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'postgres' })
 export class PostgresKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;

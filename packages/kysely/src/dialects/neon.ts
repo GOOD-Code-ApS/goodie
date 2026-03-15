@@ -1,6 +1,7 @@
 import {
   ConditionalOnProperty,
   Config,
+  Eager,
   OnDestroy,
   OnInit,
   Singleton,
@@ -18,6 +19,7 @@ export class NeonDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'neon' })
 export class NeonKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;
