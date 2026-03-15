@@ -32,13 +32,13 @@ export class CircularDependencyError extends DIError {
   }
 }
 
-/** Thrown when `get()` is called for an async bean that hasn't been resolved yet. */
-export class AsyncBeanNotReadyError extends DIError {
+/** Thrown when `get()` is called for an async component that hasn't been resolved yet. */
+export class AsyncComponentNotReadyError extends DIError {
   constructor(readonly tokenDescription: string) {
     super(
-      `Bean ${tokenDescription} is async and has not been resolved yet. Use getAsync() instead.`,
+      `Component ${tokenDescription} is async and has not been resolved yet. Use getAsync() instead.`,
     );
-    this.name = 'AsyncBeanNotReadyError';
+    this.name = 'AsyncComponentNotReadyError';
   }
 }
 
@@ -50,11 +50,11 @@ export class ContextClosedError extends DIError {
   }
 }
 
-/** Thrown when overriding a bean whose token doesn't exist in the definitions. */
+/** Thrown when overriding a component whose token doesn't exist in the definitions. */
 export class OverrideError extends DIError {
   constructor(readonly tokenDescription: string) {
     super(
-      `Cannot override ${tokenDescription}: no bean with this token exists in the definitions`,
+      `Cannot override ${tokenDescription}: no component with this token exists in the definitions`,
     );
     this.name = 'OverrideError';
   }

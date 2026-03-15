@@ -4,7 +4,7 @@ import type {
 } from './component-definition.js';
 import type { ComponentPostProcessor } from './component-post-processor.js';
 import {
-  AsyncBeanNotReadyError,
+  AsyncComponentNotReadyError,
   ContextClosedError,
   MissingDependencyError,
 } from './errors.js';
@@ -16,7 +16,7 @@ import type { AbstractConstructor, Constructor } from './types.js';
 
 /** Shape of conditional rules stored in `metadata.conditionalRules` by the transformer. */
 interface ConditionalRule {
-  type: 'onEnv' | 'onProperty' | 'onMissingBean';
+  type: 'onEnv' | 'onProperty' | 'onMissing';
   envVar?: string;
   expectedValue?: string;
   expectedValues?: string[];
@@ -174,7 +174,7 @@ export class ApplicationContext {
         this.singletonCache.get(token as Token) ??
         this.singletonCache.get(def.token);
       if (cached === UNRESOLVED || this.asyncInFlight.has(def.token)) {
-        throw new AsyncBeanNotReadyError(tokenName(def.token));
+        throw new AsyncComponentNotReadyError(tokenName(def.token));
       }
       if (cached !== undefined) {
         return cached as T;
@@ -484,7 +484,7 @@ export class ApplicationContext {
       if (def.scope === 'singleton') {
         this.singletonCache.set(def.token, UNRESOLVED);
       }
-      throw new AsyncBeanNotReadyError(tokenName(def.token));
+      throw new AsyncComponentNotReadyError(tokenName(def.token));
     }
     const instance = this.applyPostProcessorsSync(raw as T, def);
     if (def.scope === 'singleton') {
@@ -541,7 +541,7 @@ export class ApplicationContext {
     const deps = this.resolveDepsSync(def.dependencies, def);
     const raw = def.factory(...deps);
     if (raw instanceof Promise) {
-      throw new AsyncBeanNotReadyError(tokenName(def.token));
+      throw new AsyncComponentNotReadyError(tokenName(def.token));
     }
     const instance = this.applyPostProcessorsSync(raw as T, def);
     store.set(def.token, instance);
@@ -599,7 +599,7 @@ export class ApplicationContext {
         const result = pp.beforeInit(current, def as ComponentDefinition<T>);
         if (result instanceof Promise) {
           result.catch(() => {});
-          throw new AsyncBeanNotReadyError(tokenName(def.token));
+          throw new AsyncComponentNotReadyError(tokenName(def.token));
         }
         current = result as T;
       }
@@ -621,7 +621,7 @@ export class ApplicationContext {
         }
         if (result instanceof Promise) {
           result.catch(() => {});
-          throw new AsyncBeanNotReadyError(tokenName(def.token));
+          throw new AsyncComponentNotReadyError(tokenName(def.token));
         }
       }
     }
@@ -630,7 +630,7 @@ export class ApplicationContext {
         const result = pp.afterInit(current, def as ComponentDefinition<T>);
         if (result instanceof Promise) {
           result.catch(() => {});
-          throw new AsyncBeanNotReadyError(tokenName(def.token));
+          throw new AsyncComponentNotReadyError(tokenName(def.token));
         }
         current = result as T;
       }
@@ -822,12 +822,12 @@ function filterConditionalComponents(definitions: ComponentDefinition[]): {
           }
         }
       }
-      // onMissingBean handled in phase 2
+      // onMissing handled in phase 2
     }
     return true;
   });
 
-  // Phase 2: filter by onMissingBean (evaluated against remaining beans)
+  // Phase 2: filter by onMissing (evaluated against remaining beans)
   const registeredNames = new Set<string>();
   for (const def of remaining) {
     registeredNames.add(tokenName(def.token));
@@ -846,7 +846,7 @@ function filterConditionalComponents(definitions: ComponentDefinition[]): {
     if (!rules || rules.length === 0) return true;
 
     for (const rule of rules) {
-      if (rule.type !== 'onMissingBean') continue;
+      if (rule.type !== 'onMissing') continue;
 
       const ownName = tokenName(def.token);
       // Component is excluded when the target IS present (it's "on *missing*")

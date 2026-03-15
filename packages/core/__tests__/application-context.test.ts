@@ -6,7 +6,7 @@ import type {
 } from '../src/component-definition.js';
 import type { ComponentPostProcessor } from '../src/component-post-processor.js';
 import {
-  AsyncBeanNotReadyError,
+  AsyncComponentNotReadyError,
   CircularDependencyError,
   ContextClosedError,
   MissingDependencyError,
@@ -188,17 +188,17 @@ describe('ApplicationContext — async', () => {
     expect(svc.value).toBe('async');
   });
 
-  it('get() throws AsyncBeanNotReadyError for unresolved async bean', async () => {
+  it('get() throws AsyncComponentNotReadyError for unresolved async bean', async () => {
     class AsyncBean {}
     const ctx = await ApplicationContext.create([
       makeDef(AsyncBean, {
         factory: async () => new AsyncBean(),
       }),
     ]);
-    expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
+    expect(() => ctx.get(AsyncBean)).toThrow(AsyncComponentNotReadyError);
   });
 
-  it('get() throws AsyncBeanNotReadyError on second call too (not UNRESOLVED symbol)', async () => {
+  it('get() throws AsyncComponentNotReadyError on second call too (not UNRESOLVED symbol)', async () => {
     class AsyncBean {}
     const ctx = await ApplicationContext.create([
       makeDef(AsyncBean, {
@@ -206,9 +206,9 @@ describe('ApplicationContext — async', () => {
       }),
     ]);
     // First call sets UNRESOLVED in cache and throws
-    expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
+    expect(() => ctx.get(AsyncBean)).toThrow(AsyncComponentNotReadyError);
     // Second call must also throw (not return the UNRESOLVED Symbol)
-    expect(() => ctx.get(AsyncBean)).toThrow(AsyncBeanNotReadyError);
+    expect(() => ctx.get(AsyncBean)).toThrow(AsyncComponentNotReadyError);
   });
 
   it('eager async bean is available via get() after context creation', async () => {
@@ -848,7 +848,7 @@ describe('ApplicationContext — @OnInit lifecycle', () => {
     expect(factoryCallCount).toBe(2);
   });
 
-  it('throws AsyncBeanNotReadyError for async @OnInit in sync path without unhandled rejection', async () => {
+  it('throws AsyncComponentNotReadyError for async @OnInit in sync path without unhandled rejection', async () => {
     class Service {
       async init() {
         // async OnInit
@@ -861,7 +861,7 @@ describe('ApplicationContext — @OnInit lifecycle', () => {
       }),
     ]);
     // sync get() should throw, but NOT cause unhandled promise rejection
-    expect(() => ctx.get(Service)).toThrow(AsyncBeanNotReadyError);
+    expect(() => ctx.get(Service)).toThrow(AsyncComponentNotReadyError);
   });
 });
 

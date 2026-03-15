@@ -260,7 +260,7 @@ describe('Request-scoped beans', () => {
     });
   });
 
-  it('should throw AsyncBeanNotReadyError for sync get() on async request-scoped bean', async () => {
+  it('should throw AsyncComponentNotReadyError for sync get() on async request-scoped bean', async () => {
     const ctx = await ApplicationContext.create([
       makeDef(AsyncRequestService, {
         scope: 'request',

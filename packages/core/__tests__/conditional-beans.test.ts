@@ -360,7 +360,7 @@ describe('Runtime Conditional Bean Filtering', () => {
           factory: () => new FallbackService(),
           metadata: {
             conditionalRules: [
-              { type: 'onMissingBean', tokenClassName: 'ServiceA' },
+              { type: 'onMissing', tokenClassName: 'ServiceA' },
             ],
           },
         }),
@@ -379,7 +379,7 @@ describe('Runtime Conditional Bean Filtering', () => {
           factory: () => new FallbackService(),
           metadata: {
             conditionalRules: [
-              { type: 'onMissingBean', tokenClassName: 'ServiceA' },
+              { type: 'onMissing', tokenClassName: 'ServiceA' },
             ],
           },
         }),

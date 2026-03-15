@@ -3,7 +3,7 @@ import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 
 /** A single conditional rule extracted from a decorator. */
 export interface ConditionalRule {
-  type: 'onEnv' | 'onProperty' | 'onMissingBean';
+  type: 'onEnv' | 'onProperty' | 'onMissing';
   /** For onEnv: the environment variable name. */
   envVar?: string;
   /** For onEnv/onProperty: the expected value (undefined means "exists"). */
@@ -12,9 +12,9 @@ export interface ConditionalRule {
   expectedValues?: string[];
   /** For onProperty: the config key. */
   key?: string;
-  /** For onMissingBean: the class name to check. */
+  /** For onMissing: the class name to check. */
   tokenClassName?: string;
-  /** For onMissingBean: the import path of the class. */
+  /** For onMissing: the import path of the class. */
   tokenImportPath?: string;
 }
 
@@ -143,7 +143,7 @@ export function createConditionalPlugin(): TransformerPlugin {
           }
 
           rules.push({
-            type: 'onMissingBean',
+            type: 'onMissing',
             tokenClassName: className,
             tokenImportPath: importPath,
           });

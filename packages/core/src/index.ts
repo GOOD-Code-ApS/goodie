@@ -54,7 +54,7 @@ export {
   Value,
 } from './decorators/index.js';
 export {
-  AsyncBeanNotReadyError,
+  AsyncComponentNotReadyError,
   CircularDependencyError,
   ContextClosedError,
   DIError,

@@ -134,7 +134,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
   });
 
   describe('@ConditionalOnMissing', () => {
-    it('should record onMissingBean rule with resolved class info', () => {
+    it('should record onMissing rule with resolved class info', () => {
       const result = createTestProject({
         '/src/ServiceA.ts': `
           import { Singleton } from './decorators.js'
@@ -163,7 +163,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         tokenClassName: string;
       }>;
       expect(rules).toHaveLength(1);
-      expect(rules[0].type).toBe('onMissingBean');
+      expect(rules[0].type).toBe('onMissing');
       expect(rules[0].tokenClassName).toBe('ServiceA');
     });
   });
