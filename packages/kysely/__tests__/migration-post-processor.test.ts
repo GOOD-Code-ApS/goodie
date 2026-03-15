@@ -133,6 +133,23 @@ describe('MigrationPostProcessor', () => {
     errorSpy.mockRestore();
   });
 
+  it('should only run migrations once (D1 request-scoped safety)', async () => {
+    const migrateToLatest = vi.fn().mockResolvedValue({ results: [] });
+    vi.mocked(Migrator).mockImplementation(() => ({ migrateToLatest }) as any);
+
+    const migration = createMigrationClass('001_create_users');
+    const ctx = createMockContext([migration]);
+    const processor = new MigrationPostProcessor(ctx);
+
+    const db1 = createMockKyselyDatabase();
+    const db2 = createMockKyselyDatabase();
+
+    await processor.afterInit(db1, dummyDef);
+    await processor.afterInit(db2, dummyDef);
+
+    expect(migrateToLatest).toHaveBeenCalledTimes(1);
+  });
+
   it('should throw when a migration instance lacks @Migration metadata', async () => {
     class UndecoratedMigration extends AbstractMigration {
       async up() {}

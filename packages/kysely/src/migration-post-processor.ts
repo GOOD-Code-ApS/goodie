@@ -23,12 +23,15 @@ import { KyselyDatabase } from './kysely-database.js';
 @PostProcessor()
 @Singleton()
 export class MigrationPostProcessor implements ComponentPostProcessor {
+  private migrated = false;
+
   constructor(private readonly ctx: ApplicationContext) {}
 
   afterInit<T>(
     component: T,
     _definition: ComponentDefinition<T>,
   ): T | Promise<T> {
+    if (this.migrated) return component;
     if (!(component instanceof KyselyDatabase)) return component;
     return this.runMigrations(component) as Promise<T>;
   }
@@ -68,6 +71,7 @@ export class MigrationPostProcessor implements ComponentPostProcessor {
 
     if (error) throw error;
 
+    this.migrated = true;
     return db;
   }
 }
