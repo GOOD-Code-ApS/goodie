@@ -8,7 +8,7 @@ import {
   Status,
 } from '@goodie-ts/http';
 import type { CreateTodoDto, UpdateTodoDto } from './dto.js';
-import type { TodoService } from './TodoService.js';
+import type { TodoService } from './todo-service.js';
 
 @Controller('/api/todos')
 export class TodoController {

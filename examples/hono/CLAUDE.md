@@ -47,12 +47,12 @@ Library components: ServerConfig(@Config('server')) + EmbeddedServer(@Singleton)
 | File | Role |
 |------|------|
 | `src/db/schema.ts` | Kysely `Database` interface with typed table definitions |
-| `src/DatabaseModule.ts` | `@Factory` providing typed `Kysely<Database>` from `KyselyDatabase` library component |
-| `src/DatabaseHealthIndicator.ts` | `@Singleton` health check using `KyselyDatabase` with `sql\`SELECT 1\`` |
+| `src/database-module.ts` | `@Factory` providing typed `Kysely<Database>` from `KyselyDatabase` library component |
+| `src/database-health-indicator.ts` | `@Singleton` health check using `KyselyDatabase` with `sql\`SELECT 1\`` |
 | `src/dto.ts` | `@Introspected` DTOs: `CreateTodoDto` (`@NotBlank`, `@MaxLength(255)`), `UpdateTodoDto` (`@MaxLength(255)`) |
-| `src/TodoRepository.ts` | `@Singleton` repository injecting `Kysely<Database>` directly |
-| `src/TodoService.ts` | `@Singleton` business logic delegating to repository |
-| `src/TodoController.ts` | `@Controller('/api/todos')` with `@Validated` on `create`/`update`, `@Get`, `@Post`, `@Patch`, `@Delete` routes |
+| `src/todo-repository.ts` | `@Singleton` repository injecting `Kysely<Database>` directly |
+| `src/todo-service.ts` | `@Singleton` business logic delegating to repository |
+| `src/todo-controller.ts` | `@Controller('/api/todos')` with `@Validated` on `create`/`update`, `@Get`, `@Post`, `@Patch`, `@Delete` routes |
 | `src/main.ts` | Bootstrap: `await app.start()` from generated file |
 | `config/default.json` | JSON config file for server, datasource, and pool settings |
 | `vite.config.ts` | Vite config with `diPlugin({ configDir: 'config' })` |

@@ -3,7 +3,7 @@ import { Singleton } from '@goodie-ts/core';
 import { Transactional } from '@goodie-ts/kysely';
 import { LoggerFactory } from '@goodie-ts/logging';
 import { Timeout } from '@goodie-ts/resilience';
-import type { TodoRepository } from './TodoRepository.js';
+import type { TodoRepository } from './todo-repository.js';
 
 @Singleton()
 export class TodoService {
