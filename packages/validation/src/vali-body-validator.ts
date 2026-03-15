@@ -7,7 +7,7 @@ import type { ValiSchemaFactory } from './vali-schema-factory.js';
 /**
  * Valibot-based body validator.
  *
- * Registered as a `BodyValidator` library bean via `baseTokens: [BodyValidator]`.
+ * Registered as a `BodyValidator` library component via `baseTokens: [BodyValidator]`.
  * When present in the DI context, adapter plugins (e.g. Hono) call `validate()`
  * on parsed request bodies before passing them to controller methods.
  *

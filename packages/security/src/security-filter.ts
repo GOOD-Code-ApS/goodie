@@ -8,8 +8,8 @@ import type { SecurityProvider } from './security-provider.js';
 /**
  * HTTP server filter that authenticates requests via SecurityProviders.
  *
- * Registered as a library bean with `baseTokens: [HttpServerFilter]`.
- * The adapter (e.g. Hono) discovers all `HttpServerFilter` beans and
+ * Registered as a library component with `baseTokens: [HttpServerFilter]`.
+ * The adapter (e.g. Hono) discovers all `HttpServerFilter` components and
  * applies them as middleware — no adapter-specific security knowledge needed.
  *
  * Iterates all registered SecurityProviders in order. The first provider

@@ -16,7 +16,7 @@ import type { HttpContext } from './http-context.js';
  *
  * Follows the same pattern as `ExceptionHandler` and `BodyValidator` —
  * abstract class in the HTTP abstraction, concrete implementations via
- * library beans with `baseTokens: [HttpServerFilter]`.
+ * library components with `baseTokens: [HttpServerFilter]`.
  */
 export abstract class HttpServerFilter {
   /**

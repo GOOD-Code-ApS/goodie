@@ -8,7 +8,7 @@
  * unvalidated.
  *
  * Follows the same pattern as `ExceptionHandler` — abstract class in the
- * HTTP abstraction, concrete implementation via library bean with
+ * HTTP abstraction, concrete implementation via library component with
  * `baseTokens: [BodyValidator]`.
  */
 export abstract class BodyValidator {
