@@ -150,6 +150,66 @@ describe('MigrationPostProcessor', () => {
     expect(migrateToLatest).toHaveBeenCalledTimes(1);
   });
 
+  it('should handle concurrent afterInit calls without racing (double-checked locking)', async () => {
+    let resolveLatest!: () => void;
+    const migrateToLatest = vi.fn().mockReturnValue(
+      new Promise<{ results: unknown[] }>((resolve) => {
+        resolveLatest = () => resolve({ results: [] });
+      }),
+    );
+    vi.mocked(Migrator).mockImplementation(() => ({ migrateToLatest }) as any);
+
+    const migration = createMigrationClass('001_create_users');
+    const ctx = createMockContext([migration]);
+    const processor = new MigrationPostProcessor(ctx);
+
+    const db1 = createMockKyselyDatabase();
+    const db2 = createMockKyselyDatabase();
+
+    // Start both concurrently — db2 should not start a second migration
+    const p1 = processor.afterInit(db1, dummyDef);
+    const p2 = processor.afterInit(db2, dummyDef);
+
+    // Resolve the single migration
+    resolveLatest();
+
+    const [result1, result2] = await Promise.all([p1, p2]);
+
+    expect(result1).toBe(db1);
+    expect(result2).toBe(db2);
+    expect(migrateToLatest).toHaveBeenCalledTimes(1);
+  });
+
+  it('should retry migrations on next request after a transient failure', async () => {
+    const migrationError = new Error('transient network error');
+    const migrateToLatest = vi
+      .fn()
+      .mockResolvedValueOnce({ error: migrationError, results: [] })
+      .mockResolvedValueOnce({ results: [] });
+    vi.mocked(Migrator).mockImplementation(() => ({ migrateToLatest }) as any);
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const migration = createMigrationClass('001_create_users');
+    const ctx = createMockContext([migration]);
+    const processor = new MigrationPostProcessor(ctx);
+
+    const db1 = createMockKyselyDatabase();
+    const db2 = createMockKyselyDatabase();
+
+    // First attempt fails
+    await expect(processor.afterInit(db1, dummyDef)).rejects.toThrow(
+      'transient network error',
+    );
+
+    // Second attempt retries and succeeds
+    const result = await processor.afterInit(db2, dummyDef);
+    expect(result).toBe(db2);
+    expect(migrateToLatest).toHaveBeenCalledTimes(2);
+
+    errorSpy.mockRestore();
+  });
+
   it('should throw when a migration instance lacks @Migration metadata', async () => {
     class UndecoratedMigration extends AbstractMigration {
       async up() {}

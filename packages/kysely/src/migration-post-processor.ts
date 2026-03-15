@@ -23,7 +23,7 @@ import { KyselyDatabase } from './kysely-database.js';
 @PostProcessor()
 @Singleton()
 export class MigrationPostProcessor implements ComponentPostProcessor {
-  private migrated = false;
+  private migrationPromise: Promise<void> | null = null;
 
   constructor(private readonly ctx: ApplicationContext) {}
 
@@ -31,14 +31,25 @@ export class MigrationPostProcessor implements ComponentPostProcessor {
     component: T,
     _definition: ComponentDefinition<T>,
   ): T | Promise<T> {
-    if (this.migrated) return component;
     if (!(component instanceof KyselyDatabase)) return component;
+    if (this.migrationPromise) {
+      return this.migrationPromise.then(() => component) as Promise<T>;
+    }
     return this.runMigrations(component) as Promise<T>;
   }
 
-  private async runMigrations(db: KyselyDatabase): Promise<KyselyDatabase> {
+  private runMigrations(db: KyselyDatabase): Promise<KyselyDatabase> {
+    this.migrationPromise = this.doMigrate(db).catch((err) => {
+      // Clear so the next request retries — migrateToLatest() is idempotent.
+      this.migrationPromise = null;
+      throw err;
+    });
+    return this.migrationPromise.then(() => db);
+  }
+
+  private async doMigrate(db: KyselyDatabase): Promise<void> {
     const migrations = this.ctx.getAll(AbstractMigration);
-    if (migrations.length === 0) return db;
+    if (migrations.length === 0) return;
 
     const migrationMap: Record<string, KyselyMigration> = {};
     for (const m of migrations) {
@@ -70,8 +81,5 @@ export class MigrationPostProcessor implements ComponentPostProcessor {
     }
 
     if (error) throw error;
-
-    this.migrated = true;
-    return db;
   }
 }

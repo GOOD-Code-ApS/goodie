@@ -398,9 +398,16 @@ export function generateCode(
 
       if (hasTypeRegistrations) {
         for (const reg of typeRegistrations!) {
-          const fieldsJson = JSON.stringify(reg.fields);
-          const importPathProp = reg.importPath
-            ? `, importPath: '${reg.importPath}'`
+          const normalizedFields = normalizeFieldImportPaths(
+            reg.fields,
+            outputDir,
+          );
+          const fieldsJson = JSON.stringify(normalizedFields);
+          const normalizedImportPath = reg.importPath
+            ? computeRelativeImport(outputDir, reg.importPath)
+            : '';
+          const importPathProp = normalizedImportPath
+            ? `, importPath: '${normalizedImportPath}'`
             : '';
           writer.writeLine(
             `MetadataRegistry.INSTANCE.register({ type: ${reg.className}, className: '${reg.className}'${importPathProp}, fields: ${fieldsJson} });`,
@@ -1064,6 +1071,39 @@ function extractPackageName(absolutePath: string): string {
   }
 
   return packageName;
+}
+
+/**
+ * Recursively normalize absolute `importPath` values in serialized field type
+ * metadata to relative paths. This ensures generated code is deterministic
+ * across machines (absolute paths differ per checkout location).
+ */
+function normalizeFieldImportPaths(
+  fields: unknown[],
+  outputDir: string,
+): unknown[] {
+  return fields.map((field) => normalizeFieldNode(field, outputDir));
+}
+
+function normalizeFieldNode(node: unknown, outputDir: string): unknown {
+  if (node === null || typeof node !== 'object') return node;
+  if (Array.isArray(node))
+    return node.map((n) => normalizeFieldNode(n, outputDir));
+
+  const obj = node as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === 'importPath' && typeof value === 'string' && value !== '') {
+      result[key] = computeRelativeImport(outputDir, value);
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = normalizeFieldNode(value, outputDir);
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
 }
 
 /**
