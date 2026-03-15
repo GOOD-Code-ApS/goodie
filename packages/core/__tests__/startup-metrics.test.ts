@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/component-definition.js';
 import type { Scope } from '../src/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -10,7 +13,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -18,7 +21,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -86,13 +89,13 @@ describe('StartupMetrics', () => {
     expect(metrics!.getStage('topoSort')).toBeTypeOf('number');
     expect(metrics!.getStage('validateDependencies')).toBeTypeOf('number');
     expect(metrics!.getStage('initPostProcessors')).toBeTypeOf('number');
-    expect(metrics!.getStage('initEagerBeans')).toBeTypeOf('number');
+    expect(metrics!.getStage('initEagerComponents')).toBeTypeOf('number');
     expect(metrics!.getTotal()).toBeGreaterThanOrEqual(0);
 
     consoleSpy.mockRestore();
   });
 
-  it('tracks per-bean resolution times for eager beans', async () => {
+  it('tracks per-component resolution times for eager components', async () => {
     process.env.GOODIE_DEBUG = 'true';
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -105,17 +108,17 @@ describe('StartupMetrics', () => {
     ]);
 
     const metrics = ctx.getStartupMetrics()!;
-    const beanTimings = metrics.getBeanTimings();
+    const componentTimings = metrics.getComponentTimings();
 
-    expect(beanTimings.has('ServiceA')).toBe(true);
-    expect(beanTimings.has('ServiceB')).toBe(true);
-    expect(beanTimings.get('ServiceA')).toBeTypeOf('number');
-    expect(beanTimings.get('ServiceB')).toBeTypeOf('number');
+    expect(componentTimings.has('ServiceA')).toBe(true);
+    expect(componentTimings.has('ServiceB')).toBe(true);
+    expect(componentTimings.get('ServiceA')).toBeTypeOf('number');
+    expect(componentTimings.get('ServiceB')).toBeTypeOf('number');
 
     consoleSpy.mockRestore();
   });
 
-  it('does not track non-eager beans', async () => {
+  it('does not track non-eager components', async () => {
     process.env.GOODIE_DEBUG = 'true';
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -124,7 +127,7 @@ describe('StartupMetrics', () => {
     ]);
 
     const metrics = ctx.getStartupMetrics()!;
-    expect(metrics.getBeanTimings().size).toBe(0);
+    expect(metrics.getComponentTimings().size).toBe(0);
 
     consoleSpy.mockRestore();
   });
@@ -141,9 +144,9 @@ describe('StartupMetrics', () => {
     expect(output).toContain('topoSort');
     expect(output).toContain('validateDependencies');
     expect(output).toContain('initPostProcessors');
-    expect(output).toContain('initEagerBeans');
+    expect(output).toContain('initEagerComponents');
     expect(output).toContain('total');
-    expect(output).toContain('Eager bean resolution');
+    expect(output).toContain('Eager component resolution');
     expect(output).toContain('ServiceA');
 
     consoleSpy.mockRestore();

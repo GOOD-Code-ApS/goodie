@@ -1,5 +1,5 @@
 /**
- * A typed token used to look up beans in the container.
+ * A typed token used to look up components in the container.
  *
  * Use this for interfaces, primitives, or any type that doesn't have
  * a class constructor at runtime.

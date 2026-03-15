@@ -1,0 +1,47 @@
+{
+  "name": "@goodie-ts/openapi",
+  "version": "1.0.0",
+  "description": "OpenAPI 3.1 spec generation from introspection metadata for goodie-ts",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/openapi"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "goodie": {
+    "components": "dist/components.json"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc && goodie generate --mode library",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "peerDependencies": {
+    "@goodie-ts/core": ">=2.0.0",
+    "@goodie-ts/http": ">=1.0.0",
+    "openapi3-ts": "^4.0.0"
+  },
+  "devDependencies": {
+    "@goodie-ts/core": "workspace:*",
+    "@goodie-ts/http": "workspace:*",
+    "@goodie-ts/cli": "workspace:*",
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "openapi3-ts": "^4.4.0",
+    "ts-morph": "^24.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

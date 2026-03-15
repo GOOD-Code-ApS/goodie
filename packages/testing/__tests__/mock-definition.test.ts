@@ -1,5 +1,5 @@
 import {
-  type BeanDefinition,
+  type ComponentDefinition,
   type Dependency,
   InjectionToken,
   OverrideError,
@@ -20,7 +20,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -28,7 +28,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -217,9 +217,9 @@ describe('.mock() errors', () => {
   });
 
   it('throws OverrideError for non-existent Constructor token', () => {
-    class MissingBean {}
+    class MissingComponent {}
 
-    @MockDefinition(MissingBean)
+    @MockDefinition(MissingComponent)
     class MockMissing {}
 
     const builder = TestContext.from([]);

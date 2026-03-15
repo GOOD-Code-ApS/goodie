@@ -1,6 +1,6 @@
 # goodie-ts
 
-Compile-time dependency injection framework for TypeScript.
+Build-time validated application framework for TypeScript. No reflection, no runtime scanning — the dependency graph is validated at build time via ts-morph source scanning.
 
 ## Architecture
 
@@ -8,7 +8,7 @@ Compile-time dependency injection framework for TypeScript.
 Decorators (user code) → Transformer (compile-time) → Generated code → Runtime (ApplicationContext)
 ```
 
-The transformer uses ts-morph to scan decorated classes at build time, producing a generated file with typed `BeanDefinition[]` and factory functions. At runtime, `ApplicationContext` resolves the dependency graph — no reflect-metadata needed.
+The transformer uses ts-morph to scan decorated classes at build time, producing a generated file with typed `ComponentDefinition[]` and factory functions. At runtime, `ApplicationContext` resolves the dependency graph — no reflect-metadata needed.
 
 ## Package Dependency Graph
 
@@ -22,7 +22,7 @@ cache / logging / resilience / kysely / hono ──→ core + transformer (plugi
 
 ## Key Design Decisions
 
-- **Always favour compile-time code generation over runtime scanning.** If the transformer knows something at build time (controllers, migrations, interceptors, routes), generate the wiring code directly. Never use runtime scanning, marker classes, or collection injection for statically-known information. Reserve runtime mechanisms (`getAll()`, `baseTokens`) for genuinely dynamic cases where the set of beans isn't known until runtime. This is the framework's core differentiator — violating it undermines the entire architecture.
+- **Always favour compile-time code generation over runtime scanning.** If the transformer knows something at build time (controllers, migrations, interceptors, routes), generate the wiring code directly. Never use runtime scanning, marker classes, or collection injection for statically-known information. Reserve runtime mechanisms (`getAll()`, `baseTokens`) for genuinely dynamic cases where the set of components isn't known until runtime. This is the framework's core differentiator — violating it undermines the entire architecture.
 - **Native Stage 3 decorators** — no `experimentalDecorators`, no reflect-metadata
 - **`accessor` keyword** for `@Inject`/`@Optional` (Stage 3 has no parameter decorators)
 - **Lazy singletons** by default, `@Eager()` opt-in
@@ -44,13 +44,15 @@ pnpm clean          # Clean all dist/
 
 | Package | Purpose |
 |---------|---------|
-| `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), BeanDefinition, InjectionToken, topoSort |
-| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config plugins. Framework-agnostic — no HTTP knowledge. |
+| `packages/core` | Runtime container, decorators, AOP runtime (interceptor chain, advice wrappers), ComponentDefinition, InjectionToken, topoSort, `OnStart` lifecycle, `@Order()` |
+| `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config + introspection plugins. Framework-agnostic — no HTTP knowledge. |
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
-| `packages/testing` | TestContext with bean overrides and @MockDefinition |
+| `packages/testing` | TestContext with component overrides and @MockDefinition |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
-| `packages/hono` | HTTP routing — @Controller, @Get, @Post, etc., @Secured, @Anonymous, SecurityProvider, SecurityContext, EmbeddedServer, ServerConfig, transformer plugin |
+| `packages/http` | Abstract HTTP — @Controller, @Get/@Post/etc route decorators, Request\<T\>, Response\<T\>, RouteMetadata, ExceptionHandler, AbstractServerBootstrap, scan-phase transformer plugin |
+| `packages/hono` | Hono adapter — config-driven CORS, EmbeddedServer, ServerConfig, HonoServerBootstrap (library component), runtime helpers (toHonoResponse, buildRequest) |
+| `packages/validation` | Valibot-based validation — @Validated, @Introspected DTOs, constraint decorators, ValiSchemaFactory, ValidationInterceptor, ValiExceptionHandler, transformer plugin |
 | `packages/kysely` | Kysely integration — abstract KyselyDatabase with per-dialect conditional implementations, @Transactional, @Migration |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
 | `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |

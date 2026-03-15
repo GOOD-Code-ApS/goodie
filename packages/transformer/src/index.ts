@@ -15,9 +15,12 @@ export type { ConditionalRule } from './builtin-conditional-plugin.js';
 export { createConditionalPlugin } from './builtin-conditional-plugin.js';
 export { createConfigPlugin } from './builtin-config-plugin.js';
 export { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
-export type { CodegenOptions } from './codegen.js';
+export type { CodegenOptions, TypeRegistration } from './codegen.js';
 // Code Generator
 export { generateCode } from './codegen.js';
+// Decorator parsing utilities
+export type { ParsedDecoratorMeta } from './decorator-utils.js';
+export { extractDecoratorMeta } from './decorator-utils.js';
 // Plugin discovery
 export type { DiscoverAllResult } from './discover-plugins.js';
 export {
@@ -32,7 +35,7 @@ export { buildGraph } from './graph-builder.js';
 export type {
   ClassTokenRef,
   InjectionTokenRef,
-  IRBeanDefinition,
+  IRComponentDefinition,
   IRDecoratorEntry,
   IRDependency,
   IRFieldInjection,
@@ -41,21 +44,24 @@ export type {
   SourceLocation,
   TokenRef,
 } from './ir.js';
-// Library bean discovery
-export type { DiscoveryResult, LibraryBeansManifest } from './library-beans.js';
+// Library component discovery
+export type {
+  DiscoveryResult,
+  LibraryComponentsManifest,
+} from './library-components.js';
 export {
-  deserializeBeans,
+  deserializeComponents,
   discoverAopMappings,
-  discoverLibraryBeans,
+  discoverLibraryComponents,
   discoverLibraryManifests,
   rewriteImportPaths,
-  serializeBeans,
-} from './library-beans.js';
+  serializeComponents,
+} from './library-components.js';
 // Options
 export type {
   ClassVisitorContext,
-  CodegenContext,
-  CodegenContribution,
+  EmitFilesContext,
+  EmittedFile,
   MethodVisitorContext,
   TransformerPlugin,
   TransformLibraryOptions,
@@ -67,7 +73,7 @@ export type { ResolveResult } from './resolver.js';
 // Resolver
 export { resolve } from './resolver.js';
 export type {
-  ScannedBean,
+  ScannedComponent,
   ScannedConstructorParam,
   ScannedFieldInjection,
   ScannedProvides,

@@ -5,12 +5,14 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 ## What It Demonstrates
 
 - `@Controller` / `@Get` / `@Post` for declarative HTTP routing (codegen via hono plugin)
+- `@Validated` + `@Introspected` DTOs with constraint decorators (`@NotBlank`, `@MaxLength`) for request body validation
+- `ValiExceptionHandler` auto-discovered via `baseTokens: [ExceptionHandler]` — returns 400 with structured errors
 - `KyselyDatabase` abstract base with `PostgresKyselyDatabase` conditionally selected via `@ConditionalOnProperty`
-- `PostgresDatasourceConfig` + `PoolConfig` library beans via `@ConfigurationProperties('datasource')`
-- `@Module` with `@Provides` for typed `Kysely<Database>` injection (single cast in module, no casts in consumers)
+- `PostgresDatasourceConfig` + `PoolConfig` library components via `@Config('datasource')`
+- `@Factory` with `@Provides` for typed `Kysely<Database>` injection (single cast in module, no casts in consumers)
 - `@Singleton` classes with constructor injection for repository and service layers
 - `configDir: 'config'` in vite config for JSON-based configuration files
-- `ServerConfig` from `@goodie-ts/hono` library beans (host/port via `@ConfigurationProperties`)
+- `ServerConfig` from `@goodie-ts/hono` library components (host/port via `@Config`)
 - `createRouter(ctx)` pattern for testing — generates a Hono app from the DI context
 - `withConfig()` testing API to override config values in integration tests
 - Hono's built-in `.request()` for HTTP testing without a live server
@@ -18,12 +20,12 @@ Full-stack example demonstrating goodie-ts with a Hono REST API, PostgreSQL via 
 ## Architecture
 
 ```
-Library beans: PostgresKyselyDatabase(@Singleton, conditional on dialect=postgres)
-  ├── PostgresDatasourceConfig(@ConfigurationProperties('datasource'))
-  ├── PoolConfig(@ConfigurationProperties('datasource.pool'))
+Library components: PostgresKyselyDatabase(@Singleton, conditional on dialect=postgres)
+  ├── PostgresDatasourceConfig(@Config('datasource'))
+  ├── PoolConfig(@Config('datasource.pool'))
   └── config/default.json: { "datasource": { "url": "...", "dialect": "postgres", "pool": {...} } }
 │
-@Module DatabaseModule(KyselyDatabase)
+@Factory DatabaseModule(KyselyDatabase)
 ├── @Provides typedKysely(): Kysely<Database>   → typed database access (single cast here)
 │
 @Singleton TodoRepository(Kysely<Database>)     → fully typed Kysely queries, no casts
@@ -34,9 +36,8 @@ Library beans: PostgresKyselyDatabase(@Singleton, conditional on dialect=postgre
 @Controller('/api/todos') TodoController(todoService) → Hono routes via decorators
 │
 Generated: createRouter(ctx) → wires controllers to Hono app
-Generated: app.onStart()     → hook that starts EmbeddedServer with the router
 │
-Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer(@Singleton)
+Library components: ServerConfig(@Config('server')) + EmbeddedServer(@Singleton)
   └── config/default.json: { "server": { "host": "localhost", "port": 3000 } }
 ```
 
@@ -45,11 +46,12 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 | File | Role |
 |------|------|
 | `src/db/schema.ts` | Kysely `Database` interface with typed table definitions |
-| `src/DatabaseModule.ts` | `@Module` providing typed `Kysely<Database>` from `KyselyDatabase` library bean |
-| `src/DatabaseHealthIndicator.ts` | `@Singleton` health check using `KyselyDatabase` with `sql\`SELECT 1\`` |
-| `src/TodoRepository.ts` | `@Singleton` repository injecting `Kysely<Database>` directly |
-| `src/TodoService.ts` | `@Singleton` business logic delegating to repository |
-| `src/TodoController.ts` | `@Controller('/api/todos')` with `@Get`, `@Post`, `@Patch`, `@Delete` routes |
+| `src/database-module.ts` | `@Factory` providing typed `Kysely<Database>` from `KyselyDatabase` library component |
+| `src/database-health-indicator.ts` | `@Singleton` health check using `KyselyDatabase` with `sql\`SELECT 1\`` |
+| `src/dto.ts` | `@Introspected` DTOs: `CreateTodoDto` (`@NotBlank`, `@MaxLength(255)`), `UpdateTodoDto` (`@MaxLength(255)`) |
+| `src/todo-repository.ts` | `@Singleton` repository injecting `Kysely<Database>` directly |
+| `src/todo-service.ts` | `@Singleton` business logic delegating to repository |
+| `src/todo-controller.ts` | `@Controller('/api/todos')` with `@Validated` on `create`/`update`, `@Get`, `@Post`, `@Patch`, `@Delete` routes |
 | `src/main.ts` | Bootstrap: `await app.start()` from generated file |
 | `config/default.json` | JSON config file for server, datasource, and pool settings |
 | `vite.config.ts` | Vite config with `diPlugin({ configDir: 'config' })` |
@@ -59,10 +61,10 @@ Library beans: ServerConfig(@ConfigurationProperties('server')) + EmbeddedServer
 
 `AppContext.generated.ts` exports:
 - `__Goodie_Config` — `InjectionToken<Record<string, unknown>>` for config map
-- `buildDefinitions(config?)` — factory that returns `BeanDefinition[]` with optional config overrides
+- `buildDefinitions(config?)` — factory that returns `ComponentDefinition[]` with optional config overrides
 - `createContext(config?)` — async factory for testing with config overrides
-- `app` — `Goodie.build(definitions)` with `onStart` hook that starts the HTTP server
-- `createRouter(ctx)` — wires `@Controller` beans to Hono routes (contributed by hono plugin)
+- `app` — `Goodie.build(definitions)` — HTTP server started by `HonoServerBootstrap` via `OnStart` lifecycle
+- `createRouter(ctx)` — wires `@Controller` components to Hono routes (contributed by hono plugin)
 
 ## Test Pattern — createGoodieTest + TestContainers
 
@@ -87,7 +89,7 @@ test('POST /api/todos creates a todo', async ({ app }) => {
 });
 ```
 
-`createGoodieTest` accepts `buildDefinitions` (the function, not the result) so config flows through before bean construction. Custom fixtures like `app` are derived from the ApplicationContext. `app.request()` invokes routes in-process without HTTP overhead.
+`createGoodieTest` accepts `buildDefinitions` (the function, not the result) so config flows through before component construction. Custom fixtures like `app` are derived from the ApplicationContext. `app.request()` invokes routes in-process without HTTP overhead.
 
 ## Running
 

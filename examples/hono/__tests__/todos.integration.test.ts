@@ -1,8 +1,4 @@
-import {
-  SECURITY_PROVIDER,
-  type SecurityProvider,
-  type SecurityRequest,
-} from '@goodie-ts/hono';
+import { createHonoRouter } from '@goodie-ts/hono';
 import { TransactionManager } from '@goodie-ts/kysely';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
@@ -10,20 +6,7 @@ import {
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
-
-/**
- * A test SecurityProvider that authenticates requests with a Bearer token.
- * Any request with "Authorization: Bearer <token>" is authenticated.
- */
-const testSecurityProvider: SecurityProvider = {
-  async authenticate(request: SecurityRequest) {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) return null;
-    const token = authHeader.slice(7);
-    return { name: token, attributes: {} };
-  },
-};
+import { buildDefinitions } from '../src/__generated__/context.js';
 
 describe('Hono + PostgreSQL Todo API', () => {
   let container: StartedPostgreSqlContainer;
@@ -42,21 +25,18 @@ describe('Hono + PostgreSQL Todo API', () => {
       'datasource.dialect': 'postgres',
     }),
     fixtures: {
-      app: (ctx) => createRouter(ctx),
+      app: (ctx) => createHonoRouter(ctx),
     },
-    setup: (b) => b.provide(SECURITY_PROVIDER, testSecurityProvider),
     transactional: TransactionManager,
   });
 
-  const AUTH_HEADERS = { Authorization: 'Bearer test-user' };
-
   async function createTodo(
-    app: ReturnType<typeof createRouter>,
+    app: ReturnType<typeof createHonoRouter>,
     title: string,
   ) {
     const res = await app.request('/api/todos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
     });
     return res.json();
@@ -65,7 +45,7 @@ describe('Hono + PostgreSQL Todo API', () => {
   test('POST /api/todos creates a todo and returns 201', async ({ app }) => {
     const res = await app.request('/api/todos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: 'Buy groceries' }),
     });
 
@@ -94,9 +74,7 @@ describe('Hono + PostgreSQL Todo API', () => {
   test('GET /api/todos/:id returns a specific todo', async ({ app }) => {
     const created = await createTodo(app, 'Specific todo');
 
-    const res = await app.request(`/api/todos/${created.id}`, {
-      headers: AUTH_HEADERS,
-    });
+    const res = await app.request(`/api/todos/${created.id}`);
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -109,7 +87,7 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await app.request(`/api/todos/${created.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed: true }),
     });
 
@@ -124,7 +102,6 @@ describe('Hono + PostgreSQL Todo API', () => {
 
     const res = await app.request(`/api/todos/${created.id}`, {
       method: 'DELETE',
-      headers: AUTH_HEADERS,
     });
 
     expect(res.status).toBe(200);
@@ -135,84 +112,84 @@ describe('Hono + PostgreSQL Todo API', () => {
   test('GET /api/todos/:id returns 404 for missing todo', async ({ app }) => {
     const fakeId = '00000000-0000-0000-0000-000000000000';
 
-    const res = await app.request(`/api/todos/${fakeId}`, {
-      headers: AUTH_HEADERS,
-    });
+    const res = await app.request(`/api/todos/${fakeId}`);
 
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Todo not found');
   });
 
-  test('POST /api/todos returns 400 for missing title', async ({ app }) => {
+  // ── Validation tests ──
+
+  test('POST /api/todos returns 400 when title is empty', async ({ app }) => {
     const res = await app.request('/api/todos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toBe('Validation failed');
-    expect(body.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ message: expect.any(String) }),
-      ]),
-    );
-  });
-
-  test('POST /api/todos returns 400 for empty title', async ({ app }) => {
-    const res = await app.request('/api/todos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: '' }),
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Validation failed');
-    expect(body.issues[0].message).toBe('Title must not be empty');
+    expect(body.errors).toBeDefined();
+    expect(body.errors.length).toBeGreaterThan(0);
   });
 
-  test('PATCH /api/todos/:id returns 400 for invalid completed field', async ({
+  test('POST /api/todos returns 400 when title exceeds 255 characters', async ({
     app,
   }) => {
-    const created = await createTodo(app, 'Valid todo');
+    const longTitle = 'a'.repeat(256);
 
-    const res = await app.request(`/api/todos/${created.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
-      body: JSON.stringify({ completed: 'not-a-boolean' }),
+    const res = await app.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: longTitle }),
     });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Validation failed');
+    expect(body.errors).toBeDefined();
+    expect(body.errors.length).toBeGreaterThan(0);
   });
 
-  test('POST /api/todos returns 401 without auth header', async ({ app }) => {
+  test('POST /api/todos returns 400 when title is missing', async ({ app }) => {
     const res = await app.request('/api/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'Should fail' }),
+      body: JSON.stringify({}),
     });
 
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body.error).toBe('Unauthorized');
+    expect(res.status).toBe(400);
   });
 
-  test('DELETE /api/todos/:id returns 401 without auth header', async ({
+  test('PATCH /api/todos/:id returns 400 when title exceeds 255 characters', async ({
     app,
   }) => {
-    const created = await createTodo(app, 'Auth required');
+    const created = await createTodo(app, 'Valid title');
 
     const res = await app.request(`/api/todos/${created.id}`, {
-      method: 'DELETE',
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'a'.repeat(256) }),
     });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toBe('Unauthorized');
+    expect(body.errors).toBeDefined();
+  });
+
+  test('POST /api/todos with valid title at exactly 255 chars succeeds', async ({
+    app,
+  }) => {
+    const maxTitle = 'a'.repeat(255);
+
+    const res = await app.request('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: maxTitle }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.title).toBe(maxTitle);
   });
 });

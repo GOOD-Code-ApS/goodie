@@ -1,0 +1,46 @@
+{
+  "name": "@goodie-ts/security",
+  "version": "2.0.0",
+  "description": "Authentication and authorization for goodie-ts",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/security"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "goodie": {
+    "plugin": "dist/plugin.js",
+    "components": "dist/components.json"
+  },
+  "scripts": {
+    "build": "tsc && goodie generate --mode library",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "@goodie-ts/core": ">=2.0.0",
+    "@goodie-ts/http": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
+    "@goodie-ts/core": "workspace:*",
+    "@goodie-ts/http": "workspace:*",
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
+  }
+}

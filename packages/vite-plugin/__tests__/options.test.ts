@@ -13,7 +13,7 @@ describe('resolveOptions', () => {
   it('applies default outputPath when not provided', () => {
     const result = resolveOptions(undefined, viteRoot);
     expect(result.outputPath).toBe(
-      path.resolve(viteRoot, 'src/AppContext.generated.ts'),
+      path.resolve(viteRoot, 'src/__generated__/context.ts'),
     );
   });
 
@@ -69,7 +69,7 @@ describe('resolveOptions', () => {
     const result = resolveOptions({}, viteRoot);
     expect(result.tsConfigPath).toBe(path.resolve(viteRoot, 'tsconfig.json'));
     expect(result.outputPath).toBe(
-      path.resolve(viteRoot, 'src/AppContext.generated.ts'),
+      path.resolve(viteRoot, 'src/__generated__/context.ts'),
     );
     expect(result.debounceMs).toBe(100);
     expect(result.include).toBeUndefined();

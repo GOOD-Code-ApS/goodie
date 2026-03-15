@@ -1,6 +1,6 @@
 import {
   InvalidDecoratorUsageError,
-  type IRBeanDefinition,
+  type IRComponentDefinition,
   type MethodVisitorContext,
   type TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -12,8 +12,8 @@ import type { ScheduledMethodMeta } from './scheduler-service.js';
  * Create the scheduler transformer plugin.
  *
  * Scans `@Scheduled` decorators on methods at compile time, validates options,
- * and stores schedule metadata on each bean. When at least one `@Scheduled`
- * method exists, synthesizes a `SchedulerService` bean that depends on
+ * and stores schedule metadata on each component. When at least one `@Scheduled`
+ * method exists, synthesizes a `SchedulerService` component that depends on
  * `ApplicationContext` and discovers schedules via metadata at startup.
  */
 export function createSchedulerPlugin(): TransformerPlugin {
@@ -97,7 +97,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
           );
         }
 
-        // Store metadata on the bean — merged into IRBeanDefinition.metadata by the scanner
+        // Store metadata on the component — merged into IRComponentDefinition.metadata by the scanner
         const existing = (ctx.classMetadata.scheduledMethods ??
           []) as ScheduledMethodMeta[];
         existing.push({
@@ -113,16 +113,18 @@ export function createSchedulerPlugin(): TransformerPlugin {
       }
     },
 
-    beforeCodegen(beans: IRBeanDefinition[]): IRBeanDefinition[] {
+    beforeCodegen(
+      components: IRComponentDefinition[],
+    ): IRComponentDefinition[] {
       // Only create SchedulerService when @Scheduled methods are found
-      const hasScheduledMethods = beans.some(
+      const hasScheduledMethods = components.some(
         (b) =>
           b.metadata.scheduledMethods &&
           (b.metadata.scheduledMethods as unknown[]).length > 0,
       );
-      if (!hasScheduledMethods) return beans;
+      if (!hasScheduledMethods) return components;
 
-      const schedulerServiceBean: IRBeanDefinition = {
+      const schedulerServiceComponent: IRComponentDefinition = {
         tokenRef: {
           kind: 'class',
           className: 'SchedulerService',
@@ -131,6 +133,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
         scope: 'singleton',
         eager: true,
         name: undefined,
+        primary: false,
         constructorDeps: [
           {
             tokenRef: {
@@ -151,8 +154,8 @@ export function createSchedulerPlugin(): TransformerPlugin {
         factoryKind: 'constructor',
         providesSource: undefined,
         metadata: {
-          postConstructMethods: ['start'],
-          preDestroyMethods: ['stop'],
+          onInitMethods: ['start'],
+          onDestroyMethods: ['stop'],
         },
         sourceLocation: {
           filePath: '@goodie-ts/scheduler',
@@ -161,7 +164,7 @@ export function createSchedulerPlugin(): TransformerPlugin {
         },
       };
 
-      return [...beans, schedulerServiceBean];
+      return [...components, schedulerServiceComponent];
     },
   };
 }

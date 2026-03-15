@@ -2,11 +2,12 @@ import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it, vi } from 'vitest';
 import { createConfigPlugin } from '../src/builtin-config-plugin.js';
+import { createIntrospectionPlugin } from '../src/builtin-introspection-plugin.js';
 
 const DECORATOR_STUBS = `
-export function Injectable() { return (t: any, c: any) => {} }
+export function Transient() { return (t: any, c: any) => {} }
 export function Singleton() { return (t: any, c: any) => {} }
-export function ConfigurationProperties(prefix?: string) { return (t: any, c: any) => {} }
+export function Config(prefix?: string) { return (t: any, c: any) => {} }
 export function Value(key: string, opts?: any) { return (t: any, c: any) => {} }
 `;
 
@@ -21,17 +22,20 @@ function createTestProject(
     project.createSourceFile(filePath, content);
   }
 
-  return transformInMemory(project, outputPath, [createConfigPlugin()]);
+  return transformInMemory(project, outputPath, [
+    createIntrospectionPlugin(),
+    createConfigPlugin(),
+  ]);
 }
 
 describe('Config Transformer Plugin', () => {
-  it('should generate valueFields for @ConfigurationProperties class', () => {
+  it('should generate valueFields for @Config class', () => {
     const result = createTestProject({
       '/src/DbConfig.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('database')
+        @Config('database')
         export class DbConfig {
           host = 'localhost'
           port = 5432
@@ -40,12 +44,12 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'DbConfig',
     );
-    expect(bean).toBeDefined();
+    expect(component).toBeDefined();
 
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
       default?: string;
@@ -68,13 +72,13 @@ describe('Config Transformer Plugin', () => {
     });
   });
 
-  it('should generate __Goodie_Config token and config bean', () => {
+  it('should generate __Goodie_Config token and config component', () => {
     const result = createTestProject({
       '/src/AppConfig.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('app')
+        @Config('app')
         export class AppConfig {
           name = 'my-app'
         }
@@ -90,10 +94,10 @@ describe('Config Transformer Plugin', () => {
   it('should inject config values in factory body', () => {
     const result = createTestProject({
       '/src/ServerConfig.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('server')
+        @Config('server')
         export class ServerConfig {
           host = 'localhost'
           port = 3000
@@ -112,20 +116,20 @@ describe('Config Transformer Plugin', () => {
   it('should handle fields without defaults', () => {
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('api')
+        @Config('api')
         export class Config {
           url!: string
         }
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
       default?: string;
@@ -146,10 +150,10 @@ describe('Config Transformer Plugin', () => {
   it('should skip underscore-prefixed fields', () => {
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('app')
+        @Config('app')
         export class Config {
           name = 'my-app'
           _internal = 'hidden'
@@ -157,10 +161,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
     }>;
@@ -172,10 +176,10 @@ describe('Config Transformer Plugin', () => {
   it('should coexist with @Value on another class', () => {
     const result = createTestProject({
       '/src/AppConfig.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('app')
+        @Config('app')
         export class AppConfig {
           name = 'my-app'
         }
@@ -192,16 +196,16 @@ describe('Config Transformer Plugin', () => {
     });
 
     // Both classes should have valueFields
-    const appBean = result.beans.find(
+    const appComponent = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'AppConfig',
     );
-    const dbBean = result.beans.find(
+    const dbComponent = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Database',
     );
 
-    expect(appBean!.metadata.valueFields).toBeDefined();
-    expect(dbBean!.metadata.valueFields).toBeDefined();
+    expect(appComponent!.metadata.valueFields).toBeDefined();
+    expect(dbComponent!.metadata.valueFields).toBeDefined();
 
     // Only one __Goodie_Config token declaration should exist
     const configTokenDeclarations = (
@@ -210,7 +214,7 @@ describe('Config Transformer Plugin', () => {
     expect(configTokenDeclarations).toBe(1);
   });
 
-  it('should not add valueFields for class without @ConfigurationProperties', () => {
+  it('should not add valueFields for class without @Config', () => {
     const result = createTestProject({
       '/src/Service.ts': `
         import { Singleton } from './decorators.js'
@@ -222,19 +226,19 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
     );
-    expect(bean!.metadata.valueFields).toBeUndefined();
+    expect(component!.metadata.valueFields).toBeUndefined();
   });
 
   it('should handle accessor properties', () => {
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('cache')
+        @Config('cache')
         export class Config {
           accessor ttl = 300
           accessor maxSize = 1000
@@ -242,10 +246,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
       default?: string;
@@ -267,10 +271,10 @@ describe('Config Transformer Plugin', () => {
   it('should generate buildDefinitions with config parameter', () => {
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('app')
+        @Config('app')
         export class Config {
           name = 'default'
         }
@@ -285,10 +289,10 @@ describe('Config Transformer Plugin', () => {
   it('should skip private and protected fields by TypeScript modifier', () => {
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('app')
+        @Config('app')
         export class Config {
           name = 'my-app'
           private secret = 'hidden'
@@ -297,10 +301,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
     }>;
@@ -309,15 +313,15 @@ describe('Config Transformer Plugin', () => {
     expect(valueFields[0].fieldName).toBe('name');
   });
 
-  it('should warn when @ConfigurationProperties is called without prefix argument', () => {
+  it('should warn when @Config is called without prefix argument', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties()
+        @Config()
         export class Config {
           name = 'my-app'
         }
@@ -327,37 +331,35 @@ describe('Config Transformer Plugin', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('missing a prefix argument'),
     );
-    // Bean exists (has @Singleton) but no valueFields (prefix missing)
-    const bean = result.beans.find(
+    // Component exists (has @Singleton) but no valueFields (prefix missing)
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    expect(bean).toBeDefined();
-    expect(bean!.metadata.valueFields).toBeUndefined();
+    expect(component).toBeDefined();
+    expect(component!.metadata.valueFields).toBeUndefined();
     warnSpy.mockRestore();
   });
 
-  it('should warn and skip when @ConfigurationProperties is used without @Singleton', () => {
+  it('should warn and skip when @Config is used without @Singleton', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = createTestProject({
       '/src/Config.ts': `
-        import { ConfigurationProperties } from './decorators.js'
+        import { Config } from './decorators.js'
 
-        @ConfigurationProperties('app')
+        @Config('app')
         export class Config {
           name = 'my-app'
         }
       `,
     });
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('@ConfigurationProperties'),
-    );
-    // Class shouldn't be in beans at all (no @Singleton)
-    const bean = result.beans.find(
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('@Config'));
+    // Class shouldn't be in components at all (no @Singleton)
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    expect(bean).toBeUndefined();
+    expect(component).toBeUndefined();
     warnSpy.mockRestore();
   });
 
@@ -366,12 +368,12 @@ describe('Config Transformer Plugin', () => {
 
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         const MY_PREFIX = 'database'
 
         @Singleton()
-        @ConfigurationProperties(MY_PREFIX)
+        @Config(MY_PREFIX)
         export class Config {
           host = 'localhost'
         }
@@ -387,90 +389,31 @@ describe('Config Transformer Plugin', () => {
         'only single-quoted or double-quoted string literals are supported',
       ),
     );
-    // Bean exists (has @Singleton) but no valueFields (non-literal prefix)
-    const bean = result.beans.find(
+    // Component exists (has @Singleton) but no valueFields (non-literal prefix)
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    expect(bean).toBeDefined();
-    expect(bean!.metadata.valueFields).toBeUndefined();
+    expect(component).toBeDefined();
+    expect(component!.metadata.valueFields).toBeUndefined();
     warnSpy.mockRestore();
   });
 
-  it('should skip @Value-decorated properties to avoid duplicate valueFields entries', () => {
+  it('should generate introspection metadata for @Config class', () => {
     const result = createTestProject({
       '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties, Value } from './decorators.js'
+        import { Singleton, Config } from './decorators.js'
 
         @Singleton()
-        @ConfigurationProperties('app')
+        @Config('app')
         export class Config {
           name = 'my-app'
-
-          @Value('APP_SECRET')
-          accessor secret!: string
+          port = 3000
         }
       `,
     });
 
-    const bean = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
-    );
-    expect(bean).toBeDefined();
-
-    const valueFields = bean!.metadata.valueFields as Array<{
-      fieldName: string;
-      key: string;
-      default?: string;
-    }>;
-
-    // 'secret' should appear only once (from the scanner's @Value handling),
-    // NOT duplicated by the config plugin with key 'app.secret'
-    const secretEntries = valueFields.filter((f) => f.fieldName === 'secret');
-    expect(secretEntries).toHaveLength(1);
-    expect(secretEntries[0].key).toBe('APP_SECRET');
-
-    // 'name' should still be present from the config plugin
-    const nameField = valueFields.find((f) => f.fieldName === 'name');
-    expect(nameField).toBeDefined();
-    expect(nameField!.key).toBe('app.name');
-  });
-
-  it('should merge @Value fields with @ConfigurationProperties fields on the same class', () => {
-    const result = createTestProject({
-      '/src/Config.ts': `
-        import { Singleton, ConfigurationProperties, Value } from './decorators.js'
-
-        @Singleton()
-        @ConfigurationProperties('app')
-        export class Config {
-          name = 'my-app'
-
-          @Value('APP_SECRET')
-          accessor secret!: string
-        }
-      `,
-    });
-
-    const bean = result.beans.find(
-      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
-    );
-    expect(bean).toBeDefined();
-
-    const valueFields = bean!.metadata.valueFields as Array<{
-      fieldName: string;
-      key: string;
-      default?: string;
-    }>;
-    expect(valueFields).toBeDefined();
-
-    // @Value field from the scanner
-    const secretField = valueFields.find((f) => f.fieldName === 'secret');
-    expect(secretField).toBeDefined();
-    expect(secretField!.key).toBe('APP_SECRET');
-
-    // @ConfigurationProperties field from the plugin
-    const nameField = valueFields.find((f) => f.fieldName === 'name');
-    expect(nameField).toBeDefined();
-    expect(nameField!.key).toBe('app.name');
+    // @Config implies @Introspected — MetadataRegistry code should be generated
+    expect(result.code).toContain('MetadataRegistry');
+    expect(result.code).toContain("className: 'Config'");
   });
 });

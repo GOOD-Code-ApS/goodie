@@ -1,15 +1,16 @@
 import {
   ConditionalOnProperty,
-  ConfigurationProperties,
-  PostConstruct,
-  PreDestroy,
+  Config,
+  Eager,
+  OnDestroy,
+  OnInit,
   Singleton,
 } from '@goodie-ts/core';
 import type { Kysely } from 'kysely';
 import { KyselyDatabase } from '../kysely-database.js';
 
 @Singleton()
-@ConfigurationProperties('datasource')
+@Config('datasource')
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'sqlite' })
 export class SqliteDatasourceConfig {
   dialect = '';
@@ -18,6 +19,7 @@ export class SqliteDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'sqlite' })
 export class SqliteKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;
@@ -29,7 +31,7 @@ export class SqliteKyselyDatabase extends KyselyDatabase {
   get kysely(): Kysely<any> {
     if (!this._kysely) {
       throw new Error(
-        'SqliteKyselyDatabase: not initialized. Wait for @PostConstruct to complete.',
+        'SqliteKyselyDatabase: not initialized. Wait for @OnInit to complete.',
       );
     }
     return this._kysely;
@@ -39,7 +41,7 @@ export class SqliteKyselyDatabase extends KyselyDatabase {
     return true;
   }
 
-  @PostConstruct()
+  @OnInit()
   async init() {
     try {
       const BetterSqlite3 = await importOptional('better-sqlite3');
@@ -58,7 +60,7 @@ export class SqliteKyselyDatabase extends KyselyDatabase {
     }
   }
 
-  @PreDestroy()
+  @OnDestroy()
   async destroy() {
     await this._kysely?.destroy();
   }

@@ -1,15 +1,16 @@
 import {
   ConditionalOnProperty,
-  ConfigurationProperties,
-  PostConstruct,
-  PreDestroy,
+  Config,
+  Eager,
+  OnDestroy,
+  OnInit,
   Singleton,
 } from '@goodie-ts/core';
 import type { Kysely } from 'kysely';
 import { KyselyDatabase } from '../kysely-database.js';
 
 @Singleton()
-@ConfigurationProperties('datasource')
+@Config('datasource')
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'neon' })
 export class NeonDatasourceConfig {
   dialect = '';
@@ -18,6 +19,7 @@ export class NeonDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'neon' })
 export class NeonKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;
@@ -29,7 +31,7 @@ export class NeonKyselyDatabase extends KyselyDatabase {
   get kysely(): Kysely<any> {
     if (!this._kysely) {
       throw new Error(
-        'NeonKyselyDatabase: not initialized. Wait for @PostConstruct to complete.',
+        'NeonKyselyDatabase: not initialized. Wait for @OnInit to complete.',
       );
     }
     return this._kysely;
@@ -39,7 +41,7 @@ export class NeonKyselyDatabase extends KyselyDatabase {
     return true;
   }
 
-  @PostConstruct()
+  @OnInit()
   async init() {
     try {
       const mod = await importOptional('kysely-neon');
@@ -57,7 +59,7 @@ export class NeonKyselyDatabase extends KyselyDatabase {
     }
   }
 
-  @PreDestroy()
+  @OnDestroy()
   async destroy() {
     await this._kysely?.destroy();
   }

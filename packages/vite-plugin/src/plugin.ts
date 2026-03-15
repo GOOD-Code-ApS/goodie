@@ -25,10 +25,10 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
     async buildStart() {
       const outcome = await runRebuild(resolved);
       if (outcome.success) {
-        const count = outcome.result.beans.length;
+        const count = outcome.result.components.length;
         const warnings = outcome.result.warnings;
         console.log(
-          `[goodie] Transform complete: ${count} bean(s) registered.`,
+          `[goodie] Transform complete: ${count} component(s) registered.`,
         );
         for (const w of warnings) {
           console.warn(`[goodie] Warning: ${w}`);
@@ -44,10 +44,10 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
       // Only process .ts files
       if (!filePath.endsWith('.ts')) return;
 
-      // Skip the generated output file to prevent infinite loops
-      const normalizedOutput = path.normalize(resolved.outputPath);
+      // Skip files inside the __generated__/ directory to prevent infinite loops
+      const generatedDir = path.normalize(path.dirname(resolved.outputPath));
       const normalizedFile = path.normalize(filePath);
-      if (normalizedFile === normalizedOutput) return;
+      if (normalizedFile.startsWith(generatedDir + path.sep)) return;
 
       // Debounced rebuild
       if (debounceTimer !== undefined) {
@@ -59,9 +59,9 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
         debounceTimer = undefined;
         runRebuild(resolved).then((outcome) => {
           if (outcome.success) {
-            const count = outcome.result.beans.length;
+            const count = outcome.result.components.length;
             console.log(
-              `[goodie] Rebuild complete: ${count} bean(s) registered.`,
+              `[goodie] Rebuild complete: ${count} component(s) registered.`,
             );
             for (const w of outcome.result.warnings) {
               console.warn(`[goodie] Warning: ${w}`);

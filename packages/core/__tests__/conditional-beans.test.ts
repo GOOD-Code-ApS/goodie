@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/component-definition.js';
 import { InjectionToken } from '../src/injection-token.js';
 import type { Scope } from '../src/types.js';
 
@@ -9,16 +12,16 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
     scope?: Scope;
     eager?: boolean;
     metadata?: Record<string, unknown>;
-    baseTokens?: BeanDefinition<T>['baseTokens'];
+    baseTokens?: ComponentDefinition<T>['baseTokens'];
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -30,10 +33,10 @@ function makeDef<T>(
   };
 }
 
-/** Creates a __Goodie_Config bean with the given flattened config values. */
+/** Creates a __Goodie_Config component with the given flattened config values. */
 function makeConfigDef(
   config: Record<string, string>,
-): BeanDefinition<Record<string, unknown>> {
+): ComponentDefinition<Record<string, unknown>> {
   const configToken = new InjectionToken<Record<string, unknown>>(
     '__Goodie_Config',
   );
@@ -42,7 +45,7 @@ function makeConfigDef(
   });
 }
 
-describe('Runtime Conditional Bean Filtering', () => {
+describe('Runtime Conditional Component Filtering', () => {
   describe('@ConditionalOnEnv', () => {
     const originalEnv = process.env;
 
@@ -54,7 +57,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       process.env = originalEnv;
     });
 
-    it('should include bean when env var matches expected value', async () => {
+    it('should include component when env var matches expected value', async () => {
       process.env.NODE_ENV = 'production';
 
       class ProdService {}
@@ -77,7 +80,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should exclude bean when env var does not match expected value', async () => {
+    it('should exclude component when env var does not match expected value', async () => {
       process.env.NODE_ENV = 'development';
 
       class ProdService {}
@@ -100,7 +103,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should include bean when env var exists (no value check)', async () => {
+    it('should include component when env var exists (no value check)', async () => {
       process.env.FEATURE_FLAG = 'anything';
 
       class FeatureService {}
@@ -117,7 +120,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should exclude bean when env var is missing (no value check)', async () => {
+    it('should exclude component when env var is missing (no value check)', async () => {
       delete process.env.FEATURE_FLAG;
 
       class FeatureService {}
@@ -134,7 +137,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should include bean when env var is empty string (existence check)', async () => {
+    it('should include component when env var is empty string (existence check)', async () => {
       process.env.FEATURE_FLAG = '';
 
       class EmptyEnvService {}
@@ -153,7 +156,7 @@ describe('Runtime Conditional Bean Filtering', () => {
   });
 
   describe('@ConditionalOnProperty', () => {
-    it('should include bean when property matches expected value', async () => {
+    it('should include component when property matches expected value', async () => {
       class FeatureService {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({ 'feature.enabled': 'true' }),
@@ -175,7 +178,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should exclude bean when property does not match expected value', async () => {
+    it('should exclude component when property does not match expected value', async () => {
       class FeatureService {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({ 'feature.enabled': 'false' }),
@@ -197,7 +200,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should include bean when property exists (no value check)', async () => {
+    it('should include component when property exists (no value check)', async () => {
       class DbService {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({ 'datasource.url': 'postgres://localhost' }),
@@ -213,7 +216,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should exclude bean when property is absent', async () => {
+    it('should exclude component when property is absent', async () => {
       class DbService {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({}),
@@ -229,7 +232,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should include bean when havingValue matches single value', async () => {
+    it('should include component when havingValue matches single value', async () => {
       class PgService {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({ 'datasource.dialect': 'postgres' }),
@@ -251,7 +254,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should exclude bean when havingValue does not match', async () => {
+    it('should exclude component when havingValue does not match', async () => {
       class PgService {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({ 'datasource.dialect': 'mysql' }),
@@ -273,7 +276,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should include bean when havingValue array contains the config value', async () => {
+    it('should include component when havingValue array contains the config value', async () => {
       class ConnStringDb {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({ 'datasource.dialect': 'neon' }),
@@ -295,7 +298,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should exclude bean when havingValue array does not contain the config value', async () => {
+    it('should exclude component when havingValue array does not contain the config value', async () => {
       class ConnStringDb {}
       const ctx = await ApplicationContext.create([
         makeConfigDef({ 'datasource.dialect': 'd1' }),
@@ -346,8 +349,8 @@ describe('Runtime Conditional Bean Filtering', () => {
     });
   });
 
-  describe('@ConditionalOnMissingBean', () => {
-    it('should exclude bean when target bean exists', async () => {
+  describe('@ConditionalOnMissing', () => {
+    it('should exclude component when target component exists', async () => {
       class ServiceA {}
       class FallbackService {}
 
@@ -357,7 +360,7 @@ describe('Runtime Conditional Bean Filtering', () => {
           factory: () => new FallbackService(),
           metadata: {
             conditionalRules: [
-              { type: 'onMissingBean', tokenClassName: 'ServiceA' },
+              { type: 'onMissing', tokenClassName: 'ServiceA' },
             ],
           },
         }),
@@ -368,7 +371,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should include bean when target bean does not exist', async () => {
+    it('should include component when target component does not exist', async () => {
       class FallbackService {}
 
       const ctx = await ApplicationContext.create([
@@ -376,7 +379,7 @@ describe('Runtime Conditional Bean Filtering', () => {
           factory: () => new FallbackService(),
           metadata: {
             conditionalRules: [
-              { type: 'onMissingBean', tokenClassName: 'ServiceA' },
+              { type: 'onMissing', tokenClassName: 'ServiceA' },
             ],
           },
         }),
@@ -398,7 +401,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       process.env = originalEnv;
     });
 
-    it('should include bean only when all conditions are met', async () => {
+    it('should include component only when all conditions are met', async () => {
       process.env.NODE_ENV = 'production';
       process.env.FEATURE_FLAG = 'enabled';
 
@@ -423,7 +426,7 @@ describe('Runtime Conditional Bean Filtering', () => {
       await ctx.close();
     });
 
-    it('should exclude bean when any condition fails', async () => {
+    it('should exclude component when any condition fails', async () => {
       process.env.NODE_ENV = 'production';
       delete process.env.FEATURE_FLAG;
 
@@ -449,8 +452,8 @@ describe('Runtime Conditional Bean Filtering', () => {
     });
   });
 
-  describe('Unconditional beans unaffected', () => {
-    it('should not filter beans without conditional decorators', async () => {
+  describe('Unconditional components unaffected', () => {
+    it('should not filter components without conditional decorators', async () => {
       class RegularService {}
       const ctx = await ApplicationContext.create([
         makeDef(RegularService, { factory: () => new RegularService() }),
@@ -461,7 +464,7 @@ describe('Runtime Conditional Bean Filtering', () => {
     });
   });
 
-  describe('Conditional bean with dependents', () => {
+  describe('Conditional component with dependents', () => {
     it('should throw MissingDependencyError when required dep was filtered out', async () => {
       const originalEnv = process.env;
       process.env = { ...originalEnv, NODE_ENV: 'development' };
@@ -500,8 +503,8 @@ describe('Runtime Conditional Bean Filtering', () => {
     });
   });
 
-  describe('Library bean scenario — dialect selection via config', () => {
-    it('should activate only the bean matching the configured dialect', async () => {
+  describe('Library component scenario — dialect selection via config', () => {
+    it('should activate only the component matching the configured dialect', async () => {
       abstract class KyselyDatabase {}
       class PostgresKyselyDatabase extends KyselyDatabase {}
       class MysqlKyselyDatabase extends KyselyDatabase {}

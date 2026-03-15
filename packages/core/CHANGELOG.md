@@ -6,7 +6,7 @@
 
 - 2d62bec: Add `@Introspected` decorator and compile-time type metadata generation.
 
-  `@Introspected()` marks value objects (DTOs, request/response types) for compile-time field metadata extraction. The built-in introspection transformer plugin scans these classes and generates `MetadataRegistry` registration code with recursive `FieldType` trees and generic `DecoratorMeta` on each field. Introspected classes are NOT beans — they are consumed at runtime by validation, OpenAPI, and serialization systems.
+  `@Introspected()` marks value objects (DTOs, request/response types) for compile-time field metadata extraction. The built-in introspection transformer plugin scans these classes and generates `MetadataRegistry` registration code with recursive `FieldType` trees and generic `DecoratorMeta` on each field. Introspected classes are NOT components — they are consumed at runtime by validation, OpenAPI, and serialization systems.
 
   New exports from `@goodie-ts/core`: `Introspected`, `TypeMetadata`, `IntrospectedField`, `FieldType`, `DecoratorMeta`, `MetadataRegistry`.
   New export from `@goodie-ts/transformer`: `createIntrospectionPlugin`.
@@ -17,16 +17,16 @@
 
 - 9e54e65: Improve error messages and diagnostics
 
-  - **@goodie-ts/core**: `MissingDependencyError` now includes `requiredBy` context and an optional `hint` field. `get()`/`getAsync()`, `validateDependencies()`, and dependency resolution all suggest similar token names via Levenshtein distance ("Did you mean: UserService?"). When a bean was excluded by a conditional rule (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`), the error explains why ("bean exists but was excluded by: @ConditionalOnProperty('datasource.dialect', 'postgres') — property is 'mysql'"). `@PostConstruct` and `@PreDestroy` errors include bean name and method with `{ cause }` chaining.
-  - **@goodie-ts/transformer**: `MissingProviderError` now includes fuzzy matching suggestions ("Did you mean: UserService?"). Plugin hook errors are wrapped with plugin name context and preserve the original error via `{ cause }`. `GOODIE_DEBUG=true` prints the full bean graph, resolution order, active plugins, and codegen contributions during build.
+  - **@goodie-ts/core**: `MissingDependencyError` now includes `requiredBy` context and an optional `hint` field. `get()`/`getAsync()`, `validateDependencies()`, and dependency resolution all suggest similar token names via Levenshtein distance ("Did you mean: UserService?"). When a component was excluded by a conditional rule (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingComponent`), the error explains why ("component exists but was excluded by: @ConditionalOnProperty('datasource.dialect', 'postgres') — property is 'mysql'"). `@PostConstruct` and `@PreDestroy` errors include component name and method with `{ cause }` chaining.
+  - **@goodie-ts/transformer**: `MissingProviderError` now includes fuzzy matching suggestions ("Did you mean: UserService?"). Plugin hook errors are wrapped with plugin name context and preserve the original error via `{ cause }`. `GOODIE_DEBUG=true` prints the full component graph, resolution order, active plugins, and codegen contributions during build.
 
 - be45d51: Multi-runtime deployment support
 
-  - **@goodie-ts/core**: Add `@RequestScoped` decorator and `RequestScopeManager` for per-request bean instances via `AsyncLocalStorage`. `ApplicationContext` supports `scope: 'request'` with automatic proxy generation for singleton->request-scoped dependencies. Conditional bean evaluation (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) now happens at runtime in `ApplicationContext.create()` instead of at build time in the graph builder.
-  - **@goodie-ts/transformer**: Add `@RequestScoped` to scanner, `@ConditionalOnProperty` `havingValue` support (single string or array matching), `CodegenContext` with build-time config passed to plugin `codegen()` hooks. Config inlining reads `default.json` at build time, removing runtime `node:fs` dependency. Config plugin now recognises `@RequestScoped` as a bean decorator.
-  - **@goodie-ts/hono**: Multi-runtime `EmbeddedServer` (Node, Bun, Deno). `ServerConfig` gains `runtime` field (`ServerRuntime` type: `'node' | 'bun' | 'deno'`). When `server.runtime` is `'cloudflare'`, `app.onStart()` hook and `EmbeddedServer` import are omitted from codegen — use `createRouter(ctx)` directly. Request scope middleware auto-generated when request-scoped beans are present. **Breaking:** `EmbeddedServer.listen()` is now `async` — callers must `await` it.
+  - **@goodie-ts/core**: Add `@RequestScoped` decorator and `RequestScopeManager` for per-request component instances via `AsyncLocalStorage`. `ApplicationContext` supports `scope: 'request'` with automatic proxy generation for singleton->request-scoped dependencies. Conditional component evaluation (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingComponent`) now happens at runtime in `ApplicationContext.create()` instead of at build time in the graph builder.
+  - **@goodie-ts/transformer**: Add `@RequestScoped` to scanner, `@ConditionalOnProperty` `havingValue` support (single string or array matching), `CodegenContext` with build-time config passed to plugin `codegen()` hooks. Config inlining reads `default.json` at build time, removing runtime `node:fs` dependency. Config plugin now recognises `@RequestScoped` as a component decorator.
+  - **@goodie-ts/hono**: Multi-runtime `EmbeddedServer` (Node, Bun, Deno). `ServerConfig` gains `runtime` field (`ServerRuntime` type: `'node' | 'bun' | 'deno'`). When `server.runtime` is `'cloudflare'`, `app.onStart()` hook and `EmbeddedServer` import are omitted from codegen — use `createRouter(ctx)` directly. Request scope middleware auto-generated when request-scoped components are present. **Breaking:** `EmbeddedServer.listen()` is now `async` — callers must `await` it.
   - **@goodie-ts/kysely**: **Breaking:** `KyselyDatabase` is now abstract with per-dialect implementations (`PostgresKyselyDatabase`, `MysqlKyselyDatabase`, `SqliteKyselyDatabase`, `NeonKyselyDatabase`, `PlanetscaleKyselyDatabase`, `LibsqlKyselyDatabase`, `D1KyselyDatabase`). Each dialect is conditionally activated via `@ConditionalOnProperty('datasource.dialect')`. Per-dialect `DatasourceConfig` classes replace the shared `DatasourceConfig`. `PoolConfig` is conditional on pooled dialects (postgres, mysql). `supportsReturning` moved from standalone function to abstract property on `KyselyDatabase`. `TransactionManager` reads `supportsReturning` from `KyselyProvider` instead of `Dialect` type. D1 dialect is `@RequestScoped` for Cloudflare Workers. Removed: `DatasourceConfig`, `ConnectionStringKyselyDatabase`, `supportsReturning()`, `CONNECTION_STRING_DIALECTS`, `validateDialect()`, `dialect-factory.ts`.
-  - **@goodie-ts/cli**: Warn when `goodie generate --mode library` produces beans but `package.json` is missing the `"goodie": { "beans": "..." }` field. Silent when the field already exists or no beans were produced.
+  - **@goodie-ts/cli**: Warn when `goodie generate --mode library` produces components but `package.json` is missing the `"goodie": { "components": "..." }` field. Silent when the field already exists or no components were produced.
 
 - 8fc7032: Simplify application bootstrap: `await app.start()` is now the single entry point. The hono plugin registers an `onStart` hook to wire the router and start the HTTP server automatically. Generated route wiring now calls stable `@goodie-ts/hono` runtime helpers (`handleResult`, `securityMiddleware`, `validationMiddleware`, etc.) instead of raw Hono/hono-openapi APIs. `createGoodieTest()` now accepts a definitions factory function and supports custom fixtures derived from the ApplicationContext.
 
@@ -40,15 +40,15 @@
 
 ### Minor Changes
 
-- 5190bce: feat: conditional bean registration with @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissingBean
+- 5190bce: feat: conditional component registration with @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissingComponent
 
-  Adds three new decorators for conditionally including or excluding beans at compile time:
+  Adds three new decorators for conditionally including or excluding components at compile time:
 
-  - `@ConditionalOnEnv(envVar, value?)` -- include bean only when an environment variable is set (optionally matching a specific value)
-  - `@ConditionalOnProperty(key, value?)` -- include bean only when a config property exists (optionally matching a specific value)
-  - `@ConditionalOnMissingBean(Token)` -- include bean only when no other bean provides the given token (useful for default implementations)
+  - `@ConditionalOnEnv(envVar, value?)` -- include component only when an environment variable is set (optionally matching a specific value)
+  - `@ConditionalOnProperty(key, value?)` -- include component only when a config property exists (optionally matching a specific value)
+  - `@ConditionalOnMissingComponent(Token)` -- include component only when no other component provides the given token (useful for default implementations)
 
-  Conditions are evaluated during graph building with AND semantics when multiple decorators are applied. The graph builder filters in order: env -> property -> missingBean. Error messages include hints when a required dependency was filtered out by a condition.
+  Conditions are evaluated during graph building with AND semantics when multiple decorators are applied. The graph builder filters in order: env -> property -> missingComponent. Error messages include hints when a required dependency was filtered out by a condition.
 
 - 5694dd0: Remove all runtime `Symbol.metadata` usage from decorators. All core decorators (`@Singleton`, `@Injectable`, `@Named`, `@Eager`, `@Module`, `@Provides`, `@Inject`, `@Optional`, `@PostConstruct`, `@PreDestroy`, `@PostProcessor`, `@Value`) are now compile-time no-ops. The `Symbol.metadata` polyfill is removed.
 
@@ -64,7 +64,7 @@
 
 - 80b76ad: Add `@goodie-ts/security` package for declarative authentication and authorization. Introduces `@Secured()`, `@Anonymous()`, `SecurityProvider`, and `SecurityHttpFilter`.
 
-  Add compile-time `DecoratorMetadata` infrastructure. The transformer records class and method decorators (with resolved import paths) on `IRBeanDefinition`. `HttpFilterContext` now carries `classDecorators` and `methodDecorators` arrays instead of runtime `Symbol.metadata`. The hono plugin generates static decorator metadata at build time — no runtime `Symbol.metadata` needed for security checks. `@Secured()` and `@Anonymous()` are compile-time markers (no-ops at runtime).
+  Add compile-time `DecoratorMetadata` infrastructure. The transformer records class and method decorators (with resolved import paths) on `IRComponentDefinition`. `HttpFilterContext` now carries `classDecorators` and `methodDecorators` arrays instead of runtime `Symbol.metadata`. The hono plugin generates static decorator metadata at build time — no runtime `Symbol.metadata` needed for security checks. `@Secured()` and `@Anonymous()` are compile-time markers (no-ops at runtime).
 
   `DecoratorEntry` type exported from `@goodie-ts/core`. `IRDecoratorEntry` and `methodDecorators` added to transformer IR.
 
@@ -123,7 +123,7 @@
 
   Scheduler: @Scheduled decorator for cron/fixedRate/fixedDelay with compile-time discovery, overlap prevention, graceful shutdown, lifecycle integration.
 
-  Core: ApplicationContext self-registration as a bean for constructor injection by framework services.
+  Core: ApplicationContext self-registration as a component for constructor injection by framework services.
 
   Transformer: plugin system hooks (visitClass, visitMethod, beforeCodegen) for events and scheduler plugins.
 
@@ -153,7 +153,7 @@
 
 ### Patch Changes
 
-- 124bb16: Add library bean discovery via `beans.json` manifests and `transformLibrary()` pipeline. Support abstract class tokens in DI container. Replace `workspace:*` with `workspace:^` for proper semver ranges on publish.
+- 124bb16: Add library component discovery via `components.json` manifests and `transformLibrary()` pipeline. Support abstract class tokens in DI container. Replace `workspace:*` with `workspace:^` for proper semver ranges on publish.
 
 ## 0.5.1
 

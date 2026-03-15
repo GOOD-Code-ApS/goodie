@@ -18,7 +18,7 @@ export interface RunTransformOptions {
 export interface RunTransformLibraryOptions {
   tsConfigPath: string;
   packageName: string;
-  beansOutputPath: string;
+  componentsOutputPath: string;
   codeOutputPath?: string;
 }
 
@@ -76,7 +76,7 @@ export async function runTransformLibrary(
     const result = await transformLibrary({
       tsConfigFilePath: options.tsConfigPath,
       packageName: options.packageName,
-      beansOutputPath: options.beansOutputPath,
+      componentsOutputPath: options.componentsOutputPath,
       codeOutputPath: options.codeOutputPath,
     });
     const durationMs = performance.now() - start;
@@ -97,7 +97,7 @@ export function logOutcome(outcome: TransformOutcome): void {
     const { result, durationMs } = outcome;
     const ms = Math.round(durationMs);
     console.log(
-      `[goodie] Generated ${path.relative(process.cwd(), result.outputPath)} — ${result.beans.length} bean(s) in ${ms}ms`,
+      `[goodie] Generated ${path.relative(process.cwd(), result.outputPath)} — ${result.components.length} component(s) in ${ms}ms`,
     );
     for (const w of result.warnings) {
       console.warn(`[goodie] Warning: ${w}`);
@@ -112,15 +112,17 @@ export function logLibraryOutcome(outcome: LibraryTransformOutcome): void {
     const { result, durationMs } = outcome;
     const ms = Math.round(durationMs);
     const cwd = process.cwd();
-    const beansPath = path.relative(cwd, result.outputPath);
+    const componentsPath = path.relative(cwd, result.outputPath);
     const codePath = result.codeOutputPath
       ? path.relative(cwd, result.codeOutputPath)
       : undefined;
 
-    const outputs = codePath ? `${beansPath} + ${codePath}` : beansPath;
+    const outputs = codePath
+      ? `${componentsPath} + ${codePath}`
+      : componentsPath;
 
     console.log(
-      `[goodie] Library build: ${result.beans.length} bean(s) → ${outputs} in ${ms}ms`,
+      `[goodie] Library build: ${result.components.length} component(s) → ${outputs} in ${ms}ms`,
     );
     for (const w of result.warnings) {
       console.warn(`[goodie] Warning: ${w}`);

@@ -7,7 +7,7 @@ import {
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { bench, describe } from 'vitest';
-import { generateBeanSource } from './helpers.js';
+import { generateComponentSource } from './helpers.js';
 
 function createBenchProject(files: Record<string, string>): Project {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -19,17 +19,17 @@ function createBenchProject(files: Record<string, string>): Project {
 
 // Pre-generate source files for each size
 const sizes = [50, 100, 500] as const;
-const sources = new Map<number, ReturnType<typeof generateBeanSource>>();
+const sources = new Map<number, ReturnType<typeof generateComponentSource>>();
 
 for (const n of sizes) {
-  sources.set(n, generateBeanSource(n));
+  sources.set(n, generateComponentSource(n));
 }
 
 // ── Full pipeline (scan → resolve → graph → codegen) ──
 
 describe('full pipeline (transformInMemory)', () => {
   for (const n of sizes) {
-    bench(`${n} beans`, () => {
+    bench(`${n} components`, () => {
       const project = createBenchProject(sources.get(n)!);
       transformInMemory(project, '/out/AppContext.generated.ts');
     });
@@ -40,7 +40,7 @@ describe('full pipeline (transformInMemory)', () => {
 
 describe('scanner (scan)', () => {
   for (const n of sizes) {
-    bench(`${n} beans`, () => {
+    bench(`${n} components`, () => {
       const project = createBenchProject(sources.get(n)!);
       scan(project);
     });
@@ -50,11 +50,11 @@ describe('scanner (scan)', () => {
 // ── Codegen only ──
 
 describe('codegen (generateCode)', () => {
-  // Pre-compute beans for codegen benchmarks (scan + resolve + graph once)
+  // Pre-compute components for codegen benchmarks (scan + resolve + graph once)
   const precomputed = new Map<
     number,
     {
-      beans: ReturnType<typeof buildGraph>['beans'];
+      components: ReturnType<typeof buildGraph>['components'];
       controllers: ReturnType<typeof buildGraph>['controllers'];
     }
   >();
@@ -65,16 +65,16 @@ describe('codegen (generateCode)', () => {
     const resolveResult = resolve(scanResult);
     const graphResult = buildGraph(resolveResult);
     precomputed.set(n, {
-      beans: graphResult.beans,
+      components: graphResult.components,
       controllers: graphResult.controllers,
     });
   }
 
   for (const n of sizes) {
-    const { beans, controllers } = precomputed.get(n)!;
-    bench(`${n} beans`, () => {
+    const { components, controllers } = precomputed.get(n)!;
+    bench(`${n} components`, () => {
       generateCode(
-        beans,
+        components,
         { outputPath: '/out/AppContext.generated.ts' },
         [],
         controllers,

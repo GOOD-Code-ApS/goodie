@@ -18,7 +18,7 @@ const mockTransform = vi.mocked(transform);
 
 const defaultOptions: ResolvedOptions = {
   tsConfigPath: '/project/tsconfig.json',
-  outputPath: '/project/src/AppContext.generated.ts',
+  outputPath: '/project/src/__generated__/context.ts',
   include: undefined,
   debounceMs: 100,
   plugins: [],
@@ -29,7 +29,7 @@ describe('runRebuild', () => {
     const fakeResult = {
       code: '// generated',
       outputPath: defaultOptions.outputPath,
-      beans: [{ id: 'A' }],
+      components: [{ id: 'A' }],
       warnings: [],
     };
     mockTransform.mockResolvedValue(fakeResult as any);
@@ -46,7 +46,7 @@ describe('runRebuild', () => {
     mockTransform.mockResolvedValue({
       code: '',
       outputPath: '',
-      beans: [],
+      components: [],
       warnings: [],
     } as any);
 
@@ -58,7 +58,7 @@ describe('runRebuild', () => {
 
     expect(mockTransform).toHaveBeenCalledWith({
       tsConfigFilePath: '/project/tsconfig.json',
-      outputPath: '/project/src/AppContext.generated.ts',
+      outputPath: '/project/src/__generated__/context.ts',
       include: ['src/**/*.ts'],
       plugins: [],
     });
@@ -68,7 +68,7 @@ describe('runRebuild', () => {
     const transformerError = new TransformerError(
       'Missing provider',
       { filePath: 'foo.ts', line: 1, column: 0 },
-      'Add @Injectable()',
+      'Add @Transient()',
     );
     mockTransform.mockRejectedValue(transformerError);
 

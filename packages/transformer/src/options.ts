@@ -1,6 +1,6 @@
 import type { Scope } from '@goodie-ts/core';
-import type { ClassDeclaration, MethodDeclaration } from 'ts-morph';
-import type { IRBeanDefinition, IRDecoratorEntry } from './ir.js';
+import type { ClassDeclaration, MethodDeclaration, SourceFile } from 'ts-morph';
+import type { IRComponentDefinition, IRDecoratorEntry } from './ir.js';
 
 /** Options for the compile-time transform pipeline. */
 export interface TransformOptions {
@@ -17,10 +17,10 @@ export interface TransformOptions {
   plugins?: TransformerPlugin[];
   /** Skip auto-discovery of plugins from installed packages. */
   disablePluginDiscovery?: boolean;
-  /** Skip auto-discovery of library beans from installed packages. */
-  disableLibraryBeanDiscovery?: boolean;
+  /** Skip auto-discovery of library components from installed packages. */
+  disableLibraryComponentDiscovery?: boolean;
   /**
-   * npm scopes to scan for library beans and plugins (e.g. `['@goodie-ts', '@acme']`).
+   * npm scopes to scan for library components and plugins (e.g. `['@goodie-ts', '@acme']`).
    * Defaults to `['@goodie-ts']`.
    */
   scanScopes?: string[];
@@ -38,17 +38,17 @@ export interface TransformOptions {
   configDir?: string;
 }
 
-/** Options for building a library's beans.json manifest. */
+/** Options for building a library's components.json manifest. */
 export interface TransformLibraryOptions {
   /** Path to the tsconfig.json used to create the ts-morph Project. */
   tsConfigFilePath: string;
   /** npm package name (e.g. `'@goodie-ts/health'`). Used in the manifest and to rewrite import paths. */
   packageName: string;
-  /** Absolute path for the generated beans.json file. */
-  beansOutputPath: string;
+  /** Absolute path for the generated components.json file. */
+  componentsOutputPath: string;
   /**
    * Absolute path for the generated TypeScript code file.
-   * When set, library mode emits both beans.json AND generated code
+   * When set, library mode emits both components.json AND generated code
    * (useful for the library's own integration tests).
    */
   codeOutputPath?: string;
@@ -65,12 +65,12 @@ export interface TransformLibraryOptions {
 
 /** Result returned by the library transform pipeline. */
 export interface TransformLibraryResult {
-  /** The serialized beans.json manifest. */
-  manifest: import('./library-beans.js').LibraryBeansManifest;
+  /** The serialized components.json manifest. */
+  manifest: import('./library-components.js').LibraryComponentsManifest;
   /** Absolute path where the manifest was written. */
   outputPath: string;
-  /** All discovered bean definitions (with rewritten import paths). */
-  beans: import('./ir.js').IRBeanDefinition[];
+  /** All discovered component definitions (with rewritten import paths). */
+  components: import('./ir.js').IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** Generated TypeScript code (only when `codeOutputPath` is set). */
@@ -85,14 +85,16 @@ export interface TransformResult {
   code: string;
   /** Absolute path where the file was written. */
   outputPath: string;
-  /** All discovered bean definitions in topological order. */
-  beans: IRBeanDefinition[];
+  /** All discovered component definitions in topological order. */
+  components: IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** True when codegen was skipped because the IR hash matched the existing file. */
   skipped?: boolean;
   /** Discovery result that can be passed as `discoveryCache` on subsequent runs. */
   discoveryCache?: import('./discover-plugins.js').DiscoverAllResult;
+  /** Additional files emitted by plugins to the __generated__/ directory. */
+  emittedFiles?: EmittedFile[];
 }
 
 /** Context passed to visitClass hook. */
@@ -108,15 +110,15 @@ export interface ClassVisitorContext {
   /** Store arbitrary metadata that will be available in later hooks. */
   metadata: Record<string, unknown>;
   /**
-   * Register this class as a bean from a plugin.
-   * Allows plugins to make decorated classes into beans without the scanner
+   * Register this class as a component from a plugin.
+   * Allows plugins to make decorated classes into components without the scanner
    * hardcoding knowledge of plugin-specific decorators (e.g. `@Controller`).
    *
-   * @param options.scope - Bean scope ('singleton' or 'prototype')
+   * @param options.scope - Component scope ('singleton' or 'transient')
    * @param options.decoratorName - Name of the decorator for error messages (e.g. 'Controller')
-   * @throws If another plugin has already registered this class as a bean
+   * @throws If another plugin has already registered this class as a component
    */
-  registerBean(options: { scope: Scope; decoratorName?: string }): void;
+  registerComponent(options: { scope: Scope; decoratorName?: string }): void;
 }
 
 /** Context passed to visitMethod hook. */
@@ -137,22 +139,6 @@ export interface MethodVisitorContext {
   decorators: IRDecoratorEntry[];
 }
 
-/** Contribution from a plugin's codegen hook. */
-export interface CodegenContribution {
-  /** Import statements to add at the top of the generated file. */
-  imports?: string[];
-  /** Code lines to add after the bean definitions. */
-  code?: string[];
-  /** Body lines for an `app.onStart()` hook. Codegen wraps them in `app.onStart(async (ctx) => { ... })`. */
-  onStart?: string[];
-}
-
-/** Context passed to plugin codegen hooks. */
-export interface CodegenContext {
-  /** Flattened config values read from config files at build time (e.g. `{ 'server.runtime': 'cloudflare' }`). */
-  config: Record<string, string>;
-}
-
 /** Plugin interface for extending the transformer pipeline. */
 export interface TransformerPlugin {
   /** Unique plugin name. */
@@ -163,8 +149,8 @@ export interface TransformerPlugin {
 
   /**
    * Visit each decorated class found during scanning.
-   * Called for every class with at least one decorator (beans, modules, etc.).
-   * Use `ctx.metadata` to store data that will be merged into the bean's IR metadata.
+   * Called for every class with at least one decorator (components, modules, etc.).
+   * Use `ctx.metadata` to store data that will be merged into the component's IR metadata.
    */
   visitClass?(ctx: ClassVisitorContext): void;
 
@@ -177,39 +163,84 @@ export interface TransformerPlugin {
   visitMethod?(ctx: MethodVisitorContext): void;
 
   /**
-   * Mutate IR beans after type resolution, before graph building.
-   * Can modify metadata, add dependencies, filter beans, etc.
+   * Mutate IR components after type resolution, before graph building.
+   * Can modify metadata, add dependencies, filter components, etc.
    *
    * Metadata accumulated via `visitClass` (`ctx.metadata`) is already merged
-   * into each bean's `metadata` before this hook runs, so you can read
+   * into each component's `metadata` before this hook runs, so you can read
    * visitor-produced tags here.
    *
-   * **Note:** This hook receives only `@Injectable`/`@Singleton` beans.
-   * Beans created by `@Provides` methods inside `@Module` classes are expanded
+   * **Note:** This hook receives only `@Transient`/`@Singleton` components.
+   * Components created by `@Provides` methods inside `@Factory` classes are expanded
    * during graph building (the next pipeline stage) and are not visible here.
-   * Use `beforeCodegen` if you need to see the full expanded bean set.
+   * Use `beforeCodegen` if you need to see the full expanded component set.
    */
-  afterResolve?(beans: IRBeanDefinition[]): IRBeanDefinition[];
+  afterResolve?(components: IRComponentDefinition[]): IRComponentDefinition[];
 
   /**
-   * Inject or modify bean definitions before code generation.
+   * Inject or modify component definitions before code generation.
    * Runs after graph building (validation + topo sort).
    *
-   * This is the only hook that sees the full bean set including `@Provides` beans.
+   * This is the only hook that sees the full component set including `@Provides` components.
    *
-   * **Warning:** Synthetic beans added here bypass dependency validation and
-   * topological sorting. Ensure any injected beans have their dependencies
-   * already present in the bean list, or are self-contained (no dependencies).
+   * **Warning:** Synthetic components added here bypass dependency validation and
+   * topological sorting. Ensure any injected components have their dependencies
+   * already present in the component list, or are self-contained (no dependencies).
    */
-  beforeCodegen?(beans: IRBeanDefinition[]): IRBeanDefinition[];
+  beforeCodegen?(components: IRComponentDefinition[]): IRComponentDefinition[];
 
   /**
-   * Contribute additional imports and code to the generated file.
-   * Called during code generation. Duplicate imports across plugins are
-   * automatically deduplicated.
+   * Emit additional generated files alongside the main context.ts.
+   * Runs after `beforeCodegen` when the final component set is known.
+   *
+   * Use `ctx.createSourceFile(relativePath)` to create ts-morph `SourceFile` instances.
+   * Each created file is written to the `__generated__/` directory.
+   * Files are included in the IR hash — if no inputs change, no files are rewritten.
+   *
+   * This hook is **app-build only** — it runs during `transform()` (vite-plugin, CLI)
+   * but not during `transformLibrary()`.
+   *
+   * Use this to generate adapter-specific code (route wiring, validation schemas,
+   * migration sequencing) that depends on the consumer's application components.
    */
-  codegen?(
-    beans: IRBeanDefinition[],
-    context?: CodegenContext,
-  ): CodegenContribution;
+  emitFiles?(context: EmitFilesContext): void;
+}
+
+/** Context passed to the emitFiles hook. */
+export interface EmitFilesContext {
+  /** The final set of components (after graph building + beforeCodegen). */
+  components: IRComponentDefinition[];
+  /**
+   * Type registrations for `@Introspected` classes.
+   * Each entry contains the class name, import path, and serialized field metadata
+   * (field types + decorator metadata). Matches what codegen emits as
+   * `MetadataRegistry.INSTANCE.register(...)` calls.
+   */
+  typeRegistrations: ReadonlyArray<{
+    className: string;
+    importPath: string;
+    fields: unknown[];
+  }>;
+  /**
+   * Compute a relative import path from the __generated__/ directory to a source file.
+   * Handles `.ts` → `.js` extension rewriting.
+   */
+  relativeImport(absolutePath: string): string;
+  /**
+   * Create a ts-morph `SourceFile` that will be written to `__generated__/<relativePath>`.
+   * Returns a `SourceFile` that the plugin can manipulate using the full ts-morph API
+   * (add imports, classes, functions, statements, etc.).
+   *
+   * @param relativePath - Filename relative to __generated__/ (e.g. 'routes.ts')
+   * @returns A ts-morph SourceFile for type-safe code generation
+   */
+  createSourceFile(relativePath: string): SourceFile;
+}
+
+/** A file emitted by a plugin to the __generated__/ directory. */
+export interface EmittedFile {
+  /** Filename relative to __generated__/ (e.g. 'routes.ts'). */
+  relativePath: string;
+  /** The generated TypeScript source content. */
+  content: string;
 }

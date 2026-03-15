@@ -1,35 +1,15 @@
-import {
-  type ClassDeclaration,
-  type Decorator,
-  type Node,
-  SyntaxKind,
-  type Type,
-} from 'ts-morph';
-import type { IRBeanDefinition } from './ir.js';
-import type {
-  ClassVisitorContext,
-  CodegenContext,
-  CodegenContribution,
-  TransformerPlugin,
-} from './options.js';
+import type { ClassDeclaration, Type } from 'ts-morph';
+import { extractDecoratorMeta } from './decorator-utils.js';
+import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 
 // ── Scanned introspection data (intermediate representation) ──
 
-interface ScannedIntrospectedClass {
-  className: string;
-  importPath: string;
-  fields: ScannedIntrospectedField[];
-}
-
-interface ScannedDecoratorMeta {
-  name: string;
-  args: Record<string, unknown>;
-}
+import type { ParsedDecoratorMeta } from './decorator-utils.js';
 
 interface ScannedIntrospectedField {
   name: string;
   type: ScannedFieldType;
-  decorators: ScannedDecoratorMeta[];
+  decorators: ParsedDecoratorMeta[];
 }
 
 type ScannedFieldType =
@@ -46,70 +26,38 @@ type ScannedFieldType =
  *
  * Scans `@Introspected()` decorated classes for field type metadata and
  * generates `MetadataRegistry` registration code. Introspected classes
- * are NOT beans — they are value objects (DTOs, request/response types)
+ * are NOT components — they are value objects (DTOs, request/response types)
  * whose shape metadata is consumed at runtime by validation, OpenAPI, etc.
  *
  * Constraint extraction (e.g. `@MinLength`, `@Email`) is NOT handled here —
  * that belongs to the validation package's plugin (#105).
  */
 export function createIntrospectionPlugin(): TransformerPlugin {
-  const introspectedClasses: ScannedIntrospectedClass[] = [];
-
   return {
     name: 'introspection',
 
     visitClass(ctx: ClassVisitorContext): void {
       const isIntrospected = ctx.decorators.some(
-        (d) => d.name === 'Introspected',
+        (d) => d.name === 'Introspected' || d.name === 'Config',
       );
       if (!isIntrospected) return;
 
       const cls = ctx.classDeclaration;
       const fields = scanClassFields(cls);
 
-      introspectedClasses.push({
+      // Store raw fields so other plugins (e.g. config) can consume it
+      ctx.metadata.introspectedFields = fields;
+
+      // Store pre-serialized registration data for core codegen
+      ctx.metadata.__typeRegistration = {
         className: ctx.className,
         importPath: ctx.filePath,
-        fields,
-      });
-    },
-
-    codegen(
-      _beans: IRBeanDefinition[],
-      _context?: CodegenContext,
-    ): CodegenContribution {
-      if (introspectedClasses.length === 0) {
-        return {};
-      }
-
-      const imports: string[] = [
-        "import { MetadataRegistry } from '@goodie-ts/core'",
-      ];
-      const code: string[] = [];
-
-      // Import all introspected classes
-      for (const cls of introspectedClasses) {
-        imports.push(`import { ${cls.className} } from '${cls.importPath}'`);
-      }
-
-      // Populate the static singleton registry
-      code.push('// Metadata registry population');
-
-      for (const cls of introspectedClasses) {
-        const fieldsJson = JSON.stringify(
-          cls.fields.map((f) => ({
-            name: f.name,
-            type: serializeFieldType(f.type),
-            decorators: f.decorators,
-          })),
-        );
-
-        code.push(
-          `MetadataRegistry.INSTANCE.register({ type: ${cls.className}, className: '${cls.className}', fields: ${fieldsJson} })`,
-        );
-      }
-
-      return { imports, code };
+        fields: fields.map((f) => ({
+          name: f.name,
+          type: serializeFieldType(f.type),
+          decorators: f.decorators,
+        })),
+      };
     },
   };
 }
@@ -125,119 +73,25 @@ function scanClassFields(cls: ClassDeclaration): ScannedIntrospectedField[] {
   for (const prop of cls.getProperties()) {
     const name = String(prop.getName());
 
-    // Skip private/protected
+    // Skip private/protected (by TypeScript modifier or underscore convention)
     const scope = prop.getScope();
     if (scope === 'private' || scope === 'protected') continue;
+    if (name.startsWith('_')) continue;
 
     // Resolve type
     const propType = prop.getType();
     const fieldType = resolveFieldType(propType);
 
     // Extract all field decorators generically
-    const decorators = extractFieldDecorators(prop.getDecorators());
+    const decorators = extractDecoratorMeta(
+      prop.getDecorators(),
+      IGNORED_DECORATORS,
+    );
 
     fields.push({ name, type: fieldType, decorators });
   }
 
   return fields;
-}
-
-function extractFieldDecorators(
-  decorators: Decorator[],
-): ScannedDecoratorMeta[] {
-  const result: ScannedDecoratorMeta[] = [];
-
-  for (const dec of decorators) {
-    const name = dec.getName();
-    if (IGNORED_DECORATORS.has(name)) continue;
-
-    const callExpr = dec.getCallExpression();
-    const astArgs = callExpr ? callExpr.getArguments() : [];
-
-    const args = parseDecoratorArgs(astArgs);
-
-    result.push({ name, args });
-  }
-
-  return result;
-}
-
-function parseDecoratorArgs(args: Node[]): Record<string, unknown> {
-  if (args.length === 0) return {};
-
-  // Single object literal argument → parse its properties via AST
-  if (
-    args.length === 1 &&
-    args[0].getKind() === SyntaxKind.ObjectLiteralExpression
-  ) {
-    return parseObjectLiteralNode(args[0]);
-  }
-
-  // Single positional argument → { value: <parsed> }
-  if (args.length === 1) {
-    return { value: parseNodeValue(args[0]) };
-  }
-
-  // Multiple positional args → { value: first, value2: second, ... }
-  const result: Record<string, unknown> = {};
-  for (let i = 0; i < args.length; i++) {
-    result[i === 0 ? 'value' : `value${i + 1}`] = parseNodeValue(args[i]);
-  }
-  return result;
-}
-
-function parseNodeValue(node: Node): unknown {
-  const kind = node.getKind();
-
-  // String literal
-  if (kind === SyntaxKind.StringLiteral) {
-    const text = node.getText();
-    return text.slice(1, -1);
-  }
-
-  // Numeric literal
-  if (kind === SyntaxKind.NumericLiteral) {
-    return Number(node.getText());
-  }
-
-  // Negative number: PrefixUnaryExpression with minus + NumericLiteral
-  if (kind === SyntaxKind.PrefixUnaryExpression) {
-    const text = node.getText();
-    const num = Number(text);
-    if (!Number.isNaN(num)) return num;
-  }
-
-  // Boolean literals
-  if (kind === SyntaxKind.TrueKeyword) return true;
-  if (kind === SyntaxKind.FalseKeyword) return false;
-
-  // Array literal
-  if (kind === SyntaxKind.ArrayLiteralExpression) {
-    const arrayExpr = node.asKind(SyntaxKind.ArrayLiteralExpression)!;
-    return arrayExpr.getElements().map((el) => parseNodeValue(el));
-  }
-
-  // Object literal (nested)
-  if (kind === SyntaxKind.ObjectLiteralExpression) {
-    return parseObjectLiteralNode(node);
-  }
-
-  // Fallback: raw text
-  return node.getText();
-}
-
-function parseObjectLiteralNode(node: Node): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-
-  for (const prop of node.getChildrenOfKind(SyntaxKind.PropertyAssignment)) {
-    const key = prop.getChildAtIndex(0).getText();
-    const initializer = prop.getInitializer();
-    if (initializer) {
-      result[key] = parseNodeValue(initializer);
-    }
-  }
-
-  return result;
 }
 
 // ── Type resolution ──
@@ -366,7 +220,7 @@ function resolveFieldType(type: Type): ScannedFieldType {
 
 // ── Serialization helpers ──
 
-/** Serialize ScannedFieldType to the runtime FieldType shape (strip importPath from references). */
+/** Serialize ScannedFieldType to the runtime FieldType shape. */
 function serializeFieldType(type: ScannedFieldType): Record<string, unknown> {
   switch (type.kind) {
     case 'primitive':
@@ -379,7 +233,11 @@ function serializeFieldType(type: ScannedFieldType): Record<string, unknown> {
         elementType: serializeFieldType(type.elementType),
       };
     case 'reference':
-      return { kind: 'reference', className: type.className };
+      return {
+        kind: 'reference',
+        className: type.className,
+        importPath: type.importPath,
+      };
     case 'union':
       return { kind: 'union', types: type.types.map(serializeFieldType) };
     case 'optional':

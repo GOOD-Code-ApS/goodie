@@ -18,7 +18,7 @@ export interface WatchHandle {
 
 export function watchAndRebuild(options: WatchOptions): WatchHandle {
   const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
-  const normalizedOutput = path.normalize(options.outputPath);
+  const generatedDir = path.normalize(path.dirname(options.outputPath));
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   const watcher = fs.watch(
@@ -30,9 +30,10 @@ export function watchAndRebuild(options: WatchOptions): WatchHandle {
       // Only react to .ts files
       if (!filename.endsWith('.ts')) return;
 
-      // Skip the generated output file to prevent infinite loops
+      // Skip files inside the __generated__/ directory to prevent infinite loops
       const absolutePath = path.resolve(options.watchDir, filename);
-      if (path.normalize(absolutePath) === normalizedOutput) return;
+      if (path.normalize(absolutePath).startsWith(generatedDir + path.sep))
+        return;
 
       if (debounceTimer !== undefined) {
         clearTimeout(debounceTimer);

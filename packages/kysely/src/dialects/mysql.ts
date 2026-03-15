@@ -1,8 +1,9 @@
 import {
   ConditionalOnProperty,
-  ConfigurationProperties,
-  PostConstruct,
-  PreDestroy,
+  Config,
+  Eager,
+  OnDestroy,
+  OnInit,
   Singleton,
 } from '@goodie-ts/core';
 import type { Kysely } from 'kysely';
@@ -10,7 +11,7 @@ import { KyselyDatabase } from '../kysely-database.js';
 import type { PoolConfig } from '../pool-config.js';
 
 @Singleton()
-@ConfigurationProperties('datasource')
+@Config('datasource')
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'mysql' })
 export class MysqlDatasourceConfig {
   dialect = '';
@@ -24,6 +25,7 @@ export class MysqlDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'mysql' })
 export class MysqlKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;
@@ -38,7 +40,7 @@ export class MysqlKyselyDatabase extends KyselyDatabase {
   get kysely(): Kysely<any> {
     if (!this._kysely) {
       throw new Error(
-        'MysqlKyselyDatabase: not initialized. Wait for @PostConstruct to complete.',
+        'MysqlKyselyDatabase: not initialized. Wait for @OnInit to complete.',
       );
     }
     return this._kysely;
@@ -48,7 +50,7 @@ export class MysqlKyselyDatabase extends KyselyDatabase {
     return false;
   }
 
-  @PostConstruct()
+  @OnInit()
   async init() {
     try {
       const mysql2 = await importOptional('mysql2/promise');
@@ -75,7 +77,7 @@ export class MysqlKyselyDatabase extends KyselyDatabase {
     }
   }
 
-  @PreDestroy()
+  @OnDestroy()
   async destroy() {
     await this._kysely?.destroy();
   }

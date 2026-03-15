@@ -74,7 +74,7 @@ export class MissingProviderError extends TransformerError {
       `No provider found for "${tokenDescription}" (required by ${requiredBy})`,
       sourceLocation,
       customHint ??
-        'Ensure the dependency is decorated with @Injectable(), @Singleton(), or provided by a @Module.',
+        'Ensure the dependency is decorated with @Transient(), @Singleton(), or provided by a @Factory.',
     );
     this.name = 'MissingProviderError';
   }
@@ -86,11 +86,13 @@ export class AmbiguousProviderError extends TransformerError {
     readonly tokenDescription: string,
     readonly candidates: string[],
     sourceLocation: SourceLocation,
+    customHint?: string,
   ) {
     super(
       `Ambiguous provider for "${tokenDescription}": found ${candidates.join(', ')}`,
       sourceLocation,
-      'Use @Named() on the providers and @Inject(name) on the injection point to disambiguate.',
+      customHint ??
+        'Use @Named() on the providers and @Inject(name) on the injection point to disambiguate.',
     );
     this.name = 'AmbiguousProviderError';
   }

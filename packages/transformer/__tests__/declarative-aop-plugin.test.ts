@@ -1,5 +1,5 @@
 import type {
-  IRBeanDefinition,
+  IRComponentDefinition,
   ResolvedAopMapping,
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
@@ -169,7 +169,7 @@ const LOGGING_MAPPINGS: ResolvedAopMapping[] = [
   },
 ];
 
-const LOGGING_LIBRARY_BEANS: IRBeanDefinition[] = [
+const LOGGING_LIBRARY_COMPONENTS: IRComponentDefinition[] = [
   {
     tokenRef: {
       kind: 'class',
@@ -205,7 +205,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
       LOGGING_MAPPINGS,
     );
 
@@ -214,9 +214,8 @@ describe('Declarative AOP Plugin — Integration', () => {
     expect(result.code).toContain(
       "import { LoggingInterceptor } from '@goodie-ts/logging'",
     );
-    expect(result.code).toContain(
-      "import { buildInterceptorChain } from '@goodie-ts/core'",
-    );
+    // buildInterceptorChain auto-derived in core import
+    expect(result.code).toContain('buildInterceptorChain');
   });
 
   it('should not emit AOP wiring when no decorators match', () => {
@@ -234,12 +233,12 @@ describe('Declarative AOP Plugin — Integration', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
       LOGGING_MAPPINGS,
     );
 
-    // No AOP wiring should happen — LoggingInterceptor bean still appears
-    // (from library beans) but no buildInterceptorChain calls
+    // No AOP wiring should happen — LoggingInterceptor component still appears
+    // (from library components) but no buildInterceptorChain calls
     expect(result.code).not.toContain('buildInterceptorChain');
   });
 
@@ -265,13 +264,13 @@ describe('Declarative AOP Plugin — Integration', () => {
       makeProject(),
       '/out/gen.ts',
       [plugin],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
     );
     const result2 = transformInMemory(
       makeProject(),
       '/out/gen.ts',
       [plugin],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
     );
 
     const stripTimestamp = (code: string) =>
@@ -293,8 +292,8 @@ describe('Declarative AOP Plugin — Integration', () => {
       },
     ];
 
-    const libraryBeans: IRBeanDefinition[] = [
-      ...LOGGING_LIBRARY_BEANS,
+    const libraryComponents: IRComponentDefinition[] = [
+      ...LOGGING_LIBRARY_COMPONENTS,
       {
         tokenRef: {
           kind: 'class',
@@ -333,7 +332,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       project,
       '/out/gen.ts',
       [],
-      libraryBeans,
+      libraryComponents,
       allMappings,
     );
 

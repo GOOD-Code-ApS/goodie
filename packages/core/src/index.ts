@@ -10,17 +10,20 @@ export type {
   MethodInterceptor,
 } from './aop-types.js';
 export { ApplicationContext } from './application-context.js';
-export type { BeanDefinition, Dependency } from './bean-definition.js';
-export type { BeanPostProcessor } from './bean-post-processor.js';
-export { flattenObject, loadConfigFiles } from './config-loader.js';
+export type {
+  ComponentDefinition,
+  Dependency,
+} from './component-definition.js';
+export type { ComponentPostProcessor } from './component-post-processor.js';
+export { flattenObject } from './config-loader.js';
 export type {
   AfterOptions,
   AopDecoratorConfig,
   AroundOptions,
   BeforeOptions,
   ConditionalOnPropertyOptions,
+  FactoryOptions,
   IntrospectedOptions,
-  ModuleOptions,
   ValueOptions,
 } from './decorators/index.js';
 // Decorators
@@ -29,27 +32,29 @@ export {
   Around,
   Before,
   ConditionalOnEnv,
-  ConditionalOnMissingBean,
+  ConditionalOnMissing,
   ConditionalOnProperty,
-  ConfigurationProperties,
+  Config,
   createAopDecorator,
   Eager,
+  Factory,
   Inject,
-  Injectable,
   Introspected,
-  Module,
   Named,
+  OnDestroy,
+  OnInit,
   Optional,
-  PostConstruct,
+  Order,
   PostProcessor,
-  PreDestroy,
+  Primary,
   Provides,
   RequestScoped,
   Singleton,
+  Transient,
   Value,
 } from './decorators/index.js';
 export {
-  AsyncBeanNotReadyError,
+  AsyncComponentNotReadyError,
   CircularDependencyError,
   ContextClosedError,
   DIError,
@@ -73,6 +78,7 @@ export type {
   UnionFieldType,
 } from './introspection.js';
 export { MetadataRegistry } from './introspection.js';
+export { OnStart } from './on-start.js';
 export { RequestScopeManager } from './request-scope.js';
 export { StartupMetrics } from './startup-metrics.js';
 export { topoSort } from './topo-sort.js';

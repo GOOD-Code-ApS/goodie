@@ -1,99 +1,26 @@
-import {
-  InvalidDecoratorUsageError,
-  transformInMemory,
-} from '@goodie-ts/transformer';
+import createHttpPlugin from '@goodie-ts/http/plugin';
+import { transformInMemory } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { DECORATOR_STUBS } from '../../transformer/__tests__/helpers.js';
-import createHonoPlugin from '../src/plugin.js';
 
-const honoPlugin = createHonoPlugin();
+const httpPlugin = createHttpPlugin();
 
 function createProject(
   files: Record<string, string>,
   outputPath = '/out/AppContext.generated.ts',
-  plugins = [honoPlugin],
-  inlinedConfig?: Record<string, string>,
+  plugins = [httpPlugin],
 ) {
   const project = new Project({ useInMemoryFileSystem: true });
   project.createSourceFile('/src/decorators.ts', DECORATOR_STUBS);
   for (const [filePath, content] of Object.entries(files)) {
     project.createSourceFile(filePath, content);
   }
-  return transformInMemory(
-    project,
-    outputPath,
-    plugins,
-    undefined,
-    undefined,
-    inlinedConfig ? { inlinedConfig } : undefined,
-  );
+  return transformInMemory(project, outputPath, plugins);
 }
 
-describe('Hono Plugin Codegen', () => {
-  it('generates createRouter and onStart hook when @Controller classes exist', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      'export function createRouter(ctx: ApplicationContext)',
-    );
-    expect(result.code).toContain('app.onStart(async (ctx) => {');
-    expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
-    expect(result.code).not.toContain('export async function startServer');
-    expect(result.code).toContain(
-      'export type AppType = ReturnType<typeof createRouter>',
-    );
-    expect(result.code).toContain(
-      'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
-    );
-    expect(result.code).toContain('hc<AppType>(baseUrl, options)');
-  });
-
-  it('imports Hono, hc, and EmbeddedServer', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain("import { Hono } from 'hono'");
-    expect(result.code).toContain("import { hc } from 'hono/client'");
-    expect(result.code).toContain('EmbeddedServer');
-    expect(result.code).toContain('handleResult');
-    expect(result.code).toContain("from '@goodie-ts/hono'");
-  });
-
-  it('does not import security types when no @Secured is used', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).not.toContain('SecurityContext');
-    expect(result.code).not.toContain('SECURITY_PROVIDER');
-  });
-
-  it('wires routes in createRouter', () => {
+describe('HTTP Controller Metadata', () => {
+  it('stores httpController metadata on controller components', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get, Post } from './decorators.js'
@@ -107,30 +34,111 @@ describe('Hono Plugin Codegen', () => {
       `,
     });
 
-    // Routes use relative paths in sub-app, basePath in .route()
-    expect(result.code).toContain(".route('/api/users'");
-    expect(result.code).toContain(".get('/'");
-    expect(result.code).toContain(".post('/'");
-    expect(result.code).toContain('userController.list(c)');
-    expect(result.code).toContain('userController.create(c)');
+    const component = result.components.find(
+      (b) =>
+        b.tokenRef.kind === 'class' &&
+        b.tokenRef.className === 'UserController',
+    );
+    const httpCtrl = component!.metadata.httpController as {
+      basePath: string;
+      routes: Array<{ methodName: string; httpMethod: string }>;
+    };
+    expect(httpCtrl.basePath).toBe('/api/users');
+    expect(httpCtrl.routes).toHaveLength(2);
+    expect(httpCtrl.routes[0].httpMethod).toBe('get');
+    expect(httpCtrl.routes[1].httpMethod).toBe('post');
   });
 
-  it('retrieves controllers from ApplicationContext in createRouter', () => {
+  it('stores parameter binding metadata for runtime wiring', () => {
     const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post, Patch, HttpContext, Introspected } from './decorators.js'
+        @Introspected()
+        class CreateDto { title!: string }
+        @Controller('/api')
+        class Ctrl {
+          @Get('/:id')
+          getById(id: string, ctx: HttpContext) {}
+          @Post('/')
+          create(body: CreateDto) {}
+          @Patch('/:id')
+          update(id: string, body: CreateDto) {}
         }
       `,
     });
 
-    expect(result.code).toContain('ctx.get(UserController)');
+    const component = result.components.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
+    );
+    const httpCtrl = component!.metadata.httpController as {
+      routes: Array<{
+        methodName: string;
+        params: Array<{ name: string; binding: string; typeName: string }>;
+      }>;
+    };
+
+    // GET /:id — path + context params
+    expect(httpCtrl.routes[0].params).toEqual([
+      { name: 'id', binding: 'path', typeName: 'string', optional: false },
+      {
+        name: 'ctx',
+        binding: 'context',
+        typeName: 'HttpContext',
+        optional: false,
+      },
+    ]);
+
+    // POST / — body param
+    expect(httpCtrl.routes[1].params).toEqual([
+      {
+        name: 'body',
+        binding: 'body',
+        typeName: 'CreateDto',
+        optional: false,
+        typeImportPath: '/src/Ctrl.ts',
+      },
+    ]);
+
+    // PATCH /:id — path + body
+    expect(httpCtrl.routes[2].params).toEqual([
+      { name: 'id', binding: 'path', typeName: 'string', optional: false },
+      {
+        name: 'body',
+        binding: 'body',
+        typeName: 'CreateDto',
+        optional: false,
+        typeImportPath: '/src/Ctrl.ts',
+      },
+    ]);
   });
 
-  it('does not generate createRouter or onStart hook when no controllers exist', () => {
+  it('stores return type metadata for API schema', () => {
+    const result = createProject({
+      '/src/Ctrl.ts': `
+        import { Controller, Get, Post, Response } from './decorators.js'
+        interface Todo { id: string; title: string }
+        @Controller('/api')
+        class Ctrl {
+          @Get('/')
+          async list(): Promise<Todo[]> { return [] }
+          @Post('/')
+          async create(): Promise<Response<Todo>> { return Response.created({} as Todo) }
+        }
+      `,
+    });
+
+    const component = result.components.find(
+      (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
+    );
+    const httpCtrl = component!.metadata.httpController as {
+      routes: Array<{ methodName: string; returnType: string }>;
+    };
+
+    expect(httpCtrl.routes[0].returnType).toBe('Todo[]');
+    expect(httpCtrl.routes[1].returnType).toBe('Todo');
+  });
+
+  it('does not generate hono-specific code when no controllers exist', () => {
     const result = createProject({
       '/src/MyService.ts': `
         import { Singleton } from './decorators.js'
@@ -140,869 +148,6 @@ describe('Hono Plugin Codegen', () => {
     });
 
     expect(result.code).not.toContain('EmbeddedServer');
-    expect(result.code).not.toContain('app.onStart');
-    expect(result.code).not.toContain('Hono');
-    expect(result.code).not.toContain('createRouter');
-    expect(result.code).not.toContain('AppType');
-    expect(result.code).not.toContain('createClient');
-    expect(result.code).not.toContain('hc');
-  });
-
-  it('handles multiple controllers', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-      '/src/TodoController.ts': `
-        import { Controller, Get, Post } from './decorators.js'
-        @Controller('/api/todos')
-        class TodoController {
-          @Get('/')
-          list() {}
-          @Post('/')
-          create() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('export function createRouter');
-    expect(result.code).toContain(".route('/api/users'");
-    expect(result.code).toContain(".route('/api/todos'");
-  });
-
-  it('uses handleResult helper for route handlers', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('handleResult(c, await ctrl.getData(c))');
-  });
-
-  it('handles all HTTP methods', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Post, Put, Delete, Patch } from './decorators.js'
-        @Controller('/r')
-        class Ctrl {
-          @Get('/') a() {}
-          @Post('/') b() {}
-          @Put('/') c() {}
-          @Delete('/') d() {}
-          @Patch('/') e() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(".route('/r'");
-    expect(result.code).toContain(".get('/'");
-    expect(result.code).toContain(".post('/'");
-    expect(result.code).toContain(".put('/'");
-    expect(result.code).toContain(".delete('/'");
-    expect(result.code).toContain(".patch('/'");
-  });
-
-  it('uses collision-safe variable names for same-prefix controllers', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/v1/users')
-        class UserController {
-          @Get('/') list() {}
-        }
-      `,
-      '/src/UserControllerV2.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/v2/users')
-        class UserControllerV2 {
-          @Get('/') list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('userController');
-    expect(result.code).toContain('userControllerV2');
-  });
-
-  it('emits zValidator middleware for @Validate routes', () => {
-    const result = createProject({
-      '/src/schema.ts': `
-        export const createTodoSchema = {}
-      `,
-      '/src/TodoController.ts': `
-        import { Controller, Post, Get, Validate } from './decorators.js'
-        import { createTodoSchema } from './schema.js'
-
-        @Controller('/todos')
-        class TodoController {
-          @Post('/')
-          @Validate({ json: createTodoSchema })
-          create() {}
-
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('validationMiddleware');
-    expect(result.code).toContain(
-      "validationMiddleware('json', createTodoSchema)",
-    );
-
-    // Schema import should use a relative path, not an absolute one
-    expect(result.code).toMatch(
-      /import \{ createTodoSchema \} from '\.\.\/src\/schema\.js'/,
-    );
-  });
-
-  it('throws InvalidDecoratorUsageError for expression-based @Validate values', () => {
-    expect(() =>
-      createProject({
-        '/src/Ctrl.ts': `
-          import { Controller, Post, Validate } from './decorators.js'
-
-          @Controller('/api')
-          class Ctrl {
-            @Post('/')
-            @Validate({ json: makeSchema() })
-            create() {}
-          }
-        `,
-      }),
-    ).toThrow(InvalidDecoratorUsageError);
-  });
-});
-
-describe('Hono Plugin — @Cors', () => {
-  it('emits cors() import when @Cors is used', () => {
-    const result = createProject({
-      '/src/ApiController.ts': `
-        import { Controller, Get, Cors } from './decorators.js'
-
-        @Cors()
-        @Controller('/api')
-        class ApiController {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('corsMiddleware');
-  });
-
-  it('emits corsMiddleware() for class-level @Cors() with no args', () => {
-    const result = createProject({
-      '/src/ApiController.ts': `
-        import { Controller, Get, Cors } from './decorators.js'
-
-        @Cors()
-        @Controller('/api')
-        class ApiController {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('corsMiddleware(),');
-  });
-
-  it('emits cors(config) for class-level @Cors with options', () => {
-    const result = createProject({
-      '/src/ApiController.ts': `
-        import { Controller, Get, Cors } from './decorators.js'
-
-        @Cors({ origin: 'https://example.com', allowMethods: ['GET', 'POST'] })
-        @Controller('/api')
-        class ApiController {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      "corsMiddleware({ origin: 'https://example.com'",
-    );
-    expect(result.code).toContain("allowMethods: ['GET', 'POST']");
-  });
-
-  it('applies class-level @Cors to all routes', () => {
-    const result = createProject({
-      '/src/ApiController.ts': `
-        import { Controller, Get, Post, Cors } from './decorators.js'
-
-        @Cors({ origin: '*' })
-        @Controller('/api')
-        class ApiController {
-          @Get('/a')
-          a() {}
-          @Post('/b')
-          b() {}
-        }
-      `,
-    });
-
-    // Both routes should have cors middleware
-    const corsMatches = result.code.match(
-      /corsMiddleware\(\{ origin: '\*' \}\)/g,
-    );
-    expect(corsMatches).toHaveLength(2);
-  });
-
-  it('method-level @Cors overrides class-level', () => {
-    const result = createProject({
-      '/src/ApiController.ts': `
-        import { Controller, Get, Cors } from './decorators.js'
-
-        @Cors({ origin: 'https://example.com' })
-        @Controller('/api')
-        class ApiController {
-          @Get('/default')
-          defaultCors() {}
-
-          @Cors({ origin: '*' })
-          @Get('/public')
-          publicCors() {}
-        }
-      `,
-    });
-
-    // /api/default should use class-level cors
-    expect(result.code).toContain(
-      "corsMiddleware({ origin: 'https://example.com' })",
-    );
-    // /api/public should use method-level cors (origin: '*')
-    expect(result.code).toContain("corsMiddleware({ origin: '*' })");
-  });
-
-  it('does not emit cors for routes without @Cors', () => {
-    const result = createProject({
-      '/src/ApiController.ts': `
-        import { Controller, Get } from './decorators.js'
-
-        @Controller('/api')
-        class ApiController {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).not.toContain('corsMiddleware');
-    expect(result.code).not.toContain('hono/cors');
-  });
-
-  it('method-level @Cors without class-level only affects that route', () => {
-    const result = createProject({
-      '/src/ApiController.ts': `
-        import { Controller, Get, Cors } from './decorators.js'
-
-        @Controller('/api')
-        class ApiController {
-          @Cors({ origin: '*' })
-          @Get('/public')
-          publicRoute() {}
-
-          @Get('/private')
-          privateRoute() {}
-        }
-      `,
-    });
-
-    // Only the /public route should have cors
-    const corsMatches = result.code.match(/corsMiddleware\(/g);
-    expect(corsMatches).toHaveLength(1);
-  });
-
-  it('cors middleware appears before validation middleware', () => {
-    const result = createProject({
-      '/src/schema.ts': `
-        export const bodySchema = {}
-      `,
-      '/src/ApiController.ts': `
-        import { Controller, Post, Cors, Validate } from './decorators.js'
-        import { bodySchema } from './schema.js'
-
-        @Cors({ origin: '*' })
-        @Controller('/api')
-        class ApiController {
-          @Post('/data')
-          @Validate({ json: bodySchema })
-          create() {}
-        }
-      `,
-    });
-
-    const corsIdx = result.code.indexOf('corsMiddleware(');
-    const validatorIdx = result.code.indexOf('validationMiddleware(');
-    expect(corsIdx).toBeLessThan(validatorIdx);
-  });
-});
-
-describe('Hono Plugin — @Secured / @Anonymous', () => {
-  it('imports security types when @Secured is used', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Secured } from './decorators.js'
-        @Controller('/api')
-        @Secured()
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('SECURITY_PROVIDER');
-    expect(result.code).toContain('securityMiddleware');
-    expect(result.code).toContain(
-      "import type { SecurityProvider } from '@goodie-ts/hono'",
-    );
-    expect(result.code).not.toContain('SecurityContext');
-  });
-
-  it('generates security middleware for @Secured controller routes', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Secured } from './decorators.js'
-        @Controller('/api')
-        @Secured()
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    // Should use securityMiddleware helper with 'required' mode
-    expect(result.code).toContain(
-      "securityMiddleware(__securityProvider, 'required')",
-    );
-  });
-
-  it('resolves SecurityProvider in createRouter', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Secured } from './decorators.js'
-        @Controller('/api')
-        @Secured()
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).not.toContain('ctx.get(SecurityContext)');
-    expect(result.code).toContain('ctx.getAll(SECURITY_PROVIDER)');
-  });
-
-  it('passes security args to route factory for secured controllers', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Secured } from './decorators.js'
-        @Controller('/api')
-        @Secured()
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).not.toContain('__securityContext');
-    expect(result.code).toContain(
-      '__securityProvider: SecurityProvider | undefined',
-    );
-  });
-
-  it('does not pass security args to route factory for non-secured controllers', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).not.toContain('__securityContext');
-    expect(result.code).not.toContain('__securityProvider');
-  });
-
-  it('@Anonymous skips auth enforcement in @Secured controller', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Secured, Anonymous } from './decorators.js'
-        @Controller('/api')
-        @Secured()
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-
-          @Get('/health')
-          @Anonymous()
-          health() {}
-        }
-      `,
-    });
-
-    // The secured route uses 'required' mode
-    expect(result.code).toContain(
-      "securityMiddleware(__securityProvider, 'required')",
-    );
-    // The anonymous route uses 'optional' mode
-    expect(result.code).toContain(
-      "securityMiddleware(__securityProvider, 'optional')",
-    );
-  });
-
-  it('handles method-level @Secured without class-level', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Post, Secured } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/public')
-          publicRoute() {}
-
-          @Post('/admin')
-          @Secured()
-          adminRoute() {}
-        }
-      `,
-    });
-
-    // Should import security types
-    expect(result.code).toContain('SECURITY_PROVIDER');
-    // Only admin route should have security middleware
-    const securityMatches = result.code.match(
-      /securityMiddleware\(__securityProvider/g,
-    );
-    expect(securityMatches).toHaveLength(1);
-  });
-
-  it('mixes secured and non-secured controllers', () => {
-    const result = createProject({
-      '/src/PublicCtrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/public')
-        class PublicCtrl {
-          @Get('/') list() {}
-        }
-      `,
-      '/src/AdminCtrl.ts': `
-        import { Controller, Get, Secured } from './decorators.js'
-        @Controller('/admin')
-        @Secured()
-        class AdminCtrl {
-          @Get('/') list() {}
-        }
-      `,
-    });
-
-    // PublicCtrl factory should not have security params
-    expect(result.code).toContain(
-      'function __createPublicCtrlRoutes(publicCtrl: PublicCtrl)',
-    );
-    // AdminCtrl factory should have security params
-    expect(result.code).toContain(
-      '__createAdminCtrlRoutes(adminCtrl: AdminCtrl, __securityProvider: SecurityProvider',
-    );
-    // createRouter should pass security args only to AdminCtrl
-    expect(result.code).toContain(
-      '__createAdminCtrlRoutes(ctx.get(AdminCtrl), __securityProvider)',
-    );
-    // But not to PublicCtrl
-    expect(result.code).toMatch(
-      /__createPublicCtrlRoutes\(ctx\.get\(PublicCtrl\)\)/,
-    );
-  });
-});
-
-describe('Hono Plugin — RPC Client', () => {
-  it('exports AppType as ReturnType of createRouter', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      'export type AppType = ReturnType<typeof createRouter>',
-    );
-  });
-
-  it('generates createClient that wraps hc<AppType>', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
-    );
-    expect(result.code).toContain('return hc<AppType>(baseUrl, options)');
-  });
-
-  it('chains route registrations for type inference', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get, Post } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/items')
-          list() {}
-          @Post('/items')
-          create() {}
-        }
-      `,
-    });
-
-    // Per-controller route factory function
-    expect(result.code).toContain('function __createCtrlRoutes(ctrl: Ctrl)');
-    expect(result.code).toContain(".get('/items'");
-    expect(result.code).toContain(".post('/items'");
-    // Per-controller type and client
-    expect(result.code).toContain(
-      'export type CtrlRoutes = ReturnType<typeof __createCtrlRoutes>',
-    );
-    expect(result.code).toContain(
-      'export function createCtrlClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
-    );
-    // Top-level composition via .route()
-    expect(result.code).toContain('return new Hono()');
-    expect(result.code).toContain(".route('/api'");
-  });
-
-  it('generates per-controller route types and client factories', () => {
-    const result = createProject({
-      '/src/UserController.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api/users')
-        class UserController {
-          @Get('/')
-          list() {}
-        }
-      `,
-      '/src/TodoController.ts': `
-        import { Controller, Get, Post } from './decorators.js'
-        @Controller('/api/todos')
-        class TodoController {
-          @Get('/')
-          list() {}
-          @Post('/')
-          create() {}
-        }
-      `,
-    });
-
-    // Per-controller route types
-    expect(result.code).toContain('export type UserControllerRoutes =');
-    expect(result.code).toContain('export type TodoControllerRoutes =');
-    // Per-controller client factories
-    expect(result.code).toContain(
-      'export function createUserControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
-    );
-    expect(result.code).toContain(
-      'export function createTodoControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
-    );
-    // Still has the full AppType and createClient
-    expect(result.code).toContain('export type AppType =');
-    expect(result.code).toContain(
-      'export function createClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
-    );
-  });
-
-  it('createRouter has no explicit return type annotation', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/data')
-          getData() {}
-        }
-      `,
-    });
-
-    // No `: Hono` return type — TypeScript must infer the chained type
-    expect(result.code).not.toContain(
-      'createRouter(ctx: ApplicationContext): Hono',
-    );
-    expect(result.code).toContain('createRouter(ctx: ApplicationContext)');
-  });
-
-  it('handles root-path controller mounting', () => {
-    const result = createProject({
-      '/src/RootController.ts': `
-        import { Controller, Get, Post } from './decorators.js'
-        @Controller('/')
-        class RootController {
-          @Get('/health')
-          health() {}
-          @Post('/echo')
-          echo() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      'function __createRootControllerRoutes(rootController: RootController)',
-    );
-    expect(result.code).toContain(".route('/'");
-    expect(result.code).toContain(".get('/health'");
-    expect(result.code).toContain(".post('/echo'");
-    expect(result.code).toContain('export type RootControllerRoutes =');
-    expect(result.code).toContain(
-      'export function createRootControllerClient(baseUrl: string, options?: Parameters<typeof hc>[1])',
-    );
-  });
-});
-
-describe('Hono Plugin — OpenAPI', () => {
-  it('generates openApiMiddleware when route has OpenAPI options', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/', { summary: 'List items', description: 'Returns all items' })
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('openApiMiddleware');
-    expect(result.code).toContain(
-      'openApiMiddleware({ summary: "List items", description: "Returns all items" })',
-    );
-  });
-
-  it('generates openApiMiddleware with tags', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/', { tags: ['items', 'public'] })
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('tags: ["items","public"]');
-  });
-
-  it('generates openApiMiddleware with deprecated flag', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/old', { deprecated: true })
-          oldEndpoint() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('deprecated: true');
-  });
-
-  it('passes responses raw to openApiMiddleware and imports resolver + schemas', () => {
-    const result = createProject({
-      '/src/schema.ts': `
-        export const itemSchema = {}
-      `,
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        import { itemSchema } from './schema.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/', {
-            responses: {
-              200: { description: 'Success', content: { 'application/json': { schema: resolver(itemSchema) } } }
-            }
-          })
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('openApiMiddleware({');
-    expect(result.code).toContain('responses: {');
-    expect(result.code).toContain("200: { description: 'Success'");
-    expect(result.code).toContain('resolver(itemSchema)');
-    // Should import resolver from @goodie-ts/hono
-    expect(result.code).toContain('resolver');
-    // Should import the schema used inside resolver()
-    expect(result.code).toContain('import { itemSchema }');
-  });
-
-  it('does not generate openApiMiddleware when no route has OpenAPI options', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/')
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).not.toContain('openApiMiddleware');
-    expect(result.code).not.toContain('mountOpenApiSpec');
-    expect(result.code).not.toContain('OpenApiConfig');
-  });
-
-  it('generates mountOpenApiSpec when any route has OpenAPI options', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/', { summary: 'List' })
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain('mountOpenApiSpec');
-    expect(result.code).toContain('OpenApiConfig');
-    expect(result.code).toContain('ctx.get(OpenApiConfig)');
-    expect(result.code).toContain(
-      'mountOpenApiSpec(__router, __openApiConfig)',
-    );
-  });
-
-  it('calls mountOpenApiSpec with router and config', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/', { summary: 'List' })
-          list() {}
-        }
-      `,
-    });
-
-    expect(result.code).toContain(
-      'mountOpenApiSpec(__router, __openApiConfig)',
-    );
-  });
-
-  it('openApiMiddleware appears before other middleware', () => {
-    const result = createProject({
-      '/src/schema.ts': `export const bodySchema = {}`,
-      '/src/Ctrl.ts': `
-        import { Controller, Post, Validate, Secured } from './decorators.js'
-        import { bodySchema } from './schema.js'
-        @Controller('/api')
-        @Secured()
-        class Ctrl {
-          @Post('/', { summary: 'Create item' })
-          @Validate({ json: bodySchema })
-          create() {}
-        }
-      `,
-    });
-
-    const openApiIdx = result.code.indexOf('openApiMiddleware(');
-    const securityIdx = result.code.indexOf(
-      "securityMiddleware(__securityProvider, 'required')",
-    );
-    const validatorIdx = result.code.indexOf("validationMiddleware('json'");
-    expect(openApiIdx).toBeLessThan(securityIdx);
-    expect(securityIdx).toBeLessThan(validatorIdx);
-  });
-
-  it('only annotated routes get describeRoute, others do not', () => {
-    const result = createProject({
-      '/src/Ctrl.ts': `
-        import { Controller, Get } from './decorators.js'
-        @Controller('/api')
-        class Ctrl {
-          @Get('/', { summary: 'List' })
-          list() {}
-
-          @Get('/health')
-          health() {}
-        }
-      `,
-    });
-
-    // openApiMiddleware should appear once (for list), not for health
-    const matches = result.code.match(/openApiMiddleware\(/g);
-    expect(matches).toHaveLength(1);
-  });
-});
-
-describe('Multi-runtime codegen', () => {
-  const controllerFile = `
-    import { Controller, Get } from './decorators.js'
-    @Controller('/api/users')
-    class UserController {
-      @Get('/')
-      list() {}
-    }
-  `;
-
-  it('generates onStart hook with EmbeddedServer for node runtime (default)', () => {
-    const result = createProject({ '/src/UserController.ts': controllerFile });
-
-    expect(result.code).toContain('app.onStart(async (ctx) => {');
-    expect(result.code).toContain('ctx.get(EmbeddedServer).listen(router');
-    expect(result.code).toContain('EmbeddedServer');
-    expect(result.code).toContain("from '@goodie-ts/hono'");
-    expect(result.code).not.toContain('RuntimeBindings');
-    expect(result.code).not.toContain('export default');
-  });
-
-  it('skips onStart hook and EmbeddedServer for cloudflare runtime', () => {
-    const result = createProject(
-      { '/src/UserController.ts': controllerFile },
-      '/out/AppContext.generated.ts',
-      [honoPlugin],
-      { 'server.runtime': 'cloudflare' },
-    );
-
-    expect(result.code).not.toContain('app.onStart');
-    expect(result.code).not.toContain('EmbeddedServer');
-    expect(result.code).toContain(
-      'export function createRouter(ctx: ApplicationContext)',
-    );
-    expect(result.code).toContain('export function createClient');
-    expect(result.code).toContain(
-      'export type AppType = ReturnType<typeof createRouter>',
-    );
+    expect(result.code).not.toContain('createHonoRouter');
   });
 });

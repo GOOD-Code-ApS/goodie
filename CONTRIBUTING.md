@@ -50,9 +50,9 @@ pnpm release      # Build + publish to npm
 
 `workspace:^` publishes as `^0.5.0` (compatible range). `workspace:*` publishes as `*` but is only used in devDependencies, which aren't installed by consumers.
 
-## Adding Library Beans to a Package
+## Adding Library Components to a Package
 
-Library beans allow packages to ship pre-scanned bean definitions so consumers don't need transformer plugins to wire them.
+Library components allow packages to ship pre-scanned component definitions so consumers don't need transformer plugins to wire them.
 
 ### 1. Decorate source classes
 
@@ -70,7 +70,7 @@ export class MyInterceptor implements MethodInterceptor { ... }
 ```json
 {
   "goodie": {
-    "beans": "dist/beans.json"
+    "components": "dist/components.json"
   },
   "scripts": {
     "build": "tsc && goodie generate --mode library"
@@ -90,9 +90,9 @@ export class MyInterceptor implements MethodInterceptor { ... }
 pnpm build
 ```
 
-This runs `tsc` (JS + `.d.ts`) then `goodie generate --mode library` (beans.json).
+This runs `tsc` (JS + `.d.ts`) then `goodie generate --mode library` (components.json).
 
-Consumers automatically discover beans via `discoverLibraryBeans()` at build time.
+Consumers automatically discover components via `discoverLibraryComponents()` at build time.
 
 ## Adding Declarative AOP to a Package
 
@@ -101,8 +101,8 @@ For packages that provide AOP decorators (e.g. `@Log`, `@Cacheable`, `@Retryable
 ### How it works
 
 1. Define your decorator with `createAopDecorator<{...}>()`, encoding the interceptor class, order, metadata, arg mapping, and defaults in the type parameter.
-2. Run `goodie generate --mode library` — the AOP scanner reads the type parameter and includes the config in `beans.json` under an `aop` section.
-3. Consumers install the package — the transformer discovers AOP mappings from `beans.json` and wires the generic declarative AOP plugin automatically.
+2. Run `goodie generate --mode library` — the AOP scanner reads the type parameter and includes the config in `components.json` under an `aop` section.
+3. Consumers install the package — the transformer discovers AOP mappings from `components.json` and wires the generic declarative AOP plugin automatically.
 
 No hand-written transformer plugins, no `goodie.aop` in package.json — the source code is the single source of truth.
 

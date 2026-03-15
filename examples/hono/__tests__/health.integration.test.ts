@@ -1,3 +1,4 @@
+import { createHonoRouter } from '@goodie-ts/hono';
 import { TransactionManager } from '@goodie-ts/kysely';
 import { createGoodieTest } from '@goodie-ts/testing/vitest';
 import {
@@ -5,7 +6,7 @@ import {
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { buildDefinitions, createRouter } from '../src/AppContext.generated.js';
+import { buildDefinitions } from '../src/__generated__/context.js';
 
 describe('Health API', () => {
   let container: StartedPostgreSqlContainer;
@@ -24,7 +25,7 @@ describe('Health API', () => {
       'datasource.dialect': 'postgres',
     }),
     fixtures: {
-      app: (ctx) => createRouter(ctx),
+      app: (ctx) => createHonoRouter(ctx),
     },
     transactional: TransactionManager,
   });

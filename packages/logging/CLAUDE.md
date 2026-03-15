@@ -29,7 +29,7 @@ Both share the same `LoggerFactory` backend, so AOP and imperative loggers use t
 
 ## AOP Wiring
 
-The `@Log` decorator is defined via `createAopDecorator()` with AOP config in the type parameter. At library build time, the transformer's AOP scanner extracts the config and includes it in `beans.json`. The `LoggingInterceptor` singleton bean is also shipped in `beans.json`. Consumers auto-discover both at build time — no plugin setup needed.
+The `@Log` decorator is defined via `createAopDecorator()` with AOP config in the type parameter. At library build time, the transformer's AOP scanner extracts the config and includes it in `components.json`. The `LoggingInterceptor` singleton component is also shipped in `components.json`. Consumers auto-discover both at build time — no plugin setup needed.
 
 ## Gotchas
 

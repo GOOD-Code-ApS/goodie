@@ -1,0 +1,50 @@
+{
+  "name": "@goodie-ts/http",
+  "version": "1.0.0",
+  "description": "Abstract HTTP layer for goodie-ts — controllers, route decorators, Request/Response types",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GOOD-Code-ApS/goodie.git",
+    "directory": "packages/http"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./codegen": {
+      "types": "./dist/codegen.d.ts",
+      "import": "./dist/codegen.js"
+    }
+  },
+  "goodie": {
+    "plugin": "dist/plugin.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "peerDependencies": {
+    "@goodie-ts/core": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@goodie-ts/core": "workspace:*",
+    "@goodie-ts/transformer": "workspace:*",
+    "@types/node": "^22.0.0",
+    "ts-morph": "^24.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

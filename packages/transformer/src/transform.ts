@@ -12,22 +12,28 @@ import { createAopPlugin } from './builtin-aop-plugin.js';
 import { createConditionalPlugin } from './builtin-conditional-plugin.js';
 import { createConfigPlugin } from './builtin-config-plugin.js';
 import { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
-import { computeIRHash, extractIRHash, generateCode } from './codegen.js';
+import {
+  buildGeneratedHeader,
+  computeIRHash,
+  extractIRHash,
+  generateCode,
+  type TypeRegistration,
+} from './codegen.js';
 import {
   discoverAll,
   discoverPlugins,
   mergePlugins,
 } from './discover-plugins.js';
 import { buildGraph } from './graph-builder.js';
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import {
-  deserializeBeans,
+  deserializeComponents,
   discoverAopMappings,
   rewriteImportPaths,
-  serializeBeans,
-} from './library-beans.js';
+  serializeComponents,
+} from './library-components.js';
 import type {
-  CodegenContribution,
+  EmittedFile,
   TransformerPlugin,
   TransformLibraryOptions,
   TransformLibraryResult,
@@ -89,7 +95,7 @@ export async function transform(
 
   // Single filesystem discovery pass for plugins + library manifests
   const skipDiscovery =
-    options.disablePluginDiscovery && options.disableLibraryBeanDiscovery;
+    options.disablePluginDiscovery && options.disableLibraryComponentDiscovery;
   const discovery = skipDiscovery
     ? { plugins: [], manifests: [], packageDirs: new Map<string, string>() }
     : (options.discoveryCache ??
@@ -99,16 +105,16 @@ export async function transform(
     ? []
     : discovery.plugins;
 
-  // Extract library beans and AOP mappings from manifests
-  const libraryBeans: IRBeanDefinition[] = [];
+  // Extract library components and AOP mappings from manifests
+  const libraryComponents: IRComponentDefinition[] = [];
   const aopMappings: import('./aop-plugin.js').ResolvedAopMapping[] = [];
-  if (!options.disableLibraryBeanDiscovery) {
+  if (!options.disableLibraryComponentDiscovery) {
     for (const { packageName, manifest } of discovery.manifests) {
       try {
-        libraryBeans.push(...deserializeBeans(manifest));
+        libraryComponents.push(...deserializeComponents(manifest));
       } catch (err) {
         console.warn(
-          `[@goodie-ts] Failed to deserialize beans from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
+          `[@goodie-ts] Failed to deserialize components from "${manifest.package}": ${err instanceof Error ? err.message : String(err)}`,
         );
       }
       if (!options.disablePluginDiscovery && manifest.aop) {
@@ -127,9 +133,9 @@ export async function transform(
   // Built-in plugins always active; declarative AOP comes next; then discovered + user plugins
   const builtinPlugins = [
     createAopPlugin(),
+    createIntrospectionPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
-    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discoveredPlugins],
@@ -149,42 +155,49 @@ export async function transform(
   // 4. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 5. Merge visitor metadata into beans (before afterResolve so plugins can read it)
-  let beans = resolveResult.beans;
+  // 5. Merge visitor metadata into components (before afterResolve so plugins can read it)
+  let components = resolveResult.components;
   if (scanResult.pluginMetadata) {
-    mergePluginMetadata(beans, scanResult.pluginMetadata);
+    mergePluginMetadata(components, scanResult.pluginMetadata);
   }
 
-  // 5b. Inject library beans (before afterResolve so plugins see them)
-  if (!options.disableLibraryBeanDiscovery && libraryBeans.length > 0) {
-    beans = [...beans, ...libraryBeans];
+  // 5b. Inject library components (before afterResolve so plugins see them)
+  if (
+    !options.disableLibraryComponentDiscovery &&
+    libraryComponents.length > 0
+  ) {
+    components = [...components, ...libraryComponents];
     // Reconcile: scanned deps use absolute paths from ts-morph, but library
-    // beans use bare package specifiers. Rewrite dep tokenRefs to match.
-    reconcileLibraryImportPaths(beans, libraryBeans, discovery.packageDirs);
+    // components use bare package specifiers. Rewrite dep tokenRefs to match.
+    reconcileLibraryImportPaths(
+      components,
+      libraryComponents,
+      discovery.packageDirs,
+    );
   }
 
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
-      beans = runPluginHook(plugin.name, 'afterResolve', () =>
-        plugin.afterResolve!(beans),
+      components = runPluginHook(plugin.name, 'afterResolve', () =>
+        plugin.afterResolve!(components),
       );
     }
   }
 
-  // 6b. Reconcile again — plugins may add synthetic beans with bare package specifiers
-  // (e.g. TransactionManager from the kysely plugin) that scanned beans reference
+  // 6b. Reconcile again — plugins may add synthetic components with bare package specifiers
+  // (e.g. TransactionManager from the kysely plugin) that scanned components reference
   // via absolute paths.
-  if (!options.disableLibraryBeanDiscovery) {
-    // Collect all beans with bare package specifier import paths (library + plugin-synthesized)
-    const bareSpecifierBeans = beans.filter(
+  if (!options.disableLibraryComponentDiscovery) {
+    // Collect all components with bare package specifier import paths (library + plugin-synthesized)
+    const bareSpecifierComponents = components.filter(
       (b) =>
         b.tokenRef.kind === 'class' && !b.tokenRef.importPath.startsWith('/'),
     );
-    if (bareSpecifierBeans.length > 0) {
+    if (bareSpecifierComponents.length > 0) {
       reconcileLibraryImportPaths(
-        beans,
-        bareSpecifierBeans,
+        components,
+        bareSpecifierComponents,
         discovery.packageDirs,
       );
     }
@@ -196,14 +209,14 @@ export async function transform(
       ? options.configDir
       : path.resolve(baseDir, options.configDir)
     : undefined;
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph({ ...resolveResult, components: components });
 
   // 8. beforeCodegen hook
-  let finalBeans = graphResult.beans;
+  let finalComponents = graphResult.components;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
-      finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
-        plugin.beforeCodegen!(finalBeans),
+      finalComponents = runPluginHook(plugin.name, 'beforeCodegen', () =>
+        plugin.beforeCodegen!(finalComponents),
       );
     }
   }
@@ -214,27 +227,44 @@ export async function transform(
     inlinedConfig = readAndFlattenConfigFiles(resolvedConfigDir);
   }
 
-  // 10. Collect codegen contributions (pass build-time config to plugins)
-  const codegenContext = { config: inlinedConfig ?? {} };
-  const contributions: CodegenContribution[] = [];
-  for (const plugin of activePlugins) {
-    if (plugin.codegen) {
-      contributions.push(
-        runPluginHook(plugin.name, 'codegen', () =>
-          plugin.codegen!(finalBeans, codegenContext),
-        ),
-      );
+  // 10. Extract type registrations from plugin metadata
+  const typeRegistrations = extractTypeRegistrations(scanResult.pluginMetadata);
+
+  // 10a. Reconcile type registration import paths (bare package specifiers for library types)
+  if (discovery.packageDirs) {
+    for (const reg of typeRegistrations) {
+      if (reg.importPath.startsWith('/')) {
+        for (const [realDir, pkgName] of discovery.packageDirs) {
+          if (reg.importPath.startsWith(`${realDir}/`)) {
+            reg.importPath = pkgName;
+            break;
+          }
+        }
+      }
     }
   }
+
+  // 10b. Collect emitted files from plugins
+  const outputDir = path.dirname(options.outputPath);
+  const emittedFiles = collectEmittedFiles(
+    activePlugins,
+    finalComponents,
+    outputDir,
+    typeRegistrations,
+  );
 
   // 11. Check IR hash — skip codegen + write if DI graph unchanged
   const codegenOptions = {
     outputPath: options.outputPath,
     version: PKG_VERSION,
-    configDir: resolvedConfigDir,
     inlinedConfig,
   };
-  const currentHash = computeIRHash(finalBeans, codegenOptions, contributions);
+  const currentHash = computeIRHash(
+    finalComponents,
+    codegenOptions,
+    typeRegistrations,
+    emittedFiles,
+  );
 
   let existingHash: string | undefined;
   try {
@@ -250,36 +280,49 @@ export async function transform(
     return {
       code,
       outputPath: options.outputPath,
-      beans: finalBeans,
+      components: finalComponents,
       warnings: graphResult.warnings,
       skipped: true,
       discoveryCache: discovery,
+      emittedFiles,
     };
   }
 
-  // 11. Generate code (pass pre-computed hash to avoid recomputation)
-  const code = generateCode(
-    finalBeans,
-    { ...codegenOptions, hash: currentHash },
-    contributions,
-  );
+  // 12. Generate code (pass pre-computed hash to avoid recomputation)
+  const emittedFilePaths = emittedFiles.map((f) => f.relativePath);
+  const generatedHeader = buildGeneratedHeader(PKG_VERSION, currentHash);
+  const code =
+    generatedHeader +
+    generateCode(
+      finalComponents,
+      { ...codegenOptions, hash: currentHash },
+      typeRegistrations,
+      emittedFilePaths.length > 0 ? emittedFilePaths : undefined,
+    );
 
-  // 11b. Debug output
+  // 12b. Debug output
   if (process.env.GOODIE_DEBUG === 'true') {
-    printDebugInfo(finalBeans, activePlugins, contributions);
+    printDebugInfo(finalComponents, activePlugins);
   }
 
-  // 12. Write output
-  const outputDir = path.dirname(options.outputPath);
+  // 13. Write output
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(options.outputPath, code, 'utf-8');
+
+  // 13b. Write emitted files
+  for (const file of emittedFiles) {
+    const filePath = path.join(outputDir, file.relativePath);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, generatedHeader + file.content, 'utf-8');
+  }
 
   return {
     code,
     outputPath: options.outputPath,
-    beans: finalBeans,
+    components: finalComponents,
     warnings: graphResult.warnings,
     discoveryCache: discovery,
+    emittedFiles,
   };
 }
 
@@ -291,9 +334,9 @@ export function transformInMemory(
   project: Project,
   outputPath: string,
   plugins?: TransformerPlugin[],
-  libraryBeans?: IRBeanDefinition[],
+  libraryComponents?: IRComponentDefinition[],
   aopMappings?: ResolvedAopMapping[],
-  options?: { configDir?: string; inlinedConfig?: Record<string, string> },
+  options?: { inlinedConfig?: Record<string, string> },
 ): TransformResult {
   const aopPlugins =
     aopMappings && aopMappings.length > 0
@@ -301,9 +344,9 @@ export function transformInMemory(
       : [];
   const builtinPlugins = [
     createAopPlugin(),
+    createIntrospectionPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
-    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins],
@@ -323,82 +366,97 @@ export function transformInMemory(
   // 3. Resolve
   const resolveResult = resolve(scanResult);
 
-  // 4. Merge visitor metadata into beans (before afterResolve so plugins can read it)
-  let beans = resolveResult.beans;
+  // 4. Merge visitor metadata into components (before afterResolve so plugins can read it)
+  let components = resolveResult.components;
   if (scanResult.pluginMetadata) {
-    mergePluginMetadata(beans, scanResult.pluginMetadata);
+    mergePluginMetadata(components, scanResult.pluginMetadata);
   }
 
-  // 4b. Inject library beans (before afterResolve so plugins see them)
-  if (libraryBeans && libraryBeans.length > 0) {
-    beans = [...beans, ...libraryBeans];
-    reconcileLibraryImportPaths(beans, libraryBeans);
+  // 4b. Inject library components (before afterResolve so plugins see them)
+  if (libraryComponents && libraryComponents.length > 0) {
+    components = [...components, ...libraryComponents];
+    reconcileLibraryImportPaths(components, libraryComponents);
   }
 
   // 5. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
-      beans = runPluginHook(plugin.name, 'afterResolve', () =>
-        plugin.afterResolve!(beans),
+      components = runPluginHook(plugin.name, 'afterResolve', () =>
+        plugin.afterResolve!(components),
       );
     }
   }
 
-  // 5b. Reconcile again — plugins may add synthetic beans with bare package specifiers
-  if (libraryBeans && libraryBeans.length > 0) {
-    const bareSpecifierBeans = beans.filter(
+  // 5b. Reconcile again — plugins may add synthetic components with bare package specifiers
+  if (libraryComponents && libraryComponents.length > 0) {
+    const bareSpecifierComponents = components.filter(
       (b) =>
         b.tokenRef.kind === 'class' && !b.tokenRef.importPath.startsWith('/'),
     );
-    if (bareSpecifierBeans.length > 0) {
-      reconcileLibraryImportPaths(beans, bareSpecifierBeans);
+    if (bareSpecifierComponents.length > 0) {
+      reconcileLibraryImportPaths(components, bareSpecifierComponents);
     }
   }
 
   // 6. Build graph (validate + topo sort)
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph({ ...resolveResult, components: components });
 
   // 7. beforeCodegen hook
-  let finalBeans = graphResult.beans;
+  let finalComponents = graphResult.components;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
-      finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
-        plugin.beforeCodegen!(finalBeans),
+      finalComponents = runPluginHook(plugin.name, 'beforeCodegen', () =>
+        plugin.beforeCodegen!(finalComponents),
       );
     }
   }
 
-  // 8. Collect codegen contributions (pass build-time config to plugins)
-  const codegenCtx = { config: options?.inlinedConfig ?? {} };
-  const contributions: CodegenContribution[] = [];
-  for (const plugin of activePlugins) {
-    if (plugin.codegen) {
-      contributions.push(
-        runPluginHook(plugin.name, 'codegen', () =>
-          plugin.codegen!(finalBeans, codegenCtx),
-        ),
-      );
-    }
-  }
+  // 8. Extract type registrations from plugin metadata
+  const typeRegistrations = extractTypeRegistrations(scanResult.pluginMetadata);
+
+  // 8b. Collect emitted files from plugins
+  const emittedFiles = collectEmittedFiles(
+    activePlugins,
+    finalComponents,
+    path.dirname(outputPath),
+    typeRegistrations,
+  );
 
   // 9. Generate code
-  const code = generateCode(
-    finalBeans,
-    {
-      outputPath,
-      version: PKG_VERSION,
-      ...(options?.inlinedConfig
-        ? { inlinedConfig: options.inlinedConfig }
-        : {}),
-    },
-    contributions,
+  const emittedFilePaths = emittedFiles.map((f) => f.relativePath);
+  const codegenOpts = {
+    outputPath,
+    version: PKG_VERSION,
+    ...(options?.inlinedConfig ? { inlinedConfig: options.inlinedConfig } : {}),
+  };
+  const hash = computeIRHash(
+    finalComponents,
+    codegenOpts,
+    typeRegistrations,
+    emittedFiles.length > 0 ? emittedFiles : undefined,
   );
+  const generatedHeader = buildGeneratedHeader(PKG_VERSION, hash);
+  const code =
+    generatedHeader +
+    generateCode(
+      finalComponents,
+      { ...codegenOpts, hash },
+      typeRegistrations,
+      emittedFilePaths.length > 0 ? emittedFilePaths : undefined,
+    );
 
   return {
     code,
     outputPath,
-    beans: finalBeans,
+    components: finalComponents,
     warnings: graphResult.warnings,
+    emittedFiles:
+      emittedFiles.length > 0
+        ? emittedFiles.map((f) => ({
+            ...f,
+            content: generatedHeader + f.content,
+          }))
+        : undefined,
   };
 }
 
@@ -406,7 +464,7 @@ export function transformInMemory(
  * Run the transform pipeline in library mode.
  *
  * Scans decorated source, runs the full pipeline (including plugins),
- * then serializes the discovered beans to a `beans.json` manifest instead
+ * then serializes the discovered components to a `components.json` manifest instead
  * of emitting generated code. Import paths are rewritten to use the
  * bare package specifier.
  *
@@ -431,7 +489,7 @@ export async function transformLibrary(
     ? []
     : await discoverPlugins(libBaseDir);
 
-  // Discover declarative AOP mappings (library mode doesn't need them for its own beans,
+  // Discover declarative AOP mappings (library mode doesn't need them for its own components,
   // but may need them if codeOutputPath is set for integration tests)
   const aopMappings = options.disablePluginDiscovery
     ? []
@@ -441,9 +499,9 @@ export async function transformLibrary(
 
   const builtinPlugins = [
     createAopPlugin(),
+    createIntrospectionPlugin(),
     createConfigPlugin(),
     createConditionalPlugin(),
-    createIntrospectionPlugin(),
   ];
   const activePlugins = mergePlugins(
     [...builtinPlugins, ...aopPlugins, ...discovered],
@@ -464,30 +522,30 @@ export async function transformLibrary(
   const resolveResult = resolve(scanResult);
 
   // 5. Merge visitor metadata
-  let beans = resolveResult.beans;
+  let components = resolveResult.components;
   if (scanResult.pluginMetadata) {
-    mergePluginMetadata(beans, scanResult.pluginMetadata);
+    mergePluginMetadata(components, scanResult.pluginMetadata);
   }
 
   // 6. afterResolve hook
   for (const plugin of activePlugins) {
     if (plugin.afterResolve) {
-      beans = runPluginHook(plugin.name, 'afterResolve', () =>
-        plugin.afterResolve!(beans),
+      components = runPluginHook(plugin.name, 'afterResolve', () =>
+        plugin.afterResolve!(components),
       );
     }
   }
 
   // 8. Build graph (validate + topo sort)
   // Conditional rules are evaluated at runtime by ApplicationContext, not at build time.
-  const graphResult = buildGraph({ ...resolveResult, beans });
+  const graphResult = buildGraph({ ...resolveResult, components: components });
 
-  // 9. beforeCodegen hook (plugins may add synthetic beans)
-  let finalBeans = graphResult.beans;
+  // 9. beforeCodegen hook (plugins may add synthetic components)
+  let finalComponents = graphResult.components;
   for (const plugin of activePlugins) {
     if (plugin.beforeCodegen) {
-      finalBeans = runPluginHook(plugin.name, 'beforeCodegen', () =>
-        plugin.beforeCodegen!(finalBeans),
+      finalComponents = runPluginHook(plugin.name, 'beforeCodegen', () =>
+        plugin.beforeCodegen!(finalComponents),
       );
     }
   }
@@ -495,21 +553,14 @@ export async function transformLibrary(
   // 10. Generate code (before rewriting import paths — code uses relative imports)
   let code: string | undefined;
   if (options.codeOutputPath) {
-    const contributions: CodegenContribution[] = [];
-    for (const plugin of activePlugins) {
-      if (plugin.codegen) {
-        contributions.push(
-          runPluginHook(plugin.name, 'codegen', () =>
-            plugin.codegen!(finalBeans),
-          ),
-        );
-      }
-    }
+    const typeRegistrations = extractTypeRegistrations(
+      scanResult.pluginMetadata,
+    );
 
     code = generateCode(
-      finalBeans,
+      finalComponents,
       { outputPath: options.codeOutputPath, version: PKG_VERSION },
-      contributions,
+      typeRegistrations,
     );
 
     const codeDir = path.dirname(options.codeOutputPath);
@@ -540,33 +591,33 @@ export async function transformLibrary(
   const crossPackageDirs = discoverCrossPackageDirs(libBaseDir);
 
   // 12. Rewrite import paths from absolute to bare package specifier
-  const rewrittenBeans = rewriteImportPaths(
-    finalBeans,
+  const rewrittenComponents = rewriteImportPaths(
+    finalComponents,
     options.packageName,
     sourceRoot,
     crossPackageDirs,
   );
 
   // 13. Serialize to manifest
-  const manifest = serializeBeans(
-    rewrittenBeans,
+  const manifest = serializeComponents(
+    rewrittenComponents,
     options.packageName,
     aopDeclarations,
   );
 
-  // 14. Write beans.json
-  const outputDir = path.dirname(options.beansOutputPath);
+  // 14. Write components.json
+  const outputDir = path.dirname(options.componentsOutputPath);
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(
-    options.beansOutputPath,
+    options.componentsOutputPath,
     JSON.stringify(manifest, null, 2),
     'utf-8',
   );
 
   return {
     manifest,
-    outputPath: options.beansOutputPath,
-    beans: rewrittenBeans,
+    outputPath: options.componentsOutputPath,
+    components: rewrittenComponents,
     warnings: graphResult.warnings,
     code,
     codeOutputPath: options.codeOutputPath,
@@ -574,31 +625,50 @@ export async function transformLibrary(
 }
 
 /**
- * Print bean graph and plugin contributions when GOODIE_DEBUG=true.
+ * Extract type registrations from plugin metadata.
+ * Entries with `__typeRegistration` represent non-component types (e.g. @Introspected DTOs)
+ * that need MetadataRegistry.register() calls in the generated code.
+ */
+function extractTypeRegistrations(
+  pluginMetadata: Map<string, Record<string, unknown>> | undefined,
+): TypeRegistration[] {
+  if (!pluginMetadata) return [];
+  const result: TypeRegistration[] = [];
+  for (const meta of pluginMetadata.values()) {
+    if (meta.__typeRegistration) {
+      result.push(meta.__typeRegistration as TypeRegistration);
+    }
+  }
+  return result;
+}
+
+/**
+ * Print component graph and plugin contributions when GOODIE_DEBUG=true.
  */
 function printDebugInfo(
-  beans: IRBeanDefinition[],
+  components: IRComponentDefinition[],
   plugins: TransformerPlugin[],
-  contributions: CodegenContribution[],
 ): void {
   console.log('[goodie] ══════════════════════════════════');
   console.log(`[goodie] Build-time debug info`);
   console.log('[goodie] ══════════════════════════════════');
-  console.log(`[goodie] Beans (${beans.length}) in resolution order:`);
-  for (const bean of beans) {
+  console.log(
+    `[goodie] Components (${components.length}) in resolution order:`,
+  );
+  for (const component of components) {
     const name =
-      bean.tokenRef.kind === 'class'
-        ? bean.tokenRef.className
-        : bean.tokenRef.tokenName;
-    const deps = bean.constructorDeps
+      component.tokenRef.kind === 'class'
+        ? component.tokenRef.className
+        : component.tokenRef.tokenName;
+    const deps = component.constructorDeps
       .map((d) =>
         d.tokenRef.kind === 'class'
           ? d.tokenRef.className
           : d.tokenRef.tokenName,
       )
       .join(', ');
-    const scope = bean.scope;
-    const eager = bean.eager ? ' [eager]' : '';
+    const scope = component.scope;
+    const eager = component.eager ? ' [eager]' : '';
     console.log(
       `[goodie]   ${name} (${scope}${eager})${deps ? ` ← [${deps}]` : ''}`,
     );
@@ -607,42 +677,36 @@ function printDebugInfo(
   console.log(
     `[goodie] Active plugins: ${plugins.map((p) => p.name).join(', ')}`,
   );
-  const codegenPlugins = contributions.filter(
-    (c) => (c.code && c.code.length > 0) || (c.imports && c.imports.length > 0),
-  );
-  console.log(
-    `[goodie] Plugin codegen contributions: ${codegenPlugins.length}`,
-  );
   console.log('[goodie] ══════════════════════════════════');
 }
 
 /**
- * Reconcile import paths between scanned beans (absolute paths from ts-morph)
- * and library beans (bare package specifiers like `@goodie-ts/kysely`).
+ * Reconcile import paths between scanned components (absolute paths from ts-morph)
+ * and library components (bare package specifiers like `@goodie-ts/kysely`).
  *
  * When user code imports a library class, ts-morph resolves the dependency to
- * the declaration's absolute file path. But the library bean's tokenRef uses
+ * the declaration's absolute file path. But the library component's tokenRef uses
  * a bare package specifier (set by `rewriteImportPaths` during library build).
  * This mismatch causes the graph builder to see them as different tokens.
  *
- * Fix: rewrite dependency tokenRefs in scanned beans to use the library bean's
+ * Fix: rewrite dependency tokenRefs in scanned components to use the library component's
  * import path when the className matches.
  */
 function reconcileLibraryImportPaths(
-  allBeans: IRBeanDefinition[],
-  libraryBeans: IRBeanDefinition[],
+  allComponents: IRComponentDefinition[],
+  libraryComponents: IRComponentDefinition[],
   packageDirs?: Map<string, string>,
 ): void {
   // Build className → library tokenRef map (skip ambiguous names)
   const libraryClassMap = new Map<
     string,
-    IRBeanDefinition['tokenRef'] | null
+    IRComponentDefinition['tokenRef'] | null
   >();
-  for (const lib of libraryBeans) {
+  for (const lib of libraryComponents) {
     if (lib.tokenRef.kind !== 'class') continue;
     const name = lib.tokenRef.className;
     if (libraryClassMap.has(name)) {
-      // Ambiguous — two library beans with same className, skip both
+      // Ambiguous — two library components with same className, skip both
       libraryClassMap.set(name, null);
     } else {
       libraryClassMap.set(name, lib.tokenRef);
@@ -650,8 +714,8 @@ function reconcileLibraryImportPaths(
   }
 
   function reconcileRef(
-    ref: IRBeanDefinition['tokenRef'],
-  ): IRBeanDefinition['tokenRef'] {
+    ref: IRComponentDefinition['tokenRef'],
+  ): IRComponentDefinition['tokenRef'] {
     if (ref.kind !== 'class') return ref;
     const libRef = libraryClassMap.get(ref.className);
     if (libRef && libRef.kind === 'class') {
@@ -661,7 +725,7 @@ function reconcileLibraryImportPaths(
       }
       return ref;
     }
-    // Fallback: class isn't a bean but may live in a library package.
+    // Fallback: class isn't a component but may live in a library package.
     // Check if the absolute import path falls under a known library package directory.
     if (packageDirs && ref.importPath.startsWith('/')) {
       for (const [realDir, pkgName] of packageDirs) {
@@ -673,42 +737,79 @@ function reconcileLibraryImportPaths(
     return ref;
   }
 
-  for (const bean of allBeans) {
-    for (const dep of bean.constructorDeps) {
+  /** Rewrite an absolute path to a bare package specifier if it falls under a known package dir. */
+  function reconcilePath(absolutePath: string): string {
+    if (!packageDirs || !absolutePath.startsWith('/')) return absolutePath;
+    for (const [realDir, pkgName] of packageDirs) {
+      if (absolutePath.startsWith(`${realDir}/`)) {
+        return pkgName;
+      }
+    }
+    return absolutePath;
+  }
+
+  /** Recursively rewrite `importPath` / `tokenImportPath` values in metadata. */
+  function reconcileMetadata(metadata: Record<string, unknown>): void {
+    reconcileMetadataNode(metadata);
+  }
+
+  function reconcileMetadataNode(node: unknown): void {
+    if (node === null || node === undefined || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const item of node) reconcileMetadataNode(item);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    for (const [key, value] of Object.entries(obj)) {
+      if (
+        (key === 'importPath' || key === 'tokenImportPath') &&
+        typeof value === 'string' &&
+        value.startsWith('/')
+      ) {
+        obj[key] = reconcilePath(value);
+      } else if (typeof value === 'object' && value !== null) {
+        reconcileMetadataNode(value);
+      }
+    }
+  }
+
+  for (const component of allComponents) {
+    for (const dep of component.constructorDeps) {
       dep.tokenRef = reconcileRef(dep.tokenRef);
     }
-    for (const field of bean.fieldDeps) {
+    for (const field of component.fieldDeps) {
       field.tokenRef = reconcileRef(field.tokenRef);
     }
-    if (bean.baseTokenRefs) {
-      bean.baseTokenRefs = bean.baseTokenRefs.map(
+    if (component.baseTokenRefs) {
+      component.baseTokenRefs = component.baseTokenRefs.map(
         (ref) => reconcileRef(ref) as typeof ref,
       );
     }
+    reconcileMetadata(component.metadata);
   }
 }
 
 /**
- * Merge plugin-accumulated class metadata into the matching IR beans.
+ * Merge plugin-accumulated class metadata into the matching IR components.
  * Keys are "filePath:className" to avoid collisions between same-named classes in different files.
  */
 function mergePluginMetadata(
-  beans: IRBeanDefinition[],
+  components: IRComponentDefinition[],
   pluginMetadata: Map<string, Record<string, unknown>>,
 ): void {
-  for (const bean of beans) {
-    if (bean.tokenRef.kind !== 'class') continue;
+  for (const component of components) {
+    if (component.tokenRef.kind !== 'class') continue;
 
-    const metadataKey = `${bean.tokenRef.importPath}:${bean.tokenRef.className}`;
+    const metadataKey = `${component.tokenRef.importPath}:${component.tokenRef.className}`;
     const meta = pluginMetadata.get(metadataKey);
     if (meta && Object.keys(meta).length > 0) {
       for (const [key, value] of Object.entries(meta)) {
-        const existing = bean.metadata[key];
+        const existing = component.metadata[key];
         // Merge arrays (e.g. valueFields from scanner + plugin) instead of overwriting
         if (Array.isArray(existing) && Array.isArray(value)) {
-          bean.metadata[key] = [...existing, ...value];
+          component.metadata[key] = [...existing, ...value];
         } else {
-          bean.metadata[key] = value;
+          component.metadata[key] = value;
         }
       }
     }
@@ -721,7 +822,7 @@ function mergePluginMetadata(
  * Scans `node_modules/@goodie-ts/` under the library base dir for sibling packages.
  * Returns a map of real directory path → bare package name. This enables
  * `rewriteImportPaths` to convert absolute cross-package references
- * (e.g. `ServerConfig` from `@goodie-ts/hono`) to bare specifiers in `beans.json`.
+ * (e.g. `ServerConfig` from `@goodie-ts/hono`) to bare specifiers in `components.json`.
  */
 function discoverCrossPackageDirs(
   libBaseDir: string,
@@ -804,4 +905,54 @@ function flattenObject(
     }
   }
   return result;
+}
+
+/**
+ * Run `emitFiles` hooks on all active plugins.
+ *
+ * Creates a temporary ts-morph Project so plugins can use `ctx.createSourceFile()`
+ * for type-safe code generation. Collects the resulting source files as `EmittedFile[]`.
+ */
+function collectEmittedFiles(
+  plugins: TransformerPlugin[],
+  components: IRComponentDefinition[],
+  outputDir: string,
+  typeRegistrations: TypeRegistration[],
+): EmittedFile[] {
+  const hasEmitHook = plugins.some((p) => p.emitFiles);
+  if (!hasEmitHook) return [];
+
+  // Temporary in-memory project for plugin-created source files
+  const emitProject = new Project({ useInMemoryFileSystem: true });
+  const createdFiles: {
+    relativePath: string;
+    sourceFile: import('ts-morph').SourceFile;
+  }[] = [];
+
+  const context = {
+    components,
+    typeRegistrations,
+    relativeImport(absolutePath: string): string {
+      // Bare specifiers (e.g. '@goodie-ts/health') are already valid — pass through
+      if (!absolutePath.startsWith('/')) return absolutePath;
+      const rel = path.relative(outputDir, absolutePath);
+      return (rel.startsWith('.') ? rel : `./${rel}`).replace(/\.tsx?$/, '.js');
+    },
+    createSourceFile(relativePath: string) {
+      const sf = emitProject.createSourceFile(relativePath, '');
+      createdFiles.push({ relativePath, sourceFile: sf });
+      return sf;
+    },
+  };
+
+  for (const plugin of plugins) {
+    if (plugin.emitFiles) {
+      runPluginHook(plugin.name, 'emitFiles', () => plugin.emitFiles!(context));
+    }
+  }
+
+  return createdFiles.map(({ relativePath, sourceFile }) => ({
+    relativePath,
+    content: sourceFile.getFullText(),
+  }));
 }

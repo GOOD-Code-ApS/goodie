@@ -1,115 +1,95 @@
 import { RequestScopeManager } from '@goodie-ts/core';
-import type { Context, Hono, Next } from 'hono';
+import { HttpContext, Response as HttpResponse } from '@goodie-ts/http';
+import type { Context, Next, TypedResponse } from 'hono';
 import { cors } from 'hono/cors';
-import type { DescribeRouteOptions } from 'hono-openapi';
-import { describeRoute, openAPIRouteHandler, validator } from 'hono-openapi';
-import type { GoodieEnv } from './goodie-env.js';
-import type { SecurityProvider } from './security-provider.js';
+import type { ContentfulStatusCode, StatusCode } from 'hono/utils/http-status';
 
 /**
  * Runtime helpers for generated route wiring.
  *
  * These functions encapsulate all Hono ecosystem API calls so that
  * generated code only depends on stable goodie-ts interfaces.
- * When Hono or hono-openapi change their APIs, we update these
+ * When Hono changes its APIs, we update these
  * helpers — generated code stays unchanged.
  */
 
-/** Convert a controller method's return value to a Hono Response. */
-export function handleResult(
-  c: Context,
-  result: unknown,
-): Response | Promise<Response> {
-  if (result instanceof Response) return result;
-  if (result === undefined || result === null) return c.body(null, 204);
-  return c.json(result as object);
+/** Construct an HttpContext from a Hono Context. */
+export function buildHttpContext(c: Context): HttpContext {
+  return new HttpContext({
+    headers: c.req.raw.headers,
+    query: new URLSearchParams(c.req.query()),
+    params: c.req.param() as Record<string, string>,
+    url: c.req.url,
+  });
 }
 
 /**
- * Create security middleware that authenticates requests.
- * - `'required'`: rejects unauthenticated requests with 401
- * - `'optional'`: attempts auth but allows unauthenticated requests through
+ * Translate a `Response<T>` from `@goodie-ts/http` to a Hono TypedResponse.
+ *
+ * Uses a conditional type so union returns like `Response<A> | Response<B>`
+ * distribute correctly. Specifies `'json'` format for Hono RPC inference.
+ *
+ * Optional `defaultStatus` is used when the return value is a plain object
+ * (not a `Response<T>`) — set by `@Status` decorator.
  */
-export function securityMiddleware(
-  securityProvider: SecurityProvider | undefined,
-  mode: 'required' | 'optional',
-) {
-  return async (c: Context<GoodieEnv>, next: Next) => {
-    if (!securityProvider) {
-      if (mode === 'required') return c.json({ error: 'Unauthorized' }, 401);
-      return next();
+export function toHonoResponse<T extends HttpResponse<any>>(
+  c: Context,
+  result: T,
+  defaultStatus?: number,
+): T extends HttpResponse<infer U>
+  ? TypedResponse<U, StatusCode, 'json'>
+  : never;
+export function toHonoResponse<T>(
+  c: Context,
+  result: T,
+  defaultStatus?: number,
+): TypedResponse<T, StatusCode, 'json'>;
+export function toHonoResponse(
+  c: Context,
+  result: unknown,
+  defaultStatus?: number,
+): Response | TypedResponse {
+  // Framework-managed Response<T> from @goodie-ts/http
+  if (result instanceof HttpResponse) {
+    const httpRes = result as HttpResponse<unknown>;
+    for (const [key, value] of Object.entries(httpRes.headers)) {
+      c.header(key, value as string);
     }
-    const req = {
-      headers: { get: (n: string) => c.req.header(n) },
-      url: c.req.url,
-      method: c.req.method,
-    };
-    const principal = await securityProvider.authenticate(req);
-    if (mode === 'required' && !principal) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-    if (principal) c.set('principal', principal);
-    return next();
-  };
+    if (httpRes.body === undefined)
+      return c.body(null, httpRes.status as StatusCode);
+    return c.json(
+      httpRes.body as object,
+      httpRes.status as ContentfulStatusCode,
+    );
+  }
+  // Native Response passthrough
+  if (result instanceof Response) return result;
+  // No return value → 204
+  if (result === undefined || result === null) return c.body(null, 204);
+  // Plain object → JSON with default status (or 200)
+  const status = (defaultStatus ?? 200) as ContentfulStatusCode;
+  return c.json(result as object, status);
 }
 
-/** Create validation middleware for a request body/query/param. */
-export function validationMiddleware(
-  target: 'json' | 'query' | 'param',
-  // Schema type is StandardSchemaV1 from @standard-schema/spec (transitive dep
-  // via hono-openapi), but not a direct dep — so we accept unknown here.
-  schema: unknown,
-) {
-  return validator(
-    target,
-    schema as never,
-    ((result: any, c: any) => {
-      if (!result.success) {
-        return c.json(
-          {
-            error: 'Validation failed',
-            issues: result.error.map(
-              (i: { path: string; message: string }) => ({
-                path: i.path,
-                message: i.message,
-              }),
-            ),
-          },
-          400,
-        );
-      }
-    }) as never,
-  );
-}
-
-/** Create OpenAPI describeRoute middleware. */
-export function openApiMiddleware(options: DescribeRouteOptions) {
-  return describeRoute(options);
-}
-
-/** Mount the OpenAPI JSON spec handler on a router. */
-export function mountOpenApiSpec(
-  router: Hono,
-  config: { title: string; version: string; description?: string },
-) {
-  // Cast needed: router's generic schema type is built at compile time
-  // via route chaining — unknowable at this runtime abstraction layer.
-  (router as any).get(
-    '/openapi.json',
-    openAPIRouteHandler(router as any, {
-      documentation: {
-        info: {
-          title: config.title,
-          version: config.version,
-          ...(config.description ? { description: config.description } : {}),
-        },
-      },
-    }),
-  );
+/**
+ * Translate a `Response<T>` from the exception handling pipeline to a
+ * Hono Response. Returns native `Response` (not `TypedResponse<T>`) to
+ * avoid polluting Hono's RPC type inference on the happy path.
+ */
+export function toHonoErrorResponse(
+  c: Context,
+  result: HttpResponse<unknown>,
+): Response {
+  for (const [key, value] of Object.entries(result.headers)) {
+    c.header(key, value as string);
+  }
+  if (result.body === undefined)
+    return c.body(null, result.status as StatusCode);
+  return c.json(result.body as object, result.status as ContentfulStatusCode);
 }
 
 /** Create CORS middleware. */
-export function corsMiddleware(options?: Record<string, unknown>) {
+export function corsMiddleware(options?: object) {
   // Cast needed: hono/cors does not export CORSOptions type.
   return options ? cors(options as any) : cors();
 }

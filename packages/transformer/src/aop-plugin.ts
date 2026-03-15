@@ -1,9 +1,5 @@
-import type { IRBeanDefinition } from './ir.js';
-import type {
-  CodegenContribution,
-  MethodVisitorContext,
-  TransformerPlugin,
-} from './options.js';
+import type { IRComponentDefinition } from './ir.js';
+import type { MethodVisitorContext, TransformerPlugin } from './options.js';
 
 /** Declaration for a single AOP decorator in `goodie.aop`. */
 export interface AopDecoratorDeclaration {
@@ -228,18 +224,21 @@ export function createDeclarativeAopPlugin(
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
-      for (const bean of beans) {
+    afterResolve(components: IRComponentDefinition[]): IRComponentDefinition[] {
+      for (const component of components) {
         const className =
-          bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
+          component.tokenRef.kind === 'class'
+            ? component.tokenRef.className
+            : undefined;
         if (!className) continue;
 
-        const key = `${bean.tokenRef.importPath}:${className}`;
+        const key = `${component.tokenRef.importPath}:${className}`;
         const infos = classMethodInfo.get(key);
         if (!infos || infos.length === 0) continue;
 
         // Get or initialize interceptedMethods array
-        const existing = (bean.metadata.interceptedMethods ?? []) as Array<{
+        const existing = (component.metadata.interceptedMethods ??
+          []) as Array<{
           methodName: string;
           interceptors: Array<{
             className: string;
@@ -273,62 +272,11 @@ export function createDeclarativeAopPlugin(
           }
         }
 
-        bean.metadata.interceptedMethods = existing;
+        component.metadata.interceptedMethods = existing;
       }
 
-      // No synthetic beans — library beans.json already contains them
-      return beans;
-    },
-
-    codegen(beans: IRBeanDefinition[]): CodegenContribution {
-      // Collect all used interceptor classes from AOP-wired beans
-      const usedImports = new Map<string, Set<string>>(); // importPath → Set<className>
-      let hasAnyInterceptor = false;
-
-      for (const bean of beans) {
-        const methods = bean.metadata.interceptedMethods as
-          | Array<{
-              interceptors: Array<{ className: string; importPath: string }>;
-            }>
-          | undefined;
-        if (!methods) continue;
-
-        for (const m of methods) {
-          for (const i of m.interceptors) {
-            // Only emit imports for interceptors from declarative mappings
-            if (!decoratorLookup.size) continue;
-
-            // Check if this interceptor belongs to one of our mappings
-            for (const mapping of mappings) {
-              if (
-                i.className === mapping.declaration.interceptor &&
-                i.importPath === mapping.packageName
-              ) {
-                hasAnyInterceptor = true;
-                const classSet =
-                  usedImports.get(mapping.packageName) ?? new Set();
-                classSet.add(i.className);
-                usedImports.set(mapping.packageName, classSet);
-              }
-            }
-          }
-        }
-      }
-
-      if (!hasAnyInterceptor) return {};
-
-      const imports: string[] = [];
-
-      // Add per-package interceptor class imports
-      for (const [importPath, classNames] of usedImports) {
-        const sorted = [...classNames].sort().join(', ');
-        imports.push(`import { ${sorted} } from '${importPath}'`);
-      }
-
-      // Always add buildInterceptorChain when there's any AOP wiring
-      imports.push("import { buildInterceptorChain } from '@goodie-ts/core'");
-
-      return { imports };
+      // No synthetic components — library components.json already contains them
+      return components;
     },
   };
 }

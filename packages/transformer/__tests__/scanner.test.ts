@@ -12,26 +12,26 @@ function createProject(files: Record<string, string>): Project {
 }
 
 describe('Scanner', () => {
-  describe('@Injectable / @Singleton classes', () => {
-    it('should discover a basic @Injectable class', () => {
+  describe('@Transient / @Singleton classes', () => {
+    it('should discover a basic @Transient class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/UserRepo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class UserRepo {}
         `,
       });
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('UserRepo');
-      expect(result.beans[0].scope).toBe('prototype');
-      expect(result.beans[0].eager).toBe(false);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('UserRepo');
+      expect(result.components[0].scope).toBe('transient');
+      expect(result.components[0].eager).toBe(false);
     });
 
     it('should discover a @Singleton class', () => {
@@ -49,8 +49,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].scope).toBe('singleton');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].scope).toBe('singleton');
     });
 
     it('should detect @Named qualifier', () => {
@@ -70,8 +70,48 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].name).toBe('primary');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].name).toBe('primary');
+    });
+
+    it('should detect @Primary flag', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+          export function Primary(t: any, c: any) {}
+        `,
+        '/src/DefaultRepo.ts': `
+          import { Singleton, Primary } from './decorators.js'
+
+          @Primary
+          @Singleton()
+          export class DefaultRepo {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].primary).toBe(true);
+    });
+
+    it('should default primary to false', () => {
+      const project = createProject({
+        '/src/decorators.ts': `
+          export function Singleton() { return (t: any, c: any) => {} }
+        `,
+        '/src/Repo.ts': `
+          import { Singleton } from './decorators.js'
+
+          @Singleton()
+          export class Repo {}
+        `,
+      });
+
+      const result = scan(project);
+
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].primary).toBe(false);
     });
 
     it('should detect @Eager flag', () => {
@@ -91,20 +131,20 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].eager).toBe(true);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].eager).toBe(true);
     });
 
     it('should scan constructor parameters', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -119,7 +159,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -148,11 +188,11 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].fieldInjections).toHaveLength(1);
-      expect(result.beans[0].fieldInjections[0].fieldName).toBe('repo');
-      expect(result.beans[0].fieldInjections[0].qualifier).toBe('primary');
-      expect(result.beans[0].fieldInjections[0].optional).toBe(false);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].fieldInjections).toHaveLength(1);
+      expect(result.components[0].fieldInjections[0].fieldName).toBe('repo');
+      expect(result.components[0].fieldInjections[0].qualifier).toBe('primary');
+      expect(result.components[0].fieldInjections[0].optional).toBe(false);
     });
 
     it('should scan @Optional on accessor fields', () => {
@@ -173,44 +213,44 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].fieldInjections).toHaveLength(1);
-      expect(result.beans[0].fieldInjections[0].fieldName).toBe('tracer');
-      expect(result.beans[0].fieldInjections[0].optional).toBe(true);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].fieldInjections).toHaveLength(1);
+      expect(result.components[0].fieldInjections[0].fieldName).toBe('tracer');
+      expect(result.components[0].fieldInjections[0].optional).toBe(true);
     });
   });
 
-  describe('@Module classes', () => {
-    it('should discover a @Module class', () => {
+  describe('@Factory classes', () => {
+    it('should discover a @Factory class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {}
         `,
       });
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('AppModule');
-      expect(result.beans[0].scope).toBe('singleton');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('AppModule');
+      expect(result.components[0].scope).toBe('singleton');
     });
 
     it('should scan @Provides methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -223,7 +263,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       expect(appModule.provides).toHaveLength(2);
@@ -236,21 +276,21 @@ describe('Scanner', () => {
     it('should scan @Provides method parameters', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repo } from './Repo.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             service(repo: Repo): string { return 'ok' }
@@ -260,7 +300,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       expect(appModule.provides[0].params).toHaveLength(1);
@@ -271,14 +311,14 @@ describe('Scanner', () => {
     it('should detect @Eager on @Provides methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
           export function Eager() { return (t: any, c: any) => {} }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides, Eager } from './decorators.js'
+          import { Factory, Provides, Eager } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Eager()
             @Provides()
@@ -292,7 +332,7 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       expect(appModule.provides).toHaveLength(2);
@@ -302,7 +342,7 @@ describe('Scanner', () => {
       expect(appModule.provides[1].eager).toBe(false);
     });
 
-    it('should scan @Provides on a @Singleton bean (not just @Module)', () => {
+    it('should scan @Provides on a @Singleton component (not just @Factory)', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -321,37 +361,39 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('AppConfig');
-      expect(result.beans[0].scope).toBe('singleton');
-      expect(result.beans[0].isModule).toBe(false);
-      expect(result.beans[0].provides).toHaveLength(1);
-      expect(result.beans[0].provides[0].methodName).toBe('dbUrl');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('AppConfig');
+      expect(result.components[0].scope).toBe('singleton');
+      expect(result.components[0].isFactory).toBe(false);
+      expect(result.components[0].provides).toHaveLength(1);
+      expect(result.components[0].provides[0].methodName).toBe('dbUrl');
     });
 
-    it('should scan @Module as a singleton bean', () => {
+    it('should scan @Factory as a singleton component', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/DbModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class DbModule {}
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {}
         `,
       });
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(2);
-      expect(result.beans.every((b) => b.scope === 'singleton')).toBe(true);
+      expect(result.components).toHaveLength(2);
+      expect(result.components.every((b) => b.scope === 'singleton')).toBe(
+        true,
+      );
     });
   });
 
@@ -360,14 +402,14 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/User.ts': `
           export class User { name = '' }
         `,
         '/src/Repository.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/Service.ts': `
@@ -383,7 +425,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -423,7 +465,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -461,7 +503,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -475,11 +517,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -494,7 +536,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -505,7 +547,7 @@ describe('Scanner', () => {
     it('should extract generic type arguments for @Provides return type', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
           export function Provides() { return (t: any, c: any) => {} }
         `,
         '/src/User.ts': `
@@ -515,11 +557,11 @@ describe('Scanner', () => {
           export class Repository<T> { items: T[] = [] }
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Repository } from './Repository.js'
           import { User } from './User.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             userRepo(): Repository<User> { return new Repository<User>() }
@@ -528,7 +570,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const appModule = result.beans.find(
+      const appModule = result.components.find(
         (b) => b.classTokenRef.className === 'AppModule',
       )!;
       const provides = appModule.provides[0];
@@ -540,19 +582,19 @@ describe('Scanner', () => {
     });
   });
 
-  describe('@PreDestroy methods', () => {
-    it('should discover @PreDestroy method on a bean', () => {
+  describe('@OnDestroy methods', () => {
+    it('should discover @OnDestroy method on a component', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PreDestroy() { return (t: any, c: any) => {} }
+          export function OnDestroy() { return (t: any, c: any) => {} }
         `,
         '/src/Pool.ts': `
-          import { Singleton, PreDestroy } from './decorators.js'
+          import { Singleton, OnDestroy } from './decorators.js'
 
           @Singleton()
           export class Pool {
-            @PreDestroy()
+            @OnDestroy()
             shutdown() {}
           }
         `,
@@ -560,25 +602,25 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].preDestroyMethods).toEqual(['shutdown']);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onDestroyMethods).toEqual(['shutdown']);
     });
 
-    it('should discover multiple @PreDestroy methods', () => {
+    it('should discover multiple @OnDestroy methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PreDestroy() { return (t: any, c: any) => {} }
+          export function OnDestroy() { return (t: any, c: any) => {} }
         `,
         '/src/Service.ts': `
-          import { Singleton, PreDestroy } from './decorators.js'
+          import { Singleton, OnDestroy } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PreDestroy()
+            @OnDestroy()
             closeConnections() {}
 
-            @PreDestroy()
+            @OnDestroy()
             flushBuffers() {}
           }
         `,
@@ -586,14 +628,14 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].preDestroyMethods).toEqual([
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onDestroyMethods).toEqual([
         'closeConnections',
         'flushBuffers',
       ]);
     });
 
-    it('should return empty array when no @PreDestroy methods', () => {
+    it('should return empty array when no @OnDestroy methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -608,24 +650,24 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].preDestroyMethods).toEqual([]);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onDestroyMethods).toEqual([]);
     });
   });
 
-  describe('@PostConstruct methods', () => {
-    it('should discover @PostConstruct method on a bean', () => {
+  describe('@OnInit methods', () => {
+    it('should discover @OnInit method on a component', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PostConstruct() { return (t: any, c: any) => {} }
+          export function OnInit() { return (t: any, c: any) => {} }
         `,
         '/src/Service.ts': `
-          import { Singleton, PostConstruct } from './decorators.js'
+          import { Singleton, OnInit } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PostConstruct()
+            @OnInit()
             init() {}
           }
         `,
@@ -633,25 +675,25 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].postConstructMethods).toEqual(['init']);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onInitMethods).toEqual(['init']);
     });
 
-    it('should discover multiple @PostConstruct methods', () => {
+    it('should discover multiple @OnInit methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function PostConstruct() { return (t: any, c: any) => {} }
+          export function OnInit() { return (t: any, c: any) => {} }
         `,
         '/src/Service.ts': `
-          import { Singleton, PostConstruct } from './decorators.js'
+          import { Singleton, OnInit } from './decorators.js'
 
           @Singleton()
           export class Service {
-            @PostConstruct()
+            @OnInit()
             initCache() {}
 
-            @PostConstruct()
+            @OnInit()
             loadConfig() {}
           }
         `,
@@ -659,14 +701,14 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].postConstructMethods).toEqual([
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onInitMethods).toEqual([
         'initCache',
         'loadConfig',
       ]);
     });
 
-    it('should return empty array when no @PostConstruct methods', () => {
+    it('should return empty array when no @OnInit methods', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -681,13 +723,13 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].postConstructMethods).toEqual([]);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].onInitMethods).toEqual([]);
     });
   });
 
   describe('@PostProcessor detection', () => {
-    it('should detect @PostProcessor on a bean', () => {
+    it('should detect @PostProcessor on a component', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -704,11 +746,11 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].isBeanPostProcessor).toBe(true);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].isComponentPostProcessor).toBe(true);
     });
 
-    it('should default isBeanPostProcessor to false', () => {
+    it('should default isComponentPostProcessor to false', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -723,30 +765,30 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].isBeanPostProcessor).toBe(false);
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].isComponentPostProcessor).toBe(false);
     });
   });
 
-  describe('@PostProcessor + @Injectable rejection', () => {
-    it('throws InvalidDecoratorUsageError when combining @PostProcessor with @Injectable', () => {
+  describe('@PostProcessor + @Transient rejection', () => {
+    it('throws InvalidDecoratorUsageError when combining @PostProcessor with @Transient', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
           export function PostProcessor() { return (t: any, c: any) => {} }
         `,
         '/src/BadProcessor.ts': `
-          import { Injectable, PostProcessor } from './decorators.js'
+          import { Transient, PostProcessor } from './decorators.js'
 
           @PostProcessor()
-          @Injectable()
+          @Transient()
           export class BadProcessor {}
         `,
       });
 
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
       expect(() => scan(project)).toThrow(
-        /@PostProcessor cannot be combined with @Injectable/,
+        /@PostProcessor cannot be combined with @Transient/,
       );
     });
   });
@@ -756,11 +798,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/Service.ts': `
@@ -775,7 +817,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -788,11 +830,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/Service.ts': `
@@ -807,7 +849,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -819,11 +861,11 @@ describe('Scanner', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -838,7 +880,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) => b.classTokenRef.className === 'Service',
       )!;
 
@@ -865,10 +907,10 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].valueFields).toHaveLength(1);
-      expect(result.beans[0].valueFields[0].fieldName).toBe('dbUrl');
-      expect(result.beans[0].valueFields[0].key).toBe('DB_URL');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].valueFields).toHaveLength(1);
+      expect(result.components[0].valueFields[0].fieldName).toBe('dbUrl');
+      expect(result.components[0].valueFields[0].key).toBe('DB_URL');
     });
 
     it('should discover @Value with default value', () => {
@@ -889,8 +931,8 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans[0].valueFields[0].key).toBe('PORT');
-      expect(result.beans[0].valueFields[0].defaultValue).toBe('3000');
+      expect(result.components[0].valueFields[0].key).toBe('PORT');
+      expect(result.components[0].valueFields[0].defaultValue).toBe('3000');
     });
 
     it('should throw InvalidDecoratorUsageError for @Value on non-accessor property', () => {
@@ -947,27 +989,27 @@ describe('Scanner', () => {
 
       const result = scan(project);
 
-      expect(result.beans[0].valueFields).toEqual([]);
+      expect(result.components[0].valueFields).toEqual([]);
     });
   });
 
   describe('abstract class rejection', () => {
-    it('throws InvalidDecoratorUsageError for abstract @Injectable class', () => {
+    it('throws InvalidDecoratorUsageError for abstract @Transient class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/AbstractRepo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export abstract class AbstractRepo {}
         `,
       });
 
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
       expect(() => scan(project)).toThrow(
-        /Cannot apply @Injectable\(\) to abstract class "AbstractRepo"/,
+        /Cannot apply @Transient\(\) to abstract class "AbstractRepo"/,
       );
     });
 
@@ -990,22 +1032,22 @@ describe('Scanner', () => {
       );
     });
 
-    it('throws InvalidDecoratorUsageError for abstract @Module class', () => {
+    it('throws InvalidDecoratorUsageError for abstract @Factory class', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/AbstractModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export abstract class AbstractModule {}
         `,
       });
 
       expect(() => scan(project)).toThrow(InvalidDecoratorUsageError);
       expect(() => scan(project)).toThrow(
-        /Cannot apply @Module\(\) to abstract class "AbstractModule"/,
+        /Cannot apply @Factory\(\) to abstract class "AbstractModule"/,
       );
     });
 
@@ -1046,8 +1088,8 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('ConcreteRepo');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('ConcreteRepo');
     });
   });
 
@@ -1074,14 +1116,16 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const bean = result.beans.find(
+      const component = result.components.find(
         (b) => b.classTokenRef.className === 'UptimeIndicator',
       )!;
 
-      expect(bean.baseClasses).toHaveLength(1);
-      expect(bean.baseClasses[0].kind).toBe('class');
-      expect(bean.baseClasses[0].className).toBe('HealthIndicator');
-      expect(bean.baseClasses[0].importPath).toBe('/src/HealthIndicator.ts');
+      expect(component.baseClasses).toHaveLength(1);
+      expect(component.baseClasses[0].kind).toBe('class');
+      expect(component.baseClasses[0].className).toBe('HealthIndicator');
+      expect(component.baseClasses[0].importPath).toBe(
+        '/src/HealthIndicator.ts',
+      );
     });
 
     it('should return empty array for class without base class', () => {
@@ -1098,7 +1142,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      expect(result.beans[0].baseClasses).toEqual([]);
+      expect(result.components[0].baseClasses).toEqual([]);
     });
 
     it('should extract base class when both parent and child are decorated', () => {
@@ -1122,7 +1166,7 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const userRepo = result.beans.find(
+      const userRepo = result.components.find(
         (b) => b.classTokenRef.className === 'UserRepo',
       )!;
 
@@ -1135,14 +1179,14 @@ describe('Scanner', () => {
     it('should scan across multiple source files', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
           export function Singleton() { return (t: any, c: any) => {} }
-          export function Module(opts?: any) { return (t: any, c: any) => {} }
+          export function Factory(opts?: any) { return (t: any, c: any) => {} }
         `,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -1152,38 +1196,38 @@ describe('Scanner', () => {
           export class Service {}
         `,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
+          import { Factory } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {}
         `,
       });
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(3);
+      expect(result.components).toHaveLength(3);
     });
 
     it('should ignore classes without decorators', () => {
       const project = createProject({
         '/src/decorators.ts': `
-          export function Injectable() { return (t: any, c: any) => {} }
+          export function Transient() { return (t: any, c: any) => {} }
         `,
         '/src/Plain.ts': `
           export class Plain {}
         `,
         '/src/Decorated.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
 
-          @Injectable()
+          @Transient()
           export class Decorated {}
         `,
       });
 
       const result = scan(project);
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].classTokenRef.className).toBe('Decorated');
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].classTokenRef.className).toBe('Decorated');
     });
   });
 });

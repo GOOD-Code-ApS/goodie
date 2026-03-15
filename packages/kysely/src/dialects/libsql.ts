@@ -1,15 +1,16 @@
 import {
   ConditionalOnProperty,
-  ConfigurationProperties,
-  PostConstruct,
-  PreDestroy,
+  Config,
+  Eager,
+  OnDestroy,
+  OnInit,
   Singleton,
 } from '@goodie-ts/core';
 import type { Kysely } from 'kysely';
 import { KyselyDatabase } from '../kysely-database.js';
 
 @Singleton()
-@ConfigurationProperties('datasource')
+@Config('datasource')
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'libsql' })
 export class LibsqlDatasourceConfig {
   dialect = '';
@@ -20,6 +21,7 @@ export class LibsqlDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'libsql' })
 export class LibsqlKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;
@@ -31,7 +33,7 @@ export class LibsqlKyselyDatabase extends KyselyDatabase {
   get kysely(): Kysely<any> {
     if (!this._kysely) {
       throw new Error(
-        'LibsqlKyselyDatabase: not initialized. Wait for @PostConstruct to complete.',
+        'LibsqlKyselyDatabase: not initialized. Wait for @OnInit to complete.',
       );
     }
     return this._kysely;
@@ -41,7 +43,7 @@ export class LibsqlKyselyDatabase extends KyselyDatabase {
     return true;
   }
 
-  @PostConstruct()
+  @OnInit()
   async init() {
     try {
       const mod = await importOptional('@libsql/kysely-libsql');
@@ -60,7 +62,7 @@ export class LibsqlKyselyDatabase extends KyselyDatabase {
     }
   }
 
-  @PreDestroy()
+  @OnDestroy()
   async destroy() {
     await this._kysely?.destroy();
   }

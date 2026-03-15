@@ -1,6 +1,6 @@
 # @goodie-ts/kysely
 
-[Kysely](https://kysely.dev/) integration for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — `KyselyDatabase` library bean, declarative transactions, and auto-wired migrations.
+[Kysely](https://kysely.dev/) integration for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) — `KyselyDatabase` library component, declarative transactions, and auto-wired migrations.
 
 ## Install
 
@@ -109,7 +109,7 @@ export default defineConfig({
 });
 ```
 
-The kysely plugin is auto-discovered — no manual `plugins` configuration needed. `KyselyDatabase` is provided as a library bean.
+The kysely plugin is auto-discovered — no manual `plugins` configuration needed. `KyselyDatabase` is provided as a library component.
 
 ## License
 

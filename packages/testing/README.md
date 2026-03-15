@@ -1,6 +1,6 @@
 # @goodie-ts/testing
 
-Test utilities for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) with bean overrides, mock definitions, and Vitest fixtures.
+Test utilities for [goodie-ts](https://github.com/GOOD-Code-ApS/goodie) with component overrides, mock definitions, and Vitest fixtures.
 
 ## Install
 
@@ -10,7 +10,7 @@ pnpm add -D @goodie-ts/testing
 
 ## Overview
 
-Provides `createGoodieTest()` for Vitest-native fixtures and `TestContext` for creating isolated `ApplicationContext` instances with bean overrides.
+Provides `createGoodieTest()` for Vitest-native fixtures and `TestContext` for creating isolated `ApplicationContext` instances with component overrides.
 
 ## Vitest Fixtures (recommended)
 
@@ -31,7 +31,7 @@ test('GET /todos returns todos', async ({ app, resolve }) => {
   expect(res.status).toBe(200);
 });
 
-test('resolves beans directly', async ({ resolve }) => {
+test('resolves components directly', async ({ resolve }) => {
   const svc = resolve(UserService);
   expect(svc).toBeInstanceOf(UserService);
 });
@@ -76,7 +76,7 @@ const service = ctx.get(UserService);
 - `.override(token).with(MockClass)` — replace with a zero-dep class
 - `.override(token).withFactory(() => ...)` — replace with a custom factory
 - `.override(token).withDeps((dep0, dep1) => ...)` — replace factory, keep dependencies
-- `.provide(token, value)` — add a new test-only bean
+- `.provide(token, value)` — add a new test-only component
 - `.mock(MockClass, ...)` — register `@MockDefinition` classes
 - `.withConfig({ key: value })` — override config keys
 - `.build()` — returns `Promise<ApplicationContext>`

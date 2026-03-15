@@ -1,40 +1,31 @@
 import { ApplicationContext } from './application-context.js';
-import type { BeanDefinition } from './bean-definition.js';
+import type { ComponentDefinition } from './component-definition.js';
+import { OnStart } from './on-start.js';
 
 /**
  * Fluent builder for bootstrapping an ApplicationContext.
  *
  * Obtained via `Goodie.build(definitions)`. Call `.start()` to create
- * and initialize the context. Plugins (e.g. hono) register `onStart`
- * hooks to perform additional wiring (e.g. starting an HTTP server).
+ * and initialize the context. After context creation, discovers all
+ * `OnStart` components (sorted by `@Order()`) and executes them.
  *
  * Usage:
  * ```ts
- * import { app } from './AppContext.generated.js'
+ * import { app } from './__generated__/context.js'
  * await app.start()
  * ```
  */
 export class GoodieBuilder {
-  private readonly hooks: Array<(ctx: ApplicationContext) => Promise<void>> =
-    [];
+  constructor(private readonly definitions: ComponentDefinition[]) {}
 
-  constructor(private readonly definitions: BeanDefinition[]) {}
-
-  /**
-   * Register a hook that runs after the ApplicationContext is created.
-   * Used by generated code to wire plugin behaviour (e.g. starting an HTTP server).
-   */
-  onStart(hook: (ctx: ApplicationContext) => Promise<void>): this {
-    this.hooks.push(hook);
-    return this;
-  }
-
-  /** Build and start the ApplicationContext, then run all onStart hooks. */
+  /** Build and start the ApplicationContext, then run all OnStart components. */
   async start(): Promise<ApplicationContext> {
     const ctx = await ApplicationContext.create(this.definitions);
     try {
-      for (const hook of this.hooks) {
-        await hook(ctx);
+      // Discover OnStart components via baseTokens (sorted by @Order() via getAll)
+      const onStartComponents = ctx.getAll(OnStart);
+      for (const component of onStartComponents) {
+        await component.onStart(ctx);
       }
     } catch (err) {
       await ctx.close().catch(() => {});
@@ -56,8 +47,8 @@ export class GoodieBuilder {
 export class Goodie {
   private constructor() {}
 
-  /** Create a builder pre-loaded with the given bean definitions. */
-  static build(definitions: BeanDefinition[]): GoodieBuilder {
+  /** Create a builder pre-loaded with the given component definitions. */
+  static build(definitions: ComponentDefinition[]): GoodieBuilder {
     return new GoodieBuilder(definitions);
   }
 }

@@ -18,7 +18,7 @@ export class MockDefinitionError extends DIError {
 }
 
 /**
- * Class decorator that marks a mock class with the production bean it replaces.
+ * Class decorator that marks a mock class with the production component it replaces.
  *
  * Stores the target as a non-enumerable static property `__mockTarget` on
  * the decorated class. No Symbol.metadata is used.

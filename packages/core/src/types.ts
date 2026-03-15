@@ -6,8 +6,8 @@ export type AbstractConstructor<T = unknown> = abstract new (
   ...args: any[]
 ) => T;
 
-/** Bean lifecycle scope. */
-export type Scope = 'singleton' | 'prototype' | 'request';
+/** Component lifecycle scope. */
+export type Scope = 'singleton' | 'transient' | 'request';
 
 /** A decorator recorded at compile time by the transformer. */
 export interface DecoratorEntry {

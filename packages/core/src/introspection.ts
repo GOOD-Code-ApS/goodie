@@ -40,6 +40,8 @@ export interface ReferenceFieldType {
   kind: 'reference';
   /** The class name of the referenced @Introspected type. */
   className: string;
+  /** Source file path of the referenced type. Used to disambiguate same-named classes. */
+  importPath?: string;
 }
 
 export interface UnionFieldType {
@@ -98,6 +100,8 @@ export interface TypeMetadata<T = unknown> {
   ) => T;
   /** Fully-qualified class name. */
   className: string;
+  /** Source file path. Used to disambiguate same-named classes from different modules. */
+  importPath?: string;
   /** All fields with type and decorator metadata. */
   fields: IntrospectedField[];
 }
@@ -124,6 +128,19 @@ export class MetadataRegistry {
     TypeMetadata
   >();
 
+  private readonly methodParams = new Map<
+    new (
+      ...args: any[]
+    ) => unknown,
+    Map<
+      string,
+      Array<{
+        paramType: new (...args: any[]) => unknown;
+        paramIndex: number;
+      }>
+    >
+  >();
+
   /** Register a TypeMetadata entry. */
   register(metadata: TypeMetadata): void {
     this.entries.set(metadata.type, metadata);
@@ -144,8 +161,49 @@ export class MetadataRegistry {
     return [...this.entries.values()];
   }
 
+  /**
+   * Register a single validated parameter for a method.
+   * Generated code calls this once per class-typed param so runtime consumers
+   * (validation, OpenAPI, etc.) can look up which arguments to validate.
+   */
+  registerMethodParam(
+    target: new (...args: any[]) => unknown,
+    methodName: string,
+    paramType: new (...args: any[]) => unknown,
+    paramIndex: number,
+  ): void {
+    let methods = this.methodParams.get(target);
+    if (!methods) {
+      methods = new Map();
+      this.methodParams.set(target, methods);
+    }
+    let entries = methods.get(methodName);
+    if (!entries) {
+      entries = [];
+      methods.set(methodName, entries);
+    }
+    entries.push({ paramType, paramIndex });
+  }
+
+  /**
+   * Look up validated parameter entries for a method.
+   * Returns undefined if no params are registered.
+   */
+  getMethodParams(
+    target: new (...args: any[]) => unknown,
+    methodName: string,
+  ):
+    | Array<{
+        paramType: new (...args: any[]) => unknown;
+        paramIndex: number;
+      }>
+    | undefined {
+    return this.methodParams.get(target)?.get(methodName);
+  }
+
   /** Reset the registry. For testing only. */
   reset(): void {
     this.entries.clear();
+    this.methodParams.clear();
   }
 }

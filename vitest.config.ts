@@ -22,6 +22,11 @@ export default defineConfig({
         'packages/testing/src/index.ts',
       ),
       '@goodie-ts/cli': path.resolve(__dirname, 'packages/cli/src/index.ts'),
+      '@goodie-ts/http/plugin': path.resolve(
+        __dirname,
+        'packages/http/src/plugin.ts',
+      ),
+      '@goodie-ts/http': path.resolve(__dirname, 'packages/http/src/index.ts'),
       '@goodie-ts/hono/plugin': path.resolve(
         __dirname,
         'packages/hono/src/plugin.ts',
@@ -54,6 +59,26 @@ export default defineConfig({
       '@goodie-ts/scheduler': path.resolve(
         __dirname,
         'packages/scheduler/src/index.ts',
+      ),
+      '@goodie-ts/validation': path.resolve(
+        __dirname,
+        'packages/validation/src/index.ts',
+      ),
+      '@goodie-ts/management': path.resolve(
+        __dirname,
+        'packages/management/src/index.ts',
+      ),
+      '@goodie-ts/openapi': path.resolve(
+        __dirname,
+        'packages/openapi/src/index.ts',
+      ),
+      '@goodie-ts/security/plugin': path.resolve(
+        __dirname,
+        'packages/security/src/plugin.ts',
+      ),
+      '@goodie-ts/security': path.resolve(
+        __dirname,
+        'packages/security/src/index.ts',
       ),
     },
   },

@@ -42,7 +42,7 @@ class UserService {
 
 ## Setup
 
-No plugin configuration needed — `@goodie-ts/cache` ships pre-scanned beans and AOP config in `beans.json`. The transformer auto-discovers them at build time.
+No plugin configuration needed — `@goodie-ts/cache` ships pre-scanned components and AOP config in `components.json`. The transformer auto-discovers them at build time.
 
 ## License
 

@@ -1,6 +1,6 @@
 import {
   ApplicationContext,
-  type BeanDefinition,
+  type ComponentDefinition,
   type Dependency,
   DIError,
   InjectionToken,
@@ -17,7 +17,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -25,7 +25,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -39,7 +39,7 @@ function makeDef<T>(
 // ── TestContext.from() ───────────────────────────────────────────────
 
 describe('TestContext.from()', () => {
-  it('creates a builder from BeanDefinition[]', async () => {
+  it('creates a builder from ComponentDefinition[]', async () => {
     class Foo {
       value = 'original';
     }
@@ -152,7 +152,7 @@ describe('override() validation', () => {
 // ── withValue() ─────────────────────────────────────────────────────
 
 describe('withValue()', () => {
-  it('overrides a bean with a fixed value', async () => {
+  it('overrides a component with a fixed value', async () => {
     class Foo {
       constructor(readonly value: string) {}
     }
@@ -179,7 +179,7 @@ describe('withValue()', () => {
     expect(ctx.get(Foo)).toBe(instance);
   });
 
-  it('preserves non-overridden beans', async () => {
+  it('preserves non-overridden components', async () => {
     class Foo {
       value = 'foo';
     }
@@ -197,7 +197,7 @@ describe('withValue()', () => {
     expect(ctx.get(Bar).value).toBe('bar');
   });
 
-  it('dependents receive the overridden bean', async () => {
+  it('dependents receive the overridden component', async () => {
     class Repo {
       constructor(readonly name: string) {}
     }
@@ -303,7 +303,7 @@ describe('withFactory()', () => {
 // ── multiple overrides ──────────────────────────────────────────────
 
 describe('multiple overrides', () => {
-  it('chains multiple overrides for different beans', async () => {
+  it('chains multiple overrides for different components', async () => {
     class Foo {
       constructor(readonly value: string) {}
     }
@@ -368,13 +368,13 @@ describe('build()', () => {
     expect(ctx2.get(Counter).count).toBe(0);
   });
 
-  it('preserves prototype scope for non-overridden beans', async () => {
+  it('preserves prototype scope for non-overridden components', async () => {
     class Proto {}
     class Other {
       value = 'other';
     }
     const ctx = await TestContext.from([
-      makeDef(Proto, { scope: 'prototype', factory: () => new Proto() }),
+      makeDef(Proto, { scope: 'transient', factory: () => new Proto() }),
       makeDef(Other, { factory: () => new Other() }),
     ])
       .override(Other)
@@ -456,14 +456,14 @@ describe('withDeps()', () => {
     expect((receivedArgs[1] as B).value).toBe('b');
   });
 
-  it('preserves scope, eager, and metadata from the original bean', async () => {
+  it('preserves scope, eager, and metadata from the original component', async () => {
     class Foo {}
     const defs = [
       makeDef(Foo, {
         factory: () => new Foo(),
-        scope: 'prototype',
+        scope: 'transient',
         eager: true,
-        metadata: { isBeanPostProcessor: true },
+        metadata: { isComponentPostProcessor: true },
       }),
     ];
 
@@ -473,12 +473,12 @@ describe('withDeps()', () => {
       .build();
 
     const overriddenDef = ctx.getDefinitions().find((d) => d.token === Foo)!;
-    expect(overriddenDef.scope).toBe('prototype');
+    expect(overriddenDef.scope).toBe('transient');
     expect(overriddenDef.eager).toBe(true);
-    expect(overriddenDef.metadata).toEqual({ isBeanPostProcessor: true });
+    expect(overriddenDef.metadata).toEqual({ isComponentPostProcessor: true });
   });
 
-  it('works with InjectionToken-based provides beans', async () => {
+  it('works with InjectionToken-based provides components', async () => {
     class Config {
       host = 'localhost';
     }
@@ -535,7 +535,9 @@ describe('withConfig()', () => {
     '__Goodie_Config',
   );
 
-  function makeConfigDefs(config: Record<string, unknown>): BeanDefinition[] {
+  function makeConfigDefs(
+    config: Record<string, unknown>,
+  ): ComponentDefinition[] {
     return [
       {
         token: CONFIG_TOKEN,
@@ -559,7 +561,7 @@ describe('withConfig()', () => {
     expect(config.PORT).toBe('3000');
   });
 
-  it('throws DIError when no __Goodie_Config bean exists', () => {
+  it('throws DIError when no __Goodie_Config component exists', () => {
     class Foo {}
     const defs = [makeDef(Foo, { factory: () => new Foo() })];
     const builder = TestContext.from(defs);
@@ -592,12 +594,12 @@ describe('withConfig()', () => {
     expect(config.B).toBe('override-b');
   });
 
-  it('chains with override() for combined config + bean overrides', async () => {
+  it('chains with override() for combined config + component overrides', async () => {
     class Service {
       constructor(readonly name: string) {}
     }
 
-    const defs: BeanDefinition[] = [
+    const defs: ComponentDefinition[] = [
       ...makeConfigDefs({ DB_URL: 'postgres://prod' }),
       makeDef(Service, { factory: () => new Service('real') }),
     ];
@@ -616,7 +618,7 @@ describe('withConfig()', () => {
 // ── provide() ───────────────────────────────────────────────────
 
 describe('provide()', () => {
-  it('adds a new bean that does not exist in base definitions', async () => {
+  it('adds a new component that does not exist in base definitions', async () => {
     class Repo {
       find(): string {
         return 'found';

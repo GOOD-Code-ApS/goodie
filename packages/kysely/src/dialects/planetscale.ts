@@ -1,15 +1,16 @@
 import {
   ConditionalOnProperty,
-  ConfigurationProperties,
-  PostConstruct,
-  PreDestroy,
+  Config,
+  Eager,
+  OnDestroy,
+  OnInit,
   Singleton,
 } from '@goodie-ts/core';
 import type { Kysely } from 'kysely';
 import { KyselyDatabase } from '../kysely-database.js';
 
 @Singleton()
-@ConfigurationProperties('datasource')
+@Config('datasource')
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'planetscale' })
 export class PlanetscaleDatasourceConfig {
   dialect = '';
@@ -21,6 +22,7 @@ export class PlanetscaleDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'planetscale' })
 export class PlanetscaleKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;
@@ -32,7 +34,7 @@ export class PlanetscaleKyselyDatabase extends KyselyDatabase {
   get kysely(): Kysely<any> {
     if (!this._kysely) {
       throw new Error(
-        'PlanetscaleKyselyDatabase: not initialized. Wait for @PostConstruct to complete.',
+        'PlanetscaleKyselyDatabase: not initialized. Wait for @OnInit to complete.',
       );
     }
     return this._kysely;
@@ -42,7 +44,7 @@ export class PlanetscaleKyselyDatabase extends KyselyDatabase {
     return false;
   }
 
-  @PostConstruct()
+  @OnInit()
   async init() {
     try {
       const mod = await importOptional('kysely-planetscale');
@@ -63,7 +65,7 @@ export class PlanetscaleKyselyDatabase extends KyselyDatabase {
     }
   }
 
-  @PreDestroy()
+  @OnDestroy()
   async destroy() {
     await this._kysely?.destroy();
   }

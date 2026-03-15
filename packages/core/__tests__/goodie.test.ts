@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/component-definition.js';
 import { Goodie, GoodieBuilder } from '../src/goodie.js';
 import { InjectionToken } from '../src/injection-token.js';
 import type { Scope } from '../src/types.js';
@@ -12,7 +15,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -20,7 +23,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -45,7 +48,7 @@ describe('Goodie Builder', () => {
     await ctx.close();
   });
 
-  it('resolves a simple bean through the builder', async () => {
+  it('resolves a simple component through the builder', async () => {
     class Greeter {
       greet() {
         return 'hello';
@@ -82,7 +85,7 @@ describe('Goodie Builder', () => {
     await ctx.close();
   });
 
-  it('resolves InjectionToken beans', async () => {
+  it('resolves InjectionToken components', async () => {
     const DbUrl = new InjectionToken<string>('DbUrl');
 
     const ctx = await Goodie.build([
@@ -107,59 +110,5 @@ describe('Goodie Builder', () => {
     const ctx = await builder.start();
     expect(ctx.get(Config).port).toBe(3000);
     await ctx.close();
-  });
-
-  it('runs onStart hooks after context is created', async () => {
-    class Service {
-      started = false;
-    }
-
-    const hookCalls: string[] = [];
-    const ctx = await Goodie.build([
-      makeDef(Service, { factory: () => new Service() }),
-    ])
-      .onStart(async (ctx) => {
-        hookCalls.push('hook1');
-        ctx.get(Service).started = true;
-      })
-      .onStart(async () => {
-        hookCalls.push('hook2');
-      })
-      .start();
-
-    expect(ctx.get(Service).started).toBe(true);
-    expect(hookCalls).toEqual(['hook1', 'hook2']);
-    await ctx.close();
-  });
-
-  it('propagates errors from onStart hooks', async () => {
-    const builder = Goodie.build([]).onStart(async () => {
-      throw new Error('hook failed');
-    });
-
-    await expect(builder.start()).rejects.toThrow('hook failed');
-  });
-
-  it('closes context when an onStart hook throws', async () => {
-    let destroyed = false;
-
-    class Resource {
-      destroy() {
-        destroyed = true;
-      }
-    }
-
-    const builder = Goodie.build([
-      makeDef(Resource, {
-        factory: () => new Resource(),
-        eager: true,
-        metadata: { preDestroyMethods: ['destroy'] },
-      }),
-    ]).onStart(async () => {
-      throw new Error('hook failed');
-    });
-
-    await expect(builder.start()).rejects.toThrow('hook failed');
-    expect(destroyed).toBe(true);
   });
 });

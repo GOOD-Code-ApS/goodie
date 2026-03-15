@@ -189,7 +189,7 @@ describe('builtin-introspection-plugin', () => {
     expect(result.code).not.toContain('"name":"internal"');
   });
 
-  it('does not register @Introspected class as a bean', () => {
+  it('does not register @Introspected class as a component', () => {
     const result = createStrictTestProject({
       '/src/Dto.ts': `
         import { Introspected } from './decorators'
@@ -201,7 +201,7 @@ describe('builtin-introspection-plugin', () => {
       `,
     });
 
-    expect(result.beans).toHaveLength(0);
+    expect(result.components).toHaveLength(0);
     expect(result.code).toContain('MetadataRegistry.INSTANCE');
   });
 
@@ -241,7 +241,7 @@ describe('builtin-introspection-plugin', () => {
     expect(result.code).toContain('"decorators":[]');
   });
 
-  it('works alongside bean definitions', () => {
+  it('works alongside component definitions', () => {
     const result = createStrictTestProject({
       '/src/CreateTodoRequest.ts': `
         import { Introspected } from './decorators'
@@ -261,8 +261,8 @@ describe('builtin-introspection-plugin', () => {
       `,
     });
 
-    expect(result.beans).toHaveLength(1);
-    expect(result.beans[0].tokenRef).toMatchObject({
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].tokenRef).toMatchObject({
       kind: 'class',
       className: 'TodoService',
     });

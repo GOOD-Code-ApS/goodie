@@ -22,13 +22,15 @@ function makeHmrContext(filePath: string): HmrContext {
   } as unknown as HmrContext;
 }
 
-function successResult(beanCount: number, warnings: string[] = []) {
+function successResult(componentCount: number, warnings: string[] = []) {
   return {
     success: true as const,
     result: {
       code: '// generated',
-      outputPath: '/project/src/AppContext.generated.ts',
-      beans: Array.from({ length: beanCount }, (_, i) => ({ id: `Bean${i}` })),
+      outputPath: '/project/src/__generated__/context.ts',
+      components: Array.from({ length: componentCount }, (_, i) => ({
+        id: `Component${i}`,
+      })),
       warnings,
     },
   };
@@ -87,7 +89,7 @@ describe('diPlugin', () => {
       await plugin.buildStart();
       expect(mockRunRebuild).toHaveBeenCalledWith({
         tsConfigPath: path.resolve('/my/root', 'tsconfig.json'),
-        outputPath: path.resolve('/my/root', 'src/AppContext.generated.ts'),
+        outputPath: path.resolve('/my/root', 'src/__generated__/context.ts'),
         include: undefined,
         debounceMs: 100,
         plugins: [],
@@ -114,25 +116,27 @@ describe('diPlugin', () => {
   });
 
   describe('buildStart', () => {
-    it('logs bean count on success', async () => {
+    it('logs component count on success', async () => {
       const plugin = setupPlugin();
       mockRunRebuild.mockResolvedValue(successResult(5));
 
       await plugin.buildStart();
 
       expect(console.log).toHaveBeenCalledWith(
-        '[goodie] Transform complete: 5 bean(s) registered.',
+        '[goodie] Transform complete: 5 component(s) registered.',
       );
     });
 
     it('logs warnings on success', async () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(successResult(1, ['Unused bean: Foo']));
+      mockRunRebuild.mockResolvedValue(
+        successResult(1, ['Unused component: Foo']),
+      );
 
       await plugin.buildStart();
 
       expect(console.warn).toHaveBeenCalledWith(
-        '[goodie] Warning: Unused bean: Foo',
+        '[goodie] Warning: Unused component: Foo',
       );
     });
 
@@ -158,7 +162,7 @@ describe('diPlugin', () => {
 
       expect(mockRunRebuild).toHaveBeenCalledTimes(1);
       expect(console.log).toHaveBeenCalledWith(
-        '[goodie] Rebuild complete: 3 bean(s) registered.',
+        '[goodie] Rebuild complete: 3 component(s) registered.',
       );
     });
 
@@ -171,16 +175,25 @@ describe('diPlugin', () => {
       expect(mockRunRebuild).not.toHaveBeenCalled();
     });
 
-    it('ignores the generated output file', async () => {
+    it('ignores files inside the __generated__/ directory', async () => {
       const plugin = setupPlugin(undefined, '/project');
 
-      const outputPath = path.resolve(
+      // The main context file
+      const contextPath = path.resolve(
         '/project',
-        'src/AppContext.generated.ts',
+        'src/__generated__/context.ts',
       );
-      plugin.handleHotUpdate(makeHmrContext(outputPath));
+      plugin.handleHotUpdate(makeHmrContext(contextPath));
       await vi.advanceTimersByTimeAsync(200);
+      expect(mockRunRebuild).not.toHaveBeenCalled();
 
+      // Any other file in __generated__/
+      const otherGenerated = path.resolve(
+        '/project',
+        'src/__generated__/routes.ts',
+      );
+      plugin.handleHotUpdate(makeHmrContext(otherGenerated));
+      await vi.advanceTimersByTimeAsync(200);
       expect(mockRunRebuild).not.toHaveBeenCalled();
     });
 
