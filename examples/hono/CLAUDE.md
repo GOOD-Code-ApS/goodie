@@ -36,7 +36,6 @@ Library components: PostgresKyselyDatabase(@Singleton, conditional on dialect=po
 @Controller('/api/todos') TodoController(todoService) → Hono routes via decorators
 │
 Generated: createRouter(ctx) → wires controllers to Hono app
-Generated: app.onStart()     → hook that starts EmbeddedServer with the router
 │
 Library components: ServerConfig(@Config('server')) + EmbeddedServer(@Singleton)
   └── config/default.json: { "server": { "host": "localhost", "port": 3000 } }
@@ -64,7 +63,7 @@ Library components: ServerConfig(@Config('server')) + EmbeddedServer(@Singleton)
 - `__Goodie_Config` — `InjectionToken<Record<string, unknown>>` for config map
 - `buildDefinitions(config?)` — factory that returns `ComponentDefinition[]` with optional config overrides
 - `createContext(config?)` — async factory for testing with config overrides
-- `app` — `Goodie.build(definitions)` with `onStart` hook that starts the HTTP server
+- `app` — `Goodie.build(definitions)` — HTTP server started by `HonoServerBootstrap` via `OnStart` lifecycle
 - `createRouter(ctx)` — wires `@Controller` components to Hono routes (contributed by hono plugin)
 
 ## Test Pattern — createGoodieTest + TestContainers

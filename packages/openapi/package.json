@@ -28,9 +28,9 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "peerDependencies": {
-    "@goodie-ts/core": ">=1.0.0",
+    "@goodie-ts/core": ">=2.0.0",
     "@goodie-ts/http": ">=1.0.0",
-    "openapi3-ts": ">=4.0.0"
+    "openapi3-ts": "^4.0.0"
   },
   "devDependencies": {
     "@goodie-ts/core": "workspace:*",

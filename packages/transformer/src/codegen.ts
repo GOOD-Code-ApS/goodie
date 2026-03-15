@@ -24,16 +24,9 @@ export interface CodegenOptions {
   /** Pre-computed IR hash. When provided, skips recomputation inside generateCode(). */
   hash?: string;
   /**
-   * Directory containing JSON config files. When set, the generated config
-   * factory calls `loadConfigFiles()` to merge file-based configuration.
-   * @deprecated Use `inlinedConfig` instead for edge-runtime compatibility.
-   */
-  configDir?: string;
-  /**
    * Pre-loaded and flattened config values from JSON files.
-   * When set, config values are embedded directly in the generated code
-   * instead of loading them at runtime via `loadConfigFiles()`.
-   * This removes the `node:fs` runtime dependency, enabling edge runtimes.
+   * Config values are embedded directly in the generated code,
+   * avoiding any runtime dependency on `node:fs`.
    */
   inlinedConfig?: Record<string, string>;
 }
@@ -141,7 +134,7 @@ export function generateCode(
       b.metadata.valueFields &&
       (b.metadata.valueFields as unknown[]).length > 0,
   );
-  const hasConfigDir = !!options.configDir || !!options.inlinedConfig;
+  const hasConfigDir = !!options.inlinedConfig;
   const needsConfigComponent = hasValueFields || hasConfigDir;
 
   // AOP / metadata flags (derived from component metadata)
@@ -156,9 +149,6 @@ export function generateCode(
 
   // ── Core imports ───────────────────────────────────────────────────────
   const coreNamedImports = ['ApplicationContext', 'Goodie'];
-  if (options.configDir && !options.inlinedConfig) {
-    coreNamedImports.push('loadConfigFiles');
-  }
 
   // Auto-derive AOP utility imports from component metadata
   const aopImportsNeeded = new Set<string>();
@@ -469,6 +459,7 @@ function writeComponentDefinitionsBody(
         needsConfigComponent,
         interceptorDepsPerComponent,
         scopedProxyNames,
+        path.dirname(options.outputPath),
       );
     }
   });
@@ -488,11 +479,6 @@ function writeConfigComponentDefinition(
       const configLiteral = JSON.stringify(options.inlinedConfig);
       writer.writeLine(
         `factory: () => ({ ...${configLiteral}, ...process.env, ...config } as Record<string, unknown>),`,
-      );
-    } else if (options.configDir) {
-      const configDirLiteral = JSON.stringify(options.configDir);
-      writer.writeLine(
-        `factory: () => ({ ...loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? ${configDirLiteral}, process.env.NODE_ENV), ...process.env, ...config } as Record<string, unknown>),`,
       );
     } else {
       writer.writeLine(
@@ -515,6 +501,7 @@ function writeComponentDefinition(
     Map<string, InterceptorRefMeta>
   >,
   scopedProxyNames: Map<IRComponentDefinition, string>,
+  outputDir: string,
 ): void {
   writer.writeLine('{');
   writer.indent(() => {
@@ -529,7 +516,7 @@ function writeComponentDefinition(
     writer.writeLine(`eager: ${component.eager},`);
     const proxyFnName = scopedProxyNames.get(component);
     writer.writeLine(
-      `metadata: ${metadataToCode(component.metadata, proxyFnName)},`,
+      `metadata: ${metadataToCode(component.metadata, outputDir, proxyFnName)},`,
     );
     if (component.baseTokenRefs && component.baseTokenRefs.length > 0) {
       const baseTokensList = component.baseTokenRefs
@@ -1005,8 +992,12 @@ function providesFactoryToCode(component: IRComponentDefinition): string {
   return w.toString();
 }
 
+/** Keys in metadata whose string values are file paths that need normalization. */
+const PATH_METADATA_KEYS = new Set(['importPath', 'tokenImportPath']);
+
 function metadataToCode(
   metadata: Record<string, unknown>,
+  outputDir: string,
   scopedProxyFnName?: string,
 ): string {
   const entries = Object.entries(metadata);
@@ -1014,13 +1005,45 @@ function metadataToCode(
 
   const w = createWriter();
   w.write('{ ');
-  const items: string[] = entries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+  const items: string[] = entries.map(
+    ([k, v]) => `${k}: ${JSON.stringify(normalizeMetadataNode(v, outputDir))}`,
+  );
   if (scopedProxyFnName) {
     items.push(`scopedProxyFactory: ${scopedProxyFnName}`);
   }
   w.write(items.join(', '));
   w.write(' }');
   return w.toString();
+}
+
+/**
+ * Recursively normalize absolute path values in metadata objects.
+ * Converts absolute `importPath` / `tokenImportPath` values to relative paths.
+ */
+function normalizeMetadataNode(node: unknown, outputDir: string): unknown {
+  if (node === null || node === undefined || typeof node !== 'object')
+    return node;
+  if (Array.isArray(node))
+    return node.map((n) => normalizeMetadataNode(n, outputDir));
+
+  const obj = node as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (
+      PATH_METADATA_KEYS.has(key) &&
+      typeof value === 'string' &&
+      value !== ''
+    ) {
+      result[key] = computeRelativeImport(outputDir, value);
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = normalizeMetadataNode(value, outputDir);
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
 }
 
 // ── Path utilities ─────────────────────────────────────────────────────────

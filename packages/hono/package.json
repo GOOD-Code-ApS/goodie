@@ -37,10 +37,10 @@
     "ts-morph": "^24.0.0"
   },
   "peerDependencies": {
-    "@goodie-ts/core": ">=1.0.0",
+    "@goodie-ts/core": ">=2.0.0",
     "@goodie-ts/http": ">=1.0.0",
-    "@hono/node-server": ">=1.0.0",
-    "hono": ">=4.0.0"
+    "@hono/node-server": "^1.0.0",
+    "hono": "^4.0.0"
   },
   "peerDependenciesMeta": {
     "@hono/node-server": {

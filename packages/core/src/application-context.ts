@@ -746,7 +746,7 @@ function levenshtein(a: string, b: string): number {
 
 /**
  * Filter components based on conditional rules stored in `metadata.conditionalRules`.
- * Evaluated at runtime following the Micronaut pattern — the transformer records
+ * Evaluated at runtime — the transformer records
  * the rules, the container evaluates them.
  *
  * Order: onEnv → onProperty → onMissing (since onMissing depends on what remains).

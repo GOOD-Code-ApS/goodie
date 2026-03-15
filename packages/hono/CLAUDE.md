@@ -22,7 +22,7 @@ Hono adapter for goodie-ts. Thin I/O bridge between `@goodie-ts/http`'s generic 
 
 ### Parameter Binding & Response Adaptation
 
-Controller methods use Micronaut-style parameter binding. The hono plugin generates per-param extraction code:
+Controller methods use implicit parameter binding. The hono plugin generates per-param extraction code:
 
 - **No params** → `toHonoResponse(c, await ctrl.method())` — calls method with no args
 - **Path params** → `c.req.param('id')` with type coercion (`Number()` for numbers, `=== 'true'` for booleans)
@@ -65,7 +65,7 @@ Generated code never calls Hono APIs directly. Instead it calls runtime helpers 
 
 All route handlers are wrapped in try/catch. At startup, `createRouter` resolves all `ExceptionHandler` components via `ctx.getAll(ExceptionHandler)`. Caught errors are delegated to `handleException()` from `@goodie-ts/http` which iterates all handlers. If a handler returns a `Response<T>`, it's translated to a Hono response via `toHonoResponse()`. If no handler matches, the error is re-thrown.
 
-This follows Micronaut's `ExceptionHandler` pattern — multiple handlers supported (validation, security, custom), the generic pipeline lives in `@goodie-ts/http`, the adapter only bridges I/O.
+Multiple handlers are supported (validation, security, custom) — the generic pipeline lives in `@goodie-ts/http`, the adapter only bridges I/O.
 
 ### Route Factory Pattern
 
@@ -99,7 +99,7 @@ function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])
 - **Adapter pattern** — hono plugin reads from `metadata.httpController` set by the http plugin. Route scanning is in `@goodie-ts/http`, Hono-specific codegen is here.
 - **No decorator re-exports** — users import decorators from `@goodie-ts/http` directly. Swapping adapters requires no decorator import changes.
 - **CORS is config-driven and opt-in** — only emitted when `server.cors.*` config keys exist.
-- **Error handling is always-on** — route handlers always have try/catch. Exception handlers are optional runtime components. No conditional codegen for error handling — follows Micronaut.
+- **Error handling is always-on** — route handlers always have try/catch. Exception handlers are optional runtime components. No conditional codegen for error handling.
 - **Generated code never imports Hono ecosystem directly** — all Hono API calls are in `router-helpers.ts`
 
 ## Multi-Runtime Support

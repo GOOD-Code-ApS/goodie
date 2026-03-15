@@ -6,8 +6,9 @@ Valibot-based validation from compile-time introspection metadata for goodie-ts.
 
 | File | Role |
 |------|------|
-| `src/plugin.ts` | Transformer plugin — scans `@Validated` methods for `Request<T>` param types, generates `MetadataRegistry.registerMethodParams()` calls |
-| `src/vali-schema-factory.ts` | `ValiSchemaFactory` — builds Valibot schemas from `TypeMetadata` in `MetadataRegistry`, caches per type |
+| `src/plugin.ts` | Transformer plugin — `visitMethod` stores `validatedMethodParams` metadata for core codegen, `emitFiles` generates `schemas.ts` with pre-built Valibot schemas |
+| `src/vali-schema-factory.ts` | `ValiSchemaFactory` — builds Valibot schemas from `TypeMetadata` in `MetadataRegistry`, caches per type. Also has static `registerSchema()` for pre-built schemas from generated `schemas.ts` |
+| `src/vali-body-validator.ts` | `ValiBodyValidator extends BodyValidator` — `@Singleton`, validates request bodies via `ValiSchemaFactory`. Non-`@Introspected` types pass through |
 | `src/validation-interceptor.ts` | `ValidationInterceptor` — AOP interceptor, reads param types from `MetadataRegistry`, validates via `ValiSchemaFactory` |
 | `src/vali-exception-handler.ts` | `ValiExceptionHandler` — extends `ExceptionHandler` from http, catches `ValiError` -> 400 |
 | `src/decorators/constraints.ts` | Constraint decorators: `@MinLength`, `@MaxLength`, `@Min`, `@Max`, `@Pattern`, `@NotBlank`, `@Email`, `@Size` |
@@ -25,10 +26,10 @@ Valibot-based validation from compile-time introspection metadata for goodie-ts.
 
 Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
 
-- **`visitMethod`** — detects `@Validated` decorator, extracts `Request<T>` type argument via ts-morph, stores body type class name + import path
-- **`codegen`** — emits imports and `MetadataRegistry.INSTANCE.registerMethodParams(ControllerClass, 'methodName', [BodyTypeClass])` calls
+- **`visitMethod`** — detects `@Validated` decorator, extracts param types via ts-morph, stores them as `validatedMethodParams` on `ctx.classMetadata` for core codegen to emit `MetadataRegistry.registerMethodParams()` calls
+- **`emitFiles`** — generates a `schemas.ts` file with pre-built Valibot schemas. Calls `ValiSchemaFactory.registerSchema(ClassName, v.object({...}))` for every `@Introspected` type, enabling compile-time validation without lazy `MetadataRegistry` lookup at runtime
 
-This bridges the compile-time type information to runtime, enabling the `ValidationInterceptor` to know which types to validate without reflection.
+This bridges compile-time type information to runtime, enabling the `ValidationInterceptor` to know which types to validate without reflection.
 
 ## Schema Building
 
@@ -45,16 +46,17 @@ Constraints applied via `v.pipe(schema, ...actions)`. The `Size` constraint maps
 
 ## Library Components (components.json)
 
-3 singleton components:
-- **ValiSchemaFactory** — schema builder + cache
+4 singleton components:
+- **ValiSchemaFactory** — schema builder + cache, with static `registerSchema()` for pre-built schemas
+- **ValiBodyValidator** — `extends BodyValidator` (from http), validates request bodies via `ValiSchemaFactory`
 - **ValidationInterceptor** — AOP interceptor, depends on ValiSchemaFactory
 - **ValiExceptionHandler** — extends ExceptionHandler (from http), `baseTokens: [ExceptionHandler]`
 
 ## Design Decisions
 
 - **Constraint decorators are thin no-ops** — runtime logic is Valibot's. Metadata extracted at build time by the existing introspection plugin.
-- **Schemas built from introspection, not codegen** — `ValiSchemaFactory` reads `MetadataRegistry` at runtime. No Valibot imports in generated code.
+- **Two schema paths** — `emitFiles` generates pre-built schemas at build time via `ValiSchemaFactory.registerSchema()`. Fallback: `ValiSchemaFactory` reads `MetadataRegistry` lazily at runtime for types without pre-built schemas.
 - **Non-introspected references are `v.unknown()`** — validation is opt-in. Missing `@Introspected` on a referenced type means that field isn't validated, not an error.
 - **`@Validated` at method level** — applied to individual controller methods that need validation. The AOP wiring connects `ValidationInterceptor`.
 - **Param types via MetadataRegistry** — the validation plugin generates `registerMethodParams()` calls at build time. The interceptor reads them at runtime via `getMethodParams()`. This avoids JSON-serialization limitations of the AOP metadata path (class references aren't JSON-serializable).
-- **Exception handler lives here, not in the adapter** — follows Micronaut's pattern. The generic exception handling pipeline in `@goodie-ts/http` iterates all `ExceptionHandler` components. `ValiExceptionHandler` is one of potentially many.
+- **Exception handler lives here, not in the adapter** — the generic exception handling pipeline in `@goodie-ts/http` iterates all `ExceptionHandler` components. `ValiExceptionHandler` is one of potentially many.

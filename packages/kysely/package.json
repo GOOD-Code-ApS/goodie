@@ -29,7 +29,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "peerDependencies": {
-    "@goodie-ts/core": ">=1.0.0",
+    "@goodie-ts/core": ">=2.0.0",
     "kysely": ">=0.27.0",
     "pg": ">=8.0.0",
     "mysql2": ">=3.0.0",

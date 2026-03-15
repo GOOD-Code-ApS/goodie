@@ -44,7 +44,7 @@ const IGNORED_METHOD_DECORATORS = new Set([
  * Scans `@Controller` classes and `@Get`/`@Post`/etc. route methods,
  * populating `metadata.httpController` with `ControllerMetadata`.
  *
- * Supports Micronaut-style parameter binding:
+ * Supports implicit parameter binding:
  * - `HttpContext` param → read-only request context (headers, cookies, etc.)
  * - Param name matching `:pathVar` in route path → path parameter
  * - Primitive types (`string`, `number`, `boolean`) → query parameter

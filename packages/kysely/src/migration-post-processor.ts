@@ -17,8 +17,7 @@ import { KyselyDatabase } from './kysely-database.js';
  * Replaces the previous `MigrationRunner` eager singleton. As a
  * `ComponentPostProcessor`, migrations execute during `KyselyDatabase`
  * initialization — guaranteeing every consumer receives a fully-migrated
- * database instance. Follows Micronaut's `BeanCreatedEventListener<DataSource>`
- * pattern.
+ * database instance.
  */
 @PostProcessor()
 @Singleton()

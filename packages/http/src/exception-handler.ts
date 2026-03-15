@@ -5,8 +5,7 @@ import type { Response } from './response.js';
  * respective packages (e.g. `ValiExceptionHandler` in `@goodie-ts/validation`).
  *
  * Multiple handlers can be registered — the exception handling pipeline
- * iterates all handlers and uses the first match. This follows Micronaut's
- * `ExceptionHandler<T, R>` pattern.
+ * iterates all handlers and uses the first match.
  */
 export abstract class ExceptionHandler {
   abstract handle(error: unknown): Response<unknown> | undefined;

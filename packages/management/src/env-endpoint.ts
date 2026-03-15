@@ -2,7 +2,7 @@ import type { ApplicationContext } from '@goodie-ts/core';
 import { Controller, Get, Response } from '@goodie-ts/http';
 
 /**
- * Micronaut-style default mask patterns.
+ * Default mask patterns for sensitive configuration keys.
  * Keys are split on `.`, `_`, `-` separators and matched at the segment level
  * to avoid false positives (e.g. "monkey" won't match "key").
  */
@@ -20,7 +20,7 @@ const MASK = '******';
 /**
  * Management endpoint exposing resolved configuration.
  *
- * Sensitive values are masked following Micronaut's approach:
+ * Sensitive values are masked automatically:
  * keys containing "password", "credential", "certificate",
  * "key", "secret", or "token" are replaced with "******".
  */

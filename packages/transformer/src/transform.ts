@@ -230,6 +230,20 @@ export async function transform(
   // 10. Extract type registrations from plugin metadata
   const typeRegistrations = extractTypeRegistrations(scanResult.pluginMetadata);
 
+  // 10a. Reconcile type registration import paths (bare package specifiers for library types)
+  if (discovery.packageDirs) {
+    for (const reg of typeRegistrations) {
+      if (reg.importPath.startsWith('/')) {
+        for (const [realDir, pkgName] of discovery.packageDirs) {
+          if (reg.importPath.startsWith(`${realDir}/`)) {
+            reg.importPath = pkgName;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // 10b. Collect emitted files from plugins
   const outputDir = path.dirname(options.outputPath);
   const emittedFiles = collectEmittedFiles(
@@ -243,7 +257,6 @@ export async function transform(
   const codegenOptions = {
     outputPath: options.outputPath,
     version: PKG_VERSION,
-    configDir: resolvedConfigDir,
     inlinedConfig,
   };
   const currentHash = computeIRHash(
@@ -323,7 +336,7 @@ export function transformInMemory(
   plugins?: TransformerPlugin[],
   libraryComponents?: IRComponentDefinition[],
   aopMappings?: ResolvedAopMapping[],
-  options?: { configDir?: string; inlinedConfig?: Record<string, string> },
+  options?: { inlinedConfig?: Record<string, string> },
 ): TransformResult {
   const aopPlugins =
     aopMappings && aopMappings.length > 0
@@ -724,6 +737,42 @@ function reconcileLibraryImportPaths(
     return ref;
   }
 
+  /** Rewrite an absolute path to a bare package specifier if it falls under a known package dir. */
+  function reconcilePath(absolutePath: string): string {
+    if (!packageDirs || !absolutePath.startsWith('/')) return absolutePath;
+    for (const [realDir, pkgName] of packageDirs) {
+      if (absolutePath.startsWith(`${realDir}/`)) {
+        return pkgName;
+      }
+    }
+    return absolutePath;
+  }
+
+  /** Recursively rewrite `importPath` / `tokenImportPath` values in metadata. */
+  function reconcileMetadata(metadata: Record<string, unknown>): void {
+    reconcileMetadataNode(metadata);
+  }
+
+  function reconcileMetadataNode(node: unknown): void {
+    if (node === null || node === undefined || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const item of node) reconcileMetadataNode(item);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    for (const [key, value] of Object.entries(obj)) {
+      if (
+        (key === 'importPath' || key === 'tokenImportPath') &&
+        typeof value === 'string' &&
+        value.startsWith('/')
+      ) {
+        obj[key] = reconcilePath(value);
+      } else if (typeof value === 'object' && value !== null) {
+        reconcileMetadataNode(value);
+      }
+    }
+  }
+
   for (const component of allComponents) {
     for (const dep of component.constructorDeps) {
       dep.tokenRef = reconcileRef(dep.tokenRef);
@@ -736,6 +785,7 @@ function reconcileLibraryImportPaths(
         (ref) => reconcileRef(ref) as typeof ref,
       );
     }
+    reconcileMetadata(component.metadata);
   }
 }
 

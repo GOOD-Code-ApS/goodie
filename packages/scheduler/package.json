@@ -31,7 +31,7 @@
     "croner": "^9.0.0"
   },
   "peerDependencies": {
-    "@goodie-ts/core": ">=1.0.0"
+    "@goodie-ts/core": ">=2.0.0"
   },
   "devDependencies": {
     "@goodie-ts/core": "workspace:*",

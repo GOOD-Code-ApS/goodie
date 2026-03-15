@@ -15,7 +15,7 @@ export type {
   Dependency,
 } from './component-definition.js';
 export type { ComponentPostProcessor } from './component-post-processor.js';
-export { flattenObject, loadConfigFiles } from './config-loader.js';
+export { flattenObject } from './config-loader.js';
 export type {
   AfterOptions,
   AopDecoratorConfig,

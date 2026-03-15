@@ -27,7 +27,7 @@ export interface RouteMetadata {
   path: string;
   /** Default response status code (from @Status decorator, defaults to 200). */
   status: number;
-  /** Detailed parameter binding metadata for Micronaut-style param resolution. */
+  /** Detailed parameter binding metadata for implicit param resolution. */
   params: ParamMetadata[];
   /** Return type text with Promise<T> and Response<T> unwrapped (e.g. 'Todo', 'Todo | null', 'void'). */
   returnType: string;

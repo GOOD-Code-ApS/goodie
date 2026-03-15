@@ -19,7 +19,7 @@ Entry points: `transform(options)` for file-based, `transformInMemory(project, o
 
 ## Config Inlining
 
-When `configDir` is set, the transformer reads JSON config files at build time and inlines flattened values into the generated `ConfigSource` factory. This removes the runtime dependency on `node:fs` / `loadConfigFiles()`. Values are embedded as `{ 'key.path': 'value' }` with `process.env` overrides applied at runtime. The inlined config is also passed to plugins via `CodegenContext`.
+When `configDir` is set in `TransformOptions`, the transformer reads JSON config files at build time and inlines flattened values into the generated config factory via `inlinedConfig`. Values are embedded as `{ 'key.path': 'value' }` with `process.env` overrides applied at runtime. No runtime `node:fs` dependency — all file I/O happens at build time.
 
 `scan()` accepts an optional `plugins` parameter — plugin `visitClass`/`visitMethod` hooks run inline during the scan loop (single AST pass). Returns `pluginMetadata` in `ScanResult`.
 

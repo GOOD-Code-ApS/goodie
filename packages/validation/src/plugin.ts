@@ -16,7 +16,7 @@ import type {
  * **Emit phase** (`emitFiles`):
  * Generates `schemas.ts` with pre-built Valibot schemas for all `@Introspected`
  * types. Schemas are registered statically via `ValiSchemaFactory.registerSchema()`
- * at module load time — Micronaut-style compile-time validation, no lazy building.
+ * at module load time — compile-time validation, no lazy building.
  *
  * Auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }` in package.json.
  */

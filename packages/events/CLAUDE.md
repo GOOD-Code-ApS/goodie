@@ -20,7 +20,7 @@ Event publishing and listener support for goodie-ts. `ApplicationEventListener` 
 
 ## Design Decisions
 
-- **ApplicationEventListener pattern** -- Listeners are classes extending `ApplicationEventListener<E>`, not `@EventListener` method decorators. This is the Micronaut-inspired pattern and avoids `customFactory` complexity. Listeners declare their `eventType` as a property, enabling O(1) dispatch.
+- **ApplicationEventListener pattern** -- Listeners are classes extending `ApplicationEventListener<E>`, not `@EventListener` method decorators. This avoids `customFactory` complexity. Listeners declare their `eventType` as a property, enabling O(1) dispatch.
 - **`supports()` secondary filter** -- Beyond type matching, listeners can override `supports(event)` for conditional filtering (e.g. only events with `total > 10_000`).
 - **Exact-match dispatch** -- `publish()` matches by `event.constructor` identity, not the prototype chain. A `ChildEvent extends BaseEvent` will NOT trigger listeners registered for `BaseEvent`.
 - **Sequential async execution** -- Listeners run one at a time in order (`for...of` with `await`), not concurrently.

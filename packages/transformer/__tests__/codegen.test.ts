@@ -904,143 +904,7 @@ describe('Code Generator', () => {
     );
   });
 
-  it('should emit loadConfigFiles in factory when configDir is set', () => {
-    const components: IRComponentDefinition[] = [
-      {
-        tokenRef: {
-          kind: 'class',
-          className: 'Config',
-          importPath: '/src/Config.ts',
-        },
-        scope: 'singleton',
-        eager: false,
-        name: undefined,
-        constructorDeps: [],
-        fieldDeps: [],
-        factoryKind: 'constructor',
-        providesSource: undefined,
-        metadata: {
-          valueFields: [{ fieldName: 'port', key: 'PORT' }],
-        },
-        sourceLocation: loc,
-      },
-    ];
-
-    const code = generateCode(components, {
-      outputPath: '/out/AppContext.generated.ts',
-      configDir: '/project/config',
-    });
-
-    expect(code).toContain('loadConfigFiles');
-    expect(code).toContain(
-      "import { ApplicationContext, Goodie, loadConfigFiles } from '@goodie-ts/core'",
-    );
-    expect(code).toContain(
-      'loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? "/project/config", process.env.NODE_ENV)',
-    );
-    expect(code).toContain('...process.env');
-    expect(code).toContain('...config');
-  });
-
-  it('should embed configDir path verbatim (resolution happens in transform.ts)', () => {
-    const components: IRComponentDefinition[] = [
-      {
-        tokenRef: {
-          kind: 'class',
-          className: 'Config',
-          importPath: '/src/Config.ts',
-        },
-        scope: 'singleton',
-        eager: false,
-        name: undefined,
-        constructorDeps: [],
-        fieldDeps: [],
-        factoryKind: 'constructor',
-        providesSource: undefined,
-        metadata: {
-          valueFields: [{ fieldName: 'port', key: 'PORT' }],
-        },
-        sourceLocation: loc,
-      },
-    ];
-
-    const code = generateCode(components, {
-      outputPath: '/out/AppContext.generated.ts',
-      configDir: '/resolved/project/config',
-    });
-
-    expect(code).toContain(
-      'loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? "/resolved/project/config", process.env.NODE_ENV)',
-    );
-  });
-
-  it('should not emit loadConfigFiles when configDir is not set', () => {
-    const components: IRComponentDefinition[] = [
-      {
-        tokenRef: {
-          kind: 'class',
-          className: 'Config',
-          importPath: '/src/Config.ts',
-        },
-        scope: 'singleton',
-        eager: false,
-        name: undefined,
-        constructorDeps: [],
-        fieldDeps: [],
-        factoryKind: 'constructor',
-        providesSource: undefined,
-        metadata: {
-          valueFields: [{ fieldName: 'port', key: 'PORT' }],
-        },
-        sourceLocation: loc,
-      },
-    ];
-
-    const code = generateCode(components, {
-      outputPath: '/out/AppContext.generated.ts',
-    });
-
-    expect(code).not.toContain('loadConfigFiles');
-    expect(code).toContain('{ ...process.env, ...config }');
-  });
-
-  it('should generate config component when configDir is set even without @Value fields', () => {
-    const components: IRComponentDefinition[] = [
-      {
-        tokenRef: {
-          kind: 'class',
-          className: 'Service',
-          importPath: '/src/Service.ts',
-        },
-        scope: 'singleton',
-        eager: false,
-        name: undefined,
-        constructorDeps: [],
-        fieldDeps: [],
-        factoryKind: 'constructor',
-        providesSource: undefined,
-        metadata: {},
-        sourceLocation: loc,
-      },
-    ];
-
-    const code = generateCode(components, {
-      outputPath: '/out/AppContext.generated.ts',
-      configDir: '/project/config',
-    });
-
-    expect(code).toContain(
-      "import { ApplicationContext, Goodie, loadConfigFiles } from '@goodie-ts/core'",
-    );
-    expect(code).toContain('export const __Goodie_Config');
-    expect(code).toContain('export function buildDefinitions(');
-    expect(code).toContain(
-      'loadConfigFiles(process.env.GOODIE_CONFIG_DIR ?? "/project/config", process.env.NODE_ENV)',
-    );
-    expect(code).toContain('token: __Goodie_Config,');
-  });
-
-  it('should embed inlined config values instead of loadConfigFiles when inlinedConfig is set', () => {
+  it('should embed inlined config values in generated code', () => {
     const components: IRComponentDefinition[] = [
       {
         tokenRef: {
@@ -1079,13 +943,13 @@ describe('Code Generator', () => {
     expect(code).toContain('...config');
   });
 
-  it('should prefer inlinedConfig over configDir when both are set', () => {
+  it('should normalize absolute importPath values in component metadata', () => {
     const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
-          className: 'MyService',
-          importPath: '/src/MyService.ts',
+          className: 'PlanetscaleDatasourceConfig',
+          importPath: '/project/src/dialects/planetscale.ts',
         },
         scope: 'singleton',
         eager: false,
@@ -1095,8 +959,23 @@ describe('Code Generator', () => {
         factoryKind: 'constructor',
         providesSource: undefined,
         metadata: {
-          valueFields: [
-            { fieldName: 'port', key: 'server.port', default: '3000' },
+          __typeRegistration: {
+            className: 'PlanetscaleDatasourceConfig',
+            importPath: '/project/src/dialects/planetscale.ts',
+            fields: [
+              {
+                name: 'url',
+                type: { kind: 'primitive', name: 'string' },
+                decorators: [],
+              },
+            ],
+          },
+          conditionalRules: [
+            {
+              type: 'onMissing',
+              tokenClassName: 'SomeService',
+              tokenImportPath: '/project/src/some-service.ts',
+            },
           ],
         },
         sourceLocation: loc,
@@ -1105,11 +984,13 @@ describe('Code Generator', () => {
 
     const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
-      configDir: '/project/config',
-      inlinedConfig: { 'server.port': '8080' },
     });
 
-    expect(code).not.toContain('loadConfigFiles');
-    expect(code).toContain('"server.port":"8080"');
+    // Absolute paths must be converted to relative
+    expect(code).not.toContain('/project/src/dialects/planetscale.ts');
+    expect(code).not.toContain('/project/src/some-service.ts');
+    // Relative paths should be present instead
+    expect(code).toContain('../project/src/dialects/planetscale.js');
+    expect(code).toContain('../project/src/some-service.js');
   });
 });

@@ -49,7 +49,7 @@ export class TodoController {
 }
 ```
 
-The hono plugin registers an `app.onStart()` hook that wires controllers to the HTTP server automatically:
+`HonoServerBootstrap` is a library component that extends `OnStart` — it automatically starts the HTTP server after context creation:
 
 ```typescript
 import { app } from './AppContext.generated.js';

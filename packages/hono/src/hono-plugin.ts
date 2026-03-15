@@ -14,7 +14,7 @@ import type { CodeBlockWriter } from 'ts-morph';
  * Hono adapter transformer plugin.
  *
  * Uses `emitFiles` to generate a `routes.ts` file with pre-compiled
- * route wiring — Micronaut-style `$Route` executor pattern.
+ * route wiring — pre-compiled `$Route` executor pattern.
  *
  * Each controller route is generated with explicit param extraction,
  * type coercion, and method calls. No runtime metadata interpretation.
