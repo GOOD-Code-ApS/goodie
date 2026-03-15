@@ -1,4 +1,4 @@
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import type { MethodVisitorContext, TransformerPlugin } from './options.js';
 
 /** Declaration for a single AOP decorator in `goodie.aop`. */
@@ -224,18 +224,21 @@ export function createDeclarativeAopPlugin(
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
-      for (const bean of beans) {
+    afterResolve(components: IRComponentDefinition[]): IRComponentDefinition[] {
+      for (const component of components) {
         const className =
-          bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
+          component.tokenRef.kind === 'class'
+            ? component.tokenRef.className
+            : undefined;
         if (!className) continue;
 
-        const key = `${bean.tokenRef.importPath}:${className}`;
+        const key = `${component.tokenRef.importPath}:${className}`;
         const infos = classMethodInfo.get(key);
         if (!infos || infos.length === 0) continue;
 
         // Get or initialize interceptedMethods array
-        const existing = (bean.metadata.interceptedMethods ?? []) as Array<{
+        const existing = (component.metadata.interceptedMethods ??
+          []) as Array<{
           methodName: string;
           interceptors: Array<{
             className: string;
@@ -269,11 +272,11 @@ export function createDeclarativeAopPlugin(
           }
         }
 
-        bean.metadata.interceptedMethods = existing;
+        component.metadata.interceptedMethods = existing;
       }
 
-      // No synthetic beans — library beans.json already contains them
-      return beans;
+      // No synthetic components — library components.json already contains them
+      return components;
     },
   };
 }

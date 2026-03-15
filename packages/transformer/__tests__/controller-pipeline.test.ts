@@ -5,7 +5,7 @@ import { createTestProject } from './helpers.js';
 
 /**
  * Minimal plugin that mimics what the hono plugin does:
- * detects @Controller and calls registerBean({ scope: 'singleton' }).
+ * detects @Controller and calls registerComponent({ scope: 'singleton' }).
  */
 function createControllerPlugin(): TransformerPlugin {
   return {
@@ -16,7 +16,10 @@ function createControllerPlugin(): TransformerPlugin {
         .find((d) => d.getName() === 'Controller');
       if (!controllerDec) return;
 
-      ctx.registerBean({ scope: 'singleton', decoratorName: 'Controller' });
+      ctx.registerComponent({
+        scope: 'singleton',
+        decoratorName: 'Controller',
+      });
 
       let basePath = '/';
       const args = controllerDec.getArguments();
@@ -34,8 +37,8 @@ function createControllerPlugin(): TransformerPlugin {
   };
 }
 
-describe('Controller as Plugin-Registered Bean', () => {
-  it('should register @Controller as a singleton bean via plugin', () => {
+describe('Controller as Plugin-Registered Component', () => {
+  it('should register @Controller as a singleton component via plugin', () => {
     const result = createTestProject(
       {
         '/src/UserController.ts': `
@@ -52,13 +55,13 @@ describe('Controller as Plugin-Registered Bean', () => {
       [createControllerPlugin()],
     );
 
-    expect(result.beans).toHaveLength(1);
-    const bean = result.beans[0];
-    expect(bean.tokenRef).toMatchObject({
+    expect(result.components).toHaveLength(1);
+    const component = result.components[0];
+    expect(component.tokenRef).toMatchObject({
       kind: 'class',
       className: 'UserController',
     });
-    expect(bean.scope).toBe('singleton');
+    expect(component.scope).toBe('singleton');
   });
 
   it('should handle @Controller with constructor deps', () => {
@@ -87,8 +90,8 @@ describe('Controller as Plugin-Registered Bean', () => {
       [createControllerPlugin()],
     );
 
-    expect(result.beans).toHaveLength(2);
-    const names = result.beans.map((b) =>
+    expect(result.components).toHaveLength(2);
+    const names = result.components.map((b) =>
       b.tokenRef.kind === 'class' ? b.tokenRef.className : b.tokenRef.tokenName,
     );
     expect(names.indexOf('UserService')).toBeLessThan(
@@ -122,7 +125,7 @@ describe('Controller as Plugin-Registered Bean', () => {
       [createControllerPlugin()],
     );
 
-    expect(result.beans).toHaveLength(2);
+    expect(result.components).toHaveLength(2);
   });
 
   it('should not produce controller metadata for non-controller classes', () => {
@@ -135,8 +138,8 @@ describe('Controller as Plugin-Registered Bean', () => {
       `,
     });
 
-    expect(result.beans).toHaveLength(1);
-    expect(result.beans[0].metadata.controller).toBeUndefined();
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0].metadata.controller).toBeUndefined();
   });
 
   it('should not register @Controller without a plugin', () => {
@@ -152,8 +155,8 @@ describe('Controller as Plugin-Registered Bean', () => {
       `,
     });
 
-    // Without a plugin calling registerBean, @Controller alone does nothing
-    expect(result.beans).toHaveLength(0);
+    // Without a plugin calling registerComponent, @Controller alone does nothing
+    expect(result.components).toHaveLength(0);
   });
 
   it('should throw when @Controller is combined with @Singleton', () => {
@@ -174,15 +177,15 @@ describe('Controller as Plugin-Registered Bean', () => {
     ).toThrow(InvalidDecoratorUsageError);
   });
 
-  it('should throw when @Controller is combined with @Injectable', () => {
+  it('should throw when @Controller is combined with @Transient', () => {
     expect(() =>
       createTestProject(
         {
           '/src/UserController.ts': `
-          import { Controller, Injectable } from './decorators.js'
+          import { Controller, Transient } from './decorators.js'
 
           @Controller('/users')
-          @Injectable()
+          @Transient()
           export class UserController {}
         `,
         },
@@ -192,15 +195,15 @@ describe('Controller as Plugin-Registered Bean', () => {
     ).toThrow(InvalidDecoratorUsageError);
   });
 
-  it('should throw when @Controller is combined with @Module', () => {
+  it('should throw when @Controller is combined with @Factory', () => {
     expect(() =>
       createTestProject(
         {
           '/src/UserController.ts': `
-          import { Controller, Module } from './decorators.js'
+          import { Controller, Factory } from './decorators.js'
 
           @Controller('/users')
-          @Module()
+          @Factory()
           export class UserController {}
         `,
         },
@@ -236,7 +239,10 @@ describe('Controller as Plugin-Registered Bean', () => {
           .getDecorators()
           .find((d) => d.getName() === 'Controller');
         if (dec) {
-          ctx.registerBean({ scope: 'singleton', decoratorName: 'Duplicate' });
+          ctx.registerComponent({
+            scope: 'singleton',
+            decoratorName: 'Duplicate',
+          });
         }
       },
     };
@@ -254,6 +260,6 @@ describe('Controller as Plugin-Registered Bean', () => {
         undefined,
         [plugin1, plugin2],
       ),
-    ).toThrow(/already registered as a bean/);
+    ).toThrow(/already registered as a component/);
   });
 });

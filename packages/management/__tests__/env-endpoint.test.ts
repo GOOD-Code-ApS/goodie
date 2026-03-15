@@ -1,6 +1,6 @@
 import type {
   ApplicationContext,
-  BeanDefinition,
+  ComponentDefinition,
   InjectionToken,
 } from '@goodie-ts/core';
 import { Response } from '@goodie-ts/http';
@@ -14,14 +14,14 @@ function createMockContext(
     description: '__Goodie_Config',
   } as InjectionToken<Record<string, unknown>>;
 
-  const configDef: BeanDefinition = {
+  const configDef: ComponentDefinition = {
     token: configToken,
     scope: 'singleton',
     dependencies: [],
     factory: () => config,
     eager: false,
     metadata: {},
-  } as BeanDefinition;
+  } as ComponentDefinition;
 
   return {
     getDefinitions: vi.fn().mockReturnValue([configDef]),
@@ -158,7 +158,7 @@ describe('EnvEndpoint', () => {
     expect(body.properties['auth.tokenized']).toBe('should-not-mask');
   });
 
-  it('returns empty properties when no config bean exists', () => {
+  it('returns empty properties when no config component exists', () => {
     const ctx = createEmptyContext();
 
     const endpoint = new EnvEndpoint(ctx);

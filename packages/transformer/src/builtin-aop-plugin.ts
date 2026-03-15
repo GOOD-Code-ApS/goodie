@@ -2,7 +2,7 @@ import type {
   InterceptedMethodDescriptor,
   InterceptorRef,
 } from '@goodie-ts/core';
-import type { IRBeanDefinition } from './ir.js';
+import type { IRComponentDefinition } from './ir.js';
 import type { MethodVisitorContext, TransformerPlugin } from './options.js';
 
 /** Internal tracking of AOP annotations found during method visiting. */
@@ -20,7 +20,7 @@ const AOP_DECORATOR_NAMES = ['Around', 'Before', 'After'] as const;
  * Built-in AOP transformer plugin.
  *
  * Scans @Around/@Before/@After decorators on methods. At compile time,
- * interceptors become normal bean dependencies and the codegen generates
+ * interceptors become normal component dependencies and the codegen generates
  * `buildInterceptorChain()` calls inside factory functions — no runtime
  * post-processor needed.
  */
@@ -89,14 +89,16 @@ export function createAopPlugin(): TransformerPlugin {
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
-      for (const bean of beans) {
+    afterResolve(components: IRComponentDefinition[]): IRComponentDefinition[] {
+      for (const component of components) {
         const className =
-          bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
+          component.tokenRef.kind === 'class'
+            ? component.tokenRef.className
+            : undefined;
         if (!className) continue;
 
         // Match by importPath:className (consistent with plugin metadata keying)
-        const key = `${bean.tokenRef.importPath}:${className}`;
+        const key = `${component.tokenRef.importPath}:${className}`;
         const aopInfos = classAopInfo.get(key);
         if (!aopInfos || aopInfos.length === 0) continue;
 
@@ -126,10 +128,10 @@ export function createAopPlugin(): TransformerPlugin {
           });
         }
 
-        bean.metadata.interceptedMethods = interceptedMethods;
+        component.metadata.interceptedMethods = interceptedMethods;
       }
 
-      return beans;
+      return components;
     },
   };
 }

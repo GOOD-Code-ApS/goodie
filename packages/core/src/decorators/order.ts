@@ -1,9 +1,9 @@
 /**
- * Sets the execution order for beans that participate in ordered collections
- * (e.g. `OnStart` lifecycle beans).
+ * Sets the execution order for components that participate in ordered collections
+ * (e.g. `OnStart` lifecycle components).
  *
  * Lower values execute first. Default order is 0. Negative values are allowed
- * and run before default-ordered beans.
+ * and run before default-ordered components.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
  * The transformer reads this decorator via AST inspection at build time

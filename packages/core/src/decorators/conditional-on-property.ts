@@ -1,11 +1,11 @@
 /** Options for @ConditionalOnProperty. */
 export interface ConditionalOnPropertyOptions {
-  /** Expected value(s). Bean is registered if the property matches any of the values. */
+  /** Expected value(s). Component is registered if the property matches any of the values. */
   havingValue: string | string[];
 }
 
 /**
- * Conditionally register a bean based on a configuration property.
+ * Conditionally register a component based on a configuration property.
  *
  * Overloads:
  * - `@ConditionalOnProperty('key')` — registered if the property exists

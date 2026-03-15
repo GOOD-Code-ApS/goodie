@@ -8,13 +8,13 @@ Task scheduling for goodie-ts. `@Scheduled` decorator with compile-time discover
 |------|------|
 | `src/decorators/scheduled.ts` | `@Scheduled({ cron?, fixedRate?, fixedDelay?, concurrent? })` -- runtime no-op marker, read at compile time |
 | `src/scheduler-service.ts` | `SchedulerService` -- manages scheduled jobs; discovers them via `ApplicationContext.getDefinitions()`, `start()`, `stop()` |
-| `src/scheduler-transformer-plugin.ts` | `createSchedulerPlugin()` -- transformer plugin that scans `@Scheduled` and synthesizes the `SchedulerService` bean |
+| `src/scheduler-transformer-plugin.ts` | `createSchedulerPlugin()` -- transformer plugin that scans `@Scheduled` and synthesizes the `SchedulerService` component |
 | `src/index.ts` | Public API re-exports |
 
 ## How It Works
 
-1. **Compile time:** The `createSchedulerPlugin()` transformer plugin scans methods for `@Scheduled` decorators via `visitMethod`. It extracts `cron`, `fixedRate`, `fixedDelay`, and `concurrent` from the decorator's object literal argument. The plugin validates at compile time that exactly one scheduling mode is specified and that cron expressions are non-empty. Metadata is stored on the bean's `classMetadata.scheduledMethods` array. In `beforeCodegen`, it synthesizes a `SchedulerService` bean that depends on `ApplicationContext`.
-2. **Runtime:** `SchedulerService` takes `ApplicationContext` as a constructor dep. In `start()` (via `@PostConstruct`), it iterates `ctx.getDefinitions()` looking for beans with `metadata.scheduledMethods`, resolves each bean, and starts the corresponding cron/interval/delay jobs. On shutdown, `stop()` (via `@PreDestroy`) cleans up all timers and awaits in-flight executions.
+1. **Compile time:** The `createSchedulerPlugin()` transformer plugin scans methods for `@Scheduled` decorators via `visitMethod`. It extracts `cron`, `fixedRate`, `fixedDelay`, and `concurrent` from the decorator's object literal argument. The plugin validates at compile time that exactly one scheduling mode is specified and that cron expressions are non-empty. Metadata is stored on the component's `classMetadata.scheduledMethods` array. In `beforeCodegen`, it synthesizes a `SchedulerService` component that depends on `ApplicationContext`.
+2. **Runtime:** `SchedulerService` takes `ApplicationContext` as a constructor dep. In `start()` (via `@OnInit`), it iterates `ctx.getDefinitions()` looking for components with `metadata.scheduledMethods`, resolves each component, and starts the corresponding cron/interval/delay jobs. On shutdown, `stop()` (via `@OnDestroy`) cleans up all timers and awaits in-flight executions.
 
 ## Scheduling Modes
 
@@ -32,7 +32,7 @@ Set `concurrent: true` to allow overlapping executions for cron and fixedRate jo
 
 ## Lifecycle Integration
 
-The synthesized `SchedulerService` bean has:
+The synthesized `SchedulerService` component has:
 - `metadata.postConstructMethods: ['start']` -- starts all jobs after the container is fully initialized
 - `metadata.preDestroyMethods: ['stop']` -- stops all jobs, clears timers, and awaits in-flight executions on shutdown
 - `eager: true` -- ensures the service is created during context startup

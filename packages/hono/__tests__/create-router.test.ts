@@ -1,14 +1,14 @@
-import type { BeanDefinition } from '@goodie-ts/core';
+import type { ComponentDefinition } from '@goodie-ts/core';
 import { ApplicationContext } from '@goodie-ts/core';
 import { ExceptionHandler, Response as HttpResponse } from '@goodie-ts/http';
 import { describe, expect, it } from 'vitest';
 import { createHonoRouter } from '../src/create-router.js';
 
-/** Create an ApplicationContext from bean definitions. */
+/** Create an ApplicationContext from component definitions. */
 async function createContext(
-  beans: BeanDefinition[],
+  components: ComponentDefinition[],
 ): Promise<ApplicationContext> {
-  return ApplicationContext.create(beans, { preSorted: true });
+  return ApplicationContext.create(components, { preSorted: true });
 }
 
 /** Simple controller for testing. */
@@ -62,7 +62,7 @@ class TestExceptionHandler extends ExceptionHandler {
   }
 }
 
-function todoControllerDef(): BeanDefinition {
+function todoControllerDef(): ComponentDefinition {
   return {
     token: TodoController,
     scope: 'singleton',

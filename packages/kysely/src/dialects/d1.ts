@@ -1,7 +1,7 @@
 import {
   ConditionalOnProperty,
-  ConfigurationProperties,
-  PostConstruct,
+  Config,
+  OnInit,
   RequestScoped,
   RequestScopeManager,
   Singleton,
@@ -10,7 +10,7 @@ import type { Kysely } from 'kysely';
 import { KyselyDatabase } from '../kysely-database.js';
 
 @Singleton()
-@ConfigurationProperties('datasource')
+@Config('datasource')
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'd1' })
 export class D1DatasourceConfig {
   dialect = '';
@@ -36,7 +36,7 @@ export class D1KyselyDatabase extends KyselyDatabase {
   get kysely(): Kysely<any> {
     if (!this._kysely) {
       throw new Error(
-        'D1KyselyDatabase: not initialized. Wait for @PostConstruct to complete.',
+        'D1KyselyDatabase: not initialized. Wait for @OnInit to complete.',
       );
     }
     return this._kysely;
@@ -47,7 +47,7 @@ export class D1KyselyDatabase extends KyselyDatabase {
     return true;
   }
 
-  @PostConstruct()
+  @OnInit()
   async init() {
     const d1 = RequestScopeManager.getBinding<any>(this.config.binding);
     try {

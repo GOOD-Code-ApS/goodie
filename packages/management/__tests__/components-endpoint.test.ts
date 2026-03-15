@@ -1,16 +1,18 @@
 import {
   ApplicationContext,
-  type BeanDefinition,
+  type ComponentDefinition,
   type InjectionToken,
 } from '@goodie-ts/core';
 import { Response } from '@goodie-ts/http';
 import { describe, expect, it, vi } from 'vitest';
-import { BeansEndpoint } from '../src/beans-endpoint.js';
+import { ComponentsEndpoint } from '../src/components-endpoint.js';
 
 class TodoService {}
 class TodoRepository {}
 
-function createMockContext(definitions: BeanDefinition[]): ApplicationContext {
+function createMockContext(
+  definitions: ComponentDefinition[],
+): ApplicationContext {
   return {
     getDefinitions: vi.fn().mockReturnValue(definitions),
   } as unknown as ApplicationContext;
@@ -28,7 +30,7 @@ function createClassDef(
     }>;
     conditionalRules?: unknown[];
   } = {},
-): BeanDefinition {
+): ComponentDefinition {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -42,11 +44,11 @@ function createClassDef(
     metadata: opts.conditionalRules
       ? { conditionalRules: opts.conditionalRules }
       : {},
-  } as BeanDefinition;
+  } as ComponentDefinition;
 }
 
-describe('BeansEndpoint', () => {
-  it('lists all bean definitions with tokens and scopes', () => {
+describe('ComponentsEndpoint', () => {
+  it('lists all component definitions with tokens and scopes', () => {
     const ctx = createMockContext([
       createClassDef(TodoService, {
         dependencies: [{ token: TodoRepository }],
@@ -54,14 +56,14 @@ describe('BeansEndpoint', () => {
       createClassDef(TodoRepository),
     ]);
 
-    const endpoint = new BeansEndpoint(ctx);
-    const result = endpoint.beans();
+    const endpoint = new ComponentsEndpoint(ctx);
+    const result = endpoint.components();
 
     expect(result).toBeInstanceOf(Response);
     expect(result.status).toBe(200);
 
     const body = result.body as {
-      beans: Array<{
+      components: Array<{
         token: string;
         scope: string;
         eager: boolean;
@@ -73,18 +75,18 @@ describe('BeansEndpoint', () => {
         conditional: unknown;
       }>;
     };
-    expect(body.beans).toHaveLength(2);
+    expect(body.components).toHaveLength(2);
 
-    expect(body.beans[0].token).toBe('TodoService');
-    expect(body.beans[0].scope).toBe('singleton');
-    expect(body.beans[0].eager).toBe(false);
-    expect(body.beans[0].dependencies).toEqual([
+    expect(body.components[0].token).toBe('TodoService');
+    expect(body.components[0].scope).toBe('singleton');
+    expect(body.components[0].eager).toBe(false);
+    expect(body.components[0].dependencies).toEqual([
       { token: 'TodoRepository', optional: false, collection: false },
     ]);
-    expect(body.beans[0].conditional).toBeNull();
+    expect(body.components[0].conditional).toBeNull();
 
-    expect(body.beans[1].token).toBe('TodoRepository');
-    expect(body.beans[1].dependencies).toEqual([]);
+    expect(body.components[1].token).toBe('TodoRepository');
+    expect(body.components[1].dependencies).toEqual([]);
   });
 
   it('includes conditional rules when present', () => {
@@ -95,14 +97,14 @@ describe('BeansEndpoint', () => {
       createClassDef(TodoService, { conditionalRules: rules }),
     ]);
 
-    const endpoint = new BeansEndpoint(ctx);
-    const result = endpoint.beans();
+    const endpoint = new ComponentsEndpoint(ctx);
+    const result = endpoint.components();
 
-    const body = result.body as { beans: Array<{ conditional: unknown }> };
-    expect(body.beans[0].conditional).toEqual(rules);
+    const body = result.body as { components: Array<{ conditional: unknown }> };
+    expect(body.components[0].conditional).toEqual(rules);
   });
 
-  it('filters out internal framework beans', () => {
+  it('filters out internal framework components', () => {
     const configToken = {
       description: '__Goodie_Config',
     } as InjectionToken<Record<string, unknown>>;
@@ -114,7 +116,7 @@ describe('BeansEndpoint', () => {
       dependencies: [],
       factory: () => ({}),
       metadata: {},
-    } as BeanDefinition;
+    } as ComponentDefinition;
 
     const appContextDef = {
       token: ApplicationContext,
@@ -123,7 +125,7 @@ describe('BeansEndpoint', () => {
       dependencies: [],
       factory: () => null,
       metadata: {},
-    } as BeanDefinition;
+    } as ComponentDefinition;
 
     const ctx = createMockContext([
       appContextDef,
@@ -131,12 +133,12 @@ describe('BeansEndpoint', () => {
       createClassDef(TodoService),
     ]);
 
-    const endpoint = new BeansEndpoint(ctx);
-    const result = endpoint.beans();
+    const endpoint = new ComponentsEndpoint(ctx);
+    const result = endpoint.components();
 
-    const body = result.body as { beans: Array<{ token: string }> };
-    expect(body.beans).toHaveLength(1);
-    expect(body.beans[0].token).toBe('TodoService');
+    const body = result.body as { components: Array<{ token: string }> };
+    expect(body.components).toHaveLength(1);
+    expect(body.components[0].token).toBe('TodoService');
   });
 
   it('shows eager status', () => {
@@ -144,10 +146,10 @@ describe('BeansEndpoint', () => {
       createClassDef(TodoService, { eager: true }),
     ]);
 
-    const endpoint = new BeansEndpoint(ctx);
-    const result = endpoint.beans();
+    const endpoint = new ComponentsEndpoint(ctx);
+    const result = endpoint.components();
 
-    const body = result.body as { beans: Array<{ eager: boolean }> };
-    expect(body.beans[0].eager).toBe(true);
+    const body = result.body as { components: Array<{ eager: boolean }> };
+    expect(body.components[0].eager).toBe(true);
   });
 });

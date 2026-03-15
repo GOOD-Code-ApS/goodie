@@ -22,7 +22,7 @@
   },
   "goodie": {
     "plugin": "dist/plugin.js",
-    "beans": "dist/beans.json"
+    "components": "dist/components.json"
   },
   "scripts": {
     "build": "tsc && goodie generate --mode library",

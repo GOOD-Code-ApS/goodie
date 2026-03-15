@@ -3,7 +3,7 @@ import type { ClassVisitorContext, TransformerPlugin } from './options.js';
 
 /** A single conditional rule extracted from a decorator. */
 export interface ConditionalRule {
-  type: 'onEnv' | 'onProperty' | 'onMissingBean';
+  type: 'onEnv' | 'onProperty' | 'onMissing';
   /** For onEnv: the environment variable name. */
   envVar?: string;
   /** For onEnv/onProperty: the expected value (undefined means "exists"). */
@@ -12,24 +12,24 @@ export interface ConditionalRule {
   expectedValues?: string[];
   /** For onProperty: the config key. */
   key?: string;
-  /** For onMissingBean: the class name to check. */
+  /** For onMissing: the class name to check. */
   tokenClassName?: string;
-  /** For onMissingBean: the import path of the class. */
+  /** For onMissing: the import path of the class. */
   tokenImportPath?: string;
 }
 
 const CONDITIONAL_DECORATORS = [
   'ConditionalOnEnv',
   'ConditionalOnProperty',
-  'ConditionalOnMissingBean',
+  'ConditionalOnMissing',
 ] as const;
 
 /**
- * Built-in conditional bean transformer plugin.
+ * Built-in conditional component transformer plugin.
  *
- * Scans @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissingBean
+ * Scans @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissing
  * decorators on classes. Stores the extracted rules in `metadata.conditionalRules`
- * so the graph builder can evaluate them and filter beans accordingly.
+ * so the graph builder can evaluate them and filter components accordingly.
  */
 export function createConditionalPlugin(): TransformerPlugin {
   return {
@@ -118,7 +118,7 @@ export function createConditionalPlugin(): TransformerPlugin {
           } else {
             rules.push({ type: 'onProperty', key });
           }
-        } else if (name === 'ConditionalOnMissingBean') {
+        } else if (name === 'ConditionalOnMissing') {
           if (args.length === 0) continue;
           const tokenArg = args[0];
           let className = tokenArg.getText();
@@ -137,13 +137,13 @@ export function createConditionalPlugin(): TransformerPlugin {
 
           if (!importPath) {
             console.warn(
-              `[goodie] @ConditionalOnMissingBean(${className}): could not resolve import path for token class. ` +
+              `[goodie] @ConditionalOnMissing(${className}): could not resolve import path for token class. ` +
                 `The condition may not match correctly. Ensure the class is imported and resolvable.`,
             );
           }
 
           rules.push({
-            type: 'onMissingBean',
+            type: 'onMissing',
             tokenClassName: className,
             tokenImportPath: importPath,
           });

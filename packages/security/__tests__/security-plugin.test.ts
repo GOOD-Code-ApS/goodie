@@ -46,10 +46,10 @@ describe('Security Plugin', () => {
 
     const result = scan(project, [createSecurityPlugin()]);
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.classTokenRef.className === 'AdminService',
     )!;
-    expect(bean).toBeDefined();
+    expect(component).toBeDefined();
 
     const security = getMetadata(result, 'AdminService');
     expect(security?.security).toEqual({

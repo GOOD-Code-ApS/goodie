@@ -31,16 +31,16 @@ interface TypeResolutionCache {
 
 /** Names of decorators we recognize from @goodie-ts/core. */
 const DECORATOR_NAMES = {
-  Injectable: 'Injectable',
+  Transient: 'Transient',
   Singleton: 'Singleton',
   Named: 'Named',
   Eager: 'Eager',
-  Module: 'Module',
+  Factory: 'Factory',
   Provides: 'Provides',
   Inject: 'Inject',
   Optional: 'Optional',
-  PreDestroy: 'PreDestroy',
-  PostConstruct: 'PostConstruct',
+  OnDestroy: 'OnDestroy',
+  OnInit: 'OnInit',
   PostProcessor: 'PostProcessor',
   RequestScoped: 'RequestScoped',
   Value: 'Value',
@@ -48,14 +48,14 @@ const DECORATOR_NAMES = {
   Primary: 'Primary',
 } as const;
 
-/** A public member of a @RequestScoped bean, used for compile-time scoped proxy generation. */
+/** A public member of a @RequestScoped component, used for compile-time scoped proxy generation. */
 export interface ScannedPublicMember {
   name: string;
   kind: 'getter' | 'method' | 'property';
 }
 
-/** A class decorated with @Injectable, @Singleton, or @Module. */
-export interface ScannedBean {
+/** A class decorated with @Transient, @Singleton, or @Factory. */
+export interface ScannedComponent {
   classDeclaration: ClassDeclaration;
   classTokenRef: ClassTokenRef;
   scope: Scope;
@@ -63,27 +63,27 @@ export interface ScannedBean {
   name: string | undefined;
   constructorParams: ScannedConstructorParam[];
   fieldInjections: ScannedFieldInjection[];
-  /** Method names decorated with @PreDestroy(). */
-  preDestroyMethods: string[];
-  /** Method names decorated with @PostConstruct(). */
-  postConstructMethods: string[];
+  /** Method names decorated with @OnDestroy(). */
+  onDestroyMethods: string[];
+  /** Method names decorated with @OnInit(). */
+  onInitMethods: string[];
   /** Whether @PostProcessor() is present on this class. */
-  isBeanPostProcessor: boolean;
+  isComponentPostProcessor: boolean;
   /** Fields decorated with @Value('key'). */
   valueFields: ScannedValueField[];
-  /** Base classes this bean extends (for baseTokens registration). */
+  /** Base classes this component extends (for baseTokens registration). */
   baseClasses: ClassTokenRef[];
-  /** Whether this bean was decorated with @Module(). */
-  isModule: boolean;
-  /** @Provides methods defined on this class (any bean, not just @Module). */
+  /** Whether this component was decorated with @Factory(). */
+  isFactory: boolean;
+  /** @Provides methods defined on this class (any component, not just @Factory). */
   provides: ScannedProvides[];
   /** All decorators found on this class with resolved import paths. */
   decorators: IRDecoratorEntry[];
   /** Decorators found on methods, keyed by method name. */
   methodDecorators: Record<string, IRDecoratorEntry[]>;
-  /** Public members for compile-time scoped proxy generation (only for request-scoped beans). */
+  /** Public members for compile-time scoped proxy generation (only for request-scoped components). */
   publicMembers?: ScannedPublicMember[];
-  /** Whether @Primary is present — marks this bean as the default when multiple match. */
+  /** Whether @Primary is present — marks this component as the default when multiple match. */
   primary: boolean;
   /** Execution order from @Order() decorator — lower runs first, default 0. */
   order: number | undefined;
@@ -144,7 +144,7 @@ export interface ScannedFieldInjection {
   sourceLocation: SourceLocation;
 }
 
-/** A @Provides method inside a bean class. */
+/** A @Provides method inside a component class. */
 export interface ScannedProvides {
   methodName: string;
   returnTypeName: string | undefined;
@@ -161,7 +161,7 @@ export interface ScannedProvides {
 
 /** Result of scanning source files. */
 export interface ScanResult {
-  beans: ScannedBean[];
+  components: ScannedComponent[];
   warnings: string[];
   /** Plugin-accumulated class metadata, keyed by "filePath:className". Only populated when plugins with visitor hooks are provided. */
   pluginMetadata?: Map<string, Record<string, unknown>>;
@@ -172,7 +172,7 @@ export function scan(
   project: Project,
   plugins?: TransformerPlugin[],
 ): ScanResult {
-  const beans: ScannedBean[] = [];
+  const components: ScannedComponent[] = [];
   const warnings: string[] = [];
   const pluginMetadata = new Map<string, Record<string, unknown>>();
   const hasVisitors =
@@ -191,8 +191,8 @@ export function scan(
       const decorators = cls.getDecorators();
       if (decorators.length === 0) continue;
 
-      // Track plugin-driven bean registration
-      let pluginBeanScope: Scope | undefined;
+      // Track plugin-driven component registration
+      let pluginComponentScope: Scope | undefined;
       let pluginDecoratorName: string | undefined;
 
       // Run plugin visitor hooks for any decorated class with a name
@@ -210,15 +210,18 @@ export function scan(
             filePath,
             decorators: classDecorators,
             metadata,
-            registerBean(options: { scope: Scope; decoratorName?: string }) {
-              if (pluginBeanScope !== undefined) {
+            registerComponent(options: {
+              scope: Scope;
+              decoratorName?: string;
+            }) {
+              if (pluginComponentScope !== undefined) {
                 throw new InvalidDecoratorUsageError(
-                  options.decoratorName ?? 'bean',
-                  `Class "${className}" was already registered as a bean by a plugin (via @${pluginDecoratorName ?? 'unknown'}). Only one plugin may register a class as a bean.`,
+                  options.decoratorName ?? 'component',
+                  `Class "${className}" was already registered as a component by a plugin (via @${pluginDecoratorName ?? 'unknown'}). Only one plugin may register a class as a component.`,
                   getSourceLocation(cls, sourceFile),
                 );
               }
-              pluginBeanScope = options.scope;
+              pluginComponentScope = options.scope;
               pluginDecoratorName = options.decoratorName;
             },
           };
@@ -244,8 +247,8 @@ export function scan(
         }
       }
 
-      const isModule = hasDecorator(decorators, DECORATOR_NAMES.Module);
-      const isInjectable = hasDecorator(decorators, DECORATOR_NAMES.Injectable);
+      const isFactory = hasDecorator(decorators, DECORATOR_NAMES.Factory);
+      const isTransient = hasDecorator(decorators, DECORATOR_NAMES.Transient);
       const isSingleton = hasDecorator(decorators, DECORATOR_NAMES.Singleton);
       const isRequestScoped = hasDecorator(
         decorators,
@@ -255,47 +258,47 @@ export function scan(
         decorators,
         DECORATOR_NAMES.PostProcessor,
       );
-      const isPluginBean = pluginBeanScope !== undefined;
-      const coreDecoratorBean =
-        isModule ||
-        isInjectable ||
+      const isPluginComponent = pluginComponentScope !== undefined;
+      const coreDecoratorComponent =
+        isFactory ||
+        isTransient ||
         isSingleton ||
         isRequestScoped ||
         isPostProcessor;
 
-      // Plugin-registered beans cannot be combined with core DI decorators
-      if (isPluginBean && coreDecoratorBean) {
-        const coreDecName = isModule
-          ? 'Module'
+      // Plugin-registered components cannot be combined with core DI decorators
+      if (isPluginComponent && coreDecoratorComponent) {
+        const coreDecName = isFactory
+          ? 'Factory'
           : isSingleton
             ? 'Singleton'
             : isRequestScoped
               ? 'RequestScoped'
               : isPostProcessor
                 ? 'PostProcessor'
-                : 'Injectable';
+                : 'Transient';
         throw new InvalidDecoratorUsageError(
-          pluginDecoratorName ?? 'bean',
-          `@${pluginDecoratorName ?? 'PluginBean'} cannot be combined with @${coreDecName} on class "${cls.getName()}". @${pluginDecoratorName ?? 'PluginBean'} already registers the class as a bean.`,
+          pluginDecoratorName ?? 'component',
+          `@${pluginDecoratorName ?? 'PluginComponent'} cannot be combined with @${coreDecName} on class "${cls.getName()}". @${pluginDecoratorName ?? 'PluginComponent'} already registers the class as a component.`,
           getSourceLocation(cls, sourceFile),
         );
       }
 
-      const isBean = coreDecoratorBean || isPluginBean;
-      if (!isBean) continue;
+      const isComponent = coreDecoratorComponent || isPluginComponent;
+      if (!isComponent) continue;
 
       if (cls.isAbstract()) {
-        const decoratorName = isModule
-          ? 'Module'
+        const decoratorName = isFactory
+          ? 'Factory'
           : isSingleton
             ? 'Singleton'
             : isRequestScoped
               ? 'RequestScoped'
               : isPostProcessor
                 ? 'PostProcessor'
-                : isInjectable
-                  ? 'Injectable'
-                  : (pluginDecoratorName ?? 'bean');
+                : isTransient
+                  ? 'Transient'
+                  : (pluginDecoratorName ?? 'component');
         throw new InvalidDecoratorUsageError(
           decoratorName,
           `Cannot apply @${decoratorName}() to abstract class "${cls.getName()}". Abstract classes cannot be instantiated. Remove the decorator or make the class concrete.`,
@@ -303,49 +306,49 @@ export function scan(
         );
       }
 
-      if (isPostProcessor && isInjectable) {
+      if (isPostProcessor && isTransient) {
         throw new InvalidDecoratorUsageError(
           'PostProcessor',
-          `@PostProcessor cannot be combined with @Injectable — post-processors must be singletons. Use @PostProcessor() @Singleton() instead.`,
+          `@PostProcessor cannot be combined with @Transient — post-processors must be singletons. Use @PostProcessor() @Singleton() instead.`,
           getSourceLocation(cls, sourceFile),
         );
       }
 
       const scope: Scope = isRequestScoped
         ? 'request'
-        : isModule ||
+        : isFactory ||
             isSingleton ||
             isPostProcessor ||
-            pluginBeanScope === 'singleton'
+            pluginComponentScope === 'singleton'
           ? 'singleton'
-          : (pluginBeanScope ?? 'prototype');
-      const scannedBean = scanBean(
+          : (pluginComponentScope ?? 'transient');
+      const scannedComponent = scanComponent(
         cls,
         decorators,
         sourceFile,
         scope,
-        isModule,
+        isFactory,
         typeCache,
       );
-      if (scannedBean) beans.push(scannedBean);
+      if (scannedComponent) components.push(scannedComponent);
     }
   }
 
   return {
-    beans,
+    components: components,
     warnings,
     ...(hasVisitors ? { pluginMetadata } : {}),
   };
 }
 
-function scanBean(
+function scanComponent(
   cls: ClassDeclaration,
   decorators: Decorator[],
   sourceFile: SourceFile,
   scope: Scope,
-  isModule: boolean,
+  isFactory: boolean,
   cache: TypeResolutionCache,
-): ScannedBean | undefined {
+): ScannedComponent | undefined {
   const className = cls.getName();
   if (!className) return undefined;
   const eager = hasDecorator(decorators, DECORATOR_NAMES.Eager);
@@ -355,7 +358,7 @@ function scanBean(
   const constructorParams = scanConstructorParams(cls, cache);
   const fieldInjections = scanFieldInjections(cls, cache);
   const lifecycle = scanLifecycleMethods(cls);
-  const isBeanPostProcessor = hasDecorator(
+  const isComponentPostProcessor = hasDecorator(
     decorators,
     DECORATOR_NAMES.PostProcessor,
   );
@@ -371,7 +374,7 @@ function scanBean(
     }
   }
 
-  // Extract public members for request-scoped beans (used for compile-time scoped proxy)
+  // Extract public members for request-scoped components (used for compile-time scoped proxy)
   const publicMembers =
     scope === 'request' ? extractPublicMembers(cls, lifecycle) : undefined;
 
@@ -387,12 +390,12 @@ function scanBean(
     name,
     constructorParams,
     fieldInjections,
-    preDestroyMethods: lifecycle.preDestroy,
-    postConstructMethods: lifecycle.postConstruct,
-    isBeanPostProcessor,
+    onDestroyMethods: lifecycle.preDestroy,
+    onInitMethods: lifecycle.postConstruct,
+    isComponentPostProcessor,
     valueFields,
     baseClasses,
-    isModule,
+    isFactory,
     primary,
     provides,
     decorators: scannedDecorators,
@@ -612,7 +615,7 @@ function scanProvidesMethods(
  * Extract all public non-lifecycle members from a class and its parent chain.
  * Walks up the inheritance hierarchy (stopping at node_modules boundaries)
  * and collects getters, methods, and properties, skipping private/protected,
- * constructors, and lifecycle methods (@PostConstruct, @PreDestroy).
+ * constructors, and lifecycle methods (@OnInit, @OnDestroy).
  */
 function extractPublicMembers(
   cls: ClassDeclaration,
@@ -669,7 +672,7 @@ function extractPublicMembers(
   return members;
 }
 
-// ── Lifecycle method scanning (@PreDestroy + @PostConstruct in one pass) ──
+// ── Lifecycle method scanning (@OnDestroy + @OnInit in one pass) ──
 
 function scanLifecycleMethods(cls: ClassDeclaration): {
   preDestroy: string[];
@@ -679,10 +682,10 @@ function scanLifecycleMethods(cls: ClassDeclaration): {
   const postConstruct: string[] = [];
   for (const method of cls.getMethods()) {
     const decorators = method.getDecorators();
-    if (hasDecorator(decorators, DECORATOR_NAMES.PreDestroy)) {
+    if (hasDecorator(decorators, DECORATOR_NAMES.OnDestroy)) {
       preDestroy.push(method.getName());
     }
-    if (hasDecorator(decorators, DECORATOR_NAMES.PostConstruct)) {
+    if (hasDecorator(decorators, DECORATOR_NAMES.OnInit)) {
       postConstruct.push(method.getName());
     }
   }

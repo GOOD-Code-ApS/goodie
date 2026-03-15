@@ -43,7 +43,7 @@ describe('Plugin error wrapping', () => {
     const badPlugin: TransformerPlugin = {
       name: 'transparent-plugin',
       afterResolve() {
-        throw new MissingProviderError('SomeToken', 'SomeBean', {
+        throw new MissingProviderError('SomeToken', 'SomeComponent', {
           filePath: '/test.ts',
           line: 1,
           column: 1,

@@ -1,7 +1,7 @@
 {
   "name": "@goodie-ts/validation",
   "version": "1.0.0",
-  "description": "Valibot-based validation from BeanIntrospection for goodie-ts",
+  "description": "Valibot-based validation from ComponentIntrospection for goodie-ts",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -22,7 +22,7 @@
   },
   "goodie": {
     "plugin": "dist/plugin.js",
-    "beans": "dist/beans.json"
+    "components": "dist/components.json"
   },
   "scripts": {
     "build": "tsc && goodie generate --mode library",

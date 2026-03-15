@@ -13,7 +13,7 @@
     "access": "public"
   },
   "goodie": {
-    "beans": "dist/beans.json",
+    "components": "dist/components.json",
     "plugin": "./dist/kysely-transformer-plugin.js"
   },
   "main": "dist/index.js",

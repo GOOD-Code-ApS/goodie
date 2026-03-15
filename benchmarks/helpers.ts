@@ -1,4 +1,4 @@
-import type { BeanDefinition, Dependency } from '@goodie-ts/core';
+import type { ComponentDefinition, Dependency } from '@goodie-ts/core';
 
 /** Standard decorator stubs for in-memory benchmark projects. */
 const DECORATOR_STUBS = `
@@ -16,10 +16,10 @@ export function PostConstruct() { return (t: any, c: any) => {} }
 
 /**
  * Generate source files containing N @Injectable classes forming a dependency chain.
- * Bean0 has no deps, Bean1 depends on Bean0, Bean2 depends on Bean1, etc.
+ * Component0 has no deps, Component1 depends on Component0, Component2 depends on Component1, etc.
  * Returns a files map for use with ts-morph Project.
  */
-export function generateBeanSource(n: number): Record<string, string> {
+export function generateComponentSource(n: number): Record<string, string> {
   const files: Record<string, string> = {
     '/src/decorators.ts': DECORATOR_STUBS,
   };
@@ -49,12 +49,12 @@ export function generateBeanSource(n: number): Record<string, string> {
             j++
           ) {
             if (j >= start - 1 && j < start) {
-              depClasses.push(`Bean${j}`);
+              depClasses.push(`Component${j}`);
             }
           }
           if (depClasses.length > 0) {
             lines.push(
-              `import { ${depClasses.join(', ')} } from './beans_${depBatch}';`,
+              `import { ${depClasses.join(', ')} } from './components_${depBatch}';`,
             );
           }
         }
@@ -66,34 +66,34 @@ export function generateBeanSource(n: number): Record<string, string> {
     for (let i = start; i < end; i++) {
       lines.push('@Injectable()');
       if (i === 0) {
-        lines.push(`export class Bean${i} {}`);
+        lines.push(`export class Component${i} {}`);
       } else {
         lines.push(
-          `export class Bean${i} { constructor(private dep: Bean${i - 1}) {} }`,
+          `export class Component${i} { constructor(private dep: Component${i - 1}) {} }`,
         );
       }
       lines.push('');
     }
 
-    files[`/src/beans_${batch}.ts`] = lines.join('\n');
+    files[`/src/components_${batch}.ts`] = lines.join('\n');
   }
 
   return files;
 }
 
 /**
- * Generate N BeanDefinition objects for runtime benchmarks.
- * Creates a dependency chain: Bean0 ← Bean1 ← Bean2 ← ... ← BeanN-1.
+ * Generate N ComponentDefinition objects for runtime benchmarks.
+ * Creates a dependency chain: Component0 ← Component1 ← Component2 ← ... ← ComponentN-1.
  * Each "class" is a unique function constructor.
  */
-export function generateBeanDefinitions(
+export function generateComponentDefinitions(
   n: number,
   scope: 'singleton' | 'prototype' = 'singleton',
-): BeanDefinition[] {
+): ComponentDefinition[] {
   const tokens: (new (...args: unknown[]) => unknown)[] = [];
   for (let i = 0; i < n; i++) {
     tokens.push(
-      new Function(`return class Bean${i} {}`)() as new (
+      new Function(`return class Component${i} {}`)() as new (
         ...args: unknown[]
       ) => unknown,
     );

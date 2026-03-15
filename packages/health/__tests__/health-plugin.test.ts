@@ -1,20 +1,20 @@
-import type { IRBeanDefinition } from '@goodie-ts/transformer';
+import type { IRComponentDefinition } from '@goodie-ts/transformer';
 import {
-  deserializeBeans,
-  serializeBeans,
+  deserializeComponents,
+  serializeComponents,
   transformInMemory,
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 
 const DECORATOR_STUBS = `
-export function Injectable() { return (t: any, c: any) => {} }
+export function Transient() { return (t: any, c: any) => {} }
 export function Singleton() { return (t: any, c: any) => {} }
 `;
 
 const HEALTH_IMPORT_PATH = '@goodie-ts/health';
 
-const libraryBeans: IRBeanDefinition[] = [
+const libraryComponents: IRComponentDefinition[] = [
   {
     tokenRef: {
       kind: 'class',
@@ -88,17 +88,17 @@ function createProject(files: Record<string, string>) {
   return project;
 }
 
-function findBean(
-  beans: IRBeanDefinition[],
+function findComponent(
+  components: IRComponentDefinition[],
   className: string,
-): IRBeanDefinition | undefined {
-  return beans.find(
+): IRComponentDefinition | undefined {
+  return components.find(
     (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === className,
   );
 }
 
-describe('Health Library Beans', () => {
-  it('should include library beans in transform output', () => {
+describe('Health Library Components', () => {
+  it('should include library components in transform output', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -122,10 +122,10 @@ describe('Health Library Beans', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      libraryBeans,
+      libraryComponents,
     );
 
-    const aggregator = findBean(result.beans, 'HealthAggregator');
+    const aggregator = findComponent(result.components, 'HealthAggregator');
     expect(aggregator).toBeDefined();
     expect(aggregator!.tokenRef).toEqual({
       kind: 'class',
@@ -145,7 +145,7 @@ describe('Health Library Beans', () => {
     });
   });
 
-  it('should include UptimeHealthIndicator with HealthIndicator base token from library beans', () => {
+  it('should include UptimeHealthIndicator with HealthIndicator base token from library components', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -169,10 +169,10 @@ describe('Health Library Beans', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      libraryBeans,
+      libraryComponents,
     );
 
-    const uptime = findBean(result.beans, 'UptimeHealthIndicator');
+    const uptime = findComponent(result.components, 'UptimeHealthIndicator');
     expect(uptime).toBeDefined();
     expect(uptime!.tokenRef).toEqual({
       kind: 'class',
@@ -188,7 +188,7 @@ describe('Health Library Beans', () => {
     ]);
   });
 
-  it('should not include library beans when none are provided', () => {
+  it('should not include library components when none are provided', () => {
     const project = createProject({
       '/src/Service.ts': `
         import { Singleton } from './decorators.js'
@@ -200,12 +200,16 @@ describe('Health Library Beans', () => {
 
     const result = transformInMemory(project, '/out/AppContext.generated.ts');
 
-    expect(findBean(result.beans, 'HealthAggregator')).toBeUndefined();
-    expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeUndefined();
-    expect(result.beans).toHaveLength(1);
+    expect(
+      findComponent(result.components, 'HealthAggregator'),
+    ).toBeUndefined();
+    expect(
+      findComponent(result.components, 'UptimeHealthIndicator'),
+    ).toBeUndefined();
+    expect(result.components).toHaveLength(1);
   });
 
-  it('should generate imports for health classes from library beans', () => {
+  it('should generate imports for health classes from library components', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -229,10 +233,10 @@ describe('Health Library Beans', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      libraryBeans,
+      libraryComponents,
     );
 
-    // Codegen auto-generates imports from bean tokenRefs and baseTokenRefs
+    // Codegen auto-generates imports from component tokenRefs and baseTokenRefs
     expect(result.code).toContain('HealthAggregator');
     expect(result.code).toContain('HealthIndicator');
     expect(result.code).toContain('UptimeHealthIndicator');
@@ -273,16 +277,18 @@ describe('Health Library Beans', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      libraryBeans,
+      libraryComponents,
     );
 
     // DbIndicator + CacheIndicator + UptimeHealthIndicator + HealthAggregator
-    expect(result.beans).toHaveLength(4);
-    expect(findBean(result.beans, 'HealthAggregator')).toBeDefined();
-    expect(findBean(result.beans, 'UptimeHealthIndicator')).toBeDefined();
+    expect(result.components).toHaveLength(4);
+    expect(findComponent(result.components, 'HealthAggregator')).toBeDefined();
+    expect(
+      findComponent(result.components, 'UptimeHealthIndicator'),
+    ).toBeDefined();
   });
 
-  it('should not create duplicate beans when library beans are present', () => {
+  it('should not create duplicate components when library components are present', () => {
     const project = createProject({
       '/src/HealthIndicator.ts': `
         export abstract class HealthIndicator {
@@ -306,27 +312,27 @@ describe('Health Library Beans', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      libraryBeans,
+      libraryComponents,
     );
 
-    const uptimeBeans = result.beans.filter(
+    const uptimeComponents = result.components.filter(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UptimeHealthIndicator',
     );
-    const aggregatorBeans = result.beans.filter(
+    const aggregatorComponents = result.components.filter(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'HealthAggregator',
     );
 
-    expect(uptimeBeans).toHaveLength(1);
-    expect(aggregatorBeans).toHaveLength(1);
+    expect(uptimeComponents).toHaveLength(1);
+    expect(aggregatorComponents).toHaveLength(1);
   });
 
-  it('should round-trip library beans through serialize/deserialize', () => {
-    const manifest = serializeBeans(libraryBeans, HEALTH_IMPORT_PATH);
-    const roundTripped = deserializeBeans(manifest);
+  it('should round-trip library components through serialize/deserialize', () => {
+    const manifest = serializeComponents(libraryComponents, HEALTH_IMPORT_PATH);
+    const roundTripped = deserializeComponents(manifest);
 
     expect(roundTripped).toHaveLength(2);
 

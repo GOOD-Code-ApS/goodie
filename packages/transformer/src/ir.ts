@@ -8,7 +8,7 @@ export interface SourceLocation {
 }
 
 /**
- * Reference to a bean token — either a class constructor or an InjectionToken.
+ * Reference to a component token — either a class constructor or an InjectionToken.
  *
  * `kind: 'class'` → the token is the class constructor itself.
  * `kind: 'injection-token'` → an auto-generated InjectionToken (e.g. from @Provides method name).
@@ -44,11 +44,11 @@ export interface InjectionTokenRef {
   typeImports?: Map<string, string>;
 }
 
-/** A single dependency of a bean in the IR. */
+/** A single dependency of a component in the IR. */
 export interface IRDependency {
   tokenRef: TokenRef;
   optional: boolean;
-  /** When true, inject all beans under this token as an array (T[]). */
+  /** When true, inject all components under this token as an array (T[]). */
   collection: boolean;
   sourceLocation: SourceLocation;
 }
@@ -60,10 +60,10 @@ export interface IRFieldInjection {
   optional: boolean;
 }
 
-/** A @Provides method discovered inside a bean class. */
+/** A @Provides method discovered inside a component class. */
 export interface IRProvides {
   methodName: string;
-  /** Token for the bean this method produces. */
+  /** Token for the component this method produces. */
   tokenRef: TokenRef;
   scope: Scope;
   eager: boolean;
@@ -80,46 +80,46 @@ export interface IRDecoratorEntry {
   importPath: string;
 }
 
-/** A public member of a request-scoped bean for compile-time scoped proxy generation. */
+/** A public member of a request-scoped component for compile-time scoped proxy generation. */
 export interface IRPublicMember {
   name: string;
   kind: 'getter' | 'method' | 'property';
 }
 
-/** Full intermediate representation of a single bean. */
-export interface IRBeanDefinition {
+/** Full intermediate representation of a single component. */
+export interface IRComponentDefinition {
   tokenRef: TokenRef;
   scope: Scope;
   eager: boolean;
   /** Qualifier name from @Named(). */
   name: string | undefined;
-  /** Whether @Primary marks this bean as the default when multiple match. */
+  /** Whether @Primary marks this component as the default when multiple match. */
   primary: boolean;
   /** Constructor parameter dependencies (in order). */
   constructorDeps: IRDependency[];
   /** Accessor field injections (in declaration order). */
   fieldDeps: IRFieldInjection[];
   /**
-   * How this bean is created:
+   * How this component is created:
    * - 'constructor': `new Class(dep0, dep1)`
    * - 'provides': `module.method(dep0)` — from a @Provides method
    */
   factoryKind: 'constructor' | 'provides';
-  /** For 'provides' beans: the module class and method name. */
+  /** For 'provides' components: the module class and method name. */
   providesSource:
     | { moduleTokenRef: ClassTokenRef; methodName: string }
     | undefined;
-  /** Base class tokens this bean should also be registered under. */
+  /** Base class tokens this component should also be registered under. */
   baseTokenRefs?: ClassTokenRef[];
   /** Decorators found on this class (for DecoratorMetadata queries).
-   * Optional because beans from @Provides methods or library beans without
-   * decorators don't have any — omitted to keep serialized beans.json compact. */
+   * Optional because components from @Provides methods or library components without
+   * decorators don't have any — omitted to keep serialized components.json compact. */
   decorators?: IRDecoratorEntry[];
   /** Decorators found on methods, keyed by method name.
-   * Optional for the same reason as `decorators` — most beans have no
+   * Optional for the same reason as `decorators` — most components have no
    * decorated methods (only controllers with @Get/@Post/etc. do). */
   methodDecorators?: Record<string, IRDecoratorEntry[]>;
-  /** Public members for compile-time scoped proxy (only for request-scoped beans). */
+  /** Public members for compile-time scoped proxy (only for request-scoped components). */
   publicMembers?: IRPublicMember[];
   metadata: Record<string, unknown>;
   sourceLocation: SourceLocation;

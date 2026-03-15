@@ -24,11 +24,11 @@ function pipeline(files: Record<string, string>) {
 }
 
 const decoratorsFile = `
-  export function Injectable() { return (t: any, c: any) => {} }
+  export function Transient() { return (t: any, c: any) => {} }
   export function Singleton() { return (t: any, c: any) => {} }
   export function Named(n: string) { return (t: any, c: any) => {} }
   export function Eager() { return (t: any, c: any) => {} }
-  export function Module(opts?: any) { return (t: any, c: any) => {} }
+  export function Factory(opts?: any) { return (t: any, c: any) => {} }
   export function Provides() { return (t: any, c: any) => {} }
   export function Inject(q: any) { return (t: any, c: any) => {} }
   export function Optional() { return (t: any, c: any) => {} }
@@ -37,26 +37,28 @@ const decoratorsFile = `
 
 describe('Graph Builder', () => {
   describe('topological ordering', () => {
-    it('should return a single bean with no deps', () => {
+    it('should return a single component with no deps', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].tokenRef).toMatchObject({ className: 'Repo' });
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].tokenRef).toMatchObject({
+        className: 'Repo',
+      });
     });
 
     it('should order dependency before dependent', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Repo.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Repo {}
         `,
         '/src/Service.ts': `
@@ -70,8 +72,8 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(2);
-      const names = result.beans.map((b) =>
+      expect(result.components).toHaveLength(2);
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -83,14 +85,14 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/C.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class C {}
         `,
         '/src/B.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
           import { C } from './C.js'
-          @Injectable()
+          @Transient()
           export class B { constructor(private c: C) {} }
         `,
         '/src/A.ts': `
@@ -101,7 +103,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -111,7 +113,7 @@ describe('Graph Builder', () => {
     });
   });
 
-  describe('@Provides on non-@Module beans', () => {
+  describe('@Provides on non-@Factory components', () => {
     it('should expand @Provides on @Singleton and wire dependencies', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
@@ -135,7 +137,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -144,21 +146,21 @@ describe('Graph Builder', () => {
       expect(names).toContain('dbUrl');
       expect(names).toContain('Service');
 
-      // AppConfig should NOT have isModule metadata
-      const configBean = result.beans.find(
+      // AppConfig should NOT have isFactory metadata
+      const configComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'AppConfig',
       )!;
-      expect(configBean.metadata.isModule).toBeUndefined();
+      expect(configComponent.metadata.isFactory).toBeUndefined();
 
-      // dbUrl provides bean should have AppConfig as first dep
-      const dbUrlBean = result.beans.find(
+      // dbUrl provides component should have AppConfig as first dep
+      const dbUrlComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
       )!;
-      expect(dbUrlBean.factoryKind).toBe('provides');
-      expect(dbUrlBean.constructorDeps[0].tokenRef).toMatchObject({
+      expect(dbUrlComponent.factoryKind).toBe('provides');
+      expect(dbUrlComponent.constructorDeps[0].tokenRef).toMatchObject({
         className: 'AppConfig',
       });
     });
@@ -169,27 +171,27 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
-          import { Module } from './decorators.js'
-          @Module()
+          import { Factory } from './decorators.js'
+          @Factory()
           export class AppModule {}
         `,
       });
 
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].tokenRef).toMatchObject({
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].tokenRef).toMatchObject({
         className: 'AppModule',
       });
-      expect(result.beans[0].scope).toBe('singleton');
-      expect(result.beans[0].metadata.isModule).toBe(true);
+      expect(result.components[0].scope).toBe('singleton');
+      expect(result.components[0].metadata.isFactory).toBe(true);
     });
 
-    it('should register @Provides methods as beans with module as first dep', () => {
+    it('should register @Provides methods as components with module as first dep', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -197,27 +199,27 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans).toHaveLength(2);
-      const dbUrlBean = result.beans.find(
+      expect(result.components).toHaveLength(2);
+      const dbUrlComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
       )!;
-      expect(dbUrlBean).toBeDefined();
-      expect(dbUrlBean.scope).toBe('singleton');
-      expect(dbUrlBean.factoryKind).toBe('provides');
-      expect(dbUrlBean.constructorDeps[0].tokenRef).toMatchObject({
+      expect(dbUrlComponent).toBeDefined();
+      expect(dbUrlComponent.scope).toBe('singleton');
+      expect(dbUrlComponent.factoryKind).toBe('provides');
+      expect(dbUrlComponent.constructorDeps[0].tokenRef).toMatchObject({
         className: 'AppModule',
       });
     });
 
-    it('should order module before its @Provides beans', () => {
+    it('should order module before its @Provides components', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(): string { return 'postgres://localhost' }
@@ -225,7 +227,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -237,15 +239,15 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Config.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Config {}
         `,
         '/src/AppModule.ts': `
-          import { Module, Provides } from './decorators.js'
+          import { Factory, Provides } from './decorators.js'
           import { Config } from './Config.js'
 
-          @Module()
+          @Factory()
           export class AppModule {
             @Provides()
             dbUrl(config: Config): string { return 'postgres://localhost' }
@@ -253,24 +255,24 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const dbUrlBean = result.beans.find(
+      const dbUrlComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
       )!;
       // First dep is module, second is the Config param
-      expect(dbUrlBean.constructorDeps).toHaveLength(2);
-      expect(dbUrlBean.constructorDeps[0].tokenRef).toMatchObject({
+      expect(dbUrlComponent.constructorDeps).toHaveLength(2);
+      expect(dbUrlComponent.constructorDeps[0].tokenRef).toMatchObject({
         className: 'AppModule',
       });
-      expect(dbUrlBean.constructorDeps[1].tokenRef).toMatchObject({
+      expect(dbUrlComponent.constructorDeps[1].tokenRef).toMatchObject({
         className: 'Config',
       });
     });
   });
 
   describe('@Named + @Inject resolution', () => {
-    it('should resolve @Inject(name) to @Named bean', () => {
+    it('should resolve @Inject(name) to @Named component', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Repo.ts': `
@@ -290,7 +292,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -314,12 +316,12 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const bean = result.beans.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
       )!;
-      expect(bean.primary).toBe(true);
-      expect(bean.metadata.primary).toBe(true);
+      expect(component.primary).toBe(true);
+      expect(component.metadata.primary).toBe(true);
     });
 
     it('should set primary metadata to true in generated code', () => {
@@ -340,16 +342,16 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const defaultBean = result.beans.find(
+      const defaultComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
       )!;
-      const otherBean = result.beans.find(
+      const otherComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'OtherRepo',
       )!;
-      expect(defaultBean.metadata.primary).toBe(true);
-      expect(otherBean.metadata.primary).toBeUndefined();
+      expect(defaultComponent.metadata.primary).toBe(true);
+      expect(otherComponent.metadata.primary).toBeUndefined();
     });
   });
 
@@ -358,16 +360,16 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/CModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          @Module()
+          import { Factory, Provides } from './decorators.js'
+          @Factory()
           export class CModule {
             @Provides()
             cValue(): string { return 'c' }
           }
         `,
         '/src/BModule.ts': `
-          import { Module, Provides } from './decorators.js'
-          @Module()
+          import { Factory, Provides } from './decorators.js'
+          @Factory()
           export class BModule {
             @Provides()
             bValue(): number { return 2 }
@@ -375,7 +377,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const names = result.beans.map((b) =>
+      const names = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
@@ -391,15 +393,15 @@ describe('Graph Builder', () => {
         pipeline({
           '/src/decorators.ts': decoratorsFile,
           '/src/AModule.ts': `
-            import { Module } from './decorators.js'
+            import { Factory } from './decorators.js'
             import { BModule } from './BModule.js'
-            @Module()
+            @Factory()
             export class AModule { constructor(private b: BModule) {} }
           `,
           '/src/BModule.ts': `
-            import { Module } from './decorators.js'
+            import { Factory } from './decorators.js'
             import { AModule } from './AModule.js'
-            @Module()
+            @Factory()
             export class BModule { constructor(private a: AModule) {} }
           `,
         });
@@ -486,14 +488,14 @@ describe('Graph Builder', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Handler.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Handler {}
         `,
         '/src/HandlerB.ts': `
-          import { Injectable } from './decorators.js'
+          import { Transient } from './decorators.js'
           import { Handler } from './Handler.js'
-          @Injectable()
+          @Transient()
           export class HandlerB extends Handler {}
         `,
         '/src/Service.ts': `
@@ -508,7 +510,7 @@ describe('Graph Builder', () => {
       });
 
       // Should not throw AmbiguousProviderError
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -533,7 +535,7 @@ describe('Graph Builder', () => {
       });
 
       // Should not throw MissingProviderError for collection dep
-      const service = result.beans.find(
+      const service = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       )!;
@@ -541,7 +543,7 @@ describe('Graph Builder', () => {
     });
   });
 
-  describe('eager beans', () => {
+  describe('eager components', () => {
     it('should preserve @Eager flag through the graph', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
@@ -554,7 +556,7 @@ describe('Graph Builder', () => {
         `,
       });
 
-      expect(result.beans[0].eager).toBe(true);
+      expect(result.components[0].eager).toBe(true);
     });
   });
 });

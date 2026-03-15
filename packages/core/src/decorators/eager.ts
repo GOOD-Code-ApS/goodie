@@ -1,5 +1,5 @@
 /**
- * Marks a singleton bean for eager instantiation during context creation.
+ * Marks a singleton component for eager instantiation during context creation.
  * By default, singletons are lazy (created on first `get()`).
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.

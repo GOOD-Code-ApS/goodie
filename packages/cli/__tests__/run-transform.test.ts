@@ -26,7 +26,7 @@ describe('runTransform', () => {
     const fakeResult = {
       code: '// generated',
       outputPath: defaultOptions.outputPath,
-      beans: [{ id: 'A' }, { id: 'B' }],
+      components: [{ id: 'A' }, { id: 'B' }],
       warnings: [],
     };
     mockTransform.mockResolvedValue(fakeResult as any);
@@ -44,7 +44,7 @@ describe('runTransform', () => {
     mockTransform.mockResolvedValue({
       code: '',
       outputPath: '',
-      beans: [],
+      components: [],
       warnings: [],
     } as any);
 
@@ -60,7 +60,7 @@ describe('runTransform', () => {
     const error = new TransformerError(
       'Missing provider',
       { filePath: 'foo.ts', line: 1, column: 0 },
-      'Add @Injectable()',
+      'Add @Transient()',
     );
     mockTransform.mockRejectedValue(error);
 
@@ -86,7 +86,7 @@ describe('runTransform', () => {
 });
 
 describe('logOutcome', () => {
-  it('logs bean count and timing on success', () => {
+  it('logs component count and timing on success', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const outcome: TransformOutcome = {
@@ -94,7 +94,7 @@ describe('logOutcome', () => {
       result: {
         code: '// generated',
         outputPath: '/project/src/AppContext.generated.ts',
-        beans: [{ id: 'A' }, { id: 'B' }] as any,
+        components: [{ id: 'A' }, { id: 'B' }] as any,
         warnings: [],
       },
       durationMs: 123.456,
@@ -103,7 +103,7 @@ describe('logOutcome', () => {
     logOutcome(outcome);
 
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('2 bean(s) in 123ms'),
+      expect.stringContaining('2 component(s) in 123ms'),
     );
     logSpy.mockRestore();
   });
@@ -117,15 +117,17 @@ describe('logOutcome', () => {
       result: {
         code: '',
         outputPath: '/project/src/out.ts',
-        beans: [] as any,
-        warnings: ['Unused bean: Foo'],
+        components: [] as any,
+        warnings: ['Unused component: Foo'],
       },
       durationMs: 50,
     };
 
     logOutcome(outcome);
 
-    expect(warnSpy).toHaveBeenCalledWith('[goodie] Warning: Unused bean: Foo');
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[goodie] Warning: Unused component: Foo',
+    );
     warnSpy.mockRestore();
   });
 
@@ -153,13 +155,13 @@ describe('logOutcome', () => {
       error: new TransformerError(
         'Missing provider',
         { filePath: 'foo.ts', line: 1, column: 0 },
-        'Add @Injectable()',
+        'Add @Transient()',
       ),
     };
 
     logOutcome(outcome);
 
-    expect(errorSpy).toHaveBeenCalledWith('[goodie] Hint: Add @Injectable()');
+    expect(errorSpy).toHaveBeenCalledWith('[goodie] Hint: Add @Transient()');
     errorSpy.mockRestore();
   });
 });

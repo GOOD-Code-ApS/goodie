@@ -1,16 +1,16 @@
 import {
   Eager,
+  Factory,
   Inject,
-  Injectable,
   InjectionToken,
-  Module,
   Named,
+  OnDestroy,
+  OnInit,
   Optional,
-  PostConstruct,
   PostProcessor,
-  PreDestroy,
   Provides,
   Singleton,
+  Transient,
   Value,
 } from '@goodie-ts/core';
 import { describe, expect, it } from 'vitest';
@@ -21,10 +21,10 @@ import { describe, expect, it } from 'vitest';
  * These tests verify that applying decorators does not throw.
  */
 
-describe('@Injectable()', () => {
+describe('@Transient()', () => {
   it('is a no-op that does not throw', () => {
     expect(() => {
-      @Injectable()
+      @Transient()
       class _Foo {}
     }).not.toThrow();
   });
@@ -59,20 +59,20 @@ describe('@Eager()', () => {
   });
 });
 
-describe('@Module()', () => {
+describe('@Factory()', () => {
   it('is a no-op that does not throw with no options', () => {
     expect(() => {
-      @Module()
+      @Factory()
       class _AppModule {}
     }).not.toThrow();
   });
 
   it('is a no-op that does not throw with imports', () => {
-    @Module()
+    @Factory()
     class DbModule {}
 
     expect(() => {
-      @Module({ imports: [DbModule] })
+      @Factory({ imports: [DbModule] })
       class _AppModule {}
     }).not.toThrow();
   });
@@ -81,7 +81,7 @@ describe('@Module()', () => {
 describe('@Provides()', () => {
   it('is a no-op that does not throw', () => {
     expect(() => {
-      @Module()
+      @Factory()
       class _AppModule {
         @Provides()
         dbUrl(): string {
@@ -133,50 +133,50 @@ describe('@Optional()', () => {
   });
 });
 
-describe('@PreDestroy()', () => {
+describe('@OnDestroy()', () => {
   it('is a no-op that does not throw', () => {
     expect(() => {
       @Singleton()
       class _Pool {
-        @PreDestroy()
+        @OnDestroy()
         shutdown() {}
       }
     }).not.toThrow();
   });
 
-  it('supports multiple @PreDestroy methods', () => {
+  it('supports multiple @OnDestroy methods', () => {
     expect(() => {
       @Singleton()
       class _Service {
-        @PreDestroy()
+        @OnDestroy()
         closeConnections() {}
 
-        @PreDestroy()
+        @OnDestroy()
         flushBuffers() {}
       }
     }).not.toThrow();
   });
 });
 
-describe('@PostConstruct()', () => {
+describe('@OnInit()', () => {
   it('is a no-op that does not throw', () => {
     expect(() => {
       @Singleton()
       class _Service {
-        @PostConstruct()
+        @OnInit()
         init() {}
       }
     }).not.toThrow();
   });
 
-  it('supports multiple @PostConstruct methods', () => {
+  it('supports multiple @OnInit methods', () => {
     expect(() => {
       @Singleton()
       class _Service {
-        @PostConstruct()
+        @OnInit()
         initCache() {}
 
-        @PostConstruct()
+        @OnInit()
         loadConfig() {}
       }
     }).not.toThrow();

@@ -32,9 +32,9 @@ export interface AfterAdvice {
   after(ctx: AdviceContext, result: unknown): void | Promise<void>;
 }
 
-/** Reference to a single interceptor (stored in bean metadata). */
+/** Reference to a single interceptor (stored in component metadata). */
 export interface InterceptorRef {
-  /** Class name of the interceptor bean. */
+  /** Class name of the interceptor component. */
   className: string;
   /** Absolute import path for collision-safe identity. */
   importPath: string;
@@ -46,7 +46,7 @@ export interface InterceptorRef {
   metadata?: Record<string, unknown>;
 }
 
-/** Descriptor for an intercepted method (stored in bean metadata). */
+/** Descriptor for an intercepted method (stored in component metadata). */
 export interface InterceptedMethodDescriptor {
   /** The name of the intercepted method. */
   methodName: string;

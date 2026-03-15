@@ -1,6 +1,6 @@
-/** Per-request store: bean cache + optional platform env bindings. */
+/** Per-request store: component cache + optional platform env bindings. */
 interface RequestStore {
-  beans: Map<unknown, unknown>;
+  components: Map<unknown, unknown>;
   env?: Record<string, unknown>;
 }
 
@@ -47,9 +47,9 @@ function getStorageSync() {
 }
 
 /**
- * Manages request-scoped bean instances via AsyncLocalStorage.
+ * Manages request-scoped component instances via AsyncLocalStorage.
  *
- * Each request scope maintains its own bean cache. Request-scoped beans
+ * Each request scope maintains its own component cache. Request-scoped components
  * are created once per scope and cached for the duration of that scope.
  *
  * Platform bindings (e.g. Cloudflare Workers `env`) can be passed via
@@ -62,7 +62,7 @@ function getStorageSync() {
 export const RequestScopeManager = {
   /**
    * Execute a function within a new request scope.
-   * All request-scoped beans resolved during `fn` will be cached
+   * All request-scoped components resolved during `fn` will be cached
    * in this scope's store.
    */
   async run<R>(
@@ -70,7 +70,7 @@ export const RequestScopeManager = {
     env?: Record<string, unknown>,
   ): Promise<R> {
     const als = await getStorage();
-    return als.run({ beans: new Map(), env }, fn);
+    return als.run({ components: new Map(), env }, fn);
   },
 
   /**
@@ -81,11 +81,11 @@ export const RequestScopeManager = {
   },
 
   /**
-   * Get the bean cache for the current request scope.
+   * Get the component cache for the current request scope.
    * Returns undefined if not inside a scope.
    */
   getStore(): Map<unknown, unknown> | undefined {
-    return storage?.getStore()?.beans;
+    return storage?.getStore()?.components;
   },
 
   /**

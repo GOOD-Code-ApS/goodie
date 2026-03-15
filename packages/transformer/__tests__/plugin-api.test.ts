@@ -1,6 +1,6 @@
 import { Project } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
-import type { IRBeanDefinition } from '../src/ir.js';
+import type { IRComponentDefinition } from '../src/ir.js';
 import type { TransformerPlugin } from '../src/options.js';
 import { transformInMemory } from '../src/transform.js';
 import { DECORATOR_STUBS } from './helpers.js';
@@ -32,8 +32,8 @@ describe('TransformerPlugin API', () => {
           export class Foo {}
         `,
         '/src/Bar.ts': `
-          import { Injectable } from './decorators.js'
-          @Injectable()
+          import { Transient } from './decorators.js'
+          @Transient()
           export class Bar {}
         `,
       });
@@ -158,9 +158,9 @@ describe('TransformerPlugin API', () => {
         visitClass(ctx) {
           ctx.metadata.myTag = 'tagged';
         },
-        afterResolve(beans) {
+        afterResolve(components) {
           // Visitor metadata should already be merged at this point
-          return beans.filter((b) => b.metadata.myTag === 'tagged');
+          return components.filter((b) => b.metadata.myTag === 'tagged');
         },
       };
 
@@ -178,19 +178,19 @@ describe('TransformerPlugin API', () => {
         [plugin],
       );
       // If metadata wasn't merged before afterResolve, the filter would
-      // remove all beans and the result would be empty
-      expect(result.beans).toHaveLength(1);
-      expect(result.beans[0].metadata.myTag).toBe('tagged');
+      // remove all components and the result would be empty
+      expect(result.components).toHaveLength(1);
+      expect(result.components[0].metadata.myTag).toBe('tagged');
     });
 
-    it('can mutate IR bean metadata', () => {
+    it('can mutate IR component metadata', () => {
       const plugin: TransformerPlugin = {
         name: 'test-after-resolve',
-        afterResolve(beans) {
-          for (const bean of beans) {
-            bean.metadata.customFlag = true;
+        afterResolve(components) {
+          for (const component of components) {
+            component.metadata.customFlag = true;
           }
-          return beans;
+          return components;
         },
       };
 
@@ -207,14 +207,14 @@ describe('TransformerPlugin API', () => {
         '/out/AppContext.generated.ts',
         [plugin],
       );
-      expect(result.beans[0].metadata.customFlag).toBe(true);
+      expect(result.components[0].metadata.customFlag).toBe(true);
       expect(result.code).toContain('customFlag: true');
     });
   });
 
   describe('beforeCodegen', () => {
-    it('can inject additional beans into the final list', () => {
-      const syntheticBean: IRBeanDefinition = {
+    it('can inject additional components into the final list', () => {
+      const syntheticComponent: IRComponentDefinition = {
         tokenRef: {
           kind: 'class',
           className: 'Foo',
@@ -234,8 +234,8 @@ describe('TransformerPlugin API', () => {
 
       const plugin: TransformerPlugin = {
         name: 'test-before-codegen',
-        beforeCodegen(beans) {
-          return [...beans, syntheticBean];
+        beforeCodegen(components) {
+          return [...components, syntheticComponent];
         },
       };
 
@@ -255,11 +255,11 @@ describe('TransformerPlugin API', () => {
         '/out/AppContext.generated.ts',
         [plugin],
       );
-      // The synthetic bean should appear in the final beans list
-      expect(result.beans.some((b) => b.metadata.synthetic === true)).toBe(
+      // The synthetic component should appear in the final components list
+      expect(result.components.some((b) => b.metadata.synthetic === true)).toBe(
         true,
       );
-      // The generated code should reference the synthetic bean's class
+      // The generated code should reference the synthetic component's class
       expect(result.code).toContain('token: Foo');
     });
   });
@@ -276,9 +276,9 @@ describe('TransformerPlugin API', () => {
         visitClass(ctx) {
           order.push(`plugin-1:visitClass:${ctx.className}`);
         },
-        afterResolve(beans) {
+        afterResolve(components) {
           order.push('plugin-1:afterResolve');
-          return beans;
+          return components;
         },
       };
 
@@ -290,9 +290,9 @@ describe('TransformerPlugin API', () => {
         visitClass(ctx) {
           order.push(`plugin-2:visitClass:${ctx.className}`);
         },
-        afterResolve(beans) {
+        afterResolve(components) {
           order.push('plugin-2:afterResolve');
-          return beans;
+          return components;
         },
       };
 
@@ -357,14 +357,14 @@ describe('TransformerPlugin API', () => {
         [noopPlugin],
       );
 
-      expect(withPlugin.beans).toHaveLength(baseline.beans.length);
+      expect(withPlugin.components).toHaveLength(baseline.components.length);
       // Warnings count should match
       expect(withPlugin.warnings).toHaveLength(baseline.warnings.length);
     });
   });
 
-  describe('plugin metadata merges into bean metadata', () => {
-    it('visitClass metadata appears on the corresponding IR bean', () => {
+  describe('plugin metadata merges into component metadata', () => {
+    it('visitClass metadata appears on the corresponding IR component', () => {
       const plugin: TransformerPlugin = {
         name: 'test-metadata-merge',
         visitClass(ctx) {
@@ -385,12 +385,12 @@ describe('TransformerPlugin API', () => {
         '/out/AppContext.generated.ts',
         [plugin],
       );
-      const serviceBean = result.beans.find(
+      const serviceComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       );
-      expect(serviceBean).toBeDefined();
-      expect(serviceBean!.metadata.customAnnotation).toBe('test-value');
+      expect(serviceComponent).toBeDefined();
+      expect(serviceComponent!.metadata.customAnnotation).toBe('test-value');
     });
 
     it('does not collide when two files have same-named classes', () => {
@@ -420,14 +420,14 @@ describe('TransformerPlugin API', () => {
         [plugin],
       );
 
-      const serviceBeans = result.beans.filter(
+      const serviceComponents = result.components.filter(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
       );
-      expect(serviceBeans).toHaveLength(2);
+      expect(serviceComponents).toHaveLength(2);
 
-      // Each bean should have metadata pointing to its own source file
-      const sourceFiles = serviceBeans.map((b) => b.metadata.sourceFile);
+      // Each component should have metadata pointing to its own source file
+      const sourceFiles = serviceComponents.map((b) => b.metadata.sourceFile);
       expect(sourceFiles).toContain('/src/a/Service.ts');
       expect(sourceFiles).toContain('/src/b/Service.ts');
     });
@@ -481,11 +481,11 @@ describe('TransformerPlugin API', () => {
   });
 
   describe('afterResolve — filtering', () => {
-    it('can filter out beans', () => {
+    it('can filter out components', () => {
       const plugin: TransformerPlugin = {
         name: 'test-after-resolve-filter',
-        afterResolve(beans) {
-          return beans.filter(
+        afterResolve(components) {
+          return components.filter(
             (b) =>
               !(b.tokenRef.kind === 'class' && b.tokenRef.className === 'Foo'),
           );
@@ -510,13 +510,13 @@ describe('TransformerPlugin API', () => {
         '/out/AppContext.generated.ts',
         [plugin],
       );
-      const beanNames = result.beans.map((b) =>
+      const componentNames = result.components.map((b) =>
         b.tokenRef.kind === 'class'
           ? b.tokenRef.className
           : b.tokenRef.tokenName,
       );
-      expect(beanNames).not.toContain('Foo');
-      expect(beanNames).toContain('Bar');
+      expect(componentNames).not.toContain('Foo');
+      expect(componentNames).toContain('Bar');
     });
   });
 });

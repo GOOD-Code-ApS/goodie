@@ -1,6 +1,6 @@
 import type { Scope } from '@goodie-ts/core';
 import type { ClassDeclaration, MethodDeclaration } from 'ts-morph';
-import type { IRBeanDefinition, IRDecoratorEntry } from './ir.js';
+import type { IRComponentDefinition, IRDecoratorEntry } from './ir.js';
 
 /** Options for the compile-time transform pipeline. */
 export interface TransformOptions {
@@ -17,10 +17,10 @@ export interface TransformOptions {
   plugins?: TransformerPlugin[];
   /** Skip auto-discovery of plugins from installed packages. */
   disablePluginDiscovery?: boolean;
-  /** Skip auto-discovery of library beans from installed packages. */
-  disableLibraryBeanDiscovery?: boolean;
+  /** Skip auto-discovery of library components from installed packages. */
+  disableLibraryComponentDiscovery?: boolean;
   /**
-   * npm scopes to scan for library beans and plugins (e.g. `['@goodie-ts', '@acme']`).
+   * npm scopes to scan for library components and plugins (e.g. `['@goodie-ts', '@acme']`).
    * Defaults to `['@goodie-ts']`.
    */
   scanScopes?: string[];
@@ -38,17 +38,17 @@ export interface TransformOptions {
   configDir?: string;
 }
 
-/** Options for building a library's beans.json manifest. */
+/** Options for building a library's components.json manifest. */
 export interface TransformLibraryOptions {
   /** Path to the tsconfig.json used to create the ts-morph Project. */
   tsConfigFilePath: string;
   /** npm package name (e.g. `'@goodie-ts/health'`). Used in the manifest and to rewrite import paths. */
   packageName: string;
-  /** Absolute path for the generated beans.json file. */
-  beansOutputPath: string;
+  /** Absolute path for the generated components.json file. */
+  componentsOutputPath: string;
   /**
    * Absolute path for the generated TypeScript code file.
-   * When set, library mode emits both beans.json AND generated code
+   * When set, library mode emits both components.json AND generated code
    * (useful for the library's own integration tests).
    */
   codeOutputPath?: string;
@@ -65,12 +65,12 @@ export interface TransformLibraryOptions {
 
 /** Result returned by the library transform pipeline. */
 export interface TransformLibraryResult {
-  /** The serialized beans.json manifest. */
-  manifest: import('./library-beans.js').LibraryBeansManifest;
+  /** The serialized components.json manifest. */
+  manifest: import('./library-components.js').LibraryComponentsManifest;
   /** Absolute path where the manifest was written. */
   outputPath: string;
-  /** All discovered bean definitions (with rewritten import paths). */
-  beans: import('./ir.js').IRBeanDefinition[];
+  /** All discovered component definitions (with rewritten import paths). */
+  components: import('./ir.js').IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** Generated TypeScript code (only when `codeOutputPath` is set). */
@@ -85,8 +85,8 @@ export interface TransformResult {
   code: string;
   /** Absolute path where the file was written. */
   outputPath: string;
-  /** All discovered bean definitions in topological order. */
-  beans: IRBeanDefinition[];
+  /** All discovered component definitions in topological order. */
+  components: IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
   /** True when codegen was skipped because the IR hash matched the existing file. */
@@ -108,15 +108,15 @@ export interface ClassVisitorContext {
   /** Store arbitrary metadata that will be available in later hooks. */
   metadata: Record<string, unknown>;
   /**
-   * Register this class as a bean from a plugin.
-   * Allows plugins to make decorated classes into beans without the scanner
+   * Register this class as a component from a plugin.
+   * Allows plugins to make decorated classes into components without the scanner
    * hardcoding knowledge of plugin-specific decorators (e.g. `@Controller`).
    *
-   * @param options.scope - Bean scope ('singleton' or 'prototype')
+   * @param options.scope - Component scope ('singleton' or 'transient')
    * @param options.decoratorName - Name of the decorator for error messages (e.g. 'Controller')
-   * @throws If another plugin has already registered this class as a bean
+   * @throws If another plugin has already registered this class as a component
    */
-  registerBean(options: { scope: Scope; decoratorName?: string }): void;
+  registerComponent(options: { scope: Scope; decoratorName?: string }): void;
 }
 
 /** Context passed to visitMethod hook. */
@@ -147,8 +147,8 @@ export interface TransformerPlugin {
 
   /**
    * Visit each decorated class found during scanning.
-   * Called for every class with at least one decorator (beans, modules, etc.).
-   * Use `ctx.metadata` to store data that will be merged into the bean's IR metadata.
+   * Called for every class with at least one decorator (components, modules, etc.).
+   * Use `ctx.metadata` to store data that will be merged into the component's IR metadata.
    */
   visitClass?(ctx: ClassVisitorContext): void;
 
@@ -161,29 +161,29 @@ export interface TransformerPlugin {
   visitMethod?(ctx: MethodVisitorContext): void;
 
   /**
-   * Mutate IR beans after type resolution, before graph building.
-   * Can modify metadata, add dependencies, filter beans, etc.
+   * Mutate IR components after type resolution, before graph building.
+   * Can modify metadata, add dependencies, filter components, etc.
    *
    * Metadata accumulated via `visitClass` (`ctx.metadata`) is already merged
-   * into each bean's `metadata` before this hook runs, so you can read
+   * into each component's `metadata` before this hook runs, so you can read
    * visitor-produced tags here.
    *
-   * **Note:** This hook receives only `@Injectable`/`@Singleton` beans.
-   * Beans created by `@Provides` methods inside `@Module` classes are expanded
+   * **Note:** This hook receives only `@Transient`/`@Singleton` components.
+   * Components created by `@Provides` methods inside `@Factory` classes are expanded
    * during graph building (the next pipeline stage) and are not visible here.
-   * Use `beforeCodegen` if you need to see the full expanded bean set.
+   * Use `beforeCodegen` if you need to see the full expanded component set.
    */
-  afterResolve?(beans: IRBeanDefinition[]): IRBeanDefinition[];
+  afterResolve?(components: IRComponentDefinition[]): IRComponentDefinition[];
 
   /**
-   * Inject or modify bean definitions before code generation.
+   * Inject or modify component definitions before code generation.
    * Runs after graph building (validation + topo sort).
    *
-   * This is the only hook that sees the full bean set including `@Provides` beans.
+   * This is the only hook that sees the full component set including `@Provides` components.
    *
-   * **Warning:** Synthetic beans added here bypass dependency validation and
-   * topological sorting. Ensure any injected beans have their dependencies
-   * already present in the bean list, or are self-contained (no dependencies).
+   * **Warning:** Synthetic components added here bypass dependency validation and
+   * topological sorting. Ensure any injected components have their dependencies
+   * already present in the component list, or are self-contained (no dependencies).
    */
-  beforeCodegen?(beans: IRBeanDefinition[]): IRBeanDefinition[];
+  beforeCodegen?(components: IRComponentDefinition[]): IRComponentDefinition[];
 }

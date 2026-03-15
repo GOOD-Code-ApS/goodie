@@ -5,7 +5,7 @@
  * path params, URL) without carrying the request body. The body is always
  * a separate typed parameter on the controller method.
  *
- * Constructed per-request by the adapter (e.g. Hono). Not a bean —
+ * Constructed per-request by the adapter (e.g. Hono). Not a component —
  * exists only for the duration of a single request handler invocation.
  */
 export class HttpContext {

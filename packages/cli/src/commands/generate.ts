@@ -34,10 +34,10 @@ export const generate = defineCommand({
       description:
         'Package name for library mode (auto-detected from package.json if omitted)',
     },
-    'beans-output': {
+    'components-output': {
       type: 'string',
-      description: 'Output path for beans.json in library mode',
-      default: 'dist/beans.json',
+      description: 'Output path for components.json in library mode',
+      default: 'dist/components.json',
     },
     'code-output': {
       type: 'string',
@@ -47,7 +47,7 @@ export const generate = defineCommand({
     scan: {
       type: 'string',
       description:
-        'Comma-separated npm scopes to scan for library beans (e.g. "@goodie-ts,@acme")',
+        'Comma-separated npm scopes to scan for library components (e.g. "@goodie-ts,@acme")',
     },
     watch: {
       type: 'boolean',
@@ -70,7 +70,7 @@ export const generate = defineCommand({
 
     if (args.mode === 'library') {
       const packageName = args['package-name'] ?? detectPackageName(cwd);
-      const beansOutputPath = path.resolve(cwd, args['beans-output']);
+      const componentsOutputPath = path.resolve(cwd, args['components-output']);
       const codeOutputPath = args['code-output']
         ? path.resolve(cwd, args['code-output'])
         : undefined;
@@ -78,7 +78,7 @@ export const generate = defineCommand({
       const outcome = await runTransformLibrary({
         tsConfigPath,
         packageName,
-        beansOutputPath,
+        componentsOutputPath,
         codeOutputPath,
       });
       logLibraryOutcome(outcome);
@@ -88,8 +88,8 @@ export const generate = defineCommand({
         return;
       }
 
-      if (outcome.result.beans.length > 0) {
-        warnMissingGoodieField(cwd, args['beans-output']);
+      if (outcome.result.components.length > 0) {
+        warnMissingGoodieField(cwd, args['components-output']);
       }
 
       if (args.watch) {
@@ -129,22 +129,22 @@ export const generate = defineCommand({
 });
 
 /**
- * Warn if `package.json` is missing the `"goodie": { "beans": "..." }` field
- * that consumers need for automatic library bean discovery.
+ * Warn if `package.json` is missing the `"goodie": { "components": "..." }` field
+ * that consumers need for automatic library component discovery.
  */
-function warnMissingGoodieField(cwd: string, beansOutput: string): void {
+function warnMissingGoodieField(cwd: string, componentsOutput: string): void {
   const pkgJsonPath = path.join(cwd, 'package.json');
   try {
     const raw = fs.readFileSync(pkgJsonPath, 'utf-8');
-    const pkg = JSON.parse(raw) as { goodie?: { beans?: string } };
-    if (pkg.goodie?.beans) return; // Already configured
+    const pkg = JSON.parse(raw) as { goodie?: { components?: string } };
+    if (pkg.goodie?.components) return; // Already configured
   } catch {
     return; // No package.json — nothing to warn about
   }
   console.warn(
-    `[goodie] Warning: package.json is missing the "goodie.beans" field. Consumers won't discover your library beans.\n` +
+    `[goodie] Warning: package.json is missing the "goodie.components" field. Consumers won't discover your library components.\n` +
       `  Add this to your package.json:\n` +
-      `  "goodie": { "beans": "${beansOutput}" }`,
+      `  "goodie": { "components": "${componentsOutput}" }`,
   );
 }
 

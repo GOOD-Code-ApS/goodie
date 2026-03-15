@@ -1,5 +1,5 @@
 import type {
-  IRBeanDefinition,
+  IRComponentDefinition,
   ResolvedAopMapping,
 } from '@goodie-ts/transformer';
 import { Project } from 'ts-morph';
@@ -169,7 +169,7 @@ const LOGGING_MAPPINGS: ResolvedAopMapping[] = [
   },
 ];
 
-const LOGGING_LIBRARY_BEANS: IRBeanDefinition[] = [
+const LOGGING_LIBRARY_BEANS: IRComponentDefinition[] = [
   {
     tokenRef: {
       kind: 'class',
@@ -237,8 +237,8 @@ describe('Declarative AOP Plugin — Integration', () => {
       LOGGING_MAPPINGS,
     );
 
-    // No AOP wiring should happen — LoggingInterceptor bean still appears
-    // (from library beans) but no buildInterceptorChain calls
+    // No AOP wiring should happen — LoggingInterceptor component still appears
+    // (from library components) but no buildInterceptorChain calls
     expect(result.code).not.toContain('buildInterceptorChain');
   });
 
@@ -292,7 +292,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       },
     ];
 
-    const libraryBeans: IRBeanDefinition[] = [
+    const libraryComponents: IRComponentDefinition[] = [
       ...LOGGING_LIBRARY_BEANS,
       {
         tokenRef: {
@@ -332,7 +332,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       project,
       '/out/gen.ts',
       [],
-      libraryBeans,
+      libraryComponents,
       allMappings,
     );
 

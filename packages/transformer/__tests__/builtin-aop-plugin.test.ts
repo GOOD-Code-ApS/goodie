@@ -34,7 +34,7 @@ describe('AOP Plugin', () => {
     const result = transformInMemory(project, '/out/gen.ts', [
       createAopPlugin(),
     ]);
-    const myService = result.beans.find(
+    const myService = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyService',
     );
@@ -79,7 +79,7 @@ describe('AOP Plugin', () => {
     const result = transformInMemory(project, '/out/gen.ts', [
       createAopPlugin(),
     ]);
-    const myService = result.beans.find(
+    const myService = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyService',
     );
@@ -122,7 +122,7 @@ describe('AOP Plugin', () => {
     const result = transformInMemory(project, '/out/gen.ts', [
       createAopPlugin(),
     ]);
-    const myService = result.beans.find(
+    const myService = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyService',
     );
@@ -149,7 +149,7 @@ describe('AOP Plugin', () => {
     const result = transformInMemory(project, '/out/gen.ts', [
       createAopPlugin(),
     ]);
-    const myService = result.beans.find(
+    const myService = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'MyService',
     );
@@ -187,10 +187,10 @@ describe('AOP Plugin', () => {
     const result = transformInMemory(project, '/out/gen.ts', [
       createAopPlugin(),
     ]);
-    const serviceA = result.beans.find(
+    const serviceA = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'ServiceA',
     );
-    const serviceB = result.beans.find(
+    const serviceB = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'ServiceB',
     );
 

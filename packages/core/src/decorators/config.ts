@@ -6,7 +6,7 @@
  *
  * ```typescript
  * @Singleton()
- * @ConfigurationProperties('database')
+ * @Config('database')
  * class DatabaseConfig {
  *   host = 'localhost';
  *   port = 5432;
@@ -19,7 +19,7 @@
  *
  * @param prefix - Dot-separated prefix prepended to each field name as the config key.
  */
-export function ConfigurationProperties(
+export function Config(
   _prefix: string,
 ): (
   target: abstract new (...args: any[]) => unknown,

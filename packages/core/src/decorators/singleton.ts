@@ -1,5 +1,5 @@
 /**
- * Marks a class as a singleton bean.
+ * Marks a class as a singleton component.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
  * The transformer reads this decorator via AST inspection at build time.

@@ -1,20 +1,20 @@
 import type {
   AbstractConstructor,
   ApplicationContext,
-  BeanDefinition,
+  ComponentDefinition,
   Constructor,
   InjectionToken,
 } from '@goodie-ts/core';
 import { test as base, type TestAPI } from 'vitest';
 import { TestContext, type TestContextBuilder } from './test-context.js';
 
-/** A function that builds bean definitions, optionally accepting config overrides. */
+/** A function that builds component definitions, optionally accepting config overrides. */
 type DefinitionsFactory = (
   config?: Record<string, unknown>,
-) => BeanDefinition[];
+) => ComponentDefinition[];
 
 /** Input accepted by `createGoodieTest()` — either a definitions factory or a raw array. */
-type DefinitionsInput = DefinitionsFactory | BeanDefinition[];
+type DefinitionsInput = DefinitionsFactory | ComponentDefinition[];
 
 /**
  * Configuration options for `createGoodieTest()`.
@@ -49,8 +49,8 @@ export interface GoodieTestOptions<
   };
   /**
    * Wrap each test in a transaction that rolls back after the test.
-   * Pass the class or InjectionToken of your TransactionManager bean.
-   * The resolved bean must have `startTestTransaction(): Promise<() => Promise<void>>`.
+   * Pass the class or InjectionToken of your TransactionManager component.
+   * The resolved component must have `startTestTransaction(): Promise<() => Promise<void>>`.
    */
   transactional?: Constructor | InjectionToken<any>;
   /** Whether to rollback after each test. Defaults to `true` when `transactional` is set. */
@@ -61,15 +61,15 @@ export interface GoodieTestOptions<
 export interface GoodieFixtures {
   /** The built ApplicationContext. Built fresh per test, closed after. */
   ctx: ApplicationContext;
-  /** Convenience function to resolve beans from the context. */
+  /** Convenience function to resolve components from the context. */
   resolve: <T>(
     token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
   ) => T;
 }
 
 /**
- * Duck-type contract for any transaction manager bean used in test rollback.
- * The resolved bean must provide `startTestTransaction()` which replaces
+ * Duck-type contract for any transaction manager component used in test rollback.
+ * The resolved component must provide `startTestTransaction()` which replaces
  * the internal DB connection with a transaction, and returns a rollback function.
  */
 interface TestTransactionManagerLike {
@@ -119,12 +119,12 @@ export function createGoodieTest<
   const rollback = options?.rollback ?? !!transactional;
 
   // Resolve definitions once (lazily on first test) and reuse across all tests.
-  // This ensures all tests share the same BeanDefinition[] reference, which is
+  // This ensures all tests share the same ComponentDefinition[] reference, which is
   // critical for transactional rollback — tests must share the same connection pool.
   // When definitions is a factory, config() is evaluated once here and frozen for all tests.
   // When definitions is a raw array, config is applied per-test via builder.withConfig().
-  let cachedDefs: BeanDefinition[] | undefined;
-  function resolveDefinitions(): BeanDefinition[] {
+  let cachedDefs: ComponentDefinition[] | undefined;
+  function resolveDefinitions(): ComponentDefinition[] {
     if (cachedDefs) return cachedDefs;
 
     if (typeof definitions === 'function') {

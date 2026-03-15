@@ -19,11 +19,11 @@ export interface LogOptions {
  * At compile time, the transformer's AOP scanner reads the type parameter
  * and wires the `LoggingInterceptor` via AOP. No runtime metadata is stored.
  *
- * **Limitation:** `@Log` on a `@Provides` method inside a `@Module` class is
+ * **Limitation:** `@Log` on a `@Provides` method inside a `@Factory` class is
  * silently ignored. `@Provides` methods are factory functions executed by the
- * container at bean creation time — they are not instance methods that go
+ * container at component creation time — they are not instance methods that go
  * through AOP interception. Use `@Log` only on regular `@Singleton` /
- * `@Injectable` class methods.
+ * `@Transient` class methods.
  *
  * @param opts - Optional configuration (e.g. log level, argument logging).
  */

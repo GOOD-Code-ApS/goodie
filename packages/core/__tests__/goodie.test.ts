@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ApplicationContext } from '../src/application-context.js';
-import type { BeanDefinition, Dependency } from '../src/bean-definition.js';
+import type {
+  ComponentDefinition,
+  Dependency,
+} from '../src/component-definition.js';
 import { Goodie, GoodieBuilder } from '../src/goodie.js';
 import { InjectionToken } from '../src/injection-token.js';
 import type { Scope } from '../src/types.js';
@@ -12,7 +15,7 @@ function dep(token: Dependency['token'], optional = false): Dependency {
 }
 
 function makeDef<T>(
-  token: BeanDefinition<T>['token'],
+  token: ComponentDefinition<T>['token'],
   opts: {
     deps?: Dependency[];
     factory?: (...args: unknown[]) => T | Promise<T>;
@@ -20,7 +23,7 @@ function makeDef<T>(
     eager?: boolean;
     metadata?: Record<string, unknown>;
   } = {},
-): BeanDefinition<T> {
+): ComponentDefinition<T> {
   return {
     token,
     scope: opts.scope ?? 'singleton',
@@ -45,7 +48,7 @@ describe('Goodie Builder', () => {
     await ctx.close();
   });
 
-  it('resolves a simple bean through the builder', async () => {
+  it('resolves a simple component through the builder', async () => {
     class Greeter {
       greet() {
         return 'hello';
@@ -82,7 +85,7 @@ describe('Goodie Builder', () => {
     await ctx.close();
   });
 
-  it('resolves InjectionToken beans', async () => {
+  it('resolves InjectionToken components', async () => {
     const DbUrl = new InjectionToken<string>('DbUrl');
 
     const ctx = await Goodie.build([
@@ -153,7 +156,7 @@ describe('Goodie Builder', () => {
       makeDef(Resource, {
         factory: () => new Resource(),
         eager: true,
-        metadata: { preDestroyMethods: ['destroy'] },
+        metadata: { onDestroyMethods: ['destroy'] },
       }),
     ]).onStart(async () => {
       throw new Error('hook failed');

@@ -74,7 +74,7 @@ MDC.run(new Map([['traceId', crypto.randomUUID()]]), async () => {
 
 ## Setup
 
-No plugin configuration needed — `@goodie-ts/logging` ships pre-scanned beans and AOP config in `beans.json`. The transformer auto-discovers them at build time.
+No plugin configuration needed — `@goodie-ts/logging` ships pre-scanned components and AOP config in `components.json`. The transformer auto-discovers them at build time.
 
 ## License
 

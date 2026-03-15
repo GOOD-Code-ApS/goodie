@@ -1,6 +1,6 @@
 import type {
   ClassVisitorContext,
-  IRBeanDefinition,
+  IRComponentDefinition,
   MethodVisitorContext,
   TransformerPlugin,
 } from '@goodie-ts/transformer';
@@ -20,8 +20,8 @@ interface TransactionalMethodInfo {
  * Scans @Transactional decorators on methods and wires
  * TransactionalInterceptor as an AOP interceptor dependency at compile time.
  *
- * Registers @Migration decorated classes as beans so they are discovered
- * by the MigrationRunner library bean via collection injection on AbstractMigration.
+ * Registers @Migration decorated classes as components so they are discovered
+ * by the MigrationRunner library component via collection injection on AbstractMigration.
  *
  * **Limitation:** Propagation is detected via AST text matching
  * (`text.includes('REQUIRES_NEW')`). Only string literal values in the
@@ -37,10 +37,13 @@ export function createKyselyPlugin(
     name: 'kysely',
 
     visitClass(ctx: ClassVisitorContext): void {
-      // Detect @Migration('name') — register as a bean so the scanner picks it up
+      // Detect @Migration('name') — register as a component so the scanner picks it up
       for (const decorator of ctx.classDeclaration.getDecorators()) {
         if (decorator.getName() !== 'Migration') continue;
-        ctx.registerBean({ scope: 'singleton', decoratorName: 'Migration' });
+        ctx.registerComponent({
+          scope: 'singleton',
+          decoratorName: 'Migration',
+        });
         break;
       }
     },
@@ -68,18 +71,21 @@ export function createKyselyPlugin(
       }
     },
 
-    afterResolve(beans: IRBeanDefinition[]): IRBeanDefinition[] {
-      // Wire @Transactional interceptor metadata onto beans
-      for (const bean of beans) {
+    afterResolve(components: IRComponentDefinition[]): IRComponentDefinition[] {
+      // Wire @Transactional interceptor metadata onto components
+      for (const component of components) {
         const className =
-          bean.tokenRef.kind === 'class' ? bean.tokenRef.className : undefined;
+          component.tokenRef.kind === 'class'
+            ? component.tokenRef.className
+            : undefined;
         if (!className) continue;
 
-        const key = `${bean.tokenRef.importPath}:${className}`;
+        const key = `${component.tokenRef.importPath}:${className}`;
         const infos = classTransactionalInfo.get(key);
         if (!infos || infos.length === 0) continue;
 
-        const existing = (bean.metadata.interceptedMethods ?? []) as Array<{
+        const existing = (component.metadata.interceptedMethods ??
+          []) as Array<{
           methodName: string;
           interceptors: Array<{
             className: string;
@@ -113,10 +119,10 @@ export function createKyselyPlugin(
           }
         }
 
-        bean.metadata.interceptedMethods = existing;
+        component.metadata.interceptedMethods = existing;
       }
 
-      return beans;
+      return components;
     },
   };
 }

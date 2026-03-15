@@ -1,13 +1,13 @@
-import type { BeanDefinition } from '@goodie-ts/core';
+import type { ComponentDefinition } from '@goodie-ts/core';
 import { ApplicationContext } from '@goodie-ts/core';
 import { bench, describe } from 'vitest';
-import { generateBeanDefinitions } from './helpers.js';
+import { generateComponentDefinitions } from './helpers.js';
 
 // Pre-generate definitions for each size
 const sizes = [50, 100, 500] as const;
-const defsBySize = new Map<number, BeanDefinition[]>();
+const defsBySize = new Map<number, ComponentDefinition[]>();
 for (const n of sizes) {
-  defsBySize.set(n, generateBeanDefinitions(n));
+  defsBySize.set(n, generateComponentDefinitions(n));
 }
 
 // ── ApplicationContext.create() ──
@@ -15,11 +15,11 @@ for (const n of sizes) {
 describe('ApplicationContext.create()', () => {
   for (const n of sizes) {
     const defs = defsBySize.get(n)!;
-    bench(`${n} beans (with topoSort)`, async () => {
+    bench(`${n} components (with topoSort)`, async () => {
       await ApplicationContext.create(defs);
     });
 
-    bench(`${n} beans (preSorted)`, async () => {
+    bench(`${n} components (preSorted)`, async () => {
       await ApplicationContext.create(defs, { preSorted: true });
     });
   }
@@ -30,12 +30,12 @@ describe('ApplicationContext.create()', () => {
 describe('singleton get()', () => {
   for (const n of sizes) {
     const defs = defsBySize.get(n)!;
-    // The last bean in the chain depends on all others transitively
+    // The last component in the chain depends on all others transitively
     const lastToken = defs[n - 1].token;
 
     let ctx: ApplicationContext;
     bench(
-      `${n} beans — resolve leaf`,
+      `${n} components — resolve leaf`,
       async () => {
         ctx.get(lastToken);
       },
@@ -53,12 +53,12 @@ describe('singleton get()', () => {
 // ── Prototype resolution ──
 
 describe('prototype get()', () => {
-  const prototypeDefs = generateBeanDefinitions(100, 'prototype');
+  const prototypeDefs = generateComponentDefinitions(100, 'prototype');
   const lastToken = prototypeDefs[99].token;
 
   let ctx: ApplicationContext;
   bench(
-    '100 beans — resolve leaf (new instance each call)',
+    '100 components — resolve leaf (new instance each call)',
     async () => {
       ctx.get(lastToken);
     },
@@ -75,9 +75,9 @@ describe('prototype get()', () => {
 // ── getAll() collection resolution ──
 
 describe('getAll()', () => {
-  // Create 100 beans all registered under a shared base token
+  // Create 100 components all registered under a shared base token
   const BaseClass = class Base {} as new (...args: unknown[]) => unknown;
-  const collectionDefs: BeanDefinition[] = [];
+  const collectionDefs: ComponentDefinition[] = [];
   for (let i = 0; i < 100; i++) {
     const token = new Function(`return class Sub${i} {}`)() as new (
       ...args: unknown[]
@@ -95,7 +95,7 @@ describe('getAll()', () => {
 
   let ctx: ApplicationContext;
   bench(
-    '100 beans under shared base token',
+    '100 components under shared base token',
     async () => {
       ctx.getAll(BaseClass);
     },

@@ -2,20 +2,20 @@ import { ApplicationContext } from '@goodie-ts/core';
 import { Controller, Get, Response } from '@goodie-ts/http';
 
 /**
- * Management endpoint exposing registered bean definitions.
+ * Management endpoint exposing registered component definitions.
  *
- * Returns the full bean graph: tokens, scopes, dependencies,
+ * Returns the full component graph: tokens, scopes, dependencies,
  * conditional rules, and eager/lazy status.
  *
- * Internal framework beans (ApplicationContext, __Goodie_Config) are
- * filtered out — only user and library beans are shown.
+ * Internal framework components (ApplicationContext, __Goodie_Config) are
+ * filtered out — only user and library components are shown.
  */
 @Controller('/management')
-export class BeansEndpoint {
+export class ComponentsEndpoint {
   constructor(private readonly context: ApplicationContext) {}
 
-  @Get('/beans')
-  beans() {
+  @Get('/components')
+  components() {
     const definitions = this.context
       .getDefinitions()
       .filter((def) =>
@@ -24,7 +24,7 @@ export class BeansEndpoint {
           : def.token.description !== '__Goodie_Config',
       );
 
-    const beans = definitions.map((def) => {
+    const components = definitions.map((def) => {
       const token =
         typeof def.token === 'function'
           ? def.token.name
@@ -54,6 +54,6 @@ export class BeansEndpoint {
       };
     });
 
-    return Response.ok({ beans });
+    return Response.ok({ components: components });
   }
 }

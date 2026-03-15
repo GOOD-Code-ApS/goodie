@@ -20,7 +20,7 @@ function createProject(
 }
 
 describe('HTTP Controller Metadata', () => {
-  it('stores httpController metadata on controller beans', () => {
+  it('stores httpController metadata on controller components', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get, Post } from './decorators.js'
@@ -34,12 +34,12 @@ describe('HTTP Controller Metadata', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
     );
-    const httpCtrl = bean!.metadata.httpController as {
+    const httpCtrl = component!.metadata.httpController as {
       basePath: string;
       routes: Array<{ methodName: string; httpMethod: string }>;
     };
@@ -67,10 +67,10 @@ describe('HTTP Controller Metadata', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpCtrl = bean!.metadata.httpController as {
+    const httpCtrl = component!.metadata.httpController as {
       routes: Array<{
         methodName: string;
         params: Array<{ name: string; binding: string; typeName: string }>;
@@ -125,10 +125,10 @@ describe('HTTP Controller Metadata', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpCtrl = bean!.metadata.httpController as {
+    const httpCtrl = component!.metadata.httpController as {
       routes: Array<{ methodName: string; returnType: string }>;
     };
 

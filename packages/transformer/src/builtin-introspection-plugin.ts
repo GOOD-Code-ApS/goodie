@@ -26,7 +26,7 @@ type ScannedFieldType =
  *
  * Scans `@Introspected()` decorated classes for field type metadata and
  * generates `MetadataRegistry` registration code. Introspected classes
- * are NOT beans — they are value objects (DTOs, request/response types)
+ * are NOT components — they are value objects (DTOs, request/response types)
  * whose shape metadata is consumed at runtime by validation, OpenAPI, etc.
  *
  * Constraint extraction (e.g. `@MinLength`, `@Email`) is NOT handled here —
@@ -38,8 +38,7 @@ export function createIntrospectionPlugin(): TransformerPlugin {
 
     visitClass(ctx: ClassVisitorContext): void {
       const isIntrospected = ctx.decorators.some(
-        (d) =>
-          d.name === 'Introspected' || d.name === 'ConfigurationProperties',
+        (d) => d.name === 'Introspected' || d.name === 'Config',
       );
       if (!isIntrospected) return;
 

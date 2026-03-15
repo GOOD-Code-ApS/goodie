@@ -1,8 +1,8 @@
 /**
- * Marks a singleton bean as a BeanPostProcessor.
+ * Marks a singleton component as a ComponentPostProcessor.
  *
- * The transformer will set `metadata.isBeanPostProcessor = true` on the
- * generated BeanDefinition, so the runtime discovers it automatically.
+ * The transformer will set `metadata.isComponentPostProcessor = true` on the
+ * generated ComponentDefinition, so the runtime discovers it automatically.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
  * The transformer reads this decorator via AST inspection at build time.
@@ -10,8 +10,8 @@
  * @example
  * @PostProcessor()
  * @Singleton()
- * class LoggingPostProcessor implements BeanPostProcessor {
- *   afterInit(bean: unknown) { console.log('created', bean); return bean; }
+ * class LoggingPostProcessor implements ComponentPostProcessor {
+ *   afterInit(component: unknown) { console.log('created', component); return component; }
  * }
  */
 export function PostProcessor(): ClassDecorator_Stage3 {

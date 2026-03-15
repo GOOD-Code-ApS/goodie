@@ -1,18 +1,18 @@
-import type { BeanDefinition } from '@goodie-ts/core';
+import type { ComponentDefinition } from '@goodie-ts/core';
 import { ApplicationContext } from '@goodie-ts/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ScheduledMethodMeta } from '../src/scheduler-service.js';
 import { SchedulerService } from '../src/scheduler-service.js';
 
-/** Build an ApplicationContext with the given beans and their scheduled metadata. */
+/** Build an ApplicationContext with the given components and their scheduled metadata. */
 async function createSchedulerContext(
-  beans: Array<{
+  components: Array<{
     instance: object;
     token: new (...args: any[]) => unknown;
     scheduledMethods: ScheduledMethodMeta[];
   }>,
 ): Promise<{ ctx: ApplicationContext; service: SchedulerService }> {
-  const definitions: BeanDefinition[] = beans.map((b) => ({
+  const definitions: ComponentDefinition[] = components.map((b) => ({
     token: b.token,
     scope: 'singleton' as const,
     dependencies: [],
@@ -243,7 +243,7 @@ describe('SchedulerService', () => {
     await service.stop();
   });
 
-  it('should skip beans without scheduledMethods metadata', async () => {
+  it('should skip components without scheduledMethods metadata', async () => {
     vi.useFakeTimers();
     const handler = vi.fn();
 
@@ -252,7 +252,7 @@ describe('SchedulerService', () => {
     }
     class PlainService {}
 
-    const definitions: BeanDefinition[] = [
+    const definitions: ComponentDefinition[] = [
       {
         token: PlainService,
         scope: 'singleton',

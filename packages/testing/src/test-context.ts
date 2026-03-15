@@ -1,7 +1,7 @@
 import {
   type AbstractConstructor,
   ApplicationContext,
-  type BeanDefinition,
+  type ComponentDefinition,
   type Constructor,
   DIError,
   InjectionToken,
@@ -19,13 +19,15 @@ function tokenName(token: Token): string {
 }
 
 /**
- * Fluent builder for configuring a single bean override.
+ * Fluent builder for configuring a single component override.
  */
 export class OverrideBuilder<T> {
   constructor(
     private readonly token: Token,
-    private readonly commit: (def: BeanDefinition) => void,
-    private readonly findOriginal: (token: Token) => BeanDefinition | undefined,
+    private readonly commit: (def: ComponentDefinition) => void,
+    private readonly findOriginal: (
+      token: Token,
+    ) => ComponentDefinition | undefined,
     private readonly owner: TestContextBuilder,
   ) {}
 
@@ -33,8 +35,8 @@ export class OverrideBuilder<T> {
    * Override with a fixed value instance.
    */
   withValue(value: T): TestContextBuilder {
-    const def: BeanDefinition = {
-      token: this.token as BeanDefinition['token'],
+    const def: ComponentDefinition = {
+      token: this.token as ComponentDefinition['token'],
       scope: 'singleton',
       dependencies: [],
       factory: () => value,
@@ -49,8 +51,8 @@ export class OverrideBuilder<T> {
    * Override with a replacement class (zero-dependency, `new cls()`).
    */
   with(cls: Constructor<T>): TestContextBuilder {
-    const def: BeanDefinition = {
-      token: this.token as BeanDefinition['token'],
+    const def: ComponentDefinition = {
+      token: this.token as ComponentDefinition['token'],
       scope: 'singleton',
       dependencies: [],
       factory: () => new cls(),
@@ -65,8 +67,8 @@ export class OverrideBuilder<T> {
    * Override with a custom factory function (sync or async).
    */
   withFactory(factory: () => T | Promise<T>): TestContextBuilder {
-    const def: BeanDefinition = {
-      token: this.token as BeanDefinition['token'],
+    const def: ComponentDefinition = {
+      token: this.token as ComponentDefinition['token'],
       scope: 'singleton',
       dependencies: [],
       factory,
@@ -78,7 +80,7 @@ export class OverrideBuilder<T> {
   }
 
   /**
-   * Override with a factory that receives the original bean's resolved
+   * Override with a factory that receives the original component's resolved
    * dependencies. Keeps the original dependency list — only replaces the
    * factory function.
    *
@@ -93,11 +95,11 @@ export class OverrideBuilder<T> {
     const original = this.findOriginal(this.token);
     if (!original) {
       throw new DIError(
-        `withDeps(): no original bean definition found for token "${tokenName(this.token)}"`,
+        `withDeps(): no original component definition found for token "${tokenName(this.token)}"`,
       );
     }
-    const def: BeanDefinition = {
-      token: this.token as BeanDefinition['token'],
+    const def: ComponentDefinition = {
+      token: this.token as ComponentDefinition['token'],
       scope: original.scope,
       dependencies: [...original.dependencies],
       factory,
@@ -110,20 +112,20 @@ export class OverrideBuilder<T> {
 }
 
 /**
- * Accumulates bean overrides and builds a fresh ApplicationContext.
+ * Accumulates component overrides and builds a fresh ApplicationContext.
  */
 export class TestContextBuilder {
-  private readonly overrides = new Map<Token, BeanDefinition>();
-  private readonly additions = new Map<Token, BeanDefinition>();
+  private readonly overrides = new Map<Token, ComponentDefinition>();
+  private readonly additions = new Map<Token, ComponentDefinition>();
   private readonly tokenSet: Set<Token>;
 
   /** @internal — use TestContext.from() */
-  constructor(private readonly baseDefs: BeanDefinition[]) {
+  constructor(private readonly baseDefs: ComponentDefinition[]) {
     this.tokenSet = new Set(baseDefs.map((d) => d.token));
   }
 
   /**
-   * Start overriding a bean identified by its class constructor.
+   * Start overriding a component identified by its class constructor.
    * Throws OverrideError if the token doesn't exist in the base definitions.
    */
   override<T>(
@@ -164,8 +166,8 @@ export class TestContextBuilder {
         throw new OverrideError(tokenName(token));
       }
 
-      const def: BeanDefinition = {
-        token: token as BeanDefinition['token'],
+      const def: ComponentDefinition = {
+        token: token as ComponentDefinition['token'],
         scope: 'singleton',
         dependencies: [],
         factory: () => new cls(),
@@ -179,7 +181,7 @@ export class TestContextBuilder {
   }
 
   /**
-   * Register a test-only bean. Unlike `override()`, this adds a new bean
+   * Register a test-only component. Unlike `override()`, this adds a new component
    * that doesn't need to exist in the base definitions.
    *
    * @example
@@ -198,8 +200,8 @@ export class TestContextBuilder {
         `Cannot provide ${tokenName(token as Token)}: already exists in base definitions — use override() instead`,
       );
     }
-    const def: BeanDefinition = {
-      token: token as BeanDefinition['token'],
+    const def: ComponentDefinition = {
+      token: token as ComponentDefinition['token'],
       scope: 'singleton',
       dependencies: [],
       factory: () => value,
@@ -212,7 +214,7 @@ export class TestContextBuilder {
 
   /**
    * Override specific config keys while preserving the rest.
-   * Requires a `__Goodie_Config` bean in the base definitions (generated when `@Value` is used).
+   * Requires a `__Goodie_Config` component in the base definitions (generated when `@Value` is used).
    *
    * Wraps the original config factory: `{ ...originalFactory(), ...overrides }`.
    * Last `withConfig()` call wins (consistent with `override()` semantics).
@@ -226,14 +228,14 @@ export class TestContextBuilder {
 
     if (!configDef) {
       throw new DIError(
-        'No __Goodie_Config bean found — withConfig() requires @Value to be used in at least one bean',
+        'No __Goodie_Config component found — withConfig() requires @Value to be used in at least one component',
       );
     }
 
     const existingOverride = this.overrides.get(configDef.token);
     const baseDef = existingOverride ?? configDef;
     const baseFactory = baseDef.factory as () => Record<string, unknown>;
-    const overrideDef: BeanDefinition = {
+    const overrideDef: ComponentDefinition = {
       ...configDef,
       factory: () => ({ ...baseFactory(), ...overrides }),
     };
@@ -290,16 +292,16 @@ export class TestContextBuilder {
 }
 
 /**
- * Entry point for creating test-friendly ApplicationContexts with bean overrides.
+ * Entry point for creating test-friendly ApplicationContexts with component overrides.
  */
 export class TestContext {
   private constructor() {}
 
   /**
-   * Create a TestContextBuilder from an existing ApplicationContext or raw BeanDefinitions.
+   * Create a TestContextBuilder from an existing ApplicationContext or raw ComponentDefinitions.
    */
   static from(
-    source: ApplicationContext | BeanDefinition[],
+    source: ApplicationContext | ComponentDefinition[],
   ): TestContextBuilder {
     const defs = Array.isArray(source) ? source : source.getDefinitions();
     return new TestContextBuilder([...defs]);

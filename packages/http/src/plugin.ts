@@ -84,7 +84,10 @@ export default function createHttpPlugin(): TransformerPlugin {
         }
       }
 
-      ctx.registerBean({ scope: 'singleton', decoratorName: 'Controller' });
+      ctx.registerComponent({
+        scope: 'singleton',
+        decoratorName: 'Controller',
+      });
 
       // Initialize controller metadata — routes populated by visitMethod
       metadata.httpController = {

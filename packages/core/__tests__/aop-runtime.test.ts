@@ -1,7 +1,7 @@
 import type {
   AfterAdvice,
-  BeanDefinition,
   BeforeAdvice,
+  ComponentDefinition,
   InvocationContext,
   MethodInterceptor,
 } from '@goodie-ts/core';
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * Runtime integration tests that simulate what generated code does:
- * construct beans, resolve interceptors via DI, and wire up interception.
+ * construct components, resolve interceptors via DI, and wire up interception.
  */
 describe('AOP Runtime Integration', () => {
   it('@Around interceptor runs around the method', async () => {
@@ -38,7 +38,7 @@ describe('AOP Runtime Integration', () => {
     }
 
     // Simulate generated code: interceptor is a dependency of MyService
-    const definitions: BeanDefinition[] = [
+    const definitions: ComponentDefinition[] = [
       {
         token: LoggingInterceptor,
         scope: 'singleton',
@@ -93,7 +93,7 @@ describe('AOP Runtime Integration', () => {
       }
     }
 
-    const definitions: BeanDefinition[] = [
+    const definitions: ComponentDefinition[] = [
       {
         token: LogAdvice,
         scope: 'singleton',
@@ -147,7 +147,7 @@ describe('AOP Runtime Integration', () => {
       }
     }
 
-    const definitions: BeanDefinition[] = [
+    const definitions: ComponentDefinition[] = [
       {
         token: MetricsAdvice,
         scope: 'singleton',
@@ -214,7 +214,7 @@ describe('AOP Runtime Integration', () => {
       }
     }
 
-    const definitions: BeanDefinition[] = [
+    const definitions: ComponentDefinition[] = [
       {
         token: FirstInterceptor,
         scope: 'singleton',
@@ -299,7 +299,7 @@ describe('AOP Runtime Integration', () => {
       }
     }
 
-    const definitions: BeanDefinition[] = [
+    const definitions: ComponentDefinition[] = [
       {
         token: BeforeLog,
         scope: 'singleton',

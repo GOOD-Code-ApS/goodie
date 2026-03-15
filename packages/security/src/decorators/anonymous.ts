@@ -20,7 +20,7 @@
  * }
  */
 export function Anonymous(): (
-  target: Function,
+  target: (...args: never) => unknown,
   context: ClassMethodDecoratorContext,
 ) => void {
   return () => {};

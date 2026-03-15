@@ -18,7 +18,7 @@ HTTP routing, database integration, validation, caching, resilience patterns, an
 | Awilix | Manual registration | App startup | No |
 | **goodie** | **ts-morph source scanning** | **Build time** | **No** |
 
-goodie is the only TypeScript DI framework that validates the dependency graph before your app runs **and** requires no runtime reflection. Missing beans, circular dependencies, and misspelled tokens are build errors with suggestions — not runtime crashes.
+goodie is the only TypeScript DI framework that validates the dependency graph before your app runs **and** requires no runtime reflection. Missing components, circular dependencies, and misspelled tokens are build errors with suggestions — not runtime crashes.
 
 ## Requirements
 
@@ -85,7 +85,7 @@ const userService = app.context.get(UserService);
 | [`@goodie-ts/transformer`](./packages/transformer) | ts-morph scanner, code generator, and built-in AOP + config + introspection plugins (build-time only) |
 | [`@goodie-ts/cli`](./packages/cli) | CLI tool — `goodie generate` with watch mode |
 | [`@goodie-ts/vite-plugin`](./packages/vite-plugin) | Vite integration — runs transformer on build and HMR |
-| [`@goodie-ts/testing`](./packages/testing) | `TestContext` with bean overrides and `@MockDefinition` |
+| [`@goodie-ts/testing`](./packages/testing) | `TestContext` with component overrides and `@MockDefinition` |
 
 ### Framework
 
@@ -106,7 +106,7 @@ Benchmarks measured on an Apple M-series MacBook (March 2026). Run `pnpm bench` 
 
 ### Build-time (transformer)
 
-| Benchmark | 50 beans | 100 beans | 500 beans |
+| Benchmark | 50 components | 100 components | 500 components |
 |---|---|---|---|
 | Full pipeline (scan + resolve + graph + codegen) | ~82ms | ~87ms | ~104ms |
 | Scanner only | ~80ms | ~72ms | ~99ms |
@@ -118,11 +118,11 @@ The scanner (ts-morph AST traversal + type resolution) dominates build time. Cod
 
 | Benchmark | ops/sec |
 |---|---|
-| `ApplicationContext.create()` — 50 beans | ~203k |
-| `ApplicationContext.create()` — 500 beans | ~19k |
+| `ApplicationContext.create()` — 50 components | ~203k |
+| `ApplicationContext.create()` — 500 components | ~19k |
 | Singleton `get()` (cached) | ~10.4M |
 | Prototype `get()` (new instance) | ~144k |
-| `getAll()` — 100 beans | ~1.1M |
+| `getAll()` — 100 components | ~1.1M |
 
 Singleton resolution is a single Map lookup — effectively free. The `preSorted` optimization (used by generated code) makes `create()` ~2x faster by skipping redundant topological sorting.
 

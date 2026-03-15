@@ -19,7 +19,7 @@ function createProject(
 }
 
 describe('HTTP Plugin', () => {
-  it('registers @Controller as singleton bean', () => {
+  it('registers @Controller as singleton component', () => {
     const result = createProject({
       '/src/UserController.ts': `
         import { Controller, Get } from './decorators.js'
@@ -31,13 +31,13 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
     );
-    expect(bean).toBeDefined();
-    expect(bean!.scope).toBe('singleton');
+    expect(component).toBeDefined();
+    expect(component!.scope).toBe('singleton');
   });
 
   it('stores httpController metadata with basePath', () => {
@@ -52,12 +52,12 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       basePath: string;
       routes: Array<{ methodName: string; httpMethod: string; path: string }>;
     };
@@ -85,12 +85,12 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'UserController',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       basePath: string;
       routes: Array<{
         methodName: string;
@@ -157,10 +157,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
     );
-    expect(bean!.metadata.httpController).toBeUndefined();
+    expect(component!.metadata.httpController).toBeUndefined();
   });
 
   it('defaults basePath to / when no argument', () => {
@@ -175,10 +175,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       basePath: string;
     };
     expect(httpController.basePath).toBe('/');
@@ -198,10 +198,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{
         methodName: string;
         params: Array<{ name: string; binding: string }>;
@@ -248,10 +248,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{
         params: Array<{ name: string; binding: string; typeName: string }>;
       }>;
@@ -275,10 +275,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{
         params: Array<{
           name: string;
@@ -306,10 +306,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{
         params: Array<{ name: string; binding: string; typeName: string }>;
       }>;
@@ -332,10 +332,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{
         params: Array<{ name: string; binding: string; typeName: string }>;
       }>;
@@ -365,10 +365,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{
         params: Array<{ name: string; binding: string; typeName: string }>;
       }>;
@@ -396,10 +396,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{ status: number }>;
     };
     expect(httpController.routes[0].status).toBe(201);
@@ -417,10 +417,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{ status: number }>;
     };
     expect(httpController.routes[0].status).toBe(200);
@@ -455,10 +455,10 @@ describe('HTTP Plugin', () => {
       `,
     });
 
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{ path: string }>;
     };
     expect(httpController.routes[0].path).toBe('/');
@@ -471,10 +471,10 @@ describe('HTTP Plugin — return type extraction', () => {
     routeIndex = 0,
   ): string {
     const result = createProject(files);
-    const bean = result.beans.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Ctrl',
     );
-    const httpController = bean!.metadata.httpController as {
+    const httpController = component!.metadata.httpController as {
       routes: Array<{ returnType: string }>;
     };
     return httpController.routes[routeIndex].returnType;

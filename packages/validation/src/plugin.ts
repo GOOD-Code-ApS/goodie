@@ -7,7 +7,7 @@ import type {
  * Validation transformer plugin.
  *
  * Scans `@Validated` methods for class-typed parameters and stores
- * `validatedMethodParams` metadata on the bean so that core codegen
+ * `validatedMethodParams` metadata on the component so that core codegen
  * generates `MetadataRegistry.INSTANCE.registerMethodParam(...)` calls.
  * `ValidationInterceptor` reads these at runtime to know which arguments to validate.
  *

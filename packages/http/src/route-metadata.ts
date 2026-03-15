@@ -33,7 +33,7 @@ export interface RouteMetadata {
   decorators?: DecoratorMeta[];
 }
 
-/** Controller metadata stored on bean metadata by the http plugin. */
+/** Controller metadata stored on component metadata by the http plugin. */
 export interface ControllerMetadata {
   basePath: string;
   routes: RouteMetadata[];
