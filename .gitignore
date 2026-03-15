@@ -3,4 +3,4 @@ dist/
 *.tsbuildinfo
 .DS_Store
 coverage/
-*.generated.ts
+__generated__/

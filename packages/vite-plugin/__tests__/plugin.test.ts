@@ -27,7 +27,7 @@ function successResult(componentCount: number, warnings: string[] = []) {
     success: true as const,
     result: {
       code: '// generated',
-      outputPath: '/project/src/AppContext.generated.ts',
+      outputPath: '/project/src/__generated__/context.ts',
       components: Array.from({ length: componentCount }, (_, i) => ({
         id: `Component${i}`,
       })),
@@ -89,7 +89,7 @@ describe('diPlugin', () => {
       await plugin.buildStart();
       expect(mockRunRebuild).toHaveBeenCalledWith({
         tsConfigPath: path.resolve('/my/root', 'tsconfig.json'),
-        outputPath: path.resolve('/my/root', 'src/AppContext.generated.ts'),
+        outputPath: path.resolve('/my/root', 'src/__generated__/context.ts'),
         include: undefined,
         debounceMs: 100,
         plugins: [],
@@ -175,16 +175,25 @@ describe('diPlugin', () => {
       expect(mockRunRebuild).not.toHaveBeenCalled();
     });
 
-    it('ignores the generated output file', async () => {
+    it('ignores files inside the __generated__/ directory', async () => {
       const plugin = setupPlugin(undefined, '/project');
 
-      const outputPath = path.resolve(
+      // The main context file
+      const contextPath = path.resolve(
         '/project',
-        'src/AppContext.generated.ts',
+        'src/__generated__/context.ts',
       );
-      plugin.handleHotUpdate(makeHmrContext(outputPath));
+      plugin.handleHotUpdate(makeHmrContext(contextPath));
       await vi.advanceTimersByTimeAsync(200);
+      expect(mockRunRebuild).not.toHaveBeenCalled();
 
+      // Any other file in __generated__/
+      const otherGenerated = path.resolve(
+        '/project',
+        'src/__generated__/routes.ts',
+      );
+      plugin.handleHotUpdate(makeHmrContext(otherGenerated));
+      await vi.advanceTimersByTimeAsync(200);
       expect(mockRunRebuild).not.toHaveBeenCalled();
     });
 

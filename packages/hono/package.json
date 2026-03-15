@@ -21,7 +21,8 @@
     }
   },
   "goodie": {
-    "components": "dist/components.json"
+    "components": "dist/components.json",
+    "plugin": "dist/hono-plugin.js"
   },
   "scripts": {
     "build": "tsc && goodie generate --mode library",

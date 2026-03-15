@@ -1,3 +1,3 @@
-import { app } from './AppContext.generated.js';
+import { app } from './__generated__/context.js';
 
 await app.start();

@@ -22,7 +22,7 @@ export const generate = defineCommand({
     output: {
       type: 'string',
       description: 'Output file path',
-      default: 'src/AppContext.generated.ts',
+      default: 'src/__generated__/context.ts',
     },
     mode: {
       type: 'string',

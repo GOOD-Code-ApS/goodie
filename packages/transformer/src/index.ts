@@ -60,6 +60,8 @@ export {
 // Options
 export type {
   ClassVisitorContext,
+  EmitFilesContext,
+  EmittedFile,
   MethodVisitorContext,
   TransformerPlugin,
   TransformLibraryOptions,

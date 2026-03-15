@@ -14,7 +14,7 @@ function createTestProject(files: Record<string, string>) {
     project.createSourceFile(filePath, content);
   }
 
-  return transformInMemory(project, '/out/AppContext.generated.ts');
+  return transformInMemory(project, '/out/__generated__/context.ts');
 }
 
 describe('Conditional Plugin — Metadata Recording', () => {

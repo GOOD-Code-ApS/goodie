@@ -5,7 +5,7 @@ import type { TransformerPlugin } from '@goodie-ts/transformer';
 export interface DiPluginOptions {
   /** Path to tsconfig.json (relative to Vite root or absolute). Defaults to `"tsconfig.json"`. */
   tsConfigPath?: string;
-  /** Path for the generated output file (relative to Vite root or absolute). Defaults to `"src/AppContext.generated.ts"`. */
+  /** Path for the generated output file (relative to Vite root or absolute). Defaults to `"src/__generated__/context.ts"`. */
   outputPath?: string;
   /** Source file globs to scan. Passed through to the transformer. */
   include?: string[];
@@ -37,7 +37,7 @@ export interface ResolvedOptions {
 }
 
 const DEFAULT_TSCONFIG = 'tsconfig.json';
-const DEFAULT_OUTPUT = 'src/AppContext.generated.ts';
+const DEFAULT_OUTPUT = 'src/__generated__/context.ts';
 const DEFAULT_DEBOUNCE_MS = 100;
 
 /** Resolve user options against the Vite project root, applying defaults. */

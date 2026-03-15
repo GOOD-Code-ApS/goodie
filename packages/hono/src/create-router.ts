@@ -2,6 +2,7 @@ import type { ApplicationContext, ComponentDefinition } from '@goodie-ts/core';
 import {
   type ControllerMetadata,
   ExceptionHandler,
+  getGeneratedRouteWirer,
   type HttpContext,
   type HttpMethod,
   handleException,
@@ -21,13 +22,11 @@ import {
 import { ServerConfig } from './server-config.js';
 
 /**
- * Create a Hono router from the ApplicationContext at runtime.
+ * Create a Hono router from the ApplicationContext.
  *
- * Reads `metadata.httpController` from component definitions, resolves
- * controller instances from the DI container, and wires Hono routes.
- *
- * This replaces compile-time code generation — the adapter is real
- * runtime code, not assembled strings.
+ * When compile-time generated routes are registered (via `registerGeneratedRoutes`
+ * from `@goodie-ts/http`), uses the pre-compiled route wiring. Otherwise falls
+ * back to runtime metadata interpretation for backward compatibility.
  */
 export function createHonoRouter(ctx: ApplicationContext): Hono {
   const definitions = ctx.getDefinitions();
@@ -58,7 +57,27 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
     router.use('*', securityMiddleware);
   }
 
-  // Wire controllers
+  // Wire controllers — compile-time generated or runtime fallback
+  const generatedWirer = getGeneratedRouteWirer<Hono>();
+  if (generatedWirer) {
+    generatedWirer(ctx, router, exceptionHandlers);
+  } else {
+    wireRuntimeRoutes(ctx, router, definitions, exceptionHandlers);
+  }
+
+  return router;
+}
+
+/**
+ * Runtime route wiring — interprets `metadata.httpController` at runtime.
+ * Used as fallback when compile-time generated routes are not available.
+ */
+function wireRuntimeRoutes(
+  ctx: ApplicationContext,
+  router: Hono,
+  definitions: readonly ComponentDefinition[],
+  exceptionHandlers: ExceptionHandler[],
+): void {
   for (const def of definitions) {
     const httpCtrl = def.metadata.httpController as
       | ControllerMetadata
@@ -73,8 +92,6 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
     );
     router.route(httpCtrl.basePath, subRouter);
   }
-
-  return router;
 }
 
 function createControllerRouter(

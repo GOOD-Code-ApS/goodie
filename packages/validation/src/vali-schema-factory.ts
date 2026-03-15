@@ -16,6 +16,34 @@ import { customConstraintRegistry } from './decorators/create-constraint.js';
  */
 @Singleton()
 export class ValiSchemaFactory {
+  /**
+   * Static registry for compile-time pre-built schemas.
+   * Populated by generated `schemas.ts` at module load time (before DI resolves).
+   * Instance `getSchema()` checks this before falling back to lazy building.
+   */
+  private static readonly prebuilt = new Map<
+    new (
+      ...args: any[]
+    ) => unknown,
+    GenericSchema
+  >();
+
+  /**
+   * Register a pre-built Valibot schema for a type.
+   * Called from generated `schemas.ts` at module load time.
+   */
+  static registerSchema(
+    type: new (...args: any[]) => unknown,
+    schema: GenericSchema,
+  ): void {
+    ValiSchemaFactory.prebuilt.set(type, schema);
+  }
+
+  /** Reset the static schema registry. For testing only. */
+  static resetSchemas(): void {
+    ValiSchemaFactory.prebuilt.clear();
+  }
+
   private readonly cache = new Map<
     new (
       ...args: any[]
@@ -23,16 +51,21 @@ export class ValiSchemaFactory {
     GenericSchema
   >();
 
-  /** Clear the schema cache. Useful in tests after `MetadataRegistry.reset()`. */
+  /** Clear the instance schema cache. Useful in tests after `MetadataRegistry.reset()`. */
   clearCache(): void {
     this.cache.clear();
   }
 
   /**
    * Get or build a Valibot schema for the given class constructor.
+   * Checks pre-built schemas first, then instance cache, then lazy-builds.
    * Returns `undefined` if the type is not in `MetadataRegistry`.
    */
   getSchema(type: new (...args: any[]) => unknown): GenericSchema | undefined {
+    // Pre-built from compile-time generated schemas.ts
+    const prebuilt = ValiSchemaFactory.prebuilt.get(type);
+    if (prebuilt) return prebuilt;
+
     const cached = this.cache.get(type);
     if (cached) return cached;
 
@@ -55,14 +88,37 @@ export class ValiSchemaFactory {
 
     const fields: Record<string, GenericSchema> = {};
     for (const field of metadata.fields) {
-      let schema = this.fieldTypeToVali(field.type);
-      schema = this.applyConstraints(schema, field.decorators);
-      fields[field.name] = schema;
+      fields[field.name] = this.buildFieldSchema(field.type, field.decorators);
     }
 
     const objectSchema = v.object(fields);
     this.cache.set(type, objectSchema as GenericSchema);
     return objectSchema as GenericSchema;
+  }
+
+  /**
+   * Build the complete schema for a field, applying constraints to the inner
+   * type BEFORE wrapping with optional/nullable.
+   */
+  private buildFieldSchema(
+    type: FieldType,
+    decorators: DecoratorMeta[],
+  ): GenericSchema {
+    if (type.kind === 'optional') {
+      const inner = this.applyConstraints(
+        this.fieldTypeToVali(type.inner),
+        decorators,
+      );
+      return v.optional(inner) as GenericSchema;
+    }
+    if (type.kind === 'nullable') {
+      const inner = this.applyConstraints(
+        this.fieldTypeToVali(type.inner),
+        decorators,
+      );
+      return v.nullable(inner) as GenericSchema;
+    }
+    return this.applyConstraints(this.fieldTypeToVali(type), decorators);
   }
 
   private fieldTypeToVali(type: FieldType): GenericSchema {

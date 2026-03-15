@@ -27,7 +27,7 @@ const mockLogOutcome = vi.mocked(logOutcome);
 
 const defaultOptions = {
   tsConfigPath: '/project/tsconfig.json',
-  outputPath: '/project/src/AppContext.generated.ts',
+  outputPath: '/project/src/__generated__/context.ts',
   watchDir: '/project/src',
   debounceMs: 50,
 };
@@ -97,12 +97,15 @@ describe('watchAndRebuild', () => {
     expect(mockRunTransform).not.toHaveBeenCalled();
   });
 
-  it('ignores the generated output file', async () => {
+  it('ignores files inside the __generated__/ directory', async () => {
     watchAndRebuild(defaultOptions);
 
-    triggerWatch('AppContext.generated.ts');
+    triggerWatch('__generated__/context.ts');
     await vi.advanceTimersByTimeAsync(100);
+    expect(mockRunTransform).not.toHaveBeenCalled();
 
+    triggerWatch('__generated__/routes.ts');
+    await vi.advanceTimersByTimeAsync(100);
     expect(mockRunTransform).not.toHaveBeenCalled();
   });
 

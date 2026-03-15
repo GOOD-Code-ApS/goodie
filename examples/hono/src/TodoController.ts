@@ -7,7 +7,6 @@ import {
   Response,
   Status,
 } from '@goodie-ts/http';
-import { Validated } from '@goodie-ts/validation';
 import type { CreateTodoDto, UpdateTodoDto } from './dto.js';
 import type { TodoService } from './TodoService.js';
 
@@ -28,7 +27,6 @@ export class TodoController {
     return Response.ok(todo);
   }
 
-  @Validated()
   @Status(201)
   @Post('/')
   async create(body: CreateTodoDto) {
@@ -36,7 +34,6 @@ export class TodoController {
     return todo;
   }
 
-  @Validated()
   @Patch('/:id')
   async update(id: string, body: UpdateTodoDto) {
     const todo = await this.todoService.update(id, body);

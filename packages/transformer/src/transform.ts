@@ -13,6 +13,7 @@ import { createConditionalPlugin } from './builtin-conditional-plugin.js';
 import { createConfigPlugin } from './builtin-config-plugin.js';
 import { createIntrospectionPlugin } from './builtin-introspection-plugin.js';
 import {
+  buildGeneratedHeader,
   computeIRHash,
   extractIRHash,
   generateCode,
@@ -32,6 +33,7 @@ import {
   serializeComponents,
 } from './library-components.js';
 import type {
+  EmittedFile,
   TransformerPlugin,
   TransformLibraryOptions,
   TransformLibraryResult,
@@ -228,6 +230,15 @@ export async function transform(
   // 10. Extract type registrations from plugin metadata
   const typeRegistrations = extractTypeRegistrations(scanResult.pluginMetadata);
 
+  // 10b. Collect emitted files from plugins
+  const outputDir = path.dirname(options.outputPath);
+  const emittedFiles = collectEmittedFiles(
+    activePlugins,
+    finalComponents,
+    outputDir,
+    typeRegistrations,
+  );
+
   // 11. Check IR hash — skip codegen + write if DI graph unchanged
   const codegenOptions = {
     outputPath: options.outputPath,
@@ -239,6 +250,7 @@ export async function transform(
     finalComponents,
     codegenOptions,
     typeRegistrations,
+    emittedFiles,
   );
 
   let existingHash: string | undefined;
@@ -259,25 +271,37 @@ export async function transform(
       warnings: graphResult.warnings,
       skipped: true,
       discoveryCache: discovery,
+      emittedFiles,
     };
   }
 
-  // 11. Generate code (pass pre-computed hash to avoid recomputation)
-  const code = generateCode(
-    finalComponents,
-    { ...codegenOptions, hash: currentHash },
-    typeRegistrations,
-  );
+  // 12. Generate code (pass pre-computed hash to avoid recomputation)
+  const emittedFilePaths = emittedFiles.map((f) => f.relativePath);
+  const generatedHeader = buildGeneratedHeader(PKG_VERSION, currentHash);
+  const code =
+    generatedHeader +
+    generateCode(
+      finalComponents,
+      { ...codegenOptions, hash: currentHash },
+      typeRegistrations,
+      emittedFilePaths.length > 0 ? emittedFilePaths : undefined,
+    );
 
-  // 11b. Debug output
+  // 12b. Debug output
   if (process.env.GOODIE_DEBUG === 'true') {
     printDebugInfo(finalComponents, activePlugins);
   }
 
-  // 12. Write output
-  const outputDir = path.dirname(options.outputPath);
+  // 13. Write output
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(options.outputPath, code, 'utf-8');
+
+  // 13b. Write emitted files
+  for (const file of emittedFiles) {
+    const filePath = path.join(outputDir, file.relativePath);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, generatedHeader + file.content, 'utf-8');
+  }
 
   return {
     code,
@@ -285,6 +309,7 @@ export async function transform(
     components: finalComponents,
     warnings: graphResult.warnings,
     discoveryCache: discovery,
+    emittedFiles,
   };
 }
 
@@ -376,24 +401,49 @@ export function transformInMemory(
   // 8. Extract type registrations from plugin metadata
   const typeRegistrations = extractTypeRegistrations(scanResult.pluginMetadata);
 
-  // 9. Generate code
-  const code = generateCode(
+  // 8b. Collect emitted files from plugins
+  const emittedFiles = collectEmittedFiles(
+    activePlugins,
     finalComponents,
-    {
-      outputPath,
-      version: PKG_VERSION,
-      ...(options?.inlinedConfig
-        ? { inlinedConfig: options.inlinedConfig }
-        : {}),
-    },
+    path.dirname(outputPath),
     typeRegistrations,
   );
+
+  // 9. Generate code
+  const emittedFilePaths = emittedFiles.map((f) => f.relativePath);
+  const codegenOpts = {
+    outputPath,
+    version: PKG_VERSION,
+    ...(options?.inlinedConfig ? { inlinedConfig: options.inlinedConfig } : {}),
+  };
+  const hash = computeIRHash(
+    finalComponents,
+    codegenOpts,
+    typeRegistrations,
+    emittedFiles.length > 0 ? emittedFiles : undefined,
+  );
+  const generatedHeader = buildGeneratedHeader(PKG_VERSION, hash);
+  const code =
+    generatedHeader +
+    generateCode(
+      finalComponents,
+      { ...codegenOpts, hash },
+      typeRegistrations,
+      emittedFilePaths.length > 0 ? emittedFilePaths : undefined,
+    );
 
   return {
     code,
     outputPath,
     components: finalComponents,
     warnings: graphResult.warnings,
+    emittedFiles:
+      emittedFiles.length > 0
+        ? emittedFiles.map((f) => ({
+            ...f,
+            content: generatedHeader + f.content,
+          }))
+        : undefined,
   };
 }
 
@@ -805,4 +855,54 @@ function flattenObject(
     }
   }
   return result;
+}
+
+/**
+ * Run `emitFiles` hooks on all active plugins.
+ *
+ * Creates a temporary ts-morph Project so plugins can use `ctx.createSourceFile()`
+ * for type-safe code generation. Collects the resulting source files as `EmittedFile[]`.
+ */
+function collectEmittedFiles(
+  plugins: TransformerPlugin[],
+  components: IRComponentDefinition[],
+  outputDir: string,
+  typeRegistrations: TypeRegistration[],
+): EmittedFile[] {
+  const hasEmitHook = plugins.some((p) => p.emitFiles);
+  if (!hasEmitHook) return [];
+
+  // Temporary in-memory project for plugin-created source files
+  const emitProject = new Project({ useInMemoryFileSystem: true });
+  const createdFiles: {
+    relativePath: string;
+    sourceFile: import('ts-morph').SourceFile;
+  }[] = [];
+
+  const context = {
+    components,
+    typeRegistrations,
+    relativeImport(absolutePath: string): string {
+      // Bare specifiers (e.g. '@goodie-ts/health') are already valid — pass through
+      if (!absolutePath.startsWith('/')) return absolutePath;
+      const rel = path.relative(outputDir, absolutePath);
+      return (rel.startsWith('.') ? rel : `./${rel}`).replace(/\.tsx?$/, '.js');
+    },
+    createSourceFile(relativePath: string) {
+      const sf = emitProject.createSourceFile(relativePath, '');
+      createdFiles.push({ relativePath, sourceFile: sf });
+      return sf;
+    },
+  };
+
+  for (const plugin of plugins) {
+    if (plugin.emitFiles) {
+      runPluginHook(plugin.name, 'emitFiles', () => plugin.emitFiles!(context));
+    }
+  }
+
+  return createdFiles.map(({ relativePath, sourceFile }) => ({
+    relativePath,
+    content: sourceFile.getFullText(),
+  }));
 }

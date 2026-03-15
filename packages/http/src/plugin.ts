@@ -219,11 +219,24 @@ export default function createHttpPlugin(): TransformerPlugin {
         }
 
         hasBodyParam = true;
+
+        // Resolve import path for the body type class (used by adapter plugins)
+        let typeImportPath: string | undefined;
+        const bodyType = param.getType();
+        const typeSymbol = bodyType.getSymbol() ?? bodyType.getAliasSymbol();
+        if (typeSymbol) {
+          const decls = typeSymbol.getDeclarations();
+          if (decls.length > 0) {
+            typeImportPath = decls[0].getSourceFile().getFilePath();
+          }
+        }
+
         params.push({
           name: paramName,
           binding: 'body',
           typeName,
           optional: isOptional,
+          typeImportPath,
         });
       }
 

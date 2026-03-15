@@ -44,10 +44,10 @@ export function diPlugin(userOptions?: DiPluginOptions): Plugin {
       // Only process .ts files
       if (!filePath.endsWith('.ts')) return;
 
-      // Skip the generated output file to prevent infinite loops
-      const normalizedOutput = path.normalize(resolved.outputPath);
+      // Skip files inside the __generated__/ directory to prevent infinite loops
+      const generatedDir = path.normalize(path.dirname(resolved.outputPath));
       const normalizedFile = path.normalize(filePath);
-      if (normalizedFile === normalizedOutput) return;
+      if (normalizedFile.startsWith(generatedDir + path.sep)) return;
 
       // Debounced rebuild
       if (debounceTimer !== undefined) {
