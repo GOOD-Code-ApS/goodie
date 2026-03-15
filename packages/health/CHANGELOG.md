@@ -1,5 +1,12 @@
 # @goodie-ts/health
 
+## 2.0.0
+
+### Major Changes
+
+- eb93812: Add `@goodie-ts/management` package with `/health`, `/info`, and `/beans` management endpoints. Health controller is now a library bean in the health package.
+- eb93812: Rename Java-isms to TS-native terminology. `BeanDefinition` → `ComponentDefinition`, `@Bean` → `@Component`, `getBean()` → `get()`, `getAll()` replaces bean collection methods, and similar renames throughout the API surface. This is a breaking change for all packages.
+
 ## 1.0.0
 
 ### Major Changes

@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/health",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Health check indicators and aggregation for goodie-ts",
   "license": "MIT",
   "type": "module",
