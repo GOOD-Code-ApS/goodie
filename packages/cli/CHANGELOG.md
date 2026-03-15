@@ -1,5 +1,20 @@
 # @goodie-ts/cli
 
+## 2.0.0
+
+### Major Changes
+
+- eb93812: Rename Java-isms to TS-native terminology. `BeanDefinition` → `ComponentDefinition`, `@Bean` → `@Component`, `getBean()` → `get()`, `getAll()` replaces bean collection methods, and similar renames throughout the API surface. This is a breaking change for all packages.
+- eb93812: Unified `__generated__/` folder replaces per-package generated files. All generated code now lives in a single `__generated__/` directory with compile-time body validation for HTTP request types.
+
+### Patch Changes
+
+- Updated dependencies [eb93812]
+- Updated dependencies [eb93812]
+- Updated dependencies [eb93812]
+- Updated dependencies [eb93812]
+  - @goodie-ts/transformer@2.0.0
+
 ## 1.0.0
 
 ### Major Changes

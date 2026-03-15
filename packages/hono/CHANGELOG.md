@@ -1,5 +1,13 @@
 # @goodie-ts/hono
 
+## 2.0.0
+
+### Major Changes
+
+- eb93812: Extract `@goodie-ts/http` as an abstract HTTP package from `@goodie-ts/hono`. Route decorators (`@Controller`, `@Get`, `@Post`, etc.), `Request<T>`, `Response<T>`, `RouteMetadata`, and `ExceptionHandler` now live in the framework-agnostic `@goodie-ts/http` package. `@goodie-ts/hono` is now a thin adapter layer.
+- eb93812: Rename Java-isms to TS-native terminology. `BeanDefinition` → `ComponentDefinition`, `@Bean` → `@Component`, `getBean()` → `get()`, `getAll()` replaces bean collection methods, and similar renames throughout the API surface. This is a breaking change for all packages.
+- eb93812: Unified `__generated__/` folder replaces per-package generated files. All generated code now lives in a single `__generated__/` directory with compile-time body validation for HTTP request types.
+
 ## 1.0.0
 
 ### Major Changes
