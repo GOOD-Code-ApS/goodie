@@ -9,9 +9,13 @@ export {
   Pattern,
   Size,
 } from './decorators/constraints.js';
-export { createConstraint } from './decorators/create-constraint.js';
+export {
+  createConstraint,
+  customConstraintRegistry,
+} from './decorators/create-constraint.js';
 // AOP decorator
 export { Validated } from './decorators/validated.js';
+export { ValiBodyValidator } from './vali-body-validator.js';
 export { ValiExceptionHandler } from './vali-exception-handler.js';
 // Runtime components
 export { ValiSchemaFactory } from './vali-schema-factory.js';

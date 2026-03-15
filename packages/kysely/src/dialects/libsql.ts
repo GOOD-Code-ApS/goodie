@@ -1,6 +1,7 @@
 import {
   ConditionalOnProperty,
   Config,
+  Eager,
   OnDestroy,
   OnInit,
   Singleton,
@@ -20,6 +21,7 @@ export class LibsqlDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'libsql' })
 export class LibsqlKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;

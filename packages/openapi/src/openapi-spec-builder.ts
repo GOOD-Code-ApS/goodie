@@ -279,7 +279,10 @@ export class OpenApiSpecBuilder {
           items: this.fieldTypeToSchema(type.elementType, schemaNames),
         };
       case 'reference': {
-        const metadata = this.findMetadataByName(type.className);
+        const metadata = this.findMetadataByName(
+          type.className,
+          type.importPath,
+        );
         if (metadata) {
           schemaNames.add(type.className);
           return { $ref: `#/components/schemas/${type.className}` };
@@ -344,9 +347,30 @@ export class OpenApiSpecBuilder {
     }
   }
 
-  private findMetadataByName(className: string): TypeMetadata | undefined {
-    return MetadataRegistry.INSTANCE.getAll().find(
-      (m) => m.className === className,
+  private metadataByImportPath: Map<string, TypeMetadata> | undefined;
+  private metadataByName: Map<string, TypeMetadata> | undefined;
+
+  private buildMetadataLookups(): void {
+    this.metadataByImportPath = new Map();
+    this.metadataByName = new Map();
+    for (const m of MetadataRegistry.INSTANCE.getAll()) {
+      if (m.importPath) {
+        this.metadataByImportPath.set(m.importPath, m);
+      }
+      if (!this.metadataByName.has(m.className)) {
+        this.metadataByName.set(m.className, m);
+      }
+    }
+  }
+
+  private findMetadataByName(
+    className: string,
+    importPath?: string,
+  ): TypeMetadata | undefined {
+    if (!this.metadataByName) this.buildMetadataLookups();
+    return (
+      (importPath && this.metadataByImportPath!.get(importPath)) ||
+      this.metadataByName!.get(className)
     );
   }
 }

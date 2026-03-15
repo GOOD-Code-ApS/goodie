@@ -18,7 +18,7 @@ const mockTransform = vi.mocked(transform);
 
 const defaultOptions: ResolvedOptions = {
   tsConfigPath: '/project/tsconfig.json',
-  outputPath: '/project/src/AppContext.generated.ts',
+  outputPath: '/project/src/__generated__/context.ts',
   include: undefined,
   debounceMs: 100,
   plugins: [],
@@ -58,7 +58,7 @@ describe('runRebuild', () => {
 
     expect(mockTransform).toHaveBeenCalledWith({
       tsConfigFilePath: '/project/tsconfig.json',
-      outputPath: '/project/src/AppContext.generated.ts',
+      outputPath: '/project/src/__generated__/context.ts',
       include: ['src/**/*.ts'],
       plugins: [],
     });

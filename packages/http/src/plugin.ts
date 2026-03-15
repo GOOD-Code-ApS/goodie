@@ -219,11 +219,24 @@ export default function createHttpPlugin(): TransformerPlugin {
         }
 
         hasBodyParam = true;
+
+        // Resolve import path for the body type class (used by adapter plugins)
+        let typeImportPath: string | undefined;
+        const bodyType = param.getType();
+        const typeSymbol = bodyType.getSymbol() ?? bodyType.getAliasSymbol();
+        if (typeSymbol) {
+          const decls = typeSymbol.getDeclarations();
+          if (decls.length > 0) {
+            typeImportPath = decls[0].getSourceFile().getFilePath();
+          }
+        }
+
         params.push({
           name: paramName,
           binding: 'body',
           typeName,
           optional: isOptional,
+          typeImportPath,
         });
       }
 
@@ -279,12 +292,36 @@ function extractStatus(
   }
 
   const args = statusDecs[0].getArguments();
-  if (args.length > 0) {
-    const code = Number.parseInt(args[0].getText(), 10);
-    if (!Number.isNaN(code)) return code;
+  if (args.length === 0) {
+    const sourceFile = ctx.methodDeclaration.getSourceFile();
+    const dec = statusDecs[0];
+    throw new InvalidDecoratorUsageError(
+      'Status',
+      `${ctx.className}.${ctx.methodName}: @Status requires a numeric HTTP status code argument, e.g. @Status(201)`,
+      {
+        filePath: sourceFile.getFilePath(),
+        line: dec.getStartLineNumber(),
+        column: dec.getStart() - dec.getStartLineNumber() + 1,
+      },
+    );
   }
 
-  return 200;
+  const code = Number.parseInt(args[0].getText(), 10);
+  if (Number.isNaN(code) || code < 100 || code > 599) {
+    const sourceFile = ctx.methodDeclaration.getSourceFile();
+    const dec = statusDecs[0];
+    throw new InvalidDecoratorUsageError(
+      'Status',
+      `${ctx.className}.${ctx.methodName}: @Status value must be a valid HTTP status code (100-599), got '${args[0].getText()}'`,
+      {
+        filePath: sourceFile.getFilePath(),
+        line: dec.getStartLineNumber(),
+        column: dec.getStart() - dec.getStartLineNumber() + 1,
+      },
+    );
+  }
+
+  return code;
 }
 
 /** Extract path variable names from a route path (e.g. '/:id/:slug' → Set{'id', 'slug'}). */

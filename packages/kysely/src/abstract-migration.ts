@@ -4,8 +4,8 @@ import type { Kysely } from 'kysely';
  * Abstract base class for Kysely migrations.
  *
  * Extend this class and decorate with `@Migration('name')` to define a
- * migration that is auto-discovered and executed by the MigrationRunner
- * at application startup.
+ * migration that is auto-discovered and executed by the MigrationPostProcessor
+ * when KyselyDatabase is initialized.
  *
  * @example
  * ```typescript

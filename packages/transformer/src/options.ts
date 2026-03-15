@@ -1,5 +1,5 @@
 import type { Scope } from '@goodie-ts/core';
-import type { ClassDeclaration, MethodDeclaration } from 'ts-morph';
+import type { ClassDeclaration, MethodDeclaration, SourceFile } from 'ts-morph';
 import type { IRComponentDefinition, IRDecoratorEntry } from './ir.js';
 
 /** Options for the compile-time transform pipeline. */
@@ -93,6 +93,8 @@ export interface TransformResult {
   skipped?: boolean;
   /** Discovery result that can be passed as `discoveryCache` on subsequent runs. */
   discoveryCache?: import('./discover-plugins.js').DiscoverAllResult;
+  /** Additional files emitted by plugins to the __generated__/ directory. */
+  emittedFiles?: EmittedFile[];
 }
 
 /** Context passed to visitClass hook. */
@@ -186,4 +188,59 @@ export interface TransformerPlugin {
    * already present in the component list, or are self-contained (no dependencies).
    */
   beforeCodegen?(components: IRComponentDefinition[]): IRComponentDefinition[];
+
+  /**
+   * Emit additional generated files alongside the main context.ts.
+   * Runs after `beforeCodegen` when the final component set is known.
+   *
+   * Use `ctx.createSourceFile(relativePath)` to create ts-morph `SourceFile` instances.
+   * Each created file is written to the `__generated__/` directory.
+   * Files are included in the IR hash — if no inputs change, no files are rewritten.
+   *
+   * This hook is **app-build only** — it runs during `transform()` (vite-plugin, CLI)
+   * but not during `transformLibrary()`.
+   *
+   * Use this to generate adapter-specific code (route wiring, validation schemas,
+   * migration sequencing) that depends on the consumer's application components.
+   */
+  emitFiles?(context: EmitFilesContext): void;
+}
+
+/** Context passed to the emitFiles hook. */
+export interface EmitFilesContext {
+  /** The final set of components (after graph building + beforeCodegen). */
+  components: IRComponentDefinition[];
+  /**
+   * Type registrations for `@Introspected` classes.
+   * Each entry contains the class name, import path, and serialized field metadata
+   * (field types + decorator metadata). Matches what codegen emits as
+   * `MetadataRegistry.INSTANCE.register(...)` calls.
+   */
+  typeRegistrations: ReadonlyArray<{
+    className: string;
+    importPath: string;
+    fields: unknown[];
+  }>;
+  /**
+   * Compute a relative import path from the __generated__/ directory to a source file.
+   * Handles `.ts` → `.js` extension rewriting.
+   */
+  relativeImport(absolutePath: string): string;
+  /**
+   * Create a ts-morph `SourceFile` that will be written to `__generated__/<relativePath>`.
+   * Returns a `SourceFile` that the plugin can manipulate using the full ts-morph API
+   * (add imports, classes, functions, statements, etc.).
+   *
+   * @param relativePath - Filename relative to __generated__/ (e.g. 'routes.ts')
+   * @returns A ts-morph SourceFile for type-safe code generation
+   */
+  createSourceFile(relativePath: string): SourceFile;
+}
+
+/** A file emitted by a plugin to the __generated__/ directory. */
+export interface EmittedFile {
+  /** Filename relative to __generated__/ (e.g. 'routes.ts'). */
+  relativePath: string;
+  /** The generated TypeScript source content. */
+  content: string;
 }

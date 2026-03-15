@@ -2,13 +2,15 @@ import type { ApplicationContext, ComponentDefinition } from '@goodie-ts/core';
 import {
   type ControllerMetadata,
   ExceptionHandler,
-  type HttpContext,
+  filterMatchesPath,
+  getGeneratedRouteWirer,
   type HttpMethod,
+  HttpServerFilter,
   handleException,
   MappedException,
   type ParamMetadata,
 } from '@goodie-ts/http';
-import type { Context, Next } from 'hono';
+import type { Context } from 'hono';
 import { Hono } from 'hono';
 
 import {
@@ -21,13 +23,11 @@ import {
 import { ServerConfig } from './server-config.js';
 
 /**
- * Create a Hono router from the ApplicationContext at runtime.
+ * Create a Hono router from the ApplicationContext.
  *
- * Reads `metadata.httpController` from component definitions, resolves
- * controller instances from the DI container, and wires Hono routes.
- *
- * This replaces compile-time code generation — the adapter is real
- * runtime code, not assembled strings.
+ * When compile-time generated routes are registered (via `registerGeneratedRoutes`
+ * from `@goodie-ts/http`), uses the pre-compiled route wiring. Otherwise falls
+ * back to runtime metadata interpretation for backward compatibility.
  */
 export function createHonoRouter(ctx: ApplicationContext): Hono {
   const definitions = ctx.getDefinitions();
@@ -52,13 +52,40 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
     router.use('*', corsMiddleware(serverConfig.cors));
   }
 
-  // Security middleware — discover SecurityProvider components via convention
-  const securityMiddleware = buildSecurityMiddleware(ctx, definitions);
-  if (securityMiddleware) {
-    router.use('*', securityMiddleware);
+  // HttpServerFilter middleware — getAll() returns sorted by @Order(), with path pattern matching
+  const filters = ctx.getAll(HttpServerFilter);
+  for (const filter of filters) {
+    router.use('*', async (c, next) => {
+      const path = new URL(c.req.url).pathname;
+      if (filterMatchesPath(filter, path)) {
+        await filter.doFilter(buildHttpContext(c), next);
+      } else {
+        await next();
+      }
+    });
   }
 
-  // Wire controllers
+  // Wire controllers — compile-time generated or runtime fallback
+  const generatedWirer = getGeneratedRouteWirer<Hono>();
+  if (generatedWirer) {
+    generatedWirer(ctx, router, exceptionHandlers);
+  } else {
+    wireRuntimeRoutes(ctx, router, definitions, exceptionHandlers);
+  }
+
+  return router;
+}
+
+/**
+ * Runtime route wiring — interprets `metadata.httpController` at runtime.
+ * Used as fallback when compile-time generated routes are not available.
+ */
+function wireRuntimeRoutes(
+  ctx: ApplicationContext,
+  router: Hono,
+  definitions: readonly ComponentDefinition[],
+  exceptionHandlers: ExceptionHandler[],
+): void {
   for (const def of definitions) {
     const httpCtrl = def.metadata.httpController as
       | ControllerMetadata
@@ -73,8 +100,6 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
     );
     router.route(httpCtrl.basePath, subRouter);
   }
-
-  return router;
 }
 
 function createControllerRouter(
@@ -179,82 +204,4 @@ function resolveServerConfig(
   } catch {
     return undefined;
   }
-}
-
-/** Duck-typed security middleware from @goodie-ts/security. */
-type SecurityMiddlewareFn = (
-  request: HttpContext,
-  next: () => Promise<unknown>,
-) => Promise<unknown>;
-
-type CreateSecurityMiddlewareFn = (
-  providers: unknown[],
-) => SecurityMiddlewareFn;
-
-/**
- * Discover SecurityProvider components and build Hono security middleware.
- *
- * Uses convention-based discovery: finds components with baseTokens whose
- * constructor name is 'SecurityProvider'. No direct dependency on
- * @goodie-ts/security — the adapter uses duck typing.
- *
- * Delegates to `createSecurityMiddleware()` from @goodie-ts/security
- * (dynamically imported) for the actual auth pipeline. This avoids
- * duplicating authentication logic.
- */
-function buildSecurityMiddleware(
-  ctx: ApplicationContext,
-  definitions: readonly ComponentDefinition[],
-): ((c: Context, next: Next) => Promise<void>) | undefined {
-  const providerBaseToken = findBaseTokenByName(
-    definitions,
-    'SecurityProvider',
-  );
-  if (!providerBaseToken) return undefined;
-
-  const providers = ctx.getAll(providerBaseToken);
-  if (providers.length === 0) return undefined;
-
-  // Lazy-load createSecurityMiddleware — resolved on first request
-  let securityMw: SecurityMiddlewareFn | false | undefined;
-
-  return async (c: Context, next: Next) => {
-    // Lazy-resolve createSecurityMiddleware on first request
-    if (securityMw === undefined) {
-      try {
-        // Dynamic import — @goodie-ts/security is an optional peer dep.
-        // Use variable to prevent TypeScript from resolving the module.
-        const securityPkg = '@goodie-ts/security';
-        const mod = await import(/* @vite-ignore */ securityPkg);
-        const factory = (
-          mod as { createSecurityMiddleware?: CreateSecurityMiddlewareFn }
-        ).createSecurityMiddleware;
-        securityMw = factory ? factory(providers) : false;
-      } catch {
-        securityMw = false;
-      }
-    }
-
-    if (securityMw) {
-      await securityMw(buildHttpContext(c), next);
-    } else {
-      await next();
-    }
-  };
-}
-
-function findBaseTokenByName(
-  definitions: readonly ComponentDefinition[],
-  className: string,
-): ComponentDefinition['token'] | undefined {
-  for (const def of definitions) {
-    if (def.baseTokens) {
-      for (const baseToken of def.baseTokens) {
-        if (typeof baseToken === 'function' && baseToken.name === className) {
-          return baseToken as ComponentDefinition['token'];
-        }
-      }
-    }
-  }
-  return undefined;
 }

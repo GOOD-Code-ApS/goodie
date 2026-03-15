@@ -290,7 +290,13 @@ describe('HTTP Plugin', () => {
     };
     expect(httpController.routes[0].params).toEqual([
       { name: 'id', binding: 'path', typeName: 'string', optional: false },
-      { name: 'body', binding: 'body', typeName: 'UpdateDto', optional: false },
+      {
+        name: 'body',
+        binding: 'body',
+        typeName: 'UpdateDto',
+        optional: false,
+        typeImportPath: '/src/Ctrl.ts',
+      },
     ]);
   });
 
@@ -379,6 +385,7 @@ describe('HTTP Plugin', () => {
         binding: 'body',
         typeName: 'TodoDto[]',
         optional: false,
+        typeImportPath: expect.any(String),
       },
     ]);
   });

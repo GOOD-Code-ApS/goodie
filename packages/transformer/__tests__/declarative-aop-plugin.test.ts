@@ -169,7 +169,7 @@ const LOGGING_MAPPINGS: ResolvedAopMapping[] = [
   },
 ];
 
-const LOGGING_LIBRARY_BEANS: IRComponentDefinition[] = [
+const LOGGING_LIBRARY_COMPONENTS: IRComponentDefinition[] = [
   {
     tokenRef: {
       kind: 'class',
@@ -205,7 +205,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
       LOGGING_MAPPINGS,
     );
 
@@ -233,7 +233,7 @@ describe('Declarative AOP Plugin — Integration', () => {
       project,
       '/out/AppContext.generated.ts',
       [],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
       LOGGING_MAPPINGS,
     );
 
@@ -264,13 +264,13 @@ describe('Declarative AOP Plugin — Integration', () => {
       makeProject(),
       '/out/gen.ts',
       [plugin],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
     );
     const result2 = transformInMemory(
       makeProject(),
       '/out/gen.ts',
       [plugin],
-      LOGGING_LIBRARY_BEANS,
+      LOGGING_LIBRARY_COMPONENTS,
     );
 
     const stripTimestamp = (code: string) =>
@@ -293,7 +293,7 @@ describe('Declarative AOP Plugin — Integration', () => {
     ];
 
     const libraryComponents: IRComponentDefinition[] = [
-      ...LOGGING_LIBRARY_BEANS,
+      ...LOGGING_LIBRARY_COMPONENTS,
       {
         tokenRef: {
           kind: 'class',

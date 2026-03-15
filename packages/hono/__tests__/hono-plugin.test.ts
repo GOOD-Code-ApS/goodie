@@ -95,6 +95,7 @@ describe('HTTP Controller Metadata', () => {
         binding: 'body',
         typeName: 'CreateDto',
         optional: false,
+        typeImportPath: '/src/Ctrl.ts',
       },
     ]);
 
@@ -106,6 +107,7 @@ describe('HTTP Controller Metadata', () => {
         binding: 'body',
         typeName: 'CreateDto',
         optional: false,
+        typeImportPath: '/src/Ctrl.ts',
       },
     ]);
   });

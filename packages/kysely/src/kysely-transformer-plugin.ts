@@ -21,7 +21,7 @@ interface TransactionalMethodInfo {
  * TransactionalInterceptor as an AOP interceptor dependency at compile time.
  *
  * Registers @Migration decorated classes as components so they are discovered
- * by the MigrationRunner library component via collection injection on AbstractMigration.
+ * by the MigrationPostProcessor library component via `ctx.getAll(AbstractMigration)`.
  *
  * **Limitation:** Propagation is detected via AST text matching
  * (`text.includes('REQUIRES_NEW')`). Only string literal values in the

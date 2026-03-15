@@ -6,6 +6,7 @@
       "!**/dist",
       "!**/node_modules",
       "!**/*.generated.ts",
+      "!**/__generated__",
       "!pnpm-lock.yaml"
     ]
   },

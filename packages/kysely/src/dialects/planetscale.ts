@@ -1,6 +1,7 @@
 import {
   ConditionalOnProperty,
   Config,
+  Eager,
   OnDestroy,
   OnInit,
   Singleton,
@@ -21,6 +22,7 @@ export class PlanetscaleDatasourceConfig {
 }
 
 @Singleton()
+@Eager()
 @ConditionalOnProperty('datasource.dialect', { havingValue: 'planetscale' })
 export class PlanetscaleKyselyDatabase extends KyselyDatabase {
   private _kysely?: Kysely<any>;

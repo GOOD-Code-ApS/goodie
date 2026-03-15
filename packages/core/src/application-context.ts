@@ -252,7 +252,7 @@ export class ApplicationContext {
     if (!defs || defs.length === 0) {
       return [];
     }
-    return defs.map((def) => {
+    return sortByOrder(defs).map((def) => {
       if (def.scope === 'singleton') {
         const cached = this.singletonCache.get(def.token);
         if (cached !== undefined && cached !== UNRESOLVED) {
@@ -276,7 +276,7 @@ export class ApplicationContext {
       return [];
     }
     const results: T[] = [];
-    for (const def of defs) {
+    for (const def of sortByOrder(defs)) {
       if (def.scope === 'singleton') {
         const cached = this.singletonCache.get(def.token);
         if (cached !== undefined && cached !== UNRESOLVED) {
@@ -895,4 +895,19 @@ function resolveConfigFromDefinitions(
   }
   // No config component — fall back to process.env
   return { ...process.env } as Record<string, unknown>;
+}
+
+/**
+ * Sort component definitions by `@Order()` metadata.
+ * Lower values run first. Default order is 0.
+ * Returns a new array — does not mutate the input.
+ */
+function sortByOrder(
+  defs: readonly ComponentDefinition[],
+): ComponentDefinition[] {
+  return [...defs].sort((a, b) => {
+    const orderA = (a.metadata.order as number) ?? 0;
+    const orderB = (b.metadata.order as number) ?? 0;
+    return orderA - orderB;
+  });
 }

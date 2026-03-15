@@ -6,7 +6,7 @@ import {
   type StartedPostgreSqlContainer,
 } from '@testcontainers/postgresql';
 import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { buildDefinitions } from '../src/AppContext.generated.js';
+import { buildDefinitions } from '../src/__generated__/context.js';
 
 describe('Health API', () => {
   let container: StartedPostgreSqlContainer;

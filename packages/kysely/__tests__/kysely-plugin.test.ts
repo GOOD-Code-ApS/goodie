@@ -105,43 +105,33 @@ const transactionalInterceptorLibraryComponent: IRComponentDefinition = {
   },
 };
 
-/** Simulates the MigrationRunner library component from components.json. */
-const migrationRunnerLibraryComponent: IRComponentDefinition = {
+/** Simulates the MigrationPostProcessor library component from components.json. */
+const migrationPostProcessorLibraryComponent: IRComponentDefinition = {
   tokenRef: {
     kind: 'class',
-    className: 'MigrationRunner',
+    className: 'MigrationPostProcessor',
     importPath: '@goodie-ts/kysely',
   },
   scope: 'singleton',
-  eager: true,
+  eager: false,
   name: undefined,
   primary: false,
   constructorDeps: [
     {
       tokenRef: {
         kind: 'class',
-        className: 'KyselyDatabase',
-        importPath: '@goodie-ts/kysely',
+        className: 'ApplicationContext',
+        importPath: '@goodie-ts/core',
       },
       optional: false,
       collection: false,
-      sourceLocation: { filePath: '@goodie-ts/kysely', line: 0, column: 0 },
-    },
-    {
-      tokenRef: {
-        kind: 'class',
-        className: 'AbstractMigration',
-        importPath: '@goodie-ts/kysely',
-      },
-      optional: false,
-      collection: true,
       sourceLocation: { filePath: '@goodie-ts/kysely', line: 0, column: 0 },
     },
   ],
   fieldDeps: [],
   factoryKind: 'constructor',
   providesSource: undefined,
-  metadata: { onInitMethods: ['migrate'] },
+  metadata: { isComponentPostProcessor: true },
   sourceLocation: {
     filePath: '@goodie-ts/kysely',
     line: 0,
@@ -154,7 +144,7 @@ const allKyselyLibraryComponents: IRComponentDefinition[] = [
   kyselyDatabaseLibraryComponent,
   transactionManagerLibraryComponent,
   transactionalInterceptorLibraryComponent,
-  migrationRunnerLibraryComponent,
+  migrationPostProcessorLibraryComponent,
 ];
 
 describe('Kysely Transformer Plugin', () => {
@@ -319,12 +309,11 @@ describe('Kysely Transformer Plugin', () => {
 
     // Migration class should appear as a scanned component (not synthetic)
     expect(result.code).toContain('token: CreateTodos');
-    // MigrationRunner from library components should be present
-    expect(result.code).toContain('token: MigrationRunner');
-    expect(result.code).toContain('eager: true');
+    // MigrationPostProcessor from library components should be present
+    expect(result.code).toContain('token: MigrationPostProcessor');
   });
 
-  it('should not create MigrationRunner when no @Migration classes exist but library component is present', () => {
+  it('should include MigrationPostProcessor when no @Migration classes exist', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton } from './decorators.js'
@@ -342,8 +331,8 @@ describe('Kysely Transformer Plugin', () => {
       allKyselyLibraryComponents,
     );
 
-    // MigrationRunner is still present as a library component — it just has an empty migration list
-    expect(result.code).toContain('token: MigrationRunner');
+    // MigrationPostProcessor is present as a library component — afterInit is a no-op with no migrations
+    expect(result.code).toContain('token: MigrationPostProcessor');
   });
 
   it('should support @Migration alongside @Transactional in the same project', () => {
@@ -376,7 +365,7 @@ describe('Kysely Transformer Plugin', () => {
     // Both features should be present
     expect(result.code).toContain('TransactionalInterceptor');
     expect(result.code).toContain('TransactionManager');
-    expect(result.code).toContain('MigrationRunner');
+    expect(result.code).toContain('MigrationPostProcessor');
     expect(result.code).toContain('token: CreateTodos');
   });
 });

@@ -75,7 +75,7 @@ export class Response<T> {
  */
 export function createTestProject(
   files: Record<string, string>,
-  outputPath = '/out/AppContext.generated.ts',
+  outputPath = '/out/__generated__/context.ts',
   plugins?: TransformerPlugin[],
 ) {
   const project = new Project({ useInMemoryFileSystem: true });

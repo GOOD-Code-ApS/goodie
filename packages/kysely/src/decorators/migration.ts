@@ -7,7 +7,7 @@ type ClassDecorator_Stage3 = (
  * Mark a class as a Kysely migration with a unique name.
  *
  * At compile time, the Kysely transformer plugin discovers @Migration classes
- * and wires them into an auto-managed MigrationRunner.
+ * and wires them into the MigrationPostProcessor.
  *
  * At runtime, the migration name is stored as a non-enumerable static
  * property `__migrationName` on the class (no Symbol.metadata).

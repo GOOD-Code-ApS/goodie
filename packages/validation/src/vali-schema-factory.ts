@@ -16,6 +16,34 @@ import { customConstraintRegistry } from './decorators/create-constraint.js';
  */
 @Singleton()
 export class ValiSchemaFactory {
+  /**
+   * Static registry for compile-time pre-built schemas.
+   * Populated by generated `schemas.ts` at module load time (before DI resolves).
+   * Instance `getSchema()` checks this before falling back to lazy building.
+   */
+  private static readonly prebuilt = new Map<
+    new (
+      ...args: any[]
+    ) => unknown,
+    GenericSchema
+  >();
+
+  /**
+   * Register a pre-built Valibot schema for a type.
+   * Called from generated `schemas.ts` at module load time.
+   */
+  static registerSchema(
+    type: new (...args: any[]) => unknown,
+    schema: GenericSchema,
+  ): void {
+    ValiSchemaFactory.prebuilt.set(type, schema);
+  }
+
+  /** Reset the static schema registry. For testing only. */
+  static resetSchemas(): void {
+    ValiSchemaFactory.prebuilt.clear();
+  }
+
   private readonly cache = new Map<
     new (
       ...args: any[]
@@ -23,16 +51,23 @@ export class ValiSchemaFactory {
     GenericSchema
   >();
 
-  /** Clear the schema cache. Useful in tests after `MetadataRegistry.reset()`. */
+  /** Clear the instance schema cache. Useful in tests after `MetadataRegistry.reset()`. */
   clearCache(): void {
     this.cache.clear();
+    this.metadataByImportPath = undefined;
+    this.metadataByName = undefined;
   }
 
   /**
    * Get or build a Valibot schema for the given class constructor.
+   * Checks pre-built schemas first, then instance cache, then lazy-builds.
    * Returns `undefined` if the type is not in `MetadataRegistry`.
    */
   getSchema(type: new (...args: any[]) => unknown): GenericSchema | undefined {
+    // Pre-built from compile-time generated schemas.ts
+    const prebuilt = ValiSchemaFactory.prebuilt.get(type);
+    if (prebuilt) return prebuilt;
+
     const cached = this.cache.get(type);
     if (cached) return cached;
 
@@ -55,14 +90,37 @@ export class ValiSchemaFactory {
 
     const fields: Record<string, GenericSchema> = {};
     for (const field of metadata.fields) {
-      let schema = this.fieldTypeToVali(field.type);
-      schema = this.applyConstraints(schema, field.decorators);
-      fields[field.name] = schema;
+      fields[field.name] = this.buildFieldSchema(field.type, field.decorators);
     }
 
     const objectSchema = v.object(fields);
     this.cache.set(type, objectSchema as GenericSchema);
     return objectSchema as GenericSchema;
+  }
+
+  /**
+   * Build the complete schema for a field, applying constraints to the inner
+   * type BEFORE wrapping with optional/nullable.
+   */
+  private buildFieldSchema(
+    type: FieldType,
+    decorators: DecoratorMeta[],
+  ): GenericSchema {
+    if (type.kind === 'optional') {
+      const inner = this.applyConstraints(
+        this.fieldTypeToVali(type.inner),
+        decorators,
+      );
+      return v.optional(inner) as GenericSchema;
+    }
+    if (type.kind === 'nullable') {
+      const inner = this.applyConstraints(
+        this.fieldTypeToVali(type.inner),
+        decorators,
+      );
+      return v.nullable(inner) as GenericSchema;
+    }
+    return this.applyConstraints(this.fieldTypeToVali(type), decorators);
   }
 
   private fieldTypeToVali(type: FieldType): GenericSchema {
@@ -74,7 +132,7 @@ export class ValiSchemaFactory {
       case 'array':
         return v.array(this.fieldTypeToVali(type.elementType)) as GenericSchema;
       case 'reference':
-        return this.referenceToVali(type.className);
+        return this.referenceToVali(type.className, type.importPath);
       case 'union':
         return this.unionToVali(type.types);
       case 'optional':
@@ -109,18 +167,36 @@ export class ValiSchemaFactory {
     return v.unknown() as GenericSchema;
   }
 
-  private referenceToVali(className: string): GenericSchema {
-    // Look up by className in registry — warn if duplicates found
-    const allMetadata = MetadataRegistry.INSTANCE.getAll();
-    const matches = allMetadata.filter((m) => m.className === className);
-    if (matches.length === 0) return v.unknown() as GenericSchema;
-    if (matches.length > 1) {
-      console.warn(
-        `[validation] Multiple @Introspected classes named '${className}' found. Using first match. Consider renaming to avoid ambiguity.`,
-      );
-    }
+  /** Lazily-built lookup maps for metadata by importPath and by className. */
+  private metadataByImportPath: Map<string, TypeMetadata> | undefined;
+  private metadataByName: Map<string, TypeMetadata> | undefined;
 
-    return this.getSchema(matches[0].type) ?? (v.unknown() as GenericSchema);
+  private buildMetadataLookups(): void {
+    this.metadataByImportPath = new Map();
+    this.metadataByName = new Map();
+    for (const m of MetadataRegistry.INSTANCE.getAll()) {
+      if (m.importPath) {
+        this.metadataByImportPath.set(m.importPath, m);
+      }
+      // First-wins for className — importPath lookup is preferred when available
+      if (!this.metadataByName.has(m.className)) {
+        this.metadataByName.set(m.className, m);
+      }
+    }
+  }
+
+  private referenceToVali(
+    className: string,
+    importPath?: string,
+  ): GenericSchema {
+    if (!this.metadataByName) this.buildMetadataLookups();
+
+    // Prefer exact match by importPath (disambiguates same-named classes)
+    const metadata =
+      (importPath && this.metadataByImportPath!.get(importPath)) ||
+      this.metadataByName!.get(className);
+    if (!metadata) return v.unknown() as GenericSchema;
+    return this.getSchema(metadata.type) ?? (v.unknown() as GenericSchema);
   }
 
   private unionToVali(members: FieldType[]): GenericSchema {

@@ -37,7 +37,16 @@ export function handleException(
   handlers: ExceptionHandler[],
 ): void {
   for (const handler of handlers) {
-    const mapped = handler.handle(error);
-    if (mapped) throw new MappedException(mapped);
+    try {
+      const mapped = handler.handle(error);
+      if (mapped) throw new MappedException(mapped);
+    } catch (e) {
+      if (e instanceof MappedException) throw e;
+      // Handler itself threw — don't swallow the original error
+      console.error(
+        `[http] ExceptionHandler ${handler.constructor.name}.handle() threw:`,
+        e,
+      );
+    }
   }
 }

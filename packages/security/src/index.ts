@@ -13,12 +13,10 @@ export { SecurityContext } from './security-context.js';
 
 // Exception handler
 export { SecurityExceptionHandler } from './security-exception-handler.js';
-
+// Filter
+export { SecurityFilter } from './security-filter.js';
 // Interceptor
 export { SecurityInterceptor } from './security-interceptor.js';
-
-// Middleware
-export { createSecurityMiddleware } from './security-middleware.js';
 
 // Provider
 export { SECURITY_PROVIDER, SecurityProvider } from './security-provider.js';

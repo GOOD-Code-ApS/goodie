@@ -18,7 +18,7 @@ const mockTransform = vi.mocked(transform);
 
 const defaultOptions = {
   tsConfigPath: '/project/tsconfig.json',
-  outputPath: '/project/src/AppContext.generated.ts',
+  outputPath: '/project/src/__generated__/context.ts',
 };
 
 describe('runTransform', () => {
@@ -52,7 +52,7 @@ describe('runTransform', () => {
 
     expect(mockTransform).toHaveBeenCalledWith({
       tsConfigFilePath: '/project/tsconfig.json',
-      outputPath: '/project/src/AppContext.generated.ts',
+      outputPath: '/project/src/__generated__/context.ts',
     });
   });
 
@@ -93,7 +93,7 @@ describe('logOutcome', () => {
       success: true,
       result: {
         code: '// generated',
-        outputPath: '/project/src/AppContext.generated.ts',
+        outputPath: '/project/src/__generated__/context.ts',
         components: [{ id: 'A' }, { id: 'B' }] as any,
         warnings: [],
       },

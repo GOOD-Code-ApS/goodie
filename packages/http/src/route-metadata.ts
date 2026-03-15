@@ -16,6 +16,8 @@ export interface ParamMetadata {
   typeName: string;
   /** Whether the parameter is optional (has `?` or default value). */
   optional: boolean;
+  /** Import path for class-typed body params (used by adapter plugins to import the type). */
+  typeImportPath?: string;
 }
 
 /** Metadata for a single route method on a controller. */
