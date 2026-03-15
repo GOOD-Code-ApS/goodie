@@ -45,7 +45,7 @@
   - Move `createRouter()`/`startServer()` code generation from transformer core into `@goodie-ts/hono` plugin, auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }`
   - Add `ServerConfig` class with `@ConfigurationProperties('server')` for host/port configuration
   - Rewrite `EmbeddedServer` as a `@Singleton` with `ServerConfig` dependency (no longer synthesized in codegen)
-  - Resolver now stores controller metadata on `bean.metadata.controller` so plugins can read it
+  - Resolver now stores controller metadata on `component.metadata.controller` so plugins can read it
   - Remove `hono` peer dependency from `@goodie-ts/transformer` — no longer coupled
   - Add `configDir` option to `@goodie-ts/vite-plugin` for JSON config file support
 
@@ -74,11 +74,11 @@
 
 ### Patch Changes
 
-- 9f7daed: Add `createAopDecorator()` API for defining AOP decorators with compile-time config via TypeScript type parameters. Migrate logging, cache, and resilience decorators from hand-written `goodie.aop` JSON to source-level `createAopDecorator<{...}>()` calls. Remove redundant transformer plugins from logging, cache, resilience, and health packages — beans are now shipped via `beans.json` manifests and AOP config is extracted automatically by the transformer's AOP scanner.
+- 9f7daed: Add `createAopDecorator()` API for defining AOP decorators with compile-time config via TypeScript type parameters. Migrate logging, cache, and resilience decorators from hand-written `goodie.aop` JSON to source-level `createAopDecorator<{...}>()` calls. Remove redundant transformer plugins from logging, cache, resilience, and health packages — components are now shipped via `components.json` manifests and AOP config is extracted automatically by the transformer's AOP scanner.
 
-  Auto-discover transformer plugins from installed packages via `goodie.plugin` in `package.json`. The `discoverPlugins()` function now respects `scanScopes`, matching the behavior of library bean discovery. Consumers no longer need to manually list plugins.
+  Auto-discover transformer plugins from installed packages via `goodie.plugin` in `package.json`. The `discoverPlugins()` function now respects `scanScopes`, matching the behavior of library component discovery. Consumers no longer need to manually list plugins.
 
-  **Breaking:** `createHealthPlugin`, `createLoggingPlugin`, `createCachePlugin`, and `createResiliencePlugin` exports have been removed. The `goodie.aop` field in `package.json` is no longer read — AOP config now lives in the `aop` section of `beans.json`.
+  **Breaking:** `createHealthPlugin`, `createLoggingPlugin`, `createCachePlugin`, and `createResiliencePlugin` exports have been removed. The `goodie.aop` field in `package.json` is no longer read — AOP config now lives in the `aop` section of `components.json`.
 
 - Updated dependencies [9f7daed]
 - Updated dependencies [124bb16]

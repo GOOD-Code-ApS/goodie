@@ -13,8 +13,8 @@ Health check indicators and aggregation for goodie-ts. Provides `HealthIndicator
 ## How It Works
 
 1. **User defines indicators** by extending `HealthIndicator` and decorating with `@Singleton()`
-2. **Library beans** (`components.json`) ship `UptimeHealthIndicator` (with `baseTokenRefs: [HealthIndicator]`) and `HealthAggregator` (with `collection: true` dep on `HealthIndicator`)
-3. **Codegen** auto-generates imports for all library beans — no transformer plugin needed
+2. **Library components** (`components.json`) ship `UptimeHealthIndicator` (with `baseTokenRefs: [HealthIndicator]`) and `HealthAggregator` (with `collection: true` dep on `HealthIndicator`)
+3. **Codegen** auto-generates imports for all library components — no transformer plugin needed
 4. **Runtime** `ApplicationContext.getAll(HealthIndicator)` resolves all subtypes, injected into `HealthAggregator`'s constructor
 
 ## Collection Injection
@@ -30,6 +30,6 @@ Health check indicators and aggregation for goodie-ts. Provides `HealthIndicator
 
 ## Gotchas
 
-- Library beans are always injected when `@goodie-ts/health` is installed — `UptimeHealthIndicator` and `HealthAggregator` are always present
+- Library components are always injected when `@goodie-ts/health` is installed — `UptimeHealthIndicator` and `HealthAggregator` are always present
 - Indicators must extend `HealthIndicator` (not just implement the interface) for `baseTokenRefs` detection to work
-- No transformer plugin needed — beans are shipped via `components.json` and codegen handles imports automatically
+- No transformer plugin needed — components are shipped via `components.json` and codegen handles imports automatically

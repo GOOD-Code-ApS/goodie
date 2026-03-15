@@ -84,7 +84,7 @@ function makeDef<T>(
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-describe('Request-scoped beans', () => {
+describe('Request-scoped components', () => {
   it('should create a new instance per request scope', async () => {
     const ctx = await ApplicationContext.create([
       makeDef(RequestService, {
@@ -122,7 +122,7 @@ describe('Request-scoped beans', () => {
     expect(() => ctx.get(RequestService)).toThrow('No active request scope');
   });
 
-  it('should inject a compile-time scoped proxy when a singleton depends on request-scoped bean', async () => {
+  it('should inject a compile-time scoped proxy when a singleton depends on request-scoped component', async () => {
     const proxyFactory = buildScopedProxyFactory(RequestService.prototype, [
       { name: 'value', kind: 'property' },
       { name: 'getValue', kind: 'method' },
@@ -220,7 +220,7 @@ describe('Request-scoped beans', () => {
     }, env);
   });
 
-  it('should support getAsync for request-scoped beans', async () => {
+  it('should support getAsync for request-scoped components', async () => {
     const ctx = await ApplicationContext.create([
       makeDef(RequestService, {
         scope: 'request',
@@ -234,7 +234,7 @@ describe('Request-scoped beans', () => {
     });
   });
 
-  it('should support async @OnInit on request-scoped beans via getAsync', async () => {
+  it('should support async @OnInit on request-scoped components via getAsync', async () => {
     const ctx = await ApplicationContext.create([
       makeDef(AsyncRequestService, {
         scope: 'request',
@@ -260,7 +260,7 @@ describe('Request-scoped beans', () => {
     });
   });
 
-  it('should throw AsyncComponentNotReadyError for sync get() on async request-scoped bean', async () => {
+  it('should throw AsyncComponentNotReadyError for sync get() on async request-scoped component', async () => {
     const ctx = await ApplicationContext.create([
       makeDef(AsyncRequestService, {
         scope: 'request',

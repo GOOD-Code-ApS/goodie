@@ -221,7 +221,7 @@ describe('Cache Transformer Plugin', () => {
     expect(result.code).not.toContain('buildInterceptorChain');
   });
 
-  it('should have CacheManager and CacheInterceptor beans from library beans', () => {
+  it('should have CacheManager and CacheInterceptor components from library components', () => {
     const project = createProject({
       '/src/TodoService.ts': `
         import { Singleton, Cacheable } from './decorators.js'
@@ -241,7 +241,7 @@ describe('Cache Transformer Plugin', () => {
       CACHE_MAPPINGS,
     );
 
-    // CacheManager and CacheInterceptor should both be bean tokens
+    // CacheManager and CacheInterceptor should both be component tokens
     expect(result.code).toContain('token: CacheManager');
     expect(result.code).toContain('token: CacheInterceptor');
   });
@@ -319,7 +319,7 @@ describe('Cache Transformer Plugin', () => {
     expect(result.code).toContain('"ttlMs":30000');
   });
 
-  it('should not add duplicate bean definitions', () => {
+  it('should not add duplicate component definitions', () => {
     const project = createProject({
       '/src/TodoService.ts': `
         import { Singleton, Cacheable } from './decorators.js'
@@ -339,16 +339,16 @@ describe('Cache Transformer Plugin', () => {
       CACHE_MAPPINGS,
     );
 
-    // Match bean definitions (token + scope line), not dependency references
-    const interceptorBeanDefs = result.code.match(
+    // Match component definitions (token + scope line), not dependency references
+    const interceptorComponentDefs = result.code.match(
       /token: CacheInterceptor,\n\s+scope:/g,
     );
-    expect(interceptorBeanDefs).toHaveLength(1);
+    expect(interceptorComponentDefs).toHaveLength(1);
 
-    const managerBeanDefs = result.code.match(
+    const managerComponentDefs = result.code.match(
       /token: CacheManager,\n\s+scope:/g,
     );
-    expect(managerBeanDefs).toHaveLength(1);
+    expect(managerComponentDefs).toHaveLength(1);
   });
 
   it('should produce identical output when the same plugin instance is reused across transforms (rebuild)', () => {

@@ -1,20 +1,20 @@
 # @goodie-ts/hono
 
-Hono adapter for goodie-ts. Thin I/O bridge between `@goodie-ts/http`'s generic HTTP abstractions and Hono's native API. Provides config-driven CORS, `EmbeddedServer`, `ServerConfig`, `HonoServerBootstrap` (library bean), and runtime helpers.
+Hono adapter for goodie-ts. Thin I/O bridge between `@goodie-ts/http`'s generic HTTP abstractions and Hono's native API. Provides config-driven CORS, `EmbeddedServer`, `ServerConfig`, `HonoServerBootstrap` (library component), and runtime helpers.
 
 ## Key Files
 
 | File | Role |
 |------|------|
-| `src/hono-server-bootstrap.ts` | `HonoServerBootstrap` — `@Singleton` library bean extending `AbstractServerBootstrap`, creates Hono router and starts `EmbeddedServer` on `onStart()` |
+| `src/hono-server-bootstrap.ts` | `HonoServerBootstrap` — `@Singleton` library component extending `AbstractServerBootstrap`, creates Hono router and starts `EmbeddedServer` on `onStart()` |
 | `src/embedded-server.ts` | `EmbeddedServer` — `@Singleton` with multi-runtime support (Node, Bun, Deno; throws for Cloudflare) |
-| `src/server-config.ts` | `ServerConfig` — `@Config('server')` bean with `host`, `port`, `runtime`, `cors` |
+| `src/server-config.ts` | `ServerConfig` — `@Config('server')` component with `host`, `port`, `runtime`, `cors` |
 | `src/router-helpers.ts` | Runtime helpers (`toHonoResponse`, `toHonoErrorResponse`, `buildHttpContext`, `corsMiddleware`, `requestScopeMiddleware`) — encapsulate Hono API calls so generated code depends only on stable goodie-ts interfaces |
-| `src/index.ts` | Public exports — adapter-specific beans and helpers only (no decorator re-exports) |
+| `src/index.ts` | Public exports — adapter-specific components and helpers only (no decorator re-exports) |
 
 ## HonoServerBootstrap
 
-`HonoServerBootstrap` is a library bean (in `components.json`) that extends `AbstractServerBootstrap` (from `@goodie-ts/http`) which extends `OnStart` (from `@goodie-ts/core`). It is discovered at runtime via the `baseTokens` mechanism.
+`HonoServerBootstrap` is a library component (in `components.json`) that extends `AbstractServerBootstrap` (from `@goodie-ts/http`) which extends `OnStart` (from `@goodie-ts/core`). It is discovered at runtime via the `baseTokens` mechanism.
 
 - **`@ConditionalOnProperty('server.runtime', { havingValue: ['node', 'bun', 'deno'] })`** — excluded on Cloudflare Workers (serverless deployments call `createHonoRouter(ctx)` directly)
 - **`onStart(ctx)`** — calls `createHonoRouter(ctx)` to build the Hono app, then `embeddedServer.listen(router)` to start serving
@@ -63,7 +63,7 @@ Generated code never calls Hono APIs directly. Instead it calls runtime helpers 
 
 ### Error Handling
 
-All route handlers are wrapped in try/catch. At startup, `createRouter` resolves all `ExceptionHandler` beans via `ctx.getAll(ExceptionHandler)`. Caught errors are delegated to `handleException()` from `@goodie-ts/http` which iterates all handlers. If a handler returns a `Response<T>`, it's translated to a Hono response via `toHonoResponse()`. If no handler matches, the error is re-thrown.
+All route handlers are wrapped in try/catch. At startup, `createRouter` resolves all `ExceptionHandler` components via `ctx.getAll(ExceptionHandler)`. Caught errors are delegated to `handleException()` from `@goodie-ts/http` which iterates all handlers. If a handler returns a `Response<T>`, it's translated to a Hono response via `toHonoResponse()`. If no handler matches, the error is re-thrown.
 
 This follows Micronaut's `ExceptionHandler` pattern — multiple handlers supported (validation, security, custom), the generic pipeline lives in `@goodie-ts/http`, the adapter only bridges I/O.
 
@@ -86,9 +86,9 @@ function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])
 
 `handleException` throws `MappedException` if a handler matches — caught by `.onError()` on the router chain and translated via `toHonoErrorResponse`. This keeps the catch block throw-only, preserving RPC type inference.
 
-## Library Beans (components.json)
+## Library Components (components.json)
 
-3 singleton beans:
+3 singleton components:
 - **ServerConfig** — `@Config('server')` with host/port/runtime/cors
 - **EmbeddedServer** — multi-runtime server, depends on `ServerConfig`
 - **HonoServerBootstrap** — extends `AbstractServerBootstrap → OnStart`, conditional on `server.runtime` being `node`/`bun`/`deno`, depends on `EmbeddedServer`
@@ -99,7 +99,7 @@ function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])
 - **Adapter pattern** — hono plugin reads from `metadata.httpController` set by the http plugin. Route scanning is in `@goodie-ts/http`, Hono-specific codegen is here.
 - **No decorator re-exports** — users import decorators from `@goodie-ts/http` directly. Swapping adapters requires no decorator import changes.
 - **CORS is config-driven and opt-in** — only emitted when `server.cors.*` config keys exist.
-- **Error handling is always-on** — route handlers always have try/catch. Exception handlers are optional runtime beans. No conditional codegen for error handling — follows Micronaut.
+- **Error handling is always-on** — route handlers always have try/catch. Exception handlers are optional runtime components. No conditional codegen for error handling — follows Micronaut.
 - **Generated code never imports Hono ecosystem directly** — all Hono API calls are in `router-helpers.ts`
 
 ## Multi-Runtime Support
@@ -109,4 +109,4 @@ function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])
 - **`bun`** — `Bun.serve()` via `globalThis.Bun`
 - **`deno`** — `Deno.serve()` via `globalThis.Deno`
 
-`HonoServerBootstrap` uses `@ConditionalOnProperty('server.runtime', { havingValue: ['node', 'bun', 'deno'] })` — when `server.runtime` is `'cloudflare'`, the bean is excluded at runtime, and users call `createHonoRouter(ctx)` directly.
+`HonoServerBootstrap` uses `@ConditionalOnProperty('server.runtime', { havingValue: ['node', 'bun', 'deno'] })` — when `server.runtime` is `'cloudflare'`, the component is excluded at runtime, and users call `createHonoRouter(ctx)` directly.

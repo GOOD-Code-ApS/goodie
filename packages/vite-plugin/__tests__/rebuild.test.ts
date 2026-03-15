@@ -29,7 +29,7 @@ describe('runRebuild', () => {
     const fakeResult = {
       code: '// generated',
       outputPath: defaultOptions.outputPath,
-      beans: [{ id: 'A' }],
+      components: [{ id: 'A' }],
       warnings: [],
     };
     mockTransform.mockResolvedValue(fakeResult as any);
@@ -46,7 +46,7 @@ describe('runRebuild', () => {
     mockTransform.mockResolvedValue({
       code: '',
       outputPath: '',
-      beans: [],
+      components: [],
       warnings: [],
     } as any);
 

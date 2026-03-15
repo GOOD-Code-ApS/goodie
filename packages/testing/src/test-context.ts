@@ -19,7 +19,7 @@ function tokenName(token: Token): string {
 }
 
 /**
- * Fluent builder for configuring a single bean override.
+ * Fluent builder for configuring a single component override.
  */
 export class OverrideBuilder<T> {
   constructor(
@@ -80,7 +80,7 @@ export class OverrideBuilder<T> {
   }
 
   /**
-   * Override with a factory that receives the original bean's resolved
+   * Override with a factory that receives the original component's resolved
    * dependencies. Keeps the original dependency list — only replaces the
    * factory function.
    *
@@ -95,7 +95,7 @@ export class OverrideBuilder<T> {
     const original = this.findOriginal(this.token);
     if (!original) {
       throw new DIError(
-        `withDeps(): no original bean definition found for token "${tokenName(this.token)}"`,
+        `withDeps(): no original component definition found for token "${tokenName(this.token)}"`,
       );
     }
     const def: ComponentDefinition = {
@@ -112,7 +112,7 @@ export class OverrideBuilder<T> {
 }
 
 /**
- * Accumulates bean overrides and builds a fresh ApplicationContext.
+ * Accumulates component overrides and builds a fresh ApplicationContext.
  */
 export class TestContextBuilder {
   private readonly overrides = new Map<Token, ComponentDefinition>();
@@ -125,7 +125,7 @@ export class TestContextBuilder {
   }
 
   /**
-   * Start overriding a bean identified by its class constructor.
+   * Start overriding a component identified by its class constructor.
    * Throws OverrideError if the token doesn't exist in the base definitions.
    */
   override<T>(
@@ -181,7 +181,7 @@ export class TestContextBuilder {
   }
 
   /**
-   * Register a test-only bean. Unlike `override()`, this adds a new bean
+   * Register a test-only component. Unlike `override()`, this adds a new component
    * that doesn't need to exist in the base definitions.
    *
    * @example
@@ -214,7 +214,7 @@ export class TestContextBuilder {
 
   /**
    * Override specific config keys while preserving the rest.
-   * Requires a `__Goodie_Config` bean in the base definitions (generated when `@Value` is used).
+   * Requires a `__Goodie_Config` component in the base definitions (generated when `@Value` is used).
    *
    * Wraps the original config factory: `{ ...originalFactory(), ...overrides }`.
    * Last `withConfig()` call wins (consistent with `override()` semantics).
@@ -228,7 +228,7 @@ export class TestContextBuilder {
 
     if (!configDef) {
       throw new DIError(
-        'No __Goodie_Config bean found — withConfig() requires @Value to be used in at least one bean',
+        'No __Goodie_Config component found — withConfig() requires @Value to be used in at least one component',
       );
     }
 
@@ -292,7 +292,7 @@ export class TestContextBuilder {
 }
 
 /**
- * Entry point for creating test-friendly ApplicationContexts with bean overrides.
+ * Entry point for creating test-friendly ApplicationContexts with component overrides.
  */
 export class TestContext {
   private constructor() {}

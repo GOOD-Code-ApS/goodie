@@ -8,7 +8,7 @@ import type { KyselyDatabase } from './kysely-database.js';
 /**
  * Runs Kysely migrations at application startup.
  *
- * Library bean — eager singleton with `@OnInit migrate()`.
+ * Library component — eager singleton with `@OnInit migrate()`.
  * Constructor receives `KyselyDatabase` and all `@Migration` instances
  * via collection injection on `AbstractMigration`.
  *

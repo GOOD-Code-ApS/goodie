@@ -1,5 +1,5 @@
 /**
- * Marks a method inside a `@Factory()` class as a bean factory.
+ * Marks a method inside a `@Factory()` class as a component factory.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.
  * The transformer reads this decorator via AST inspection at build time.

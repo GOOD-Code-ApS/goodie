@@ -23,7 +23,7 @@ import { ServerConfig } from './server-config.js';
 /**
  * Create a Hono router from the ApplicationContext at runtime.
  *
- * Reads `metadata.httpController` from bean definitions, resolves
+ * Reads `metadata.httpController` from component definitions, resolves
  * controller instances from the DI container, and wires Hono routes.
  *
  * This replaces compile-time code generation — the adapter is real
@@ -42,7 +42,7 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
     throw e;
   });
 
-  // Request scope middleware (if any request-scoped beans exist)
+  // Request scope middleware (if any request-scoped components exist)
   if (definitions.some((d) => d.scope === 'request')) {
     router.use('*', requestScopeMiddleware());
   }
@@ -52,7 +52,7 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
     router.use('*', corsMiddleware(serverConfig.cors));
   }
 
-  // Security middleware — discover SecurityProvider beans via convention
+  // Security middleware — discover SecurityProvider components via convention
   const securityMiddleware = buildSecurityMiddleware(ctx, definitions);
   if (securityMiddleware) {
     router.use('*', securityMiddleware);
@@ -192,9 +192,9 @@ type CreateSecurityMiddlewareFn = (
 ) => SecurityMiddlewareFn;
 
 /**
- * Discover SecurityProvider beans and build Hono security middleware.
+ * Discover SecurityProvider components and build Hono security middleware.
  *
- * Uses convention-based discovery: finds beans with baseTokens whose
+ * Uses convention-based discovery: finds components with baseTokens whose
  * constructor name is 'SecurityProvider'. No direct dependency on
  * @goodie-ts/security — the adapter uses duck typing.
  *

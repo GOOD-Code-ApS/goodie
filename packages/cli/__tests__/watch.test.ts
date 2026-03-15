@@ -49,7 +49,7 @@ describe('watchAndRebuild', () => {
     mockFsWatch.mockReturnValue({ close: mockWatcherClose } as any);
     mockRunTransform.mockResolvedValue({
       success: true,
-      result: { code: '', outputPath: '', beans: [], warnings: [] },
+      result: { code: '', outputPath: '', components: [], warnings: [] },
       durationMs: 10,
     } as any);
   });

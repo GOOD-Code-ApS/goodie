@@ -69,7 +69,7 @@ describe('Scheduler Transformer Plugin', () => {
       onDestroyMethods: ['stop'],
     });
 
-    // Single dep: ApplicationContext (not the scheduled beans)
+    // Single dep: ApplicationContext (not the scheduled components)
     expect(scheduler!.constructorDeps).toHaveLength(1);
     expect(scheduler!.constructorDeps[0].tokenRef).toEqual({
       kind: 'class',
@@ -78,7 +78,7 @@ describe('Scheduler Transformer Plugin', () => {
     });
   });
 
-  it('should store scheduledMethods metadata on user beans', () => {
+  it('should store scheduledMethods metadata on user components', () => {
     const result = createTestProject({
       '/src/MyTask.ts': `
         import { Singleton, Scheduled } from './decorators.js'
@@ -144,7 +144,7 @@ describe('Scheduler Transformer Plugin', () => {
     ]);
   });
 
-  it('should store metadata across multiple scheduled beans', () => {
+  it('should store metadata across multiple scheduled components', () => {
     const result = createTestProject({
       '/src/TaskA.ts': `
         import { Singleton, Scheduled } from './decorators.js'

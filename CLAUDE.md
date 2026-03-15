@@ -22,7 +22,7 @@ cache / logging / resilience / kysely / hono ──→ core + transformer (plugi
 
 ## Key Design Decisions
 
-- **Always favour compile-time code generation over runtime scanning.** If the transformer knows something at build time (controllers, migrations, interceptors, routes), generate the wiring code directly. Never use runtime scanning, marker classes, or collection injection for statically-known information. Reserve runtime mechanisms (`getAll()`, `baseTokens`) for genuinely dynamic cases where the set of beans isn't known until runtime. This is the framework's core differentiator — violating it undermines the entire architecture.
+- **Always favour compile-time code generation over runtime scanning.** If the transformer knows something at build time (controllers, migrations, interceptors, routes), generate the wiring code directly. Never use runtime scanning, marker classes, or collection injection for statically-known information. Reserve runtime mechanisms (`getAll()`, `baseTokens`) for genuinely dynamic cases where the set of components isn't known until runtime. This is the framework's core differentiator — violating it undermines the entire architecture.
 - **Native Stage 3 decorators** — no `experimentalDecorators`, no reflect-metadata
 - **`accessor` keyword** for `@Inject`/`@Optional` (Stage 3 has no parameter decorators)
 - **Lazy singletons** by default, `@Eager()` opt-in
@@ -48,10 +48,10 @@ pnpm clean          # Clean all dist/
 | `packages/transformer` | ts-morph scanner → resolver → graph-builder → codegen, plugin system, built-in AOP + config + introspection plugins. Framework-agnostic — no HTTP knowledge. |
 | `packages/cli` | CLI tool — `goodie generate` with watch mode |
 | `packages/vite-plugin` | Vite integration, runs transformer on build/HMR |
-| `packages/testing` | TestContext with bean overrides and @MockDefinition |
+| `packages/testing` | TestContext with component overrides and @MockDefinition |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
 | `packages/http` | Abstract HTTP — @Controller, @Get/@Post/etc route decorators, Request\<T\>, Response\<T\>, RouteMetadata, ExceptionHandler, AbstractServerBootstrap, scan-phase transformer plugin |
-| `packages/hono` | Hono adapter — config-driven CORS, EmbeddedServer, ServerConfig, HonoServerBootstrap (library bean), runtime helpers (toHonoResponse, buildRequest) |
+| `packages/hono` | Hono adapter — config-driven CORS, EmbeddedServer, ServerConfig, HonoServerBootstrap (library component), runtime helpers (toHonoResponse, buildRequest) |
 | `packages/validation` | Valibot-based validation — @Validated, @Introspected DTOs, constraint decorators, ValiSchemaFactory, ValidationInterceptor, ValiExceptionHandler, transformer plugin |
 | `packages/kysely` | Kysely integration — abstract KyselyDatabase with per-dialect conditional implementations, @Transactional, @Migration |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |

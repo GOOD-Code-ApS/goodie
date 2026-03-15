@@ -17,10 +17,10 @@ export interface TransformOptions {
   plugins?: TransformerPlugin[];
   /** Skip auto-discovery of plugins from installed packages. */
   disablePluginDiscovery?: boolean;
-  /** Skip auto-discovery of library beans from installed packages. */
-  disableLibraryBeanDiscovery?: boolean;
+  /** Skip auto-discovery of library components from installed packages. */
+  disableLibraryComponentDiscovery?: boolean;
   /**
-   * npm scopes to scan for library beans and plugins (e.g. `['@goodie-ts', '@acme']`).
+   * npm scopes to scan for library components and plugins (e.g. `['@goodie-ts', '@acme']`).
    * Defaults to `['@goodie-ts']`.
    */
   scanScopes?: string[];
@@ -69,7 +69,7 @@ export interface TransformLibraryResult {
   manifest: import('./library-components.js').LibraryComponentsManifest;
   /** Absolute path where the manifest was written. */
   outputPath: string;
-  /** All discovered bean definitions (with rewritten import paths). */
+  /** All discovered component definitions (with rewritten import paths). */
   components: import('./ir.js').IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
@@ -85,7 +85,7 @@ export interface TransformResult {
   code: string;
   /** Absolute path where the file was written. */
   outputPath: string;
-  /** All discovered bean definitions in topological order. */
+  /** All discovered component definitions in topological order. */
   components: IRComponentDefinition[];
   /** Non-fatal warnings encountered during transformation. */
   warnings: string[];
@@ -108,15 +108,15 @@ export interface ClassVisitorContext {
   /** Store arbitrary metadata that will be available in later hooks. */
   metadata: Record<string, unknown>;
   /**
-   * Register this class as a bean from a plugin.
-   * Allows plugins to make decorated classes into beans without the scanner
+   * Register this class as a component from a plugin.
+   * Allows plugins to make decorated classes into components without the scanner
    * hardcoding knowledge of plugin-specific decorators (e.g. `@Controller`).
    *
-   * @param options.scope - Bean scope ('singleton' or 'transient')
+   * @param options.scope - Component scope ('singleton' or 'transient')
    * @param options.decoratorName - Name of the decorator for error messages (e.g. 'Controller')
-   * @throws If another plugin has already registered this class as a bean
+   * @throws If another plugin has already registered this class as a component
    */
-  registerBean(options: { scope: Scope; decoratorName?: string }): void;
+  registerComponent(options: { scope: Scope; decoratorName?: string }): void;
 }
 
 /** Context passed to visitMethod hook. */
@@ -147,8 +147,8 @@ export interface TransformerPlugin {
 
   /**
    * Visit each decorated class found during scanning.
-   * Called for every class with at least one decorator (beans, modules, etc.).
-   * Use `ctx.metadata` to store data that will be merged into the bean's IR metadata.
+   * Called for every class with at least one decorator (components, modules, etc.).
+   * Use `ctx.metadata` to store data that will be merged into the component's IR metadata.
    */
   visitClass?(ctx: ClassVisitorContext): void;
 
@@ -161,29 +161,29 @@ export interface TransformerPlugin {
   visitMethod?(ctx: MethodVisitorContext): void;
 
   /**
-   * Mutate IR beans after type resolution, before graph building.
-   * Can modify metadata, add dependencies, filter beans, etc.
+   * Mutate IR components after type resolution, before graph building.
+   * Can modify metadata, add dependencies, filter components, etc.
    *
    * Metadata accumulated via `visitClass` (`ctx.metadata`) is already merged
-   * into each bean's `metadata` before this hook runs, so you can read
+   * into each component's `metadata` before this hook runs, so you can read
    * visitor-produced tags here.
    *
-   * **Note:** This hook receives only `@Transient`/`@Singleton` beans.
-   * Beans created by `@Provides` methods inside `@Factory` classes are expanded
+   * **Note:** This hook receives only `@Transient`/`@Singleton` components.
+   * Components created by `@Provides` methods inside `@Factory` classes are expanded
    * during graph building (the next pipeline stage) and are not visible here.
-   * Use `beforeCodegen` if you need to see the full expanded bean set.
+   * Use `beforeCodegen` if you need to see the full expanded component set.
    */
-  afterResolve?(beans: IRComponentDefinition[]): IRComponentDefinition[];
+  afterResolve?(components: IRComponentDefinition[]): IRComponentDefinition[];
 
   /**
-   * Inject or modify bean definitions before code generation.
+   * Inject or modify component definitions before code generation.
    * Runs after graph building (validation + topo sort).
    *
-   * This is the only hook that sees the full bean set including `@Provides` beans.
+   * This is the only hook that sees the full component set including `@Provides` components.
    *
-   * **Warning:** Synthetic beans added here bypass dependency validation and
-   * topological sorting. Ensure any injected beans have their dependencies
-   * already present in the bean list, or are self-contained (no dependencies).
+   * **Warning:** Synthetic components added here bypass dependency validation and
+   * topological sorting. Ensure any injected components have their dependencies
+   * already present in the component list, or are self-contained (no dependencies).
    */
-  beforeCodegen?(beans: IRComponentDefinition[]): IRComponentDefinition[];
+  beforeCodegen?(components: IRComponentDefinition[]): IRComponentDefinition[];
 }

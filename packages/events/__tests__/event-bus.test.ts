@@ -17,7 +17,7 @@ class OrderPlacedEvent extends ApplicationEvent {
   }
 }
 
-/** Build an ApplicationContext with listener beans and an EventBus. */
+/** Build an ApplicationContext with listener components and an EventBus. */
 async function createEventBusContext(
   listeners: ApplicationEventListener[],
 ): Promise<EventBus> {

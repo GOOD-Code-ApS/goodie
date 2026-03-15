@@ -5,7 +5,7 @@ import { createTestProject } from './helpers.js';
 
 /**
  * Minimal plugin that mimics what the hono plugin does:
- * detects @Controller and calls registerBean({ scope: 'singleton' }).
+ * detects @Controller and calls registerComponent({ scope: 'singleton' }).
  */
 function createControllerPlugin(): TransformerPlugin {
   return {
@@ -16,7 +16,10 @@ function createControllerPlugin(): TransformerPlugin {
         .find((d) => d.getName() === 'Controller');
       if (!controllerDec) return;
 
-      ctx.registerBean({ scope: 'singleton', decoratorName: 'Controller' });
+      ctx.registerComponent({
+        scope: 'singleton',
+        decoratorName: 'Controller',
+      });
 
       let basePath = '/';
       const args = controllerDec.getArguments();
@@ -34,8 +37,8 @@ function createControllerPlugin(): TransformerPlugin {
   };
 }
 
-describe('Controller as Plugin-Registered Bean', () => {
-  it('should register @Controller as a singleton bean via plugin', () => {
+describe('Controller as Plugin-Registered Component', () => {
+  it('should register @Controller as a singleton component via plugin', () => {
     const result = createTestProject(
       {
         '/src/UserController.ts': `
@@ -53,12 +56,12 @@ describe('Controller as Plugin-Registered Bean', () => {
     );
 
     expect(result.components).toHaveLength(1);
-    const bean = result.components[0];
-    expect(bean.tokenRef).toMatchObject({
+    const component = result.components[0];
+    expect(component.tokenRef).toMatchObject({
       kind: 'class',
       className: 'UserController',
     });
-    expect(bean.scope).toBe('singleton');
+    expect(component.scope).toBe('singleton');
   });
 
   it('should handle @Controller with constructor deps', () => {
@@ -152,7 +155,7 @@ describe('Controller as Plugin-Registered Bean', () => {
       `,
     });
 
-    // Without a plugin calling registerBean, @Controller alone does nothing
+    // Without a plugin calling registerComponent, @Controller alone does nothing
     expect(result.components).toHaveLength(0);
   });
 
@@ -236,7 +239,10 @@ describe('Controller as Plugin-Registered Bean', () => {
           .getDecorators()
           .find((d) => d.getName() === 'Controller');
         if (dec) {
-          ctx.registerBean({ scope: 'singleton', decoratorName: 'Duplicate' });
+          ctx.registerComponent({
+            scope: 'singleton',
+            decoratorName: 'Duplicate',
+          });
         }
       },
     };
@@ -254,6 +260,6 @@ describe('Controller as Plugin-Registered Bean', () => {
         undefined,
         [plugin1, plugin2],
       ),
-    ).toThrow(/already registered as a bean/);
+    ).toThrow(/already registered as a component/);
   });
 });

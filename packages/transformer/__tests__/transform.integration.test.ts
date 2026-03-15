@@ -8,7 +8,7 @@ import { createTestProject } from './helpers.js';
 
 describe('Transform Pipeline (Integration)', () => {
   describe('basic injectable (no deps)', () => {
-    it('should generate a bean definition for a simple @Transient class', () => {
+    it('should generate a component definition for a simple @Transient class', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
           import { Transient } from './decorators.js'
@@ -27,7 +27,7 @@ describe('Transform Pipeline (Integration)', () => {
   });
 
   describe('singleton with one dep', () => {
-    it('should generate ordered beans with correct factory', () => {
+    it('should generate ordered components with correct factory', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
           import { Transient } from './decorators.js'
@@ -95,7 +95,7 @@ describe('Transform Pipeline (Integration)', () => {
   });
 
   describe('@Factory with @Provides methods', () => {
-    it('should generate module bean + provides beans', () => {
+    it('should generate module component + provides components', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
           import { Factory, Provides } from './decorators.js'
@@ -276,7 +276,7 @@ describe('Transform Pipeline (Integration)', () => {
   });
 
   describe('@Named + @Inject disambiguation', () => {
-    it('should resolve @Inject(name) to the @Named bean', () => {
+    it('should resolve @Inject(name) to the @Named component', () => {
       const result = createTestProject({
         '/src/RepoA.ts': `
           import { Singleton, Named } from './decorators.js'
@@ -400,7 +400,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      // AppModule + Repository<User> provides bean + Service
+      // AppModule + Repository<User> provides component + Service
       expect(result.components.length).toBeGreaterThanOrEqual(3);
       expect(result.code).toContain(
         "export const Repository_User_Token = new InjectionToken<Repository<User>>('Repository<User>')",
@@ -409,7 +409,7 @@ describe('Transform Pipeline (Integration)', () => {
     });
   });
 
-  describe('two different generic specializations as separate beans', () => {
+  describe('two different generic specializations as separate components', () => {
     it('should produce separate tokens for Repository<User> and Repository<Order>', () => {
       const result = createTestProject({
         '/src/User.ts': `
@@ -548,7 +548,7 @@ describe('Transform Pipeline (Integration)', () => {
   });
 
   describe('@Eager on @Provides method', () => {
-    it('should set eager: true on @Provides bean when @Eager is present', () => {
+    it('should set eager: true on @Provides component when @Eager is present', () => {
       const result = createTestProject({
         '/src/AppModule.ts': `
           import { Factory, Provides, Eager } from './decorators.js'
@@ -565,25 +565,25 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      const eagerBean = result.components.find(
+      const eagerComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'startupService',
       )!;
-      const lazyBean = result.components.find(
+      const lazyComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'lazyService',
       )!;
 
-      expect(eagerBean.eager).toBe(true);
-      expect(lazyBean.eager).toBe(false);
+      expect(eagerComponent.eager).toBe(true);
+      expect(lazyComponent.eager).toBe(false);
       expect(result.code).toContain('eager: true');
     });
   });
 
-  describe('@Eager + generic bean', () => {
-    it('should generate eager generic @Provides bean', () => {
+  describe('@Eager + generic component', () => {
+    it('should generate eager generic @Provides component', () => {
       const result = createTestProject({
         '/src/User.ts': `
           export class User { name = '' }
@@ -604,7 +604,7 @@ describe('Transform Pipeline (Integration)', () => {
         `,
       });
 
-      // The generic bean should be created with correct token
+      // The generic component should be created with correct token
       expect(result.code).toContain('Repository_User_Token');
     });
   });
@@ -693,7 +693,7 @@ describe('Transform Pipeline (Integration)', () => {
       expect(result.code).toContain('isComponentPostProcessor: true');
     });
 
-    it('should not emit isComponentPostProcessor for regular beans', () => {
+    it('should not emit isComponentPostProcessor for regular components', () => {
       const result = createTestProject({
         '/src/Service.ts': `
           import { Singleton } from './decorators.js'
@@ -837,7 +837,7 @@ describe('Transform Pipeline (Integration)', () => {
   });
 
   describe('@Value config injection', () => {
-    it('should generate config token and config bean when @Value is used', () => {
+    it('should generate config token and config component when @Value is used', () => {
       const result = createTestProject({
         '/src/Service.ts': `
           import { Singleton, Value } from './decorators.js'
@@ -908,7 +908,7 @@ describe('Transform Pipeline (Integration)', () => {
       );
     });
 
-    it('should add config token as dependency only for beans with @Value', () => {
+    it('should add config token as dependency only for components with @Value', () => {
       const result = createTestProject({
         '/src/Repo.ts': `
           import { Transient } from './decorators.js'
@@ -1174,9 +1174,9 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       expect(result.components).toHaveLength(1);
-      const bean = result.components[0];
-      expect(bean.baseTokenRefs).toHaveLength(1);
-      expect(bean.baseTokenRefs![0].className).toBe('HealthIndicator');
+      const component = result.components[0];
+      expect(component.baseTokenRefs).toHaveLength(1);
+      expect(component.baseTokenRefs![0].className).toBe('HealthIndicator');
 
       expect(result.code).toContain('baseTokens: [HealthIndicator]');
       expect(result.code).toContain(
@@ -1219,9 +1219,9 @@ describe('Transform Pipeline (Integration)', () => {
       });
 
       expect(result.components).toHaveLength(2);
-      for (const bean of result.components) {
-        expect(bean.baseTokenRefs).toHaveLength(1);
-        expect(bean.baseTokenRefs![0].className).toBe('HealthIndicator');
+      for (const component of result.components) {
+        expect(component.baseTokenRefs).toHaveLength(1);
+        expect(component.baseTokenRefs![0].className).toBe('HealthIndicator');
       }
 
       // Both should have baseTokens in generated code

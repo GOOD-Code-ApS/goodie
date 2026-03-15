@@ -14,8 +14,8 @@ import {
 import { transformLibrary } from '../src/transform.js';
 
 describe('serializeComponents / deserializeComponents', () => {
-  it('should round-trip a simple class bean', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should round-trip a simple class component', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -34,21 +34,21 @@ describe('serializeComponents / deserializeComponents', () => {
       },
     ];
 
-    const manifest = serializeComponents(beans, '@acme/lib');
+    const manifest = serializeComponents(components, '@acme/lib');
     expect(manifest.version).toBe(1);
     expect(manifest.package).toBe('@acme/lib');
 
     const result = deserializeComponents(manifest);
     expect(result).toHaveLength(1);
-    expect(result[0].tokenRef).toEqual(beans[0].tokenRef);
+    expect(result[0].tokenRef).toEqual(components[0].tokenRef);
     expect(result[0].scope).toBe('singleton');
     expect(result[0].name).toBeUndefined();
     expect(result[0].providesSource).toBeUndefined();
     expect(result[0].baseTokenRefs).toBeUndefined();
   });
 
-  it('should round-trip a bean with constructorDeps and baseTokenRefs', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should round-trip a component with constructorDeps and baseTokenRefs', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -113,7 +113,7 @@ describe('serializeComponents / deserializeComponents', () => {
       },
     ];
 
-    const manifest = serializeComponents(beans, '@goodie-ts/health');
+    const manifest = serializeComponents(components, '@goodie-ts/health');
     const result = deserializeComponents(manifest);
 
     expect(result).toHaveLength(2);
@@ -137,7 +137,7 @@ describe('serializeComponents / deserializeComponents', () => {
   });
 
   it('should handle typeImports Map <-> object conversion', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'injection-token',
@@ -161,7 +161,7 @@ describe('serializeComponents / deserializeComponents', () => {
       },
     ];
 
-    const manifest = serializeComponents(beans, '@acme/lib');
+    const manifest = serializeComponents(components, '@acme/lib');
 
     // Verify serialized form has plain object, not Map
     const serializedToken = manifest.components[0].tokenRef as Record<
@@ -184,7 +184,7 @@ describe('serializeComponents / deserializeComponents', () => {
   });
 
   it('should handle undefined <-> null conversion for injection token fields', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'injection-token',
@@ -205,7 +205,7 @@ describe('serializeComponents / deserializeComponents', () => {
       },
     ];
 
-    const manifest = serializeComponents(beans, 'test');
+    const manifest = serializeComponents(components, 'test');
 
     // Verify null in serialized form
     const serializedToken = manifest.components[0].tokenRef as Record<
@@ -238,7 +238,7 @@ describe('serializeComponents / deserializeComponents', () => {
   });
 
   it('should include aop section in manifest when provided', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -261,14 +261,14 @@ describe('serializeComponents / deserializeComponents', () => {
       Log: { interceptor: 'LoggingInterceptor', order: -100 },
     };
 
-    const manifest = serializeComponents(beans, '@goodie-ts/logging', aop);
+    const manifest = serializeComponents(components, '@goodie-ts/logging', aop);
     expect(manifest.aop).toEqual(aop);
     expect(manifest.components).toHaveLength(1);
   });
 
   it('should omit aop section when no aop mappings exist', () => {
-    const beans: IRComponentDefinition[] = [];
-    const manifest = serializeComponents(beans, '@acme/lib');
+    const components: IRComponentDefinition[] = [];
+    const manifest = serializeComponents(components, '@acme/lib');
     expect(manifest.aop).toBeUndefined();
   });
 });
@@ -296,8 +296,8 @@ describe('discoverLibraryComponents', () => {
       }),
     );
 
-    const beans = await discoverLibraryComponents(tmpDir);
-    expect(beans).toEqual([]);
+    const components = await discoverLibraryComponents(tmpDir);
+    expect(components).toEqual([]);
   });
 
   it('should discover and deserialize components from packages with goodie.components field', async () => {
@@ -350,14 +350,14 @@ describe('discoverLibraryComponents', () => {
       JSON.stringify(manifest),
     );
 
-    const beans = await discoverLibraryComponents(tmpDir);
-    expect(beans).toHaveLength(1);
-    expect(beans[0].tokenRef).toEqual({
+    const components = await discoverLibraryComponents(tmpDir);
+    expect(components).toHaveLength(1);
+    expect(components[0].tokenRef).toEqual({
       kind: 'class',
       className: 'UptimeHealthIndicator',
       importPath: '@goodie-ts/health',
     });
-    expect(beans[0].baseTokenRefs).toEqual([
+    expect(components[0].baseTokenRefs).toEqual([
       {
         kind: 'class',
         className: 'HealthIndicator',
@@ -410,9 +410,9 @@ describe('discoverLibraryComponents', () => {
     );
 
     // Only scan @acme, not @goodie-ts
-    const beans = await discoverLibraryComponents(tmpDir, ['@acme']);
-    expect(beans).toHaveLength(1);
-    expect(beans[0].tokenRef).toEqual({
+    const components = await discoverLibraryComponents(tmpDir, ['@acme']);
+    expect(components).toHaveLength(1);
+    expect(components[0].tokenRef).toEqual({
       kind: 'class',
       className: 'AcmeService',
       importPath: '@acme/my-lib',
@@ -436,14 +436,14 @@ describe('discoverLibraryComponents', () => {
       '{ invalid }',
     );
 
-    const beans = await discoverLibraryComponents(tmpDir);
-    expect(beans).toEqual([]);
+    const components = await discoverLibraryComponents(tmpDir);
+    expect(components).toEqual([]);
   });
 
   it('should return empty array when node_modules does not exist', async () => {
     const nonExistent = path.join(tmpDir, 'does-not-exist');
-    const beans = await discoverLibraryComponents(nonExistent);
-    expect(beans).toEqual([]);
+    const components = await discoverLibraryComponents(nonExistent);
+    expect(components).toEqual([]);
   });
 });
 
@@ -492,7 +492,7 @@ describe('discoverAopMappings', () => {
     });
   });
 
-  it('should skip packages without beans field', () => {
+  it('should skip packages without components field', () => {
     const pkgDir = path.join(tmpDir, 'node_modules', '@goodie-ts', 'core');
     fs.mkdirSync(pkgDir, { recursive: true });
     fs.writeFileSync(
@@ -594,7 +594,7 @@ describe('discoverAopMappings', () => {
 
 describe('rewriteImportPaths', () => {
   it('should rewrite absolute paths to bare package specifiers', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -640,7 +640,7 @@ describe('rewriteImportPaths', () => {
     ];
 
     const result = rewriteImportPaths(
-      beans,
+      components,
       '@acme/my-lib',
       '/home/user/project/src',
     );
@@ -667,7 +667,7 @@ describe('rewriteImportPaths', () => {
   });
 
   it('should not rewrite paths that do not match sourceRoot', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -687,7 +687,7 @@ describe('rewriteImportPaths', () => {
     ];
 
     const result = rewriteImportPaths(
-      beans,
+      components,
       '@acme/my-lib',
       '/home/user/project/src',
     );
@@ -870,10 +870,10 @@ export class Service {}
     const manifest: LibraryComponentsManifest = JSON.parse(
       fs.readFileSync(componentsOutputPath, 'utf-8'),
     );
-    const beans = deserializeComponents(manifest);
+    const components = deserializeComponents(manifest);
 
-    expect(beans).toHaveLength(1);
-    expect(beans[0].tokenRef).toEqual({
+    expect(components).toHaveLength(1);
+    expect(components[0].tokenRef).toEqual({
       kind: 'class',
       className: 'Service',
       importPath: '@acme/lib',
@@ -924,7 +924,7 @@ export class MyService {
     expect(result.code).toBeDefined();
     expect(result.codeOutputPath).toBe(codeOutputPath);
 
-    // Generated code should contain bean definitions
+    // Generated code should contain component definitions
     const code = fs.readFileSync(codeOutputPath, 'utf-8');
     expect(code).toContain('MyService');
     expect(code).toContain('ComponentDefinition');

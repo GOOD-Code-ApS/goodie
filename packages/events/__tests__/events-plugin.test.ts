@@ -33,7 +33,7 @@ function createTestProject(
 }
 
 describe('Events Transformer Plugin', () => {
-  it('should synthesize EventBus bean even with zero listeners', () => {
+  it('should synthesize EventBus component even with zero listeners', () => {
     const result = createTestProject({
       '/src/Service.ts': `
         import { Singleton } from './decorators.js'

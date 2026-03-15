@@ -124,7 +124,7 @@ describe('Logging Transformer Plugin', () => {
     expect(result.code).toContain('"level":"debug"');
   });
 
-  it('should add LoggingInterceptor as a dependency in the bean definition', () => {
+  it('should add LoggingInterceptor as a dependency in the component definition', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton, Log } from './decorators.js'
@@ -148,7 +148,7 @@ describe('Logging Transformer Plugin', () => {
     expect(result.code).toContain('token: LoggingInterceptor');
   });
 
-  it('should have LoggingInterceptor bean from library beans', () => {
+  it('should have LoggingInterceptor component from library components', () => {
     const project = createProject({
       '/src/MyService.ts': `
         import { Singleton, Log } from './decorators.js'
@@ -168,13 +168,13 @@ describe('Logging Transformer Plugin', () => {
       LOGGING_MAPPINGS,
     );
 
-    // Should have a bean definition with token: LoggingInterceptor
+    // Should have a component definition with token: LoggingInterceptor
     const lines = result.code.split('\n');
-    const beanTokenLines = lines.filter((l) =>
+    const componentTokenLines = lines.filter((l) =>
       l.includes('token: LoggingInterceptor'),
     );
-    // At least 2: one in dependencies, one as the bean's own token
-    expect(beanTokenLines.length).toBeGreaterThanOrEqual(2);
+    // At least 2: one in dependencies, one as the component's own token
+    expect(componentTokenLines.length).toBeGreaterThanOrEqual(2);
   });
 
   it('should not add interceptor when no @Log decorators are present', () => {

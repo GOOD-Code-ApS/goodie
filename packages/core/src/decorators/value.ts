@@ -7,7 +7,7 @@ export interface ValueOptions {
 /**
  * Injects a configuration value by key.
  *
- * The config source is a bean registered under the `__Goodie_Config` token,
+ * The config source is a component registered under the `__Goodie_Config` token,
  * which defaults to `process.env` and can be overridden via `createContext(config)`.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.

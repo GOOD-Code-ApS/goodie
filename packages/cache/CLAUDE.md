@@ -25,9 +25,9 @@ Keys include the class name to avoid collisions across classes: `ClassName#metho
 
 `CacheInterceptor` uses an in-flight promise map. Concurrent calls for the same cache key share a single promise instead of hitting the backend multiple times.
 
-## Library Beans
+## Library Components
 
-The package ships two beans in `components.json`:
+The package ships two components in `components.json`:
 - `CacheManager` (singleton) — the cache store
 - `CacheInterceptor` (singleton, depends on `CacheManager`) — the AOP interceptor
 
@@ -38,4 +38,4 @@ Consumers auto-discover them at build time via `discoverLibraryComponents()`.
 - Cache is in-memory only — no distributed cache support yet
 - TTL is per-entry, checked lazily on read
 - `@CacheEvict({ allEntries: true })` clears the entire named cache
-- The plugin deduplicates synthetic beans across multiple transform runs
+- The plugin deduplicates synthetic components across multiple transform runs

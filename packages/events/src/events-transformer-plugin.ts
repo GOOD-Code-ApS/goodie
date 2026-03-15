@@ -11,7 +11,7 @@ import type {
  * ensures they have `baseTokenRefs` so the runtime `EventBus` can discover
  * them via `getAll(ApplicationEventListener)`.
  *
- * Synthesizes an `EventBus` bean that depends on `ApplicationContext` and
+ * Synthesizes an `EventBus` component that depends on `ApplicationContext` and
  * discovers listeners at startup via `@OnInit`.
  */
 export function createEventsPlugin(): TransformerPlugin {
@@ -28,16 +28,18 @@ export function createEventsPlugin(): TransformerPlugin {
       const symbol = baseType.getSymbol();
       if (symbol?.getName() !== 'ApplicationEventListener') return;
 
-      // Mark this bean as an event listener so beforeCodegen can add baseTokenRefs.
+      // Mark this component as an event listener so beforeCodegen can add baseTokenRefs.
       // The scanner stops at node_modules, so external base classes aren't captured
       // automatically — this ensures ApplicationEventListener is registered.
       ctx.metadata.__isEventListener = true;
     },
 
-    beforeCodegen(beans: IRComponentDefinition[]): IRComponentDefinition[] {
+    beforeCodegen(
+      components: IRComponentDefinition[],
+    ): IRComponentDefinition[] {
       // Add baseTokenRefs for ApplicationEventListener subclasses
-      for (const bean of beans) {
-        if (!bean.metadata.__isEventListener) continue;
+      for (const component of components) {
+        if (!component.metadata.__isEventListener) continue;
 
         const baseRef = {
           kind: 'class' as const,
@@ -46,28 +48,28 @@ export function createEventsPlugin(): TransformerPlugin {
         };
 
         // Replace any existing ref (scanner may add one with local path) or add new
-        const existingIdx = bean.baseTokenRefs?.findIndex(
+        const existingIdx = component.baseTokenRefs?.findIndex(
           (r) => r.className === 'ApplicationEventListener',
         );
         if (
           existingIdx !== undefined &&
           existingIdx >= 0 &&
-          bean.baseTokenRefs
+          component.baseTokenRefs
         ) {
-          bean.baseTokenRefs[existingIdx] = baseRef;
-        } else if (bean.baseTokenRefs) {
-          bean.baseTokenRefs.push(baseRef);
+          component.baseTokenRefs[existingIdx] = baseRef;
+        } else if (component.baseTokenRefs) {
+          component.baseTokenRefs.push(baseRef);
         } else {
-          bean.baseTokenRefs = [baseRef];
+          component.baseTokenRefs = [baseRef];
         }
 
         // Clean up internal marker — not needed at runtime
-        delete bean.metadata.__isEventListener;
+        delete component.metadata.__isEventListener;
       }
 
       // Always create EventBus when the plugin is installed — allows
       // @Inject() accessor events!: EventPublisher even with zero listeners
-      const eventBusBean: IRComponentDefinition = {
+      const eventBusComponent: IRComponentDefinition = {
         tokenRef: {
           kind: 'class',
           className: 'EventBus',
@@ -113,7 +115,7 @@ export function createEventsPlugin(): TransformerPlugin {
         },
       };
 
-      return [...beans, eventBusBean];
+      return [...components, eventBusComponent];
     },
   };
 }

@@ -11,7 +11,7 @@ import { SecurityContext } from './security-context.js';
  * SecurityContext. Throws UnauthorizedError if no principal, ForbiddenError
  * if the principal lacks required roles.
  *
- * Works on both controller methods and regular @Singleton bean methods.
+ * Works on both controller methods and regular @Singleton component methods.
  */
 @Singleton()
 export class SecurityInterceptor implements MethodInterceptor {

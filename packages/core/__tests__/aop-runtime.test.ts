@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * Runtime integration tests that simulate what generated code does:
- * construct beans, resolve interceptors via DI, and wire up interception.
+ * construct components, resolve interceptors via DI, and wire up interception.
  */
 describe('AOP Runtime Integration', () => {
   it('@Around interceptor runs around the method', async () => {

@@ -217,9 +217,9 @@ describe('.mock() errors', () => {
   });
 
   it('throws OverrideError for non-existent Constructor token', () => {
-    class MissingBean {}
+    class MissingComponent {}
 
-    @MockDefinition(MissingBean)
+    @MockDefinition(MissingComponent)
     class MockMissing {}
 
     const builder = TestContext.from([]);

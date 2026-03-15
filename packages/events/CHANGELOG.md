@@ -45,7 +45,7 @@
 
   Scheduler: @Scheduled decorator for cron/fixedRate/fixedDelay with compile-time discovery, overlap prevention, graceful shutdown, lifecycle integration.
 
-  Core: ApplicationContext self-registration as a bean for constructor injection by framework services.
+  Core: ApplicationContext self-registration as a component for constructor injection by framework services.
 
   Transformer: plugin system hooks (visitClass, visitMethod, beforeCodegen) for events and scheduler plugins.
 

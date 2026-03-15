@@ -90,7 +90,7 @@ All dialect drivers are optional peer dependencies — only the configured diale
 2. `TransactionalInterceptor` singleton (depends on `TransactionManager`)
 3. `MigrationRunner` singleton with individual `@Migration` classes as constructor deps
 
-No configuration needed — the plugin discovers `KyselyDatabase` automatically from the library beans list.
+No configuration needed — the plugin discovers `KyselyDatabase` automatically from the library components list.
 
 ## Migration Ordering
 

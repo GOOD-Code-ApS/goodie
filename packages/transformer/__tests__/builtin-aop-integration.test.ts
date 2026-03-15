@@ -41,13 +41,13 @@ describe('AOP Integration — Generated Code', () => {
     expect(result.code).toContain('buildInterceptorChain');
     expect(result.code).not.toContain('AopPostProcessor');
 
-    // No synthetic AopPostProcessor bean
-    const postProcessorBean = result.components.find(
+    // No synthetic AopPostProcessor component
+    const postProcessorComponent = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' &&
         b.tokenRef.className === 'AopPostProcessor',
     );
-    expect(postProcessorBean).toBeUndefined();
+    expect(postProcessorComponent).toBeUndefined();
   });
 
   it('imports buildInterceptorChain from @goodie-ts/core', () => {
@@ -166,7 +166,7 @@ describe('AOP Integration — Generated Code', () => {
     expect(result.code).toContain('buildInterceptorChain');
   });
 
-  it('throws MissingProviderError when interceptor class is not a registered bean', () => {
+  it('throws MissingProviderError when interceptor class is not a registered component', () => {
     const project = createProject({
       '/src/UnregisteredInterceptor.ts': `
         export class UnregisteredInterceptor {}
@@ -188,7 +188,7 @@ describe('AOP Integration — Generated Code', () => {
     ).toThrow(MissingProviderError);
   });
 
-  it('handles combined @Value fields and @Around interception on same bean', () => {
+  it('handles combined @Value fields and @Around interception on same component', () => {
     const project = createProject({
       '/src/TimingInterceptor.ts': `
         import { Singleton } from './decorators.js'
@@ -222,7 +222,7 @@ describe('AOP Integration — Generated Code', () => {
     expect(result.code).toContain('token: TimingInterceptor');
   });
 
-  it('bean with no interception has normal factory (no buildInterceptorChain)', () => {
+  it('component with no interception has normal factory (no buildInterceptorChain)', () => {
     const project = createProject({
       '/src/TimingInterceptor.ts': `
         import { Singleton } from './decorators.js'

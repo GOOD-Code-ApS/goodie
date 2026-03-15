@@ -13,6 +13,6 @@ export { createConstraint } from './decorators/create-constraint.js';
 // AOP decorator
 export { Validated } from './decorators/validated.js';
 export { ValiExceptionHandler } from './vali-exception-handler.js';
-// Runtime beans
+// Runtime components
 export { ValiSchemaFactory } from './vali-schema-factory.js';
 export { ValidationInterceptor } from './validation-interceptor.js';

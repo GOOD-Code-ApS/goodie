@@ -48,7 +48,7 @@ function createClassDef(
 }
 
 describe('ComponentsEndpoint', () => {
-  it('lists all bean definitions with tokens and scopes', () => {
+  it('lists all component definitions with tokens and scopes', () => {
     const ctx = createMockContext([
       createClassDef(TodoService, {
         dependencies: [{ token: TodoRepository }],
@@ -100,11 +100,11 @@ describe('ComponentsEndpoint', () => {
     const endpoint = new ComponentsEndpoint(ctx);
     const result = endpoint.components();
 
-    const body = result.body as { beans: Array<{ conditional: unknown }> };
+    const body = result.body as { components: Array<{ conditional: unknown }> };
     expect(body.components[0].conditional).toEqual(rules);
   });
 
-  it('filters out internal framework beans', () => {
+  it('filters out internal framework components', () => {
     const configToken = {
       description: '__Goodie_Config',
     } as InjectionToken<Record<string, unknown>>;
@@ -136,7 +136,7 @@ describe('ComponentsEndpoint', () => {
     const endpoint = new ComponentsEndpoint(ctx);
     const result = endpoint.components();
 
-    const body = result.body as { beans: Array<{ token: string }> };
+    const body = result.body as { components: Array<{ token: string }> };
     expect(body.components).toHaveLength(1);
     expect(body.components[0].token).toBe('TodoService');
   });
@@ -149,7 +149,7 @@ describe('ComponentsEndpoint', () => {
     const endpoint = new ComponentsEndpoint(ctx);
     const result = endpoint.components();
 
-    const body = result.body as { beans: Array<{ eager: boolean }> };
+    const body = result.body as { components: Array<{ eager: boolean }> };
     expect(body.components[0].eager).toBe(true);
   });
 });

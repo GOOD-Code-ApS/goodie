@@ -1,7 +1,7 @@
 import type { ApplicationContext } from './application-context.js';
 
 /**
- * Lifecycle interface for beans that need to perform actions after the
+ * Lifecycle interface for components that need to perform actions after the
  * ApplicationContext is fully initialized.
  *
  * Implementations are discovered via `getAll(OnStart)` using the
@@ -11,8 +11,8 @@ import type { ApplicationContext } from './application-context.js';
  * @example
  * ```ts
  * @Singleton()
- * @Order(-10) // runs before default-ordered beans
- * class MyStartupBean extends OnStart {
+ * @Order(-10) // runs before default-ordered components
+ * class MyStartupComponent extends OnStart {
  *   async onStart(ctx: ApplicationContext): Promise<void> {
  *     // initialization logic
  *   }

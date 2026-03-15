@@ -28,9 +28,9 @@ export class StartupMetrics {
   }
 
   /**
-   * Record a per-bean resolution time.
+   * Record a per-component resolution time.
    */
-  recordBean(name: string, ms: number): void {
+  recordComponent(name: string, ms: number): void {
     this.componentTimings.set(name, ms);
   }
 
@@ -49,7 +49,7 @@ export class StartupMetrics {
   }
 
   /**
-   * Get per-bean resolution timings.
+   * Get per-component resolution timings.
    */
   getComponentTimings(): ReadonlyMap<string, number> {
     return this.componentTimings;
@@ -78,7 +78,7 @@ export class StartupMetrics {
 
     if (this.componentTimings.size > 0) {
       console.log('[goodie]');
-      console.log('[goodie] Eager bean resolution');
+      console.log('[goodie] Eager component resolution');
       console.log('[goodie] ──────────────────────────────');
       for (const [name, ms] of this.componentTimings) {
         console.log(`[goodie]   ${name}: ${ms.toFixed(2)}ms`);

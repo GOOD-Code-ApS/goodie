@@ -44,12 +44,12 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.components.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'DbConfig',
     );
-    expect(bean).toBeDefined();
+    expect(component).toBeDefined();
 
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
       default?: string;
@@ -72,7 +72,7 @@ describe('Config Transformer Plugin', () => {
     });
   });
 
-  it('should generate __Goodie_Config token and config bean', () => {
+  it('should generate __Goodie_Config token and config component', () => {
     const result = createTestProject({
       '/src/AppConfig.ts': `
         import { Singleton, Config } from './decorators.js'
@@ -126,10 +126,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.components.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
       default?: string;
@@ -161,10 +161,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.components.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
     }>;
@@ -196,16 +196,16 @@ describe('Config Transformer Plugin', () => {
     });
 
     // Both classes should have valueFields
-    const appBean = result.components.find(
+    const appComponent = result.components.find(
       (b) =>
         b.tokenRef.kind === 'class' && b.tokenRef.className === 'AppConfig',
     );
-    const dbBean = result.components.find(
+    const dbComponent = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Database',
     );
 
-    expect(appBean!.metadata.valueFields).toBeDefined();
-    expect(dbBean!.metadata.valueFields).toBeDefined();
+    expect(appComponent!.metadata.valueFields).toBeDefined();
+    expect(dbComponent!.metadata.valueFields).toBeDefined();
 
     // Only one __Goodie_Config token declaration should exist
     const configTokenDeclarations = (
@@ -226,10 +226,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.components.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Service',
     );
-    expect(bean!.metadata.valueFields).toBeUndefined();
+    expect(component!.metadata.valueFields).toBeUndefined();
   });
 
   it('should handle accessor properties', () => {
@@ -246,10 +246,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.components.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
       default?: string;
@@ -301,10 +301,10 @@ describe('Config Transformer Plugin', () => {
       `,
     });
 
-    const bean = result.components.find(
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    const valueFields = bean!.metadata.valueFields as Array<{
+    const valueFields = component!.metadata.valueFields as Array<{
       fieldName: string;
       key: string;
     }>;
@@ -331,12 +331,12 @@ describe('Config Transformer Plugin', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('missing a prefix argument'),
     );
-    // Bean exists (has @Singleton) but no valueFields (prefix missing)
-    const bean = result.components.find(
+    // Component exists (has @Singleton) but no valueFields (prefix missing)
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    expect(bean).toBeDefined();
-    expect(bean!.metadata.valueFields).toBeUndefined();
+    expect(component).toBeDefined();
+    expect(component!.metadata.valueFields).toBeUndefined();
     warnSpy.mockRestore();
   });
 
@@ -355,11 +355,11 @@ describe('Config Transformer Plugin', () => {
     });
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('@Config'));
-    // Class shouldn't be in beans at all (no @Singleton)
-    const bean = result.components.find(
+    // Class shouldn't be in components at all (no @Singleton)
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    expect(bean).toBeUndefined();
+    expect(component).toBeUndefined();
     warnSpy.mockRestore();
   });
 
@@ -389,12 +389,12 @@ describe('Config Transformer Plugin', () => {
         'only single-quoted or double-quoted string literals are supported',
       ),
     );
-    // Bean exists (has @Singleton) but no valueFields (non-literal prefix)
-    const bean = result.components.find(
+    // Component exists (has @Singleton) but no valueFields (non-literal prefix)
+    const component = result.components.find(
       (b) => b.tokenRef.kind === 'class' && b.tokenRef.className === 'Config',
     );
-    expect(bean).toBeDefined();
-    expect(bean!.metadata.valueFields).toBeUndefined();
+    expect(component).toBeDefined();
+    expect(component!.metadata.valueFields).toBeUndefined();
     warnSpy.mockRestore();
   });
 

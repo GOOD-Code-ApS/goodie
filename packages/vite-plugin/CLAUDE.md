@@ -29,7 +29,7 @@ interface DiPluginOptions {
   include?: string[];      // source file globs
   debounceMs?: number;     // HMR rebuild debounce, default: 100
   plugins?: TransformerPlugin[];  // additional transformer plugins
-  scan?: string[];         // npm scopes to scan for library beans
+  scan?: string[];         // npm scopes to scan for library components
   configDir?: string;      // directory containing JSON config files (default.json, {env}.json)
 }
 ```

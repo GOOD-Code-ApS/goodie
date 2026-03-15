@@ -35,9 +35,9 @@ Each method gets its own circuit keyed by `className:methodName`. Only one probe
 
 Exponential backoff with random jitter (50–100% of computed delay) to prevent thundering herd. On first failure of a sync method, the return becomes a `Promise` due to `setTimeout` — callers should always `await` `@Retryable` methods.
 
-## Library Beans
+## Library Components
 
-The package ships three singleton interceptor beans in `components.json` (`RetryInterceptor`, `CircuitBreakerInterceptor`, `TimeoutInterceptor`). AOP decorator config is also included in the manifest's `aop` section. Consumers auto-discover both at build time.
+The package ships three singleton interceptor components in `components.json` (`RetryInterceptor`, `CircuitBreakerInterceptor`, `TimeoutInterceptor`). AOP decorator config is also included in the manifest's `aop` section. Consumers auto-discover both at build time.
 
 ## Gotchas
 

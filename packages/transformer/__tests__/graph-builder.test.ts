@@ -37,7 +37,7 @@ const decoratorsFile = `
 
 describe('Graph Builder', () => {
   describe('topological ordering', () => {
-    it('should return a single bean with no deps', () => {
+    it('should return a single component with no deps', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Repo.ts': `
@@ -113,7 +113,7 @@ describe('Graph Builder', () => {
     });
   });
 
-  describe('@Provides on non-@Factory beans', () => {
+  describe('@Provides on non-@Factory components', () => {
     it('should expand @Provides on @Singleton and wire dependencies', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
@@ -147,20 +147,20 @@ describe('Graph Builder', () => {
       expect(names).toContain('Service');
 
       // AppConfig should NOT have isFactory metadata
-      const configBean = result.components.find(
+      const configComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'AppConfig',
       )!;
-      expect(configBean.metadata.isFactory).toBeUndefined();
+      expect(configComponent.metadata.isFactory).toBeUndefined();
 
-      // dbUrl provides bean should have AppConfig as first dep
-      const dbUrlBean = result.components.find(
+      // dbUrl provides component should have AppConfig as first dep
+      const dbUrlComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
       )!;
-      expect(dbUrlBean.factoryKind).toBe('provides');
-      expect(dbUrlBean.constructorDeps[0].tokenRef).toMatchObject({
+      expect(dbUrlComponent.factoryKind).toBe('provides');
+      expect(dbUrlComponent.constructorDeps[0].tokenRef).toMatchObject({
         className: 'AppConfig',
       });
     });
@@ -185,7 +185,7 @@ describe('Graph Builder', () => {
       expect(result.components[0].metadata.isFactory).toBe(true);
     });
 
-    it('should register @Provides methods as beans with module as first dep', () => {
+    it('should register @Provides methods as components with module as first dep', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
@@ -200,20 +200,20 @@ describe('Graph Builder', () => {
       });
 
       expect(result.components).toHaveLength(2);
-      const dbUrlBean = result.components.find(
+      const dbUrlComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
       )!;
-      expect(dbUrlBean).toBeDefined();
-      expect(dbUrlBean.scope).toBe('singleton');
-      expect(dbUrlBean.factoryKind).toBe('provides');
-      expect(dbUrlBean.constructorDeps[0].tokenRef).toMatchObject({
+      expect(dbUrlComponent).toBeDefined();
+      expect(dbUrlComponent.scope).toBe('singleton');
+      expect(dbUrlComponent.factoryKind).toBe('provides');
+      expect(dbUrlComponent.constructorDeps[0].tokenRef).toMatchObject({
         className: 'AppModule',
       });
     });
 
-    it('should order module before its @Provides beans', () => {
+    it('should order module before its @Provides components', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/AppModule.ts': `
@@ -255,24 +255,24 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const dbUrlBean = result.components.find(
+      const dbUrlComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'injection-token' &&
           b.tokenRef.tokenName === 'dbUrl',
       )!;
       // First dep is module, second is the Config param
-      expect(dbUrlBean.constructorDeps).toHaveLength(2);
-      expect(dbUrlBean.constructorDeps[0].tokenRef).toMatchObject({
+      expect(dbUrlComponent.constructorDeps).toHaveLength(2);
+      expect(dbUrlComponent.constructorDeps[0].tokenRef).toMatchObject({
         className: 'AppModule',
       });
-      expect(dbUrlBean.constructorDeps[1].tokenRef).toMatchObject({
+      expect(dbUrlComponent.constructorDeps[1].tokenRef).toMatchObject({
         className: 'Config',
       });
     });
   });
 
   describe('@Named + @Inject resolution', () => {
-    it('should resolve @Inject(name) to @Named bean', () => {
+    it('should resolve @Inject(name) to @Named component', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,
         '/src/Repo.ts': `
@@ -316,12 +316,12 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
       )!;
-      expect(bean.primary).toBe(true);
-      expect(bean.metadata.primary).toBe(true);
+      expect(component.primary).toBe(true);
+      expect(component.metadata.primary).toBe(true);
     });
 
     it('should set primary metadata to true in generated code', () => {
@@ -342,16 +342,16 @@ describe('Graph Builder', () => {
         `,
       });
 
-      const defaultBean = result.components.find(
+      const defaultComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DefaultRepo',
       )!;
-      const otherBean = result.components.find(
+      const otherComponent = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'OtherRepo',
       )!;
-      expect(defaultBean.metadata.primary).toBe(true);
-      expect(otherBean.metadata.primary).toBeUndefined();
+      expect(defaultComponent.metadata.primary).toBe(true);
+      expect(otherComponent.metadata.primary).toBeUndefined();
     });
   });
 
@@ -543,7 +543,7 @@ describe('Graph Builder', () => {
     });
   });
 
-  describe('eager beans', () => {
+  describe('eager components', () => {
     it('should preserve @Eager flag through the graph', () => {
       const result = pipeline({
         '/src/decorators.ts': decoratorsFile,

@@ -49,16 +49,16 @@ export default function createSecurityPlugin(): TransformerPlugin {
       }
     },
 
-    afterResolve(beans: IRComponentDefinition[]): IRComponentDefinition[] {
+    afterResolve(components: IRComponentDefinition[]): IRComponentDefinition[] {
       // Mark anonymous methods in the AOP interceptor metadata so
       // SecurityInterceptor can skip auth for @Anonymous methods.
-      for (const bean of beans) {
-        const security = bean.metadata.security as
+      for (const component of components) {
+        const security = component.metadata.security as
           | { classRoles: string[]; anonymousMethods: string[] }
           | undefined;
         if (!security || security.anonymousMethods.length === 0) continue;
 
-        const interceptedMethods = bean.metadata.interceptedMethods as
+        const interceptedMethods = component.metadata.interceptedMethods as
           | Array<{
               methodName: string;
               interceptors: Array<{
@@ -86,7 +86,7 @@ export default function createSecurityPlugin(): TransformerPlugin {
         }
       }
 
-      return beans;
+      return components;
     },
   };
 }

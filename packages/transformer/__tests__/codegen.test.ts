@@ -5,8 +5,8 @@ import { generateCode } from '../src/codegen.js';
 const loc = { filePath: '/src/test.ts', line: 1, column: 1 };
 
 describe('Code Generator', () => {
-  it('should generate code for a bean with no dependencies', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should generate code for a component with no dependencies', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -25,7 +25,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -37,8 +37,8 @@ describe('Code Generator', () => {
     expect(code).toContain('eager: false');
   });
 
-  it('should generate code for a singleton bean with constructor deps', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should generate code for a singleton component with constructor deps', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -84,7 +84,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -96,7 +96,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate InjectionToken declarations for method-name tokens', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -149,7 +149,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -161,7 +161,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate @Provides factory code', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -214,7 +214,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -222,7 +222,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate @Provides factory with method params', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -301,7 +301,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -311,7 +311,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate field injection factory', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -356,7 +356,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -369,7 +369,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate mixed constructor + field injection', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: { kind: 'class', className: 'A', importPath: '/src/A.ts' },
         scope: 'transient',
@@ -433,7 +433,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -461,8 +461,8 @@ describe('Code Generator', () => {
     );
   });
 
-  it('should generate eager: true for eager beans', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should generate eager: true for eager components', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -481,7 +481,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -489,7 +489,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate sanitized variable names for generic InjectionTokens', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'injection-token',
@@ -508,7 +508,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -521,7 +521,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate distinct tokens for different specializations', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'injection-token',
@@ -556,7 +556,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -569,7 +569,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate InjectionTokens for generic deps with importPath', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -599,7 +599,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -613,7 +613,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate distinct var names when tokenNames collide after sanitization', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'injection-token',
@@ -648,7 +648,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -659,13 +659,13 @@ describe('Code Generator', () => {
     expect(code).toContain(
       "export const Repository_User_Token_2 = new InjectionToken<unknown>('RepositoryUser')",
     );
-    // Both should appear as token references in their bean definitions
+    // Both should appear as token references in their component definitions
     expect(code).toContain('token: Repository_User_Token,');
     expect(code).toContain('token: Repository_User_Token_2,');
   });
 
-  it('should generate metadata for module beans', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should generate metadata for module components', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -684,7 +684,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -692,7 +692,7 @@ describe('Code Generator', () => {
   });
 
   it('should escape single quotes in @Value keys to prevent code injection', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -718,7 +718,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -729,7 +729,7 @@ describe('Code Generator', () => {
   });
 
   it('should generate app export with Goodie.build when @Value fields exist', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -750,7 +750,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -761,7 +761,7 @@ describe('Code Generator', () => {
   });
 
   it('should export __Goodie_Config token when @Value fields exist', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -782,7 +782,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -790,7 +790,7 @@ describe('Code Generator', () => {
   });
 
   it('should export buildDefinitions when @Value fields exist', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -811,15 +811,15 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
     expect(code).toContain('export function buildDefinitions(');
   });
 
-  it('should generate buildDefinitions without config bean when no @Value fields exist', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should generate buildDefinitions without config component when no @Value fields exist', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -838,7 +838,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -849,7 +849,7 @@ describe('Code Generator', () => {
   });
 
   it('should always generate collection field in dependency output', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -895,7 +895,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -905,7 +905,7 @@ describe('Code Generator', () => {
   });
 
   it('should emit loadConfigFiles in factory when configDir is set', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -926,7 +926,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
       configDir: '/project/config',
     });
@@ -943,7 +943,7 @@ describe('Code Generator', () => {
   });
 
   it('should embed configDir path verbatim (resolution happens in transform.ts)', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -964,7 +964,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
       configDir: '/resolved/project/config',
     });
@@ -975,7 +975,7 @@ describe('Code Generator', () => {
   });
 
   it('should not emit loadConfigFiles when configDir is not set', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -996,7 +996,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
     });
 
@@ -1004,8 +1004,8 @@ describe('Code Generator', () => {
     expect(code).toContain('{ ...process.env, ...config }');
   });
 
-  it('should generate config bean when configDir is set even without @Value fields', () => {
-    const beans: IRComponentDefinition[] = [
+  it('should generate config component when configDir is set even without @Value fields', () => {
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -1024,7 +1024,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
       configDir: '/project/config',
     });
@@ -1041,7 +1041,7 @@ describe('Code Generator', () => {
   });
 
   it('should embed inlined config values instead of loadConfigFiles when inlinedConfig is set', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -1064,7 +1064,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
       inlinedConfig: { 'server.port': '8080', 'server.host': 'localhost' },
     });
@@ -1080,7 +1080,7 @@ describe('Code Generator', () => {
   });
 
   it('should prefer inlinedConfig over configDir when both are set', () => {
-    const beans: IRComponentDefinition[] = [
+    const components: IRComponentDefinition[] = [
       {
         tokenRef: {
           kind: 'class',
@@ -1103,7 +1103,7 @@ describe('Code Generator', () => {
       },
     ];
 
-    const code = generateCode(beans, {
+    const code = generateCode(components, {
       outputPath: '/out/AppContext.generated.ts',
       configDir: '/project/config',
       inlinedConfig: { 'server.port': '8080' },

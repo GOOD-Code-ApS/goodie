@@ -43,7 +43,7 @@ function makeDef<T>(
 // ── Basic Resolution ─────────────────────────────────────────────────
 
 describe('ApplicationContext — basic resolution', () => {
-  it('resolves a bean with no dependencies', async () => {
+  it('resolves a component with no dependencies', async () => {
     class Foo {
       value = 42;
     }
@@ -55,7 +55,7 @@ describe('ApplicationContext — basic resolution', () => {
     expect(foo.value).toBe(42);
   });
 
-  it('resolves a bean with one dependency', async () => {
+  it('resolves a component with one dependency', async () => {
     class Repo {}
     class Service {
       constructor(readonly repo: Repo) {}
@@ -119,7 +119,7 @@ describe('ApplicationContext — basic resolution', () => {
     expect(a.b.d).toBe(a.c.d);
   });
 
-  it('resolves InjectionToken-based beans', async () => {
+  it('resolves InjectionToken-based components', async () => {
     const DB_URL = new InjectionToken<string>('DB_URL');
     const ctx = await ApplicationContext.create([
       makeDef<string>(DB_URL, { factory: () => 'postgres://localhost' }),
@@ -188,30 +188,30 @@ describe('ApplicationContext — async', () => {
     expect(svc.value).toBe('async');
   });
 
-  it('get() throws AsyncComponentNotReadyError for unresolved async bean', async () => {
-    class AsyncBean {}
+  it('get() throws AsyncComponentNotReadyError for unresolved async component', async () => {
+    class AsyncComponent {}
     const ctx = await ApplicationContext.create([
-      makeDef(AsyncBean, {
-        factory: async () => new AsyncBean(),
+      makeDef(AsyncComponent, {
+        factory: async () => new AsyncComponent(),
       }),
     ]);
-    expect(() => ctx.get(AsyncBean)).toThrow(AsyncComponentNotReadyError);
+    expect(() => ctx.get(AsyncComponent)).toThrow(AsyncComponentNotReadyError);
   });
 
   it('get() throws AsyncComponentNotReadyError on second call too (not UNRESOLVED symbol)', async () => {
-    class AsyncBean {}
+    class AsyncComponent {}
     const ctx = await ApplicationContext.create([
-      makeDef(AsyncBean, {
-        factory: async () => new AsyncBean(),
+      makeDef(AsyncComponent, {
+        factory: async () => new AsyncComponent(),
       }),
     ]);
     // First call sets UNRESOLVED in cache and throws
-    expect(() => ctx.get(AsyncBean)).toThrow(AsyncComponentNotReadyError);
+    expect(() => ctx.get(AsyncComponent)).toThrow(AsyncComponentNotReadyError);
     // Second call must also throw (not return the UNRESOLVED Symbol)
-    expect(() => ctx.get(AsyncBean)).toThrow(AsyncComponentNotReadyError);
+    expect(() => ctx.get(AsyncComponent)).toThrow(AsyncComponentNotReadyError);
   });
 
-  it('eager async bean is available via get() after context creation', async () => {
+  it('eager async component is available via get() after context creation', async () => {
     class EagerAsync {
       value = 'ready';
     }
@@ -225,9 +225,9 @@ describe('ApplicationContext — async', () => {
       }),
     ]);
     // Should be available synchronously since it was eagerly resolved
-    const bean = ctx.get(EagerAsync);
-    expect(bean).toBeInstanceOf(EagerAsync);
-    expect(bean.value).toBe('ready');
+    const component = ctx.get(EagerAsync);
+    expect(component).toBeInstanceOf(EagerAsync);
+    expect(component.value).toBe('ready');
   });
 
   it('getAsync deduplicates concurrent resolution of the same singleton', async () => {
@@ -254,15 +254,15 @@ describe('ApplicationContext — async', () => {
 // ── ComponentPostProcessor ────────────────────────────────────────────────
 
 describe('ApplicationContext — ComponentPostProcessor', () => {
-  it('calls beforeInit on created beans', async () => {
+  it('calls beforeInit on created components', async () => {
     const calls: string[] = [];
     class Target {
       name = 'target';
     }
     const processor: ComponentPostProcessor = {
-      beforeInit(bean) {
+      beforeInit(component) {
         calls.push('beforeInit');
-        return bean;
+        return component;
       },
     };
     const ctx = await ApplicationContext.create([
@@ -279,13 +279,13 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
     expect(calls).toEqual(['beforeInit']);
   });
 
-  it('calls afterInit on created beans', async () => {
+  it('calls afterInit on created components', async () => {
     const calls: string[] = [];
     class Target {}
     const processor: ComponentPostProcessor = {
-      afterInit(bean) {
+      afterInit(component) {
         calls.push('afterInit');
-        return bean;
+        return component;
       },
     };
     const ctx = await ApplicationContext.create([
@@ -302,7 +302,7 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
     expect(calls).toEqual(['afterInit']);
   });
 
-  it('can replace a bean instance', async () => {
+  it('can replace a component instance', async () => {
     class Original {
       kind = 'original';
     }
@@ -310,11 +310,11 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
       kind = 'replaced';
     }
     const processor: ComponentPostProcessor = {
-      afterInit<T>(bean: T, def: ComponentDefinition<T>): T {
+      afterInit<T>(component: T, def: ComponentDefinition<T>): T {
         if (def.token === Original) {
           return new Replacement() as unknown as T;
         }
-        return bean;
+        return component;
       },
     };
     const ctx = await ApplicationContext.create([
@@ -335,15 +335,15 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
     const order: string[] = [];
     class Target {}
     const pp1: ComponentPostProcessor = {
-      afterInit(bean) {
+      afterInit(component) {
         order.push('pp1');
-        return bean;
+        return component;
       },
     };
     const pp2: ComponentPostProcessor = {
-      afterInit(bean) {
+      afterInit(component) {
         order.push('pp2');
-        return bean;
+        return component;
       },
     };
     const ctx = await ApplicationContext.create([
@@ -371,9 +371,9 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
     const processed: string[] = [];
     class Target {}
     const pp1: ComponentPostProcessor = {
-      afterInit(bean, def) {
+      afterInit(component, def) {
         processed.push(tokenDesc(def.token));
-        return bean;
+        return component;
       },
     };
     const ppToken = new InjectionToken<ComponentPostProcessor>('pp1');
@@ -404,11 +404,11 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
         factory: (config) => {
           const cfg = config as Config;
           return {
-            afterInit<T>(bean: T, def: ComponentDefinition<T>): T {
+            afterInit<T>(component: T, def: ComponentDefinition<T>): T {
               if (def.token === Target) {
-                (bean as Target).label = `${cfg.prefix}:processed`;
+                (component as Target).label = `${cfg.prefix}:processed`;
               }
-              return bean;
+              return component;
             },
           } satisfies ComponentPostProcessor;
         },
@@ -440,11 +440,11 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
         factory: (config) => {
           const cfg = config as AsyncConfig;
           return {
-            afterInit<T>(bean: T, def: ComponentDefinition<T>): T {
+            afterInit<T>(component: T, def: ComponentDefinition<T>): T {
               if (def.token === Target) {
-                (bean as Target).timeout = cfg.timeout;
+                (component as Target).timeout = cfg.timeout;
               }
-              return bean;
+              return component;
             },
           } satisfies ComponentPostProcessor;
         },
@@ -470,9 +470,9 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
       makeDef(Config, { factory: () => new Config() }),
       makeDef<ComponentPostProcessor>(pp1Token, {
         factory: () => ({
-          afterInit(bean, def) {
+          afterInit(component, def) {
             processed.push(tokenDesc(def.token));
-            return bean;
+            return component;
           },
         }),
         metadata: { isComponentPostProcessor: true },
@@ -482,9 +482,9 @@ describe('ApplicationContext — ComponentPostProcessor', () => {
         factory: (_config) => {
           // pp2 depends on Config; Config should be post-processed by pp1
           return {
-            afterInit(bean, def) {
+            afterInit(component, def) {
               processed.push(`pp2:${tokenDesc(def.token)}`);
-              return bean;
+              return component;
             },
           } satisfies ComponentPostProcessor;
         },
@@ -538,7 +538,7 @@ describe('ApplicationContext — optional deps', () => {
 // ── getAll ───────────────────────────────────────────────────────────
 
 describe('ApplicationContext — getAll', () => {
-  it('returns all beans registered under a token', async () => {
+  it('returns all components registered under a token', async () => {
     const HANDLER = new InjectionToken<{ name: string }>('Handler');
     const ctx = await ApplicationContext.create([
       makeDef(HANDLER, { factory: () => ({ name: 'a' }) }),
@@ -667,7 +667,7 @@ describe('ApplicationContext — collection injection', () => {
     expect(svc.handlers[0].name).toBe('async-a');
   });
 
-  it('getAllAsync resolves async bean in collection', async () => {
+  it('getAllAsync resolves async component in collection', async () => {
     const TOKEN = new InjectionToken<number>('Num');
     const ctx = await ApplicationContext.create([
       makeDef(TOKEN, { factory: async () => 42 }),
@@ -760,13 +760,13 @@ describe('ApplicationContext — @OnInit lifecycle', () => {
       }
     }
     const processor: ComponentPostProcessor = {
-      beforeInit(bean, def) {
+      beforeInit(component, def) {
         if (def.token === Service) calls.push('beforeInit');
-        return bean;
+        return component;
       },
-      afterInit(bean, def) {
+      afterInit(component, def) {
         if (def.token === Service) calls.push('afterInit');
-        return bean;
+        return component;
       },
     };
     const ppToken = new InjectionToken<ComponentPostProcessor>('pp');
@@ -784,7 +784,7 @@ describe('ApplicationContext — @OnInit lifecycle', () => {
     expect(calls).toEqual(['beforeInit', 'postConstruct', 'afterInit']);
   });
 
-  it('calls @OnInit on prototype beans each time', async () => {
+  it('calls @OnInit on prototype components each time', async () => {
     let callCount = 0;
     class Proto {
       init() {
@@ -803,7 +803,7 @@ describe('ApplicationContext — @OnInit lifecycle', () => {
     expect(callCount).toBe(2);
   });
 
-  it('calls @OnInit on eager beans during context creation', async () => {
+  it('calls @OnInit on eager components during context creation', async () => {
     const calls: string[] = [];
     class Startup {
       init() {
@@ -916,7 +916,7 @@ describe('ApplicationContext — @OnDestroy lifecycle', () => {
     expect(calls).toEqual(['service', 'database']);
   });
 
-  it('close() skips beans that were never resolved', async () => {
+  it('close() skips components that were never resolved', async () => {
     const calls: string[] = [];
     class LazyService {
       destroy() {
@@ -929,37 +929,37 @@ describe('ApplicationContext — @OnDestroy lifecycle', () => {
         metadata: { onDestroyMethods: ['destroy'] },
       }),
     ]);
-    // Don't resolve the bean — it should not be destroyed
+    // Don't resolve the component — it should not be destroyed
     await ctx.close();
     expect(calls).toEqual([]);
   });
 
-  it('close() collects errors and still cleans up remaining beans', async () => {
+  it('close() collects errors and still cleans up remaining components', async () => {
     const calls: string[] = [];
-    class FailingBean {
+    class FailingComponent {
       destroy() {
         throw new Error('fail!');
       }
     }
-    class GoodBean {
+    class GoodComponent {
       destroy() {
         calls.push('good');
       }
     }
     const ctx = await ApplicationContext.create([
-      makeDef(GoodBean, {
-        factory: () => new GoodBean(),
+      makeDef(GoodComponent, {
+        factory: () => new GoodComponent(),
         metadata: { onDestroyMethods: ['destroy'] },
       }),
-      makeDef(FailingBean, {
-        factory: () => new FailingBean(),
+      makeDef(FailingComponent, {
+        factory: () => new FailingComponent(),
         metadata: { onDestroyMethods: ['destroy'] },
       }),
     ]);
-    ctx.get(GoodBean);
-    ctx.get(FailingBean);
+    ctx.get(GoodComponent);
+    ctx.get(FailingComponent);
     await expect(ctx.close()).rejects.toThrow('fail!');
-    // GoodBean should still have been cleaned up (it's after FailingBean in reverse order)
+    // GoodComponent should still have been cleaned up (it's after FailingComponent in reverse order)
     expect(calls).toEqual(['good']);
   });
 
@@ -982,7 +982,7 @@ describe('ApplicationContext — @OnDestroy lifecycle', () => {
     expect(calls).toEqual(['async-shutdown']);
   });
 
-  it('prototype beans are not destroyed', async () => {
+  it('prototype components are not destroyed', async () => {
     const calls: string[] = [];
     class Proto {
       destroy() {
@@ -1001,7 +1001,7 @@ describe('ApplicationContext — @OnDestroy lifecycle', () => {
     expect(calls).toEqual([]);
   });
 
-  it('close() throws AggregateError when multiple beans fail', async () => {
+  it('close() throws AggregateError when multiple components fail', async () => {
     class Fail1 {
       destroy() {
         throw new Error('fail1');
@@ -1069,7 +1069,7 @@ describe('ApplicationContext — getDefinitions', () => {
 // ── baseTokens ──────────────────────────────────────────────────────
 
 describe('ApplicationContext — baseTokens', () => {
-  it('bean with baseTokens is findable via getAll(baseToken)', async () => {
+  it('component with baseTokens is findable via getAll(baseToken)', async () => {
     class Base {}
     class Sub extends Base {
       value = 'sub';
@@ -1084,7 +1084,7 @@ describe('ApplicationContext — baseTokens', () => {
     expect(ctx.getAll(Base)).toEqual([]);
   });
 
-  it('getAll(baseToken) returns beans registered with baseTokens', async () => {
+  it('getAll(baseToken) returns components registered with baseTokens', async () => {
     class HealthIndicator {}
     class UptimeIndicator extends HealthIndicator {
       name = 'uptime';
@@ -1115,7 +1115,7 @@ describe('ApplicationContext — baseTokens', () => {
     expect(indicators[0]).toBeInstanceOf(UptimeIndicator);
   });
 
-  it('multiple beans registering under the same base token', async () => {
+  it('multiple components registering under the same base token', async () => {
     class HealthIndicator {}
     class UptimeIndicator extends HealthIndicator {
       name = 'uptime';
@@ -1149,7 +1149,7 @@ describe('ApplicationContext — baseTokens', () => {
     expect(indicators[1]).toBeInstanceOf(DiskIndicator);
   });
 
-  it('get() on base token returns the last-registered bean', async () => {
+  it('get() on base token returns the last-registered component', async () => {
     class HealthIndicator {}
     class UptimeIndicator extends HealthIndicator {}
     class DiskIndicator extends HealthIndicator {}
@@ -1237,7 +1237,7 @@ describe('ApplicationContext — self-injection', () => {
     expect(result).toBe(ctx);
   });
 
-  it('beans can depend on ApplicationContext', async () => {
+  it('components can depend on ApplicationContext', async () => {
     class Service {
       constructor(readonly ctx: ApplicationContext) {}
     }
@@ -1255,7 +1255,7 @@ describe('ApplicationContext — self-injection', () => {
 // ── @Primary ────────────────────────────────────────────────────────
 
 describe('ApplicationContext — @Primary', () => {
-  it('selects @Primary bean over last-registered bean via shared token', async () => {
+  it('selects @Primary component over last-registered component via shared token', async () => {
     abstract class Provider {}
 
     class PrimaryImpl extends Provider {
@@ -1291,7 +1291,7 @@ describe('ApplicationContext — @Primary', () => {
     expect(provider).toBeInstanceOf(PrimaryImpl);
   });
 
-  it('selects @Primary bean under shared base token', async () => {
+  it('selects @Primary component under shared base token', async () => {
     abstract class CacheProvider {}
 
     class InMemoryCache extends CacheProvider {
@@ -1327,7 +1327,7 @@ describe('ApplicationContext — @Primary', () => {
     expect(provider).toBeInstanceOf(InMemoryCache);
   });
 
-  it('getAll still returns all beans regardless of @Primary', async () => {
+  it('getAll still returns all components regardless of @Primary', async () => {
     abstract class Handler {}
 
     class HandlerA extends Handler {}

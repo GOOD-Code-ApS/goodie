@@ -44,7 +44,7 @@ export type {
   SourceLocation,
   TokenRef,
 } from './ir.js';
-// Library bean discovery
+// Library component discovery
 export type {
   DiscoveryResult,
   LibraryComponentsManifest,
@@ -71,7 +71,7 @@ export type { ResolveResult } from './resolver.js';
 // Resolver
 export { resolve } from './resolver.js';
 export type {
-  ScannedBean,
+  ScannedComponent,
   ScannedConstructorParam,
   ScannedFieldInjection,
   ScannedProvides,

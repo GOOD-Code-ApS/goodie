@@ -1,7 +1,7 @@
 import { type ApplicationContext, OnStart } from '@goodie-ts/core';
 
 /**
- * Abstract base class for HTTP server bootstrap beans.
+ * Abstract base class for HTTP server bootstrap components.
  *
  * Concrete implementations (e.g. `HonoServerBootstrap`) extend this class
  * to create and start a framework-specific HTTP router/server.

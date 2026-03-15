@@ -86,7 +86,7 @@ describe('runTransform', () => {
 });
 
 describe('logOutcome', () => {
-  it('logs bean count and timing on success', () => {
+  it('logs component count and timing on success', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const outcome: TransformOutcome = {
@@ -118,14 +118,16 @@ describe('logOutcome', () => {
         code: '',
         outputPath: '/project/src/out.ts',
         components: [] as any,
-        warnings: ['Unused bean: Foo'],
+        warnings: ['Unused component: Foo'],
       },
       durationMs: 50,
     };
 
     logOutcome(outcome);
 
-    expect(warnSpy).toHaveBeenCalledWith('[goodie] Warning: Unused bean: Foo');
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[goodie] Warning: Unused component: Foo',
+    );
     warnSpy.mockRestore();
   });
 

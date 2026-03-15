@@ -14,7 +14,7 @@ export interface DiPluginOptions {
   /** Transformer plugins to extend the pipeline (e.g. AOP, logging, cache). */
   plugins?: TransformerPlugin[];
   /**
-   * npm scopes to scan for library beans (e.g. `['@goodie-ts', '@acme']`).
+   * npm scopes to scan for library components (e.g. `['@goodie-ts', '@acme']`).
    * Defaults to `['@goodie-ts']`.
    */
   scan?: string[];

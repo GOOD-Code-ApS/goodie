@@ -158,7 +158,7 @@ describe('EnvEndpoint', () => {
     expect(body.properties['auth.tokenized']).toBe('should-not-mask');
   });
 
-  it('returns empty properties when no config bean exists', () => {
+  it('returns empty properties when no config component exists', () => {
     const ctx = createEmptyContext();
 
     const endpoint = new EnvEndpoint(ctx);

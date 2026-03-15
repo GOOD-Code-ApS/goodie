@@ -1,9 +1,9 @@
 /**
- * Conditionally register a bean based on an environment variable.
+ * Conditionally register a component based on an environment variable.
  *
- * When `value` is provided, the bean is only registered if
+ * When `value` is provided, the component is only registered if
  * `process.env[envVar] === value`. When `value` is omitted,
- * the bean is registered if `process.env[envVar]` is defined.
+ * the component is registered if `process.env[envVar]` is defined.
  *
  * This decorator is a compile-time no-op -- the transformer scans it
  * via AST and the graph builder evaluates the condition.

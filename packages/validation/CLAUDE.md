@@ -43,9 +43,9 @@ This bridges the compile-time type information to runtime, enabling the `Validat
 
 Constraints applied via `v.pipe(schema, ...actions)`. The `Size` constraint maps to `v.minLength()` + `v.maxLength()`.
 
-## Library Beans (components.json)
+## Library Components (components.json)
 
-3 singleton beans:
+3 singleton components:
 - **ValiSchemaFactory** — schema builder + cache
 - **ValidationInterceptor** — AOP interceptor, depends on ValiSchemaFactory
 - **ValiExceptionHandler** — extends ExceptionHandler (from http), `baseTokens: [ExceptionHandler]`
@@ -57,4 +57,4 @@ Constraints applied via `v.pipe(schema, ...actions)`. The `Size` constraint maps
 - **Non-introspected references are `v.unknown()`** — validation is opt-in. Missing `@Introspected` on a referenced type means that field isn't validated, not an error.
 - **`@Validated` at method level** — applied to individual controller methods that need validation. The AOP wiring connects `ValidationInterceptor`.
 - **Param types via MetadataRegistry** — the validation plugin generates `registerMethodParams()` calls at build time. The interceptor reads them at runtime via `getMethodParams()`. This avoids JSON-serialization limitations of the AOP metadata path (class references aren't JSON-serializable).
-- **Exception handler lives here, not in the adapter** — follows Micronaut's pattern. The generic exception handling pipeline in `@goodie-ts/http` iterates all `ExceptionHandler` beans. `ValiExceptionHandler` is one of potentially many.
+- **Exception handler lives here, not in the adapter** — follows Micronaut's pattern. The generic exception handling pipeline in `@goodie-ts/http` iterates all `ExceptionHandler` components. `ValiExceptionHandler` is one of potentially many.

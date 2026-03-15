@@ -189,7 +189,7 @@ describe('builtin-introspection-plugin', () => {
     expect(result.code).not.toContain('"name":"internal"');
   });
 
-  it('does not register @Introspected class as a bean', () => {
+  it('does not register @Introspected class as a component', () => {
     const result = createStrictTestProject({
       '/src/Dto.ts': `
         import { Introspected } from './decorators'
@@ -241,7 +241,7 @@ describe('builtin-introspection-plugin', () => {
     expect(result.code).toContain('"decorators":[]');
   });
 
-  it('works alongside bean definitions', () => {
+  it('works alongside component definitions', () => {
     const result = createStrictTestProject({
       '/src/CreateTodoRequest.ts': `
         import { Introspected } from './decorators'

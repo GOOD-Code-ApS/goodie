@@ -5,9 +5,9 @@ import { ValiError } from 'valibot';
 /**
  * Exception handler for Valibot's `ValiError`.
  *
- * Library bean — extends `ExceptionHandler` from `@goodie-ts/http`.
+ * Library component — extends `ExceptionHandler` from `@goodie-ts/http`.
  * The generic exception handling pipeline iterates all registered
- * `ExceptionHandler` beans. This one catches `ValiError` and returns
+ * `ExceptionHandler` components. This one catches `ValiError` and returns
  * a 400 Bad Request with structured error details.
  */
 @Singleton()

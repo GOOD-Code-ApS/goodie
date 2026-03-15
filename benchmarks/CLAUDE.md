@@ -12,8 +12,8 @@ pnpm bench          # Run all benchmarks
 
 | File | What it measures |
 |------|-----------------|
-| `helpers.ts` | Shared generators: `generateBeanSource(n)` for transformer benchmarks, `generateBeanDefinitions(n)` for runtime benchmarks |
-| `transformer.bench.ts` | Build-time: full pipeline, scanner only, codegen only — for 50/100/500 beans |
+| `helpers.ts` | Shared generators: `generateComponentSource(n)` for transformer benchmarks, `generateComponentDefinitions(n)` for runtime benchmarks |
+| `transformer.bench.ts` | Build-time: full pipeline, scanner only, codegen only — for 50/100/500 components |
 | `runtime.bench.ts` | Runtime: `ApplicationContext.create()`, singleton/prototype `get()`, `getAll()` |
 
 ## Adding Benchmarks

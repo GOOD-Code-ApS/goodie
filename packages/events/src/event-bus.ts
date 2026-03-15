@@ -4,10 +4,10 @@ import { ApplicationEventListener } from './application-event-listener.js';
 import { EventPublisher } from './event-publisher.js';
 
 /**
- * In-memory event bus that routes events to {@link ApplicationEventListener} beans.
+ * In-memory event bus that routes events to {@link ApplicationEventListener} components.
  *
  * Synthesized by the events transformer plugin as an eager singleton.
- * Discovers all `ApplicationEventListener` beans via `ApplicationContext.getAll()`
+ * Discovers all `ApplicationEventListener` components via `ApplicationContext.getAll()`
  * and groups them by `eventType` for O(1) dispatch.
  *
  * **Event matching**: by `eventType` property (exact class identity), then

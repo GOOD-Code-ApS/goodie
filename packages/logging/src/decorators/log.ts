@@ -21,7 +21,7 @@ export interface LogOptions {
  *
  * **Limitation:** `@Log` on a `@Provides` method inside a `@Factory` class is
  * silently ignored. `@Provides` methods are factory functions executed by the
- * container at bean creation time — they are not instance methods that go
+ * container at component creation time — they are not instance methods that go
  * through AOP interception. Use `@Log` only on regular `@Singleton` /
  * `@Transient` class methods.
  *

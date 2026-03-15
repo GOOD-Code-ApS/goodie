@@ -42,7 +42,7 @@ export class ApplicationContext {
   private readonly singletonCache = new Map<Token, unknown>();
   private readonly asyncInFlight = new Map<Token, Promise<unknown>>();
   private readonly postProcessors: ComponentPostProcessor[] = [];
-  /** Names of beans excluded by conditional rules, with reason strings. */
+  /** Names of components excluded by conditional rules, with reason strings. */
   private readonly filteredOutComponents = new Map<string, string>();
   private closed = false;
   private startupMetrics: StartupMetrics | undefined;
@@ -93,7 +93,7 @@ export class ApplicationContext {
    * 1. Topologically sorts definitions
    * 2. Validates required dependencies exist
    * 3. Discovers and initializes ComponentPostProcessors
-   * 4. Eagerly resolves beans marked with `eager: true`
+   * 4. Eagerly resolves components marked with `eager: true`
    */
   static async create(
     definitions: ComponentDefinition[],
@@ -120,7 +120,7 @@ export class ApplicationContext {
     }
     ctx.startupMetrics = metrics;
 
-    // Self-register so beans can inject ApplicationContext.
+    // Self-register so components can inject ApplicationContext.
     ctx.singletonCache.set(ApplicationContext, ctx);
     const selfDef: ComponentDefinition = {
       token: ApplicationContext,
@@ -140,21 +140,23 @@ export class ApplicationContext {
       await metrics.timeStage('initPostProcessors', () =>
         ctx.initPostProcessors(),
       );
-      await metrics.timeStage('initEagerBeans', () => ctx.initEagerBeans());
+      await metrics.timeStage('initEagerComponents', () =>
+        ctx.initEagerComponents(),
+      );
       metrics.setTotal(performance.now() - totalStart);
       metrics.print();
     } else {
       ctx.validateDependencies();
       await ctx.initPostProcessors();
-      await ctx.initEagerBeans();
+      await ctx.initEagerComponents();
     }
 
     return ctx;
   }
 
   /**
-   * Synchronously get a bean. Throws if:
-   * - The bean is async and hasn't been resolved yet
+   * Synchronously get a component. Throws if:
+   * - The component is async and hasn't been resolved yet
    * - The token has no provider
    * - The context is closed
    */
@@ -193,7 +195,7 @@ export class ApplicationContext {
   }
 
   /**
-   * Asynchronously get a bean. Always works, even for async factories.
+   * Asynchronously get a component. Always works, even for async factories.
    */
   async getAsync<T>(
     token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
@@ -239,8 +241,8 @@ export class ApplicationContext {
   }
 
   /**
-   * Get all beans registered under the given token.
-   * Throws if any bean has an async factory — use `getAllAsync()` instead.
+   * Get all components registered under the given token.
+   * Throws if any component has an async factory — use `getAllAsync()` instead.
    */
   getAll<T>(
     token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
@@ -262,8 +264,8 @@ export class ApplicationContext {
   }
 
   /**
-   * Asynchronously get all beans registered under the given token.
-   * Safe to use when beans may have async factories.
+   * Asynchronously get all components registered under the given token.
+   * Safe to use when components may have async factories.
    */
   async getAllAsync<T>(
     token: Constructor<T> | AbstractConstructor<T> | InjectionToken<T>,
@@ -288,7 +290,7 @@ export class ApplicationContext {
   }
 
   /**
-   * Returns a shallow defensive copy of the bean definitions used to build this context,
+   * Returns a shallow defensive copy of the component definitions used to build this context,
    * including the self-registered ApplicationContext definition.
    */
   getDefinitions(): readonly ComponentDefinition[] {
@@ -379,13 +381,13 @@ export class ApplicationContext {
     }
   }
 
-  private async initEagerBeans(): Promise<void> {
+  private async initEagerComponents(): Promise<void> {
     for (const def of this.sortedDefs) {
       if (def.eager && !def.metadata.isComponentPostProcessor) {
         if (this.startupMetrics) {
           const start = performance.now();
           await this.resolveAsyncRaw(def, false);
-          this.startupMetrics.recordBean(
+          this.startupMetrics.recordComponent(
             tokenName(def.token),
             performance.now() - start,
           );
@@ -414,7 +416,7 @@ export class ApplicationContext {
           this.buildSuggestionHint(depName),
         );
       }
-      // Singleton depending on request-scoped bean → inject a proxy
+      // Singleton depending on request-scoped component → inject a proxy
       if (depDef.scope === 'request' && parentDef?.scope === 'singleton') {
         return this.createRequestScopeProxy(depDef);
       }
@@ -592,8 +594,11 @@ export class ApplicationContext {
     );
   }
 
-  private applyPostProcessorsSync<T>(bean: T, def: ComponentDefinition): T {
-    let current = bean;
+  private applyPostProcessorsSync<T>(
+    component: T,
+    def: ComponentDefinition,
+  ): T {
+    let current = component;
     for (const pp of this.postProcessors) {
       if (pp.beforeInit) {
         const result = pp.beforeInit(current, def as ComponentDefinition<T>);
@@ -639,10 +644,10 @@ export class ApplicationContext {
   }
 
   private async applyPostProcessorsAsync(
-    bean: unknown,
+    component: unknown,
     def: ComponentDefinition,
   ): Promise<unknown> {
-    let current = bean;
+    let current = component;
     for (const pp of this.postProcessors) {
       if (pp.beforeInit) {
         current = await pp.beforeInit(current, def);
@@ -684,7 +689,7 @@ export class ApplicationContext {
   }
 
   private buildSuggestionHint(name: string): string | undefined {
-    // Check if the bean was excluded by a conditional rule
+    // Check if the component was excluded by a conditional rule
     const conditionalReason = this.filteredOutComponents.get(name);
     if (conditionalReason) {
       return `A component '${name}' exists but was excluded by: ${conditionalReason}`;
@@ -827,7 +832,7 @@ function filterConditionalComponents(definitions: ComponentDefinition[]): {
     return true;
   });
 
-  // Phase 2: filter by onMissing (evaluated against remaining beans)
+  // Phase 2: filter by onMissing (evaluated against remaining components)
   const registeredNames = new Set<string>();
   for (const def of remaining) {
     registeredNames.add(tokenName(def.token));
@@ -869,9 +874,9 @@ function filterConditionalComponents(definitions: ComponentDefinition[]): {
 
 /**
  * Resolve config values for @ConditionalOnProperty evaluation.
- * Finds the __Goodie_Config bean (if present) and calls its factory,
+ * Finds the __Goodie_Config component (if present) and calls its factory,
  * which returns the merged config (inlined + process.env + overrides).
- * Falls back to process.env if no config bean exists.
+ * Falls back to process.env if no config component exists.
  */
 function resolveConfigFromDefinitions(
   definitions: ComponentDefinition[],
@@ -882,12 +887,12 @@ function resolveConfigFromDefinitions(
       d.token.description === '__Goodie_Config',
   );
   if (configDef) {
-    // Config bean has zero dependencies — safe to call factory directly
+    // Config component has zero dependencies — safe to call factory directly
     const result = configDef.factory();
     if (result && typeof result === 'object') {
       return result as Record<string, unknown>;
     }
   }
-  // No config bean — fall back to process.env
+  // No config component — fall back to process.env
   return { ...process.env } as Record<string, unknown>;
 }

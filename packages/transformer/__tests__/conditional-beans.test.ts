@@ -30,12 +30,12 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'ProdService',
       );
-      expect(bean).toBeDefined();
-      expect(bean!.metadata.conditionalRules).toEqual([
+      expect(component).toBeDefined();
+      expect(component!.metadata.conditionalRules).toEqual([
         { type: 'onEnv', envVar: 'NODE_ENV', expectedValue: 'production' },
       ]);
     });
@@ -51,12 +51,12 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'FeatureService',
       );
-      expect(bean!.metadata.conditionalRules).toEqual([
+      expect(component!.metadata.conditionalRules).toEqual([
         { type: 'onEnv', envVar: 'FEATURE_FLAG' },
       ]);
     });
@@ -74,11 +74,11 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'PgService',
       );
-      expect(bean!.metadata.conditionalRules).toEqual([
+      expect(component!.metadata.conditionalRules).toEqual([
         {
           type: 'onProperty',
           key: 'datasource.dialect',
@@ -98,12 +98,12 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'ConnStringDb',
       );
-      expect(bean!.metadata.conditionalRules).toEqual([
+      expect(component!.metadata.conditionalRules).toEqual([
         {
           type: 'onProperty',
           key: 'datasource.dialect',
@@ -123,11 +123,11 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'DbService',
       );
-      expect(bean!.metadata.conditionalRules).toEqual([
+      expect(component!.metadata.conditionalRules).toEqual([
         { type: 'onProperty', key: 'datasource.url' },
       ]);
     });
@@ -152,13 +152,13 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'FallbackService',
       );
-      expect(bean).toBeDefined();
-      const rules = bean!.metadata.conditionalRules as Array<{
+      expect(component).toBeDefined();
+      const rules = component!.metadata.conditionalRules as Array<{
         type: string;
         tokenClassName: string;
       }>;
@@ -181,20 +181,20 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' &&
           b.tokenRef.className === 'MultiCondService',
       );
-      expect(bean!.metadata.conditionalRules).toEqual([
+      expect(component!.metadata.conditionalRules).toEqual([
         { type: 'onEnv', envVar: 'NODE_ENV', expectedValue: 'production' },
         { type: 'onProperty', key: 'feature.enabled', expectedValue: 'true' },
       ]);
     });
   });
 
-  describe('All beans pass through graph builder', () => {
-    it('should include conditional beans in output (filtering deferred to runtime)', () => {
+  describe('All components pass through graph builder', () => {
+    it('should include conditional components in output (filtering deferred to runtime)', () => {
       const result = createTestProject({
         '/src/ProdService.ts': `
           import { Singleton, ConditionalOnEnv } from './decorators.js'
@@ -212,7 +212,7 @@ describe('Conditional Plugin — Metadata Recording', () => {
         `,
       });
 
-      // Both beans should be in the output — runtime will filter
+      // Both components should be in the output — runtime will filter
       const prod = result.components.find(
         (b) =>
           b.tokenRef.kind === 'class' && b.tokenRef.className === 'ProdService',

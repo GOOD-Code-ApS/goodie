@@ -6,7 +6,7 @@ import type {
   TokenRef,
 } from './ir.js';
 import type {
-  ScannedBean,
+  ScannedComponent,
   ScannedConstructorParam,
   ScannedFieldInjection,
   ScannedTypeArgument,
@@ -40,23 +40,23 @@ const PRIMITIVE_TYPES = new Set([
  * Resolve scanned AST information into typed IR.
  * Converts raw type names and source files into TokenRefs.
  *
- * Beans with @Provides methods are expanded inline: the bean itself is
+ * Components with @Provides methods are expanded inline: the component itself is
  * registered as a singleton, and each @Provides method becomes a separate
- * bean with `factoryKind: 'provides'`.
+ * component with `factoryKind: 'provides'`.
  */
 export function resolve(scanResult: ScanResult): ResolveResult {
   const warnings: string[] = [...scanResult.warnings];
-  const beans: IRComponentDefinition[] = [];
+  const components: IRComponentDefinition[] = [];
 
   for (const scanned of scanResult.components) {
-    beans.push(...resolveBean(scanned, warnings));
+    components.push(...resolveComponent(scanned, warnings));
   }
 
-  return { components: beans, warnings };
+  return { components: components, warnings };
 }
 
-function resolveBean(
-  scanned: ScannedBean,
+function resolveComponent(
+  scanned: ScannedComponent,
   _warnings: string[],
 ): IRComponentDefinition[] {
   const constructorDeps = resolveConstructorParams(
@@ -96,7 +96,7 @@ function resolveBean(
     metadata.order = scanned.order;
   }
 
-  const beanDef: IRComponentDefinition = {
+  const componentDef: IRComponentDefinition = {
     tokenRef: scanned.classTokenRef,
     scope: scanned.scope,
     eager: scanned.eager,
@@ -118,25 +118,25 @@ function resolveBean(
     sourceLocation: scanned.sourceLocation,
   };
 
-  const result: IRComponentDefinition[] = [beanDef];
+  const result: IRComponentDefinition[] = [componentDef];
 
-  // Expand @Provides methods into separate beans
+  // Expand @Provides methods into separate components
   if (scanned.provides.length > 0) {
-    const providesBeans = expandProvides(scanned, beanDef);
-    result.push(...providesBeans);
+    const providesComponents = expandProvides(scanned, componentDef);
+    result.push(...providesComponents);
   }
 
   return result;
 }
 
 /**
- * Expand @Provides methods on a bean into separate IRComponentDefinition entries.
- * Each @Provides method becomes a bean with `factoryKind: 'provides'` whose
- * first constructor dependency is the owning bean instance.
+ * Expand @Provides methods on a component into separate IRComponentDefinition entries.
+ * Each @Provides method becomes a component with `factoryKind: 'provides'` whose
+ * first constructor dependency is the owning component instance.
  */
 function expandProvides(
-  scanned: ScannedBean,
-  ownerBean: IRComponentDefinition,
+  scanned: ScannedComponent,
+  ownerComponent: IRComponentDefinition,
 ): IRComponentDefinition[] {
   const className = scanned.classTokenRef.className;
 
@@ -171,7 +171,7 @@ function expandProvides(
     }
   }
 
-  // Pass 2: resolve params and create bean definitions
+  // Pass 2: resolve params and create component definitions
   return providesWithTokens.map(({ scanned: p, tokenRef }) => {
     const dependencies = resolveProvidesParams(
       p.params,
@@ -179,17 +179,17 @@ function expandProvides(
       providesByReturnType,
     );
 
-    // Owner bean instance is the implicit first dependency
+    // Owner component instance is the implicit first dependency
     const ownerDep: IRDependency = {
-      tokenRef: ownerBean.tokenRef,
+      tokenRef: ownerComponent.tokenRef,
       optional: false,
       collection: false,
       sourceLocation: p.sourceLocation,
     };
 
-    // @Primary on the module class does NOT propagate to provided beans.
-    // Each @Provides bean is an independent definition — mark individual
-    // provided beans with @Primary via a separate decorator if needed.
+    // @Primary on the module class does NOT propagate to provided components.
+    // Each @Provides component is an independent definition — mark individual
+    // provided components with @Primary via a separate decorator if needed.
     return {
       tokenRef,
       scope: 'singleton' as const,
@@ -214,9 +214,9 @@ function expandProvides(
  * Resolve @Provides method parameters, with special handling for primitives.
  * Primitive-typed params are matched to other @Provides methods that return that type.
  *
- * Note: primitive param resolution is scoped to the owning bean's @Provides methods.
- * A primitive @Provides on bean X cannot be auto-wired as a param of bean Y's @Provides.
- * Cross-bean primitive wiring requires an explicit InjectionToken.
+ * Note: primitive param resolution is scoped to the owning component's @Provides methods.
+ * A primitive @Provides on component X cannot be auto-wired as a param of component Y's @Provides.
+ * Cross-component primitive wiring requires an explicit InjectionToken.
  */
 function resolveProvidesParams(
   params: ScannedConstructorParam[],
@@ -418,7 +418,7 @@ function resolveFieldInjection(
   let tokenRef: TokenRef;
 
   if (field.qualifier) {
-    // @Inject('name') → we'll match against @Named beans later in graph-builder
+    // @Inject('name') → we'll match against @Named components later in graph-builder
     // For now, store as an injection-token with the qualifier as name
     tokenRef = {
       kind: 'injection-token',

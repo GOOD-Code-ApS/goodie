@@ -57,13 +57,13 @@ describe('createGoodieTest()', () => {
   describe('context lifecycle', () => {
     const test = createGoodieTest([greeterDef, counterDef]);
 
-    test('builds context and resolves beans via ctx', ({ ctx }) => {
+    test('builds context and resolves components via ctx', ({ ctx }) => {
       const greeter = ctx.get(Greeter);
       expect(greeter).toBeInstanceOf(Greeter);
       expect(greeter.greet('World')).toBe('Hello, World!');
     });
 
-    test('resolves multiple beans', ({ ctx }) => {
+    test('resolves multiple components', ({ ctx }) => {
       const counter = ctx.get(Counter);
       expect(counter).toBeInstanceOf(Counter);
       expect(counter.increment()).toBe(1);
@@ -75,7 +75,7 @@ describe('createGoodieTest()', () => {
   describe('resolve() fixture', () => {
     const test = createGoodieTest([greeterDef]);
 
-    test('resolves beans via resolve fixture', ({ resolve }) => {
+    test('resolves components via resolve fixture', ({ resolve }) => {
       const greeter = resolve(Greeter);
       expect(greeter.greet('Fixture')).toBe('Hello, Fixture!');
     });
@@ -143,7 +143,7 @@ describe('createGoodieTest()', () => {
         builder.override(Greeter).withValue(new FakeGreeter() as Greeter),
     });
 
-    test('uses the overridden bean', ({ ctx }) => {
+    test('uses the overridden component', ({ ctx }) => {
       const greeter = ctx.get(Greeter);
       expect(greeter.greet('test')).toBe('Fake: test');
     });
@@ -158,7 +158,7 @@ describe('createGoodieTest()', () => {
       setup: (builder) => builder.provide(AUTH_TOKEN, { user: 'test-user' }),
     });
 
-    test('resolves provided bean from setup', ({ ctx }) => {
+    test('resolves provided component from setup', ({ ctx }) => {
       expect(ctx.get(AUTH_TOKEN).user).toBe('test-user');
     });
   });
@@ -178,15 +178,17 @@ describe('createGoodieTest()', () => {
 
     const test = createGoodieTest([loggerDef]);
 
-    test('resolves InjectionToken-based beans via fixture', ({ resolve }) => {
+    test('resolves InjectionToken-based components via fixture', ({
+      resolve,
+    }) => {
       const logger = resolve(LOGGER_TOKEN);
       expect(logger.log('hello')).toBe('[LOG] hello');
     });
   });
 
-  // ── beans with dependencies ──────────────────────────────────────
+  // ── components with dependencies ──────────────────────────────────────
 
-  describe('beans with dependencies', () => {
+  describe('components with dependencies', () => {
     class Repository {
       findAll(): string[] {
         return ['item1', 'item2'];
@@ -208,7 +210,7 @@ describe('createGoodieTest()', () => {
 
     const test = createGoodieTest([repoDef, serviceDef]);
 
-    test('resolves beans with dependency injection', ({ resolve }) => {
+    test('resolves components with dependency injection', ({ resolve }) => {
       const svc = resolve(Service);
       expect(svc.getAll()).toEqual(['item1', 'item2']);
     });

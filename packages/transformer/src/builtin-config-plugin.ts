@@ -27,8 +27,8 @@ export function createConfigPlugin(): TransformerPlugin {
       const configDec = decorators.find((d) => d.getName() === 'Config');
       if (!configDec) return;
 
-      // Validate that a bean decorator is present
-      const hasBeanDecorator = decorators.some((d) => {
+      // Validate that a component decorator is present
+      const hasComponentDecorator = decorators.some((d) => {
         const name = d.getName();
         return (
           name === 'Singleton' ||
@@ -36,7 +36,7 @@ export function createConfigPlugin(): TransformerPlugin {
           name === 'RequestScoped'
         );
       });
-      if (!hasBeanDecorator) {
+      if (!hasComponentDecorator) {
         const className = ctx.classDeclaration.getName() ?? '<anonymous>';
         console.warn(
           `[config] @Config on '${className}' requires @Singleton or @Transient — config values will not be injected.`,

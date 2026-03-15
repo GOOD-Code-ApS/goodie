@@ -6,8 +6,8 @@ import type { AbstractConstructor, Constructor } from './types.js';
 type Token = InjectionToken<unknown> | Constructor | AbstractConstructor;
 
 /**
- * Topologically sorts bean definitions so that dependencies come before
- * the beans that depend on them. Detects cycles and reports the full path.
+ * Topologically sorts component definitions so that dependencies come before
+ * the components that depend on them. Detects cycles and reports the full path.
  *
  * Optional dependencies are included in ordering when present but do not
  * cause failures when missing.

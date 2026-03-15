@@ -65,7 +65,7 @@ class HealthController {
 
 ## Setup
 
-Health beans are auto-discovered from `beans.json` — no manual plugin registration needed:
+Health components are auto-discovered from `components.json` — no manual plugin registration needed:
 
 ```typescript
 import { diPlugin } from '@goodie-ts/vite-plugin';

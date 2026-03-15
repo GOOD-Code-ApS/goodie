@@ -1,8 +1,8 @@
 /**
- * Marks a bean as the default (primary) when multiple beans match a dependency type.
+ * Marks a component as the default (primary) when multiple components match a dependency type.
  *
- * When multiple beans are registered under the same token, the container selects
- * the `@Primary` bean for injection unless the injection point specifies a qualifier
+ * When multiple components are registered under the same token, the container selects
+ * the `@Primary` component for injection unless the injection point specifies a qualifier
  * (e.g. `@Inject('name')`).
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.

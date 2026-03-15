@@ -65,7 +65,7 @@ describe('Error messages', () => {
   });
 
   describe('@OnInit error wrapping', () => {
-    it('should include bean name and method in error', async () => {
+    it('should include component name and method in error', async () => {
       class Broken {
         init() {
           throw new Error('init failed');
@@ -88,7 +88,7 @@ describe('Error messages', () => {
       }
     });
 
-    it('should include bean name for async @OnInit errors', async () => {
+    it('should include component name for async @OnInit errors', async () => {
       class AsyncBroken {
         async init() {
           throw new Error('async init failed');
@@ -111,7 +111,7 @@ describe('Error messages', () => {
   });
 
   describe('@OnDestroy error wrapping', () => {
-    it('should include bean name and method in error', async () => {
+    it('should include component name and method in error', async () => {
       class Destroyable {
         cleanup() {
           throw new Error('cleanup failed');

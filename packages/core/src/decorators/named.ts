@@ -1,5 +1,5 @@
 /**
- * Assigns a qualifier name to a bean, used for disambiguation
+ * Assigns a qualifier name to a component, used for disambiguation
  * when multiple implementations exist for the same type.
  *
  * **Compile-time only** — the decorator is a no-op marker at runtime.

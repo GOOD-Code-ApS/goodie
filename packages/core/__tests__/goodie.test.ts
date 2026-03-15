@@ -48,7 +48,7 @@ describe('Goodie Builder', () => {
     await ctx.close();
   });
 
-  it('resolves a simple bean through the builder', async () => {
+  it('resolves a simple component through the builder', async () => {
     class Greeter {
       greet() {
         return 'hello';
@@ -85,7 +85,7 @@ describe('Goodie Builder', () => {
     await ctx.close();
   });
 
-  it('resolves InjectionToken beans', async () => {
+  it('resolves InjectionToken components', async () => {
     const DbUrl = new InjectionToken<string>('DbUrl');
 
     const ctx = await Goodie.build([

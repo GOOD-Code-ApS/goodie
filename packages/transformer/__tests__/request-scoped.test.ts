@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createTestProject } from './helpers.js';
 
 describe('@RequestScoped', () => {
-  it('should generate a bean with scope: request', () => {
+  it('should generate a component with scope: request', () => {
     const result = createTestProject({
       '/src/my-service.ts': `
         import { RequestScoped } from './decorators.js'
@@ -18,7 +18,7 @@ describe('@RequestScoped', () => {
     expect(result.code).toContain('MyService');
   });
 
-  it('should not mark request-scoped beans as eager', () => {
+  it('should not mark request-scoped components as eager', () => {
     const result = createTestProject({
       '/src/my-service.ts': `
         import { RequestScoped } from './decorators.js'
@@ -31,7 +31,7 @@ describe('@RequestScoped', () => {
     expect(result.code).toContain('eager: false');
   });
 
-  it('should support constructor dependencies on request-scoped beans', () => {
+  it('should support constructor dependencies on request-scoped components', () => {
     const result = createTestProject({
       '/src/dep.ts': `
         import { Singleton } from './decorators.js'
@@ -54,7 +54,7 @@ describe('@RequestScoped', () => {
     expect(result.code).toContain('token: DepService');
   });
 
-  it('should generate a compile-time scoped proxy factory for request-scoped beans with getters', () => {
+  it('should generate a compile-time scoped proxy factory for request-scoped components with getters', () => {
     const result = createTestProject({
       '/src/my-service.ts': `
         import { RequestScoped } from './decorators.js'
@@ -86,7 +86,7 @@ describe('@RequestScoped', () => {
     );
   });
 
-  it('should not generate scoped proxy for request-scoped beans with no public members', () => {
+  it('should not generate scoped proxy for request-scoped components with no public members', () => {
     const result = createTestProject({
       '/src/my-service.ts': `
         import { RequestScoped } from './decorators.js'

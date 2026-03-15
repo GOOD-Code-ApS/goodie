@@ -28,7 +28,7 @@ describe('topoSort', () => {
     expect(topoSort([])).toEqual([]);
   });
 
-  it('returns single bean unchanged', () => {
+  it('returns single component unchanged', () => {
     class A {}
     const defs = [def(A)];
     const sorted = topoSort(defs);

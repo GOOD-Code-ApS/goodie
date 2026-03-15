@@ -25,8 +25,8 @@ interface ScheduledJob {
  * Synthesized by the scheduler transformer plugin as an eager singleton
  * with `onInitMethods: ['start']` and `onDestroyMethods: ['stop']`.
  *
- * At startup, iterates all bean definitions looking for `metadata.scheduledMethods`,
- * resolves each bean, and starts the corresponding schedules.
+ * At startup, iterates all component definitions looking for `metadata.scheduledMethods`,
+ * resolves each component, and starts the corresponding schedules.
  */
 export class SchedulerService {
   private readonly jobs: ScheduledJob[] = [];
@@ -45,16 +45,16 @@ export class SchedulerService {
         | undefined;
       if (!scheduledMethods || scheduledMethods.length === 0) continue;
 
-      const bean = await this.ctx.getAsync(def.token);
+      const component = await this.ctx.getAsync(def.token);
 
       for (const meta of scheduledMethods) {
-        const label = `${(bean as object).constructor.name}.${meta.methodName}`;
+        const label = `${(component as object).constructor.name}.${meta.methodName}`;
         const method = (
-          bean as Record<string, (...args: unknown[]) => unknown>
+          component as Record<string, (...args: unknown[]) => unknown>
         )[meta.methodName];
         if (!method) continue;
 
-        const boundMethod = method.bind(bean);
+        const boundMethod = method.bind(component);
 
         if (meta.cron !== undefined) {
           this.startCronJob(label, meta.cron, boundMethod, meta.concurrent);

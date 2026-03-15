@@ -5,7 +5,7 @@
  * The transformer reads this decorator via AST inspection at build time
  * and generates a `TypeMetadata` entry with field type and decorator metadata.
  *
- * `@Introspected` classes are NOT beans — they are value objects (DTOs,
+ * `@Introspected` classes are NOT components — they are value objects (DTOs,
  * request/response types) whose shape is needed at runtime by validation,
  * OpenAPI, and serialization.
  *

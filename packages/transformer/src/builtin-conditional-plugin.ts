@@ -25,11 +25,11 @@ const CONDITIONAL_DECORATORS = [
 ] as const;
 
 /**
- * Built-in conditional bean transformer plugin.
+ * Built-in conditional component transformer plugin.
  *
  * Scans @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissing
  * decorators on classes. Stores the extracted rules in `metadata.conditionalRules`
- * so the graph builder can evaluate them and filter beans accordingly.
+ * so the graph builder can evaluate them and filter components accordingly.
  */
 export function createConditionalPlugin(): TransformerPlugin {
   return {

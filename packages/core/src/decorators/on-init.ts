@@ -1,5 +1,5 @@
 /**
- * Marks a method to be called after the bean is fully constructed and
+ * Marks a method to be called after the component is fully constructed and
  * `beforeInit` post-processors have run, but before `afterInit` post-processors.
  *
  * Only effective on `@Singleton` / `@Transient` classes.

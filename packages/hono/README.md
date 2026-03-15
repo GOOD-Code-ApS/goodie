@@ -12,11 +12,11 @@ pnpm add @goodie-ts/hono hono
 
 Hono HTTP integration for goodie-ts. Provides route decorators (`@Controller`, `@Get`, `@Post`, etc.), security (`@Secured`, `@Anonymous`), OpenAPI support via `hono-openapi`, the transformer plugin for compile-time route wiring, `@Validate` for request validation, and multi-runtime `EmbeddedServer`.
 
-The hono transformer plugin scans controller metadata on beans and generates a `createRouter(ctx)` function that wires controllers from the DI container to Hono routes. No runtime scanning required.
+The hono transformer plugin scans controller metadata on components and generates a `createRouter(ctx)` function that wires controllers from the DI container to Hono routes. No runtime scanning required.
 
-`@Controller` implicitly registers the class as a singleton bean — no need to add `@Singleton`.
+`@Controller` implicitly registers the class as a singleton component — no need to add `@Singleton`.
 
-The package also ships `ServerConfig` (configurable via `@ConfigurationProperties('server')`) and `EmbeddedServer` as library beans, auto-discovered at build time.
+The package also ships `ServerConfig` (configurable via `@ConfigurationProperties('server')`) and `EmbeddedServer` as library components, auto-discovered at build time.
 
 ## Usage
 
@@ -96,7 +96,7 @@ import type { TodoControllerRoutes } from './AppContext.generated.js';
 
 ## Server Configuration
 
-`ServerConfig` is auto-discovered as a library bean. Configure it via a JSON config file:
+`ServerConfig` is auto-discovered as a library component. Configure it via a JSON config file:
 
 ```json
 // config/default.json

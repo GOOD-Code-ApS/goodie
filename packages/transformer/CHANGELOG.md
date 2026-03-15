@@ -6,7 +6,7 @@
 
 - 2d62bec: Add `@Introspected` decorator and compile-time type metadata generation.
 
-  `@Introspected()` marks value objects (DTOs, request/response types) for compile-time field metadata extraction. The built-in introspection transformer plugin scans these classes and generates `MetadataRegistry` registration code with recursive `FieldType` trees and generic `DecoratorMeta` on each field. Introspected classes are NOT beans — they are consumed at runtime by validation, OpenAPI, and serialization systems.
+  `@Introspected()` marks value objects (DTOs, request/response types) for compile-time field metadata extraction. The built-in introspection transformer plugin scans these classes and generates `MetadataRegistry` registration code with recursive `FieldType` trees and generic `DecoratorMeta` on each field. Introspected classes are NOT components — they are consumed at runtime by validation, OpenAPI, and serialization systems.
 
   New exports from `@goodie-ts/core`: `Introspected`, `TypeMetadata`, `IntrospectedField`, `FieldType`, `DecoratorMeta`, `MetadataRegistry`.
   New export from `@goodie-ts/transformer`: `createIntrospectionPlugin`.
@@ -22,16 +22,16 @@
 
 - 9e54e65: Improve error messages and diagnostics
 
-  - **@goodie-ts/core**: `MissingDependencyError` now includes `requiredBy` context and an optional `hint` field. `get()`/`getAsync()`, `validateDependencies()`, and dependency resolution all suggest similar token names via Levenshtein distance ("Did you mean: UserService?"). When a bean was excluded by a conditional rule (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`), the error explains why ("bean exists but was excluded by: @ConditionalOnProperty('datasource.dialect', 'postgres') — property is 'mysql'"). `@PostConstruct` and `@PreDestroy` errors include bean name and method with `{ cause }` chaining.
-  - **@goodie-ts/transformer**: `MissingProviderError` now includes fuzzy matching suggestions ("Did you mean: UserService?"). Plugin hook errors are wrapped with plugin name context and preserve the original error via `{ cause }`. `GOODIE_DEBUG=true` prints the full bean graph, resolution order, active plugins, and codegen contributions during build.
+  - **@goodie-ts/core**: `MissingDependencyError` now includes `requiredBy` context and an optional `hint` field. `get()`/`getAsync()`, `validateDependencies()`, and dependency resolution all suggest similar token names via Levenshtein distance ("Did you mean: UserService?"). When a component was excluded by a conditional rule (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingComponent`), the error explains why ("component exists but was excluded by: @ConditionalOnProperty('datasource.dialect', 'postgres') — property is 'mysql'"). `@PostConstruct` and `@PreDestroy` errors include component name and method with `{ cause }` chaining.
+  - **@goodie-ts/transformer**: `MissingProviderError` now includes fuzzy matching suggestions ("Did you mean: UserService?"). Plugin hook errors are wrapped with plugin name context and preserve the original error via `{ cause }`. `GOODIE_DEBUG=true` prints the full component graph, resolution order, active plugins, and codegen contributions during build.
 
 - be45d51: Multi-runtime deployment support
 
-  - **@goodie-ts/core**: Add `@RequestScoped` decorator and `RequestScopeManager` for per-request bean instances via `AsyncLocalStorage`. `ApplicationContext` supports `scope: 'request'` with automatic proxy generation for singleton->request-scoped dependencies. Conditional bean evaluation (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingBean`) now happens at runtime in `ApplicationContext.create()` instead of at build time in the graph builder.
-  - **@goodie-ts/transformer**: Add `@RequestScoped` to scanner, `@ConditionalOnProperty` `havingValue` support (single string or array matching), `CodegenContext` with build-time config passed to plugin `codegen()` hooks. Config inlining reads `default.json` at build time, removing runtime `node:fs` dependency. Config plugin now recognises `@RequestScoped` as a bean decorator.
-  - **@goodie-ts/hono**: Multi-runtime `EmbeddedServer` (Node, Bun, Deno). `ServerConfig` gains `runtime` field (`ServerRuntime` type: `'node' | 'bun' | 'deno'`). When `server.runtime` is `'cloudflare'`, `app.onStart()` hook and `EmbeddedServer` import are omitted from codegen — use `createRouter(ctx)` directly. Request scope middleware auto-generated when request-scoped beans are present. **Breaking:** `EmbeddedServer.listen()` is now `async` — callers must `await` it.
+  - **@goodie-ts/core**: Add `@RequestScoped` decorator and `RequestScopeManager` for per-request component instances via `AsyncLocalStorage`. `ApplicationContext` supports `scope: 'request'` with automatic proxy generation for singleton->request-scoped dependencies. Conditional component evaluation (`@ConditionalOnProperty`, `@ConditionalOnEnv`, `@ConditionalOnMissingComponent`) now happens at runtime in `ApplicationContext.create()` instead of at build time in the graph builder.
+  - **@goodie-ts/transformer**: Add `@RequestScoped` to scanner, `@ConditionalOnProperty` `havingValue` support (single string or array matching), `CodegenContext` with build-time config passed to plugin `codegen()` hooks. Config inlining reads `default.json` at build time, removing runtime `node:fs` dependency. Config plugin now recognises `@RequestScoped` as a component decorator.
+  - **@goodie-ts/hono**: Multi-runtime `EmbeddedServer` (Node, Bun, Deno). `ServerConfig` gains `runtime` field (`ServerRuntime` type: `'node' | 'bun' | 'deno'`). When `server.runtime` is `'cloudflare'`, `app.onStart()` hook and `EmbeddedServer` import are omitted from codegen — use `createRouter(ctx)` directly. Request scope middleware auto-generated when request-scoped components are present. **Breaking:** `EmbeddedServer.listen()` is now `async` — callers must `await` it.
   - **@goodie-ts/kysely**: **Breaking:** `KyselyDatabase` is now abstract with per-dialect implementations (`PostgresKyselyDatabase`, `MysqlKyselyDatabase`, `SqliteKyselyDatabase`, `NeonKyselyDatabase`, `PlanetscaleKyselyDatabase`, `LibsqlKyselyDatabase`, `D1KyselyDatabase`). Each dialect is conditionally activated via `@ConditionalOnProperty('datasource.dialect')`. Per-dialect `DatasourceConfig` classes replace the shared `DatasourceConfig`. `PoolConfig` is conditional on pooled dialects (postgres, mysql). `supportsReturning` moved from standalone function to abstract property on `KyselyDatabase`. `TransactionManager` reads `supportsReturning` from `KyselyProvider` instead of `Dialect` type. D1 dialect is `@RequestScoped` for Cloudflare Workers. Removed: `DatasourceConfig`, `ConnectionStringKyselyDatabase`, `supportsReturning()`, `CONNECTION_STRING_DIALECTS`, `validateDialect()`, `dialect-factory.ts`.
-  - **@goodie-ts/cli**: Warn when `goodie generate --mode library` produces beans but `package.json` is missing the `"goodie": { "beans": "..." }` field. Silent when the field already exists or no beans were produced.
+  - **@goodie-ts/cli**: Warn when `goodie generate --mode library` produces components but `package.json` is missing the `"goodie": { "components": "..." }` field. Silent when the field already exists or no components were produced.
 
 - 8fc7032: Simplify application bootstrap: `await app.start()` is now the single entry point. The hono plugin registers an `onStart` hook to wire the router and start the HTTP server automatically. Generated route wiring now calls stable `@goodie-ts/hono` runtime helpers (`handleResult`, `securityMiddleware`, `validationMiddleware`, etc.) instead of raw Hono/hono-openapi APIs. `createGoodieTest()` now accepts a definitions factory function and supports custom fixtures derived from the ApplicationContext.
 
@@ -52,15 +52,15 @@
 
 ### Minor Changes
 
-- 5190bce: feat: conditional bean registration with @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissingBean
+- 5190bce: feat: conditional component registration with @ConditionalOnEnv, @ConditionalOnProperty, and @ConditionalOnMissingComponent
 
-  Adds three new decorators for conditionally including or excluding beans at compile time:
+  Adds three new decorators for conditionally including or excluding components at compile time:
 
-  - `@ConditionalOnEnv(envVar, value?)` -- include bean only when an environment variable is set (optionally matching a specific value)
-  - `@ConditionalOnProperty(key, value?)` -- include bean only when a config property exists (optionally matching a specific value)
-  - `@ConditionalOnMissingBean(Token)` -- include bean only when no other bean provides the given token (useful for default implementations)
+  - `@ConditionalOnEnv(envVar, value?)` -- include component only when an environment variable is set (optionally matching a specific value)
+  - `@ConditionalOnProperty(key, value?)` -- include component only when a config property exists (optionally matching a specific value)
+  - `@ConditionalOnMissingComponent(Token)` -- include component only when no other component provides the given token (useful for default implementations)
 
-  Conditions are evaluated during graph building with AND semantics when multiple decorators are applied. The graph builder filters in order: env -> property -> missingBean. Error messages include hints when a required dependency was filtered out by a condition.
+  Conditions are evaluated during graph building with AND semantics when multiple decorators are applied. The graph builder filters in order: env -> property -> missingComponent. Error messages include hints when a required dependency was filtered out by a condition.
 
 ### Patch Changes
 
@@ -86,7 +86,7 @@
 
 - 80b76ad: Add `@goodie-ts/security` package for declarative authentication and authorization. Introduces `@Secured()`, `@Anonymous()`, `SecurityProvider`, and `SecurityHttpFilter`.
 
-  Add compile-time `DecoratorMetadata` infrastructure. The transformer records class and method decorators (with resolved import paths) on `IRBeanDefinition`. `HttpFilterContext` now carries `classDecorators` and `methodDecorators` arrays instead of runtime `Symbol.metadata`. The hono plugin generates static decorator metadata at build time — no runtime `Symbol.metadata` needed for security checks. `@Secured()` and `@Anonymous()` are compile-time markers (no-ops at runtime).
+  Add compile-time `DecoratorMetadata` infrastructure. The transformer records class and method decorators (with resolved import paths) on `IRComponentDefinition`. `HttpFilterContext` now carries `classDecorators` and `methodDecorators` arrays instead of runtime `Symbol.metadata`. The hono plugin generates static decorator metadata at build time — no runtime `Symbol.metadata` needed for security checks. `@Secured()` and `@Anonymous()` are compile-time markers (no-ops at runtime).
 
   `DecoratorEntry` type exported from `@goodie-ts/core`. `IRDecoratorEntry` and `methodDecorators` added to transformer IR.
 
@@ -101,17 +101,17 @@
 
 ### Minor Changes
 
-- 4e7ae76: Remove `@Controller` from scanner's hardcoded decorator names. Plugins can now register classes as beans via `ctx.registerBean({ scope })` in their `visitClass` hook. The hono plugin uses this to register `@Controller` classes as singletons — the DI core no longer has any HTTP knowledge.
+- 4e7ae76: Remove `@Controller` from scanner's hardcoded decorator names. Plugins can now register classes as components via `ctx.registerComponent({ scope })` in their `visitClass` hook. The hono plugin uses this to register `@Controller` classes as singletons — the DI core no longer has any HTTP knowledge.
 
   **BREAKING:** `@Controller` is no longer recognized by the scanner without the hono plugin. Projects using `@Controller` must have `@goodie-ts/hono` installed (which was already required for route codegen).
 
-- f793885: refactor!: unify @Module into @Singleton — @Provides is now an orthogonal capability on any bean
+- f793885: refactor!: unify @Module into @Singleton — @Provides is now an orthogonal capability on any component
 
   - Removed `IRModule`, `ScannedModule`, `ScannedModuleImport` types
-  - `@Module` classes are now scanned as regular beans (singleton scope) with `isModule` metadata
+  - `@Module` classes are now scanned as regular components (singleton scope) with `isModule` metadata
   - `@Provides` expansion happens in the resolver stage instead of graph-builder's `expandModules()`
   - Removed module imports (`@Module({ imports: [...] })`) — use constructor injection instead
-  - Any bean can now have `@Provides` methods, not just `@Module` classes
+  - Any component can now have `@Provides` methods, not just `@Module` classes
 
 ### Patch Changes
 
@@ -122,13 +122,13 @@
 
 ### Patch Changes
 
-- 7c48eb2: feat(kysely): KyselyDatabase library bean, multi-dialect support, remove CrudRepository
+- 7c48eb2: feat(kysely): KyselyDatabase library component, multi-dialect support, remove CrudRepository
 
   Added `KyselyDatabase` as a library-provided `@Singleton` that creates and manages
   a `Kysely<any>` instance from configuration. Users inject it directly for untyped
   access or use `@Module` with `@Provides` for typed `Kysely<DB>` injection.
 
-  Added `DatasourceConfig` and `PoolConfig` as `@ConfigurationProperties` library beans.
+  Added `DatasourceConfig` and `PoolConfig` as `@ConfigurationProperties` library components.
   Users configure via `config/default.json` with nested `datasource.url`, `datasource.dialect`,
   and `datasource.pool.min`/`datasource.pool.max` fields.
 
@@ -139,7 +139,7 @@
   CRUD base class unnecessary unlike Spring Data for JPQL. Users write queries directly.
 
   Simplified the kysely transformer plugin — no longer scans for database wrapper classes.
-  Uses `KyselyDatabase` from library beans to wire `TransactionManager` and `TransactionalInterceptor`.
+  Uses `KyselyDatabase` from library components to wire `TransactionManager` and `TransactionalInterceptor`.
 
   fix(transformer): @Module classes now support constructor and field injection
 
@@ -149,9 +149,9 @@
 
   fix(transformer): reconcile import paths for all library package classes
 
-  Library beans use bare package specifiers (`@goodie-ts/kysely`) in their tokenRefs,
+  Library components use bare package specifiers (`@goodie-ts/kysely`) in their tokenRefs,
   but ts-morph resolves user imports to absolute file paths. Added
-  `reconcileLibraryImportPaths()` with `packageDirs` fallback — non-bean classes
+  `reconcileLibraryImportPaths()` with `packageDirs` fallback — non-component classes
   from library packages (e.g. abstract base classes in `baseTokenRefs`) are also
   rewritten using directory-prefix matching from `discoverAll()`.
 
@@ -183,7 +183,7 @@
   - Move `createRouter()`/`startServer()` code generation from transformer core into `@goodie-ts/hono` plugin, auto-discovered via `"goodie": { "plugin": "dist/plugin.js" }`
   - Add `ServerConfig` class with `@ConfigurationProperties('server')` for host/port configuration
   - Rewrite `EmbeddedServer` as a `@Singleton` with `ServerConfig` dependency (no longer synthesized in codegen)
-  - Resolver now stores controller metadata on `bean.metadata.controller` so plugins can read it
+  - Resolver now stores controller metadata on `component.metadata.controller` so plugins can read it
   - Remove `hono` peer dependency from `@goodie-ts/transformer` — no longer coupled
   - Add `configDir` option to `@goodie-ts/vite-plugin` for JSON config file support
 
@@ -233,7 +233,7 @@
 
   Scheduler: @Scheduled decorator for cron/fixedRate/fixedDelay with compile-time discovery, overlap prevention, graceful shutdown, lifecycle integration.
 
-  Core: ApplicationContext self-registration as a bean for constructor injection by framework services.
+  Core: ApplicationContext self-registration as a component for constructor injection by framework services.
 
   Transformer: plugin system hooks (visitClass, visitMethod, beforeCodegen) for events and scheduler plugins.
 
@@ -276,15 +276,15 @@
 
 ### Minor Changes
 
-- 9f7daed: Add `createAopDecorator()` API for defining AOP decorators with compile-time config via TypeScript type parameters. Migrate logging, cache, and resilience decorators from hand-written `goodie.aop` JSON to source-level `createAopDecorator<{...}>()` calls. Remove redundant transformer plugins from logging, cache, resilience, and health packages — beans are now shipped via `beans.json` manifests and AOP config is extracted automatically by the transformer's AOP scanner.
+- 9f7daed: Add `createAopDecorator()` API for defining AOP decorators with compile-time config via TypeScript type parameters. Migrate logging, cache, and resilience decorators from hand-written `goodie.aop` JSON to source-level `createAopDecorator<{...}>()` calls. Remove redundant transformer plugins from logging, cache, resilience, and health packages — components are now shipped via `components.json` manifests and AOP config is extracted automatically by the transformer's AOP scanner.
 
-  Auto-discover transformer plugins from installed packages via `goodie.plugin` in `package.json`. The `discoverPlugins()` function now respects `scanScopes`, matching the behavior of library bean discovery. Consumers no longer need to manually list plugins.
+  Auto-discover transformer plugins from installed packages via `goodie.plugin` in `package.json`. The `discoverPlugins()` function now respects `scanScopes`, matching the behavior of library component discovery. Consumers no longer need to manually list plugins.
 
-  **Breaking:** `createHealthPlugin`, `createLoggingPlugin`, `createCachePlugin`, and `createResiliencePlugin` exports have been removed. The `goodie.aop` field in `package.json` is no longer read — AOP config now lives in the `aop` section of `beans.json`.
+  **Breaking:** `createHealthPlugin`, `createLoggingPlugin`, `createCachePlugin`, and `createResiliencePlugin` exports have been removed. The `goodie.aop` field in `package.json` is no longer read — AOP config now lives in the `aop` section of `components.json`.
 
 ### Patch Changes
 
-- 124bb16: Add library bean discovery via `beans.json` manifests and `transformLibrary()` pipeline. Support abstract class tokens in DI container. Replace `workspace:*` with `workspace:^` for proper semver ranges on publish.
+- 124bb16: Add library component discovery via `components.json` manifests and `transformLibrary()` pipeline. Support abstract class tokens in DI container. Replace `workspace:*` with `workspace:^` for proper semver ranges on publish.
 - Updated dependencies [124bb16]
   - @goodie-ts/core@0.5.2
 

@@ -45,7 +45,7 @@ const RESILIENCE_MAPPINGS: ResolvedAopMapping[] = [
   },
 ];
 
-function makeInterceptorBean(className: string): IRComponentDefinition {
+function makeInterceptorComponent(className: string): IRComponentDefinition {
   return {
     tokenRef: {
       kind: 'class',
@@ -69,9 +69,9 @@ function makeInterceptorBean(className: string): IRComponentDefinition {
 }
 
 const RESILIENCE_LIBRARY_BEANS: IRComponentDefinition[] = [
-  makeInterceptorBean('RetryInterceptor'),
-  makeInterceptorBean('CircuitBreakerInterceptor'),
-  makeInterceptorBean('TimeoutInterceptor'),
+  makeInterceptorComponent('RetryInterceptor'),
+  makeInterceptorComponent('CircuitBreakerInterceptor'),
+  makeInterceptorComponent('TimeoutInterceptor'),
 ];
 
 function createProject(files: Record<string, string>) {
@@ -283,7 +283,7 @@ describe('Resilience Transformer Plugin', () => {
 
     // Only RetryInterceptor should appear in the interceptor chain
     expect(result.code).toContain('buildInterceptorChain([__interceptor0]');
-    // The other interceptors exist as library beans but aren't in the AOP chain
+    // The other interceptors exist as library components but aren't in the AOP chain
     expect(result.code).not.toContain(
       'instance.fetchData = buildInterceptorChain([__interceptor0, __interceptor1',
     );

@@ -18,7 +18,7 @@ export interface KyselyProvider {
  * Provides transaction propagation across async call chains without
  * explicitly threading a transaction object through every method.
  *
- * Library bean — constructor receives the `KyselyDatabase` bean
+ * Library component — constructor receives the `KyselyDatabase` component
  * and reads its `.kysely` and `.supportsReturning` properties.
  * For tests, call `new TransactionManager()` with no args + `configure()`.
  */

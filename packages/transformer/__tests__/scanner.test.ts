@@ -342,7 +342,7 @@ describe('Scanner', () => {
       expect(appModule.provides[1].eager).toBe(false);
     });
 
-    it('should scan @Provides on a @Singleton bean (not just @Factory)', () => {
+    it('should scan @Provides on a @Singleton component (not just @Factory)', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -369,7 +369,7 @@ describe('Scanner', () => {
       expect(result.components[0].provides[0].methodName).toBe('dbUrl');
     });
 
-    it('should scan @Factory as a singleton bean', () => {
+    it('should scan @Factory as a singleton component', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Factory(opts?: any) { return (t: any, c: any) => {} }
@@ -583,7 +583,7 @@ describe('Scanner', () => {
   });
 
   describe('@OnDestroy methods', () => {
-    it('should discover @OnDestroy method on a bean', () => {
+    it('should discover @OnDestroy method on a component', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -656,7 +656,7 @@ describe('Scanner', () => {
   });
 
   describe('@OnInit methods', () => {
-    it('should discover @OnInit method on a bean', () => {
+    it('should discover @OnInit method on a component', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -729,7 +729,7 @@ describe('Scanner', () => {
   });
 
   describe('@PostProcessor detection', () => {
-    it('should detect @PostProcessor on a bean', () => {
+    it('should detect @PostProcessor on a component', () => {
       const project = createProject({
         '/src/decorators.ts': `
           export function Singleton() { return (t: any, c: any) => {} }
@@ -1116,14 +1116,16 @@ describe('Scanner', () => {
       });
 
       const result = scan(project);
-      const bean = result.components.find(
+      const component = result.components.find(
         (b) => b.classTokenRef.className === 'UptimeIndicator',
       )!;
 
-      expect(bean.baseClasses).toHaveLength(1);
-      expect(bean.baseClasses[0].kind).toBe('class');
-      expect(bean.baseClasses[0].className).toBe('HealthIndicator');
-      expect(bean.baseClasses[0].importPath).toBe('/src/HealthIndicator.ts');
+      expect(component.baseClasses).toHaveLength(1);
+      expect(component.baseClasses[0].kind).toBe('class');
+      expect(component.baseClasses[0].className).toBe('HealthIndicator');
+      expect(component.baseClasses[0].importPath).toBe(
+        '/src/HealthIndicator.ts',
+      );
     });
 
     it('should return empty array for class without base class', () => {

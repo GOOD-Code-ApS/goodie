@@ -4,11 +4,11 @@ import { ExceptionHandler, Response as HttpResponse } from '@goodie-ts/http';
 import { describe, expect, it } from 'vitest';
 import { createHonoRouter } from '../src/create-router.js';
 
-/** Create an ApplicationContext from bean definitions. */
+/** Create an ApplicationContext from component definitions. */
 async function createContext(
-  beans: ComponentDefinition[],
+  components: ComponentDefinition[],
 ): Promise<ApplicationContext> {
-  return ApplicationContext.create(beans, { preSorted: true });
+  return ApplicationContext.create(components, { preSorted: true });
 }
 
 /** Simple controller for testing. */

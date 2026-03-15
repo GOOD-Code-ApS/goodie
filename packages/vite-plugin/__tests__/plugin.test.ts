@@ -22,13 +22,13 @@ function makeHmrContext(filePath: string): HmrContext {
   } as unknown as HmrContext;
 }
 
-function successResult(beanCount: number, warnings: string[] = []) {
+function successResult(componentCount: number, warnings: string[] = []) {
   return {
     success: true as const,
     result: {
       code: '// generated',
       outputPath: '/project/src/AppContext.generated.ts',
-      components: Array.from({ length: beanCount }, (_, i) => ({
+      components: Array.from({ length: componentCount }, (_, i) => ({
         id: `Component${i}`,
       })),
       warnings,
@@ -116,7 +116,7 @@ describe('diPlugin', () => {
   });
 
   describe('buildStart', () => {
-    it('logs bean count on success', async () => {
+    it('logs component count on success', async () => {
       const plugin = setupPlugin();
       mockRunRebuild.mockResolvedValue(successResult(5));
 
@@ -129,12 +129,14 @@ describe('diPlugin', () => {
 
     it('logs warnings on success', async () => {
       const plugin = setupPlugin();
-      mockRunRebuild.mockResolvedValue(successResult(1, ['Unused bean: Foo']));
+      mockRunRebuild.mockResolvedValue(
+        successResult(1, ['Unused component: Foo']),
+      );
 
       await plugin.buildStart();
 
       expect(console.warn).toHaveBeenCalledWith(
-        '[goodie] Warning: Unused bean: Foo',
+        '[goodie] Warning: Unused component: Foo',
       );
     });
 
