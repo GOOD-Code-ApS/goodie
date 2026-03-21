@@ -49,6 +49,11 @@ export const generate = defineCommand({
       description:
         'Comma-separated npm scopes to scan for library components (e.g. "@goodie-ts,@acme")',
     },
+    'config-dir': {
+      type: 'string',
+      description:
+        'Directory containing JSON config files (default.json, {env}.json) for build-time config inlining',
+    },
     watch: {
       type: 'boolean',
       description: 'Watch for changes and rebuild',
@@ -99,10 +104,14 @@ export const generate = defineCommand({
         process.exitCode = 1;
       }
     } else {
+      const configDir = args['config-dir']
+        ? path.resolve(cwd, args['config-dir'])
+        : undefined;
       const outcome = await runTransform({
         tsConfigPath,
         outputPath,
         scanScopes,
+        configDir,
       });
       logOutcome(outcome);
 
@@ -121,6 +130,8 @@ export const generate = defineCommand({
         watchAndRebuild({
           tsConfigPath,
           outputPath,
+          scanScopes,
+          configDir,
           watchDir,
         });
       }

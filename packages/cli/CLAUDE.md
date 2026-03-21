@@ -15,10 +15,12 @@ CLI tool that wraps `@goodie-ts/transformer` with timing, logging, watch mode, a
 ## CLI Interface
 
 ```
-goodie generate [--tsconfig path] [--output path] [--watch] [--watch-dir path]
+goodie generate [--tsconfig path] [--output path] [--config-dir path] [--scan scopes] [--watch] [--watch-dir path]
 ```
 
-- Defaults: `tsconfig.json` -> `src/AppContext.generated.ts`
+- Defaults: `tsconfig.json` -> `src/__generated__/context.ts`
+- `--config-dir` — directory containing JSON config files (`default.json`, `{env}.json`) for build-time config inlining. Same as the `configDir` option in the Vite plugin.
+- `--scan` — comma-separated npm scopes to scan for library components (e.g. `@goodie-ts,@acme`)
 - `--watch` runs an initial transform, then watches for `.ts` changes
 - `--watch-dir` defaults to cwd (not output dir)
 
