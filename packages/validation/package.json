@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/validation",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Valibot-based validation from ComponentIntrospection for goodie-ts",
   "license": "MIT",
   "type": "module",
