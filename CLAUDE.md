@@ -51,8 +51,8 @@ pnpm clean          # Clean all dist/
 | `packages/testing` | TestContext with component overrides and @MockDefinition |
 | `packages/cache` | In-memory caching — @Cacheable, @CacheEvict, @CachePut |
 | `packages/http` | Abstract HTTP — @Controller, @Get/@Post/etc route decorators, Request\<T\>, Response\<T\>, RouteMetadata, ExceptionHandler, AbstractServerBootstrap, scan-phase transformer plugin |
-| `packages/hono` | Hono adapter — config-driven CORS, EmbeddedServer, ServerConfig, HonoServerBootstrap (library component), runtime helpers (toHonoResponse, buildRequest) |
-| `packages/validation` | Valibot-based validation — @Validated, @Introspected DTOs, constraint decorators, ValiSchemaFactory, ValidationInterceptor, ValiExceptionHandler, transformer plugin |
+| `packages/hono` | Hono adapter — config-driven CORS, EmbeddedServer, ServerConfig, HonoServerBootstrap (library component), runtime helpers (toHonoResponse, extractPathParam, extractBody, etc.) |
+| `packages/validation` | Valibot-based validation — @Validated, @Introspected DTOs, constraint decorators, registerSchema, ValiSchemaFactory, ValidationInterceptor, ValiExceptionHandler, transformer plugin |
 | `packages/kysely` | Kysely integration — abstract KyselyDatabase with per-dialect conditional implementations, @Transactional, @Migration |
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
 | `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |

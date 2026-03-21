@@ -5,6 +5,10 @@ export { HonoServerBootstrap } from './hono-server-bootstrap.js';
 export {
   buildHttpContext,
   corsMiddleware,
+  extractBody,
+  extractPathParam,
+  extractQueryParam,
+  extractQueryParams,
   requestScopeMiddleware,
   toHonoErrorResponse,
   toHonoResponse,

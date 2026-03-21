@@ -88,6 +88,64 @@ export function toHonoErrorResponse(
   return c.json(result.body as object, result.status as ContentfulStatusCode);
 }
 
+// ── Request parameter extraction ────────────────────────────────────────
+// Generated route code calls these instead of c.req.* directly, isolating
+// Hono's Context API behind stable goodie-ts interfaces.
+
+interface CoerceMap {
+  string: string;
+  number: number;
+  boolean: boolean;
+}
+
+type CoerceType = keyof CoerceMap;
+
+/** Extract a path parameter with optional type coercion. */
+export function extractPathParam<T extends CoerceType = 'string'>(
+  c: Context,
+  name: string,
+  type?: T,
+): CoerceMap[T] {
+  return coerce(c.req.param(name), type) as CoerceMap[T];
+}
+
+/** Extract a single query parameter with optional type coercion. */
+export function extractQueryParam<T extends CoerceType = 'string'>(
+  c: Context,
+  name: string,
+  type?: T,
+): CoerceMap[T] | undefined {
+  const raw = c.req.query(name);
+  if (raw === undefined) return undefined;
+  return coerce(raw, type) as CoerceMap[T];
+}
+
+/** Extract all values for a query parameter (array) with optional type coercion. */
+export function extractQueryParams<T extends CoerceType = 'string'>(
+  c: Context,
+  name: string,
+  type?: T,
+): CoerceMap[T][] {
+  const raw = c.req.queries(name) ?? [];
+  return raw.map((v) => coerce(v, type)) as CoerceMap[T][];
+}
+
+/** Parse the JSON request body. */
+export async function extractBody<T = unknown>(c: Context): Promise<T> {
+  return c.req.json() as Promise<T>;
+}
+
+function coerce(value: string, type?: CoerceType): string | number | boolean {
+  switch (type) {
+    case 'number':
+      return Number(value);
+    case 'boolean':
+      return value === 'true';
+    default:
+      return value;
+  }
+}
+
 /** Create CORS middleware. */
 export function corsMiddleware(options?: object) {
   // Cast needed: hono/cors does not export CORSOptions type.

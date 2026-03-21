@@ -40,9 +40,16 @@ export default function createHonoPlugin(): TransformerPlugin {
       const sf = ctx.createSourceFile('routes.ts');
 
       // Imports
+      const honoImports = ['buildHttpContext', 'toHonoResponse'];
+      const needsExtraction = collectParamBindings(controllers);
+      if (needsExtraction.path) honoImports.push('extractPathParam');
+      if (needsExtraction.query) honoImports.push('extractQueryParam');
+      if (needsExtraction.queryArray) honoImports.push('extractQueryParams');
+      if (needsExtraction.body) honoImports.push('extractBody');
+
       sf.addImportDeclaration({
         moduleSpecifier: '@goodie-ts/hono',
-        namedImports: ['buildHttpContext', 'toHonoResponse'],
+        namedImports: honoImports,
       });
 
       const httpImports = [
@@ -241,49 +248,48 @@ function generateParamExtraction(
 ): ParamExtractionResult {
   switch (param.binding) {
     case 'path': {
-      const raw = `c.req.param('${param.name}')`;
-      const coercion = generateCoercion(raw, param.typeName);
-      if (coercion === raw) {
-        return { argExpr: coercion };
+      const typeArg = coerceTypeArg(param.typeName);
+      const call = `extractPathParam(c, '${param.name}'${typeArg})`;
+      if (!typeArg) {
+        return { argExpr: call };
       }
       return {
-        declaration: `const ${param.name} = ${coercion};`,
+        declaration: `const ${param.name} = ${call};`,
         argExpr: param.name,
       };
     }
     case 'query': {
-      if (isArrayType(param.typeName)) {
+      if (param.typeName.endsWith('[]')) {
         const elementType = param.typeName.slice(0, -2);
-        const raw = `c.req.queries('${param.name}') ?? []`;
-        const coercion = generateArrayCoercion(raw, elementType);
+        const typeArg = coerceTypeArg(elementType);
         return {
-          declaration: `const ${param.name} = ${coercion};`,
+          declaration: `const ${param.name} = extractQueryParams(c, '${param.name}'${typeArg});`,
           argExpr: param.name,
         };
       }
-      const raw = `c.req.query('${param.name}')`;
-      const coercion = generateCoercion(raw, param.typeName);
-      if (coercion === raw) {
-        return { argExpr: coercion };
+      const typeArg = coerceTypeArg(param.typeName);
+      const call = `extractQueryParam(c, '${param.name}'${typeArg})`;
+      if (!typeArg) {
+        return { argExpr: call };
       }
       return {
-        declaration: `const ${param.name} = ${coercion};`,
+        declaration: `const ${param.name} = ${call};`,
         argExpr: param.name,
       };
     }
     case 'body': {
+      const typeParam = param.typeImportPath ? `<${param.typeName}>` : '';
       if (hasBodyValidation && param.typeImportPath) {
-        // Body param with known type — parse JSON, then validate via BodyValidator
         const rawVar = `__${param.name}Raw`;
         return {
           declaration:
-            `const ${rawVar} = await c.req.json();\n` +
+            `const ${rawVar} = await extractBody${typeParam}(c);\n` +
             `const ${param.name} = __bodyValidator ? await __bodyValidator.validate(${param.typeName}, ${rawVar}) : ${rawVar};`,
           argExpr: param.name,
         };
       }
       return {
-        declaration: `const ${param.name} = await c.req.json();`,
+        declaration: `const ${param.name} = await extractBody${typeParam}(c);`,
         argExpr: param.name,
       };
     }
@@ -292,28 +298,42 @@ function generateParamExtraction(
   }
 }
 
-function generateCoercion(expr: string, typeName: string): string {
+/** Return the coerce type argument string (e.g. `, 'number'`), or empty for string (default). */
+function coerceTypeArg(typeName: string): string {
   switch (typeName) {
     case 'number':
-      return `Number(${expr})`;
+      return ", 'number'";
     case 'boolean':
-      return `${expr} === 'true'`;
+      return ", 'boolean'";
     default:
-      return expr;
+      return '';
   }
 }
 
-function generateArrayCoercion(expr: string, elementType: string): string {
-  switch (elementType) {
-    case 'number':
-      return `(${expr}).map(Number)`;
-    case 'boolean':
-      return `(${expr}).map((v: string) => v === 'true')`;
-    default:
-      return expr;
-  }
+interface ParamBindings {
+  path: boolean;
+  query: boolean;
+  queryArray: boolean;
+  body: boolean;
 }
 
-function isArrayType(typeName: string): boolean {
-  return typeName.endsWith('[]');
+function collectParamBindings(controllers: ControllerEntry[]): ParamBindings {
+  const result: ParamBindings = {
+    path: false,
+    query: false,
+    queryArray: false,
+    body: false,
+  };
+  for (const { metadata } of controllers) {
+    for (const route of metadata.routes) {
+      for (const param of route.params) {
+        if (param.binding === 'path') result.path = true;
+        else if (param.binding === 'query') {
+          if (param.typeName.endsWith('[]')) result.queryArray = true;
+          else result.query = true;
+        } else if (param.binding === 'body') result.body = true;
+      }
+    }
+  }
+  return result;
 }

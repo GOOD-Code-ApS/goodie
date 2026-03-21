@@ -2,7 +2,7 @@ import type { DecoratorMeta, FieldType, TypeMetadata } from '@goodie-ts/core';
 import { MetadataRegistry, Singleton } from '@goodie-ts/core';
 import type { BaseSchema, GenericSchema } from 'valibot';
 import * as v from 'valibot';
-import { customConstraintRegistry } from './decorators/create-constraint.js';
+import { constraintToActions } from './constraint-actions.js';
 
 /**
  * Builds and caches Valibot schemas from `TypeMetadata` (compile-time introspection).
@@ -37,6 +37,17 @@ export class ValiSchemaFactory {
     schema: GenericSchema,
   ): void {
     ValiSchemaFactory.prebuilt.set(type, schema);
+  }
+
+  /**
+   * Look up a pre-built schema by class name.
+   * Used by `SchemaBuilder` to resolve `reference` fields composably.
+   */
+  static getPrebuiltByName(className: string): GenericSchema | undefined {
+    for (const [ctor, schema] of ValiSchemaFactory.prebuilt) {
+      if (ctor.name === className) return schema;
+    }
+    return undefined;
   }
 
   /** Reset the static schema registry. For testing only. */
@@ -220,49 +231,11 @@ export class ValiSchemaFactory {
     const actions: v.GenericValidation[] = [];
 
     for (const dec of decorators) {
-      const result = this.constraintToActions(dec);
+      const result = constraintToActions(dec);
       if (result) actions.push(...result);
     }
 
     if (actions.length === 0) return schema;
     return v.pipe(schema, ...actions) as GenericSchema;
-  }
-
-  private constraintToActions(
-    dec: DecoratorMeta,
-  ): v.GenericValidation[] | undefined {
-    const val = dec.args.value;
-
-    switch (dec.name) {
-      case 'MinLength':
-        return [v.minLength(val as number)];
-      case 'MaxLength':
-        return [v.maxLength(val as number)];
-      case 'Min':
-        return [v.minValue(val as number)];
-      case 'Max':
-        return [v.maxValue(val as number)];
-      case 'Pattern':
-        return [v.regex(new RegExp(val as string))];
-      case 'NotBlank':
-        return [
-          v.check((s: string) => s.trim().length > 0, 'Must not be blank'),
-        ];
-      case 'Email':
-        return [v.email()];
-      case 'Size': {
-        const min = val as number;
-        const max = dec.args.value2 as number;
-        return [v.minLength(min), v.maxLength(max)];
-      }
-      default: {
-        // Check custom constraint registry
-        const validator = customConstraintRegistry.get(dec.name);
-        if (validator) {
-          return [v.check(validator, `Custom constraint '${dec.name}' failed`)];
-        }
-        return undefined;
-      }
-    }
   }
 }
