@@ -25,9 +25,9 @@ Hono adapter for goodie-ts. Thin I/O bridge between `@goodie-ts/http`'s generic 
 Controller methods use implicit parameter binding. The hono plugin generates per-param extraction code:
 
 - **No params** → `toHonoResponse(c, await ctrl.method())` — calls method with no args
-- **Path params** → `c.req.param('id')` with type coercion (`Number()` for numbers, `=== 'true'` for booleans)
-- **Query params** → `c.req.query('name')` for scalars, `c.req.queries('name')` for arrays
-- **Body params** → `await c.req.json()` (POST/PUT/PATCH only)
+- **Path params** → `extractPathParam(c, 'id')` or `extractPathParam(c, 'id', 'number')` for typed coercion
+- **Query params** → `extractQueryParam(c, 'name')` for scalars, `extractQueryParams(c, 'name')` for arrays, with optional type coercion
+- **Body params** → `await extractBody<DtoType>(c)` (POST/PUT/PATCH only), generic preserves body type
 - **`HttpContext` param** → `buildHttpContext(c)` — read-only request context (headers, cookies, etc.)
 - **`@Status(code)`** → passes `defaultStatus` to `toHonoResponse` for plain return values
 
@@ -55,6 +55,10 @@ No config → no CORS middleware emitted. No `@Cors` decorator — CORS is a ser
 
 Generated code never calls Hono APIs directly. Instead it calls runtime helpers exported from `@goodie-ts/hono`:
 
+- `extractPathParam<T>(c, name, type?)` — extract path param with generic type coercion (`'number'`, `'boolean'`, or default `'string'`)
+- `extractQueryParam<T>(c, name, type?)` — extract single query param with generic type coercion
+- `extractQueryParams<T>(c, name, type?)` — extract all values for a query param (array) with generic type coercion
+- `extractBody<T>(c)` — parse JSON body, generic preserves the DTO type
 - `toHonoResponse(c, result, defaultStatus?)` — translates controller return values to Hono Response. Optional `defaultStatus` from `@Status` decorator. Generic overloads preserve `TypedResponse<T>` for RPC inference.
 - `toHonoErrorResponse(c, result)` — translates `Response<T>` from exception handling to native `Response`. Returns non-generic `Response` to avoid polluting Hono's RPC type inference.
 - `buildHttpContext(c)` — constructs `HttpContext` from Hono Context (read-only: headers, cookies, query, params, url)
