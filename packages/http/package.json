@@ -1,6 +1,6 @@
 {
   "name": "@goodie-ts/http",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Abstract HTTP layer for goodie-ts — controllers, route decorators, Request/Response types",
   "license": "MIT",
   "type": "module",
