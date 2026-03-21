@@ -8,7 +8,8 @@ const projectRoot = path.resolve(__dirname, '..');
 // Tests share a single D1 database without per-test cleanup (no transactional
 // rollback like the hono/postgres example). Test assertions account for
 // cumulative state — ordering matters.
-describe('Cloudflare Workers + D1 Todo API', () => {
+// Skipped in CI — unstable_dev + workerd is unreliable on GitHub Actions runners.
+describe.skipIf(!!process.env.CI)('Cloudflare Workers + D1 Todo API', () => {
   let worker: Unstable_DevWorker;
 
   beforeAll(async () => {
