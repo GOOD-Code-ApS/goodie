@@ -1,0 +1,9 @@
+{
+  "server": {
+    "runtime": "cloudflare"
+  },
+  "datasource": {
+    "dialect": "d1",
+    "binding": "DB"
+  }
+}

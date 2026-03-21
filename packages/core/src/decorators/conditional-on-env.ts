@@ -8,6 +8,12 @@
  * This decorator is a compile-time no-op -- the transformer scans it
  * via AST and the graph builder evaluates the condition.
  *
+ * **Edge runtime limitation:** This decorator reads `process.env` at startup.
+ * On edge runtimes (Cloudflare Workers, Deno Deploy) where environment
+ * bindings are per-request rather than global, `process.env` is empty and
+ * all checks will evaluate as if the variable is undefined.
+ * Use {@link ConditionalOnProperty} with inlined config instead.
+ *
  * @param envVar - The environment variable name to check
  * @param value - Optional expected value
  */

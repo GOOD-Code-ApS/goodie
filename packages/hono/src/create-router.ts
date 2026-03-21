@@ -43,8 +43,22 @@ export function createHonoRouter(ctx: ApplicationContext): Hono {
   });
 
   // Request scope middleware (if any request-scoped components exist)
-  if (definitions.some((d) => d.scope === 'request')) {
+  const requestScopedDefs = definitions.filter((d) => d.scope === 'request');
+  if (requestScopedDefs.length > 0) {
     router.use('*', requestScopeMiddleware());
+
+    // Pre-initialize request-scoped components with async factories or @OnInit
+    // (e.g. D1KyselyDatabase). Without this, scoped proxies would fail because
+    // they resolve synchronously via get(), but async components need getAsync().
+    // Currently only D1KyselyDatabase is request-scoped+async in the framework.
+    // If many sync request-scoped components are added in the future, consider
+    // filtering to only pre-initialize components with async init.
+    router.use('*', async (_c, next) => {
+      for (const def of requestScopedDefs) {
+        await ctx.getAsync(def.token);
+      }
+      await next();
+    });
   }
 
   // CORS middleware from ServerConfig

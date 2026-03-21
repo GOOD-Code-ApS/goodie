@@ -17,8 +17,11 @@ Runs the goodie-ts transformer from the command line. Use it as a standalone cod
 ## Usage
 
 ```bash
-# One-shot generation (defaults: tsconfig.json -> src/AppContext.generated.ts)
+# One-shot generation
 goodie generate
+
+# With library scanning and config inlining
+goodie generate --scan @goodie-ts --config-dir config
 
 # Custom paths
 goodie generate --tsconfig tsconfig.app.json --output src/generated/Context.ts
@@ -35,7 +38,9 @@ goodie generate --watch --watch-dir src
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--tsconfig` | `tsconfig.json` | Path to tsconfig.json |
-| `--output` | `src/AppContext.generated.ts` | Output file path |
+| `--output` | `src/__generated__/context.ts` | Output file path |
+| `--scan` | — | Comma-separated npm scopes to scan for library components (e.g. `@goodie-ts,@acme`) |
+| `--config-dir` | — | Directory containing JSON config files for build-time config inlining |
 | `--watch` | `false` | Watch for changes and rebuild |
 | `--watch-dir` | `.` (cwd) | Directory to watch (recursive) |
 

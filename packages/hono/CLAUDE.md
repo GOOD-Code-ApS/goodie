@@ -110,3 +110,7 @@ function __createCtrlRoutes(ctrl: Ctrl, __exceptionHandlers: ExceptionHandler[])
 - **`deno`** — `Deno.serve()` via `globalThis.Deno`
 
 `HonoServerBootstrap` uses `@ConditionalOnProperty('server.runtime', { havingValue: ['node', 'bun', 'deno'] })` — when `server.runtime` is `'cloudflare'`, the component is excluded at runtime, and users call `createHonoRouter(ctx)` directly.
+
+### Async Request-Scoped Pre-Initialization
+
+`createHonoRouter` automatically pre-initializes all request-scoped components via `getAsync()` at the start of each request, before route handlers execute. This ensures components with async `@OnInit` (e.g. `D1KyselyDatabase` with dynamic imports) are fully initialized before scoped proxies resolve them synchronously via `get()`. Without this, scoped proxies would throw `AsyncComponentNotReadyError`.

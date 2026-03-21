@@ -57,6 +57,7 @@ pnpm clean          # Clean all dist/
 | `packages/logging` | Method logging — @Log, LoggerFactory, MDC |
 | `packages/resilience` | Resilience patterns — @Retryable, @CircuitBreaker, @Timeout |
 | `examples/hono` | Full-stack example with Hono, PostgreSQL, Kysely, TestContainers |
+| `examples/cloudflare-workers` | Minimal Cloudflare Workers example with D1, Wrangler, Miniflare integration tests |
 
 ## Testing
 

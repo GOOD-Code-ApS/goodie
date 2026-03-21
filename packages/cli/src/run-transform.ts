@@ -13,6 +13,7 @@ export interface RunTransformOptions {
   tsConfigPath: string;
   outputPath: string;
   scanScopes?: string[];
+  configDir?: string;
 }
 
 export interface RunTransformLibraryOptions {
@@ -44,6 +45,7 @@ export async function runTransform(
       tsConfigFilePath: options.tsConfigPath,
       outputPath: options.outputPath,
       scanScopes: options.scanScopes,
+      configDir: options.configDir,
     });
     const durationMs = performance.now() - start;
     return { success: true, result, durationMs };

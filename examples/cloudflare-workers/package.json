@@ -1,0 +1,28 @@
+{
+  "name": "@goodie-ts/example-cloudflare-workers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "goodie generate --scan @goodie-ts --config-dir config",
+    "dev": "goodie generate --scan @goodie-ts --config-dir config && goodie generate --scan @goodie-ts --config-dir config --watch & wrangler dev",
+    "predeploy": "goodie generate --scan @goodie-ts --config-dir config",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@goodie-ts/core": "workspace:*",
+    "@goodie-ts/hono": "workspace:*",
+    "@goodie-ts/http": "workspace:*",
+    "@goodie-ts/kysely": "workspace:*",
+    "hono": "^4.7.0",
+    "kysely": "^0.27.0",
+    "kysely-d1": "^0.3.0"
+  },
+  "devDependencies": {
+    "@goodie-ts/cli": "workspace:*",
+    "@goodie-ts/transformer": "workspace:*",
+    "@cloudflare/workers-types": "^4.20250313.0",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.0.0"
+  }
+}
